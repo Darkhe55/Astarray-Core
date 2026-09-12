@@ -13,7 +13,7 @@ export default defineConfig({
         "私有 GUI 包（已迁出）/**",
         "packages/core/src/feedback-process/child-bootstrap.ts",
       ],
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "json-summary"],
       thresholds: {
         lines: 85,
         functions: 85,
