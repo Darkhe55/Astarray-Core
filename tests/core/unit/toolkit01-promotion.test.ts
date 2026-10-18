@@ -56,7 +56,7 @@ describe("TOOLKIT-01-03：推广候选必须去项目化", () => {
 
   it("② 候选体内出现绝对路径 / 项目源码片段 / 凭据 / nonce / 私有记忆 ⇒ 拒绝", () => {
     const cases: Array<Record<string, unknown>> = [
-      { generalLogic: { steps: ["读取 C:\\Users\\someone\\project\\a.ts"] } },
+      { generalLogic: { steps: ["读取 C:\\Users\\<username>\\project\\a.ts"] } },
       { generalLogic: { steps: ["import x from '../project-alpha/src/secret.ts'"] } },
       { generalLogic: { steps: ["curl -H 'Authorization: Bearer sk-live-abcdefghijklmnop'"] } },
       { userPreferences: { authorizationNonce: "once-123" } },
