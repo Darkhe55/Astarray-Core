@@ -661,6 +661,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R26 | `PROJECT-01-04`：**跨项目副本回执按个体过滤**（发现并修复"list --agent 串数据"） | `summarizeCopyReceipts` 增加 `filter`（来源/目标/接收个体）并解析 `receivingAgentInstanceId`； 摘要条目新增该字段（可追溯）；CLI 三个过滤参数同时传入。 反例 `cross-project-copy-receipt-filter.test.ts`（**3 条，修复前 3 红**）； 变异 `cross-project-copy-receipts-ignore-agent-filter` 被拦下 | 低并发全量 `npx vitest run --maxWorkers=2` **493/3635 exit 0** |
 | R27 | `EXP-01 / FOLD-01-03`（判定层）：复用/停用/回退——已停用或未登记版本拒绝、参数 schema 必须一致、 未知副作用与在途实例阻塞回退、回归时停用新版本但**不自动重跑**、停用须记原因并留历史 | 新增 `workflow-fold-lifecycle.ts` + `tests/core/unit/exp01-fold-lifecycle.test.ts`（**7 条**）； 3 条变异体（未知副作用回退／自动重跑／复用停用版本）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **494/3642 exit 0** |
 | R28 | **契约层 SDK 的包级验收**：新增 `verify:contract-sdk`（隔离安装 tarball ⇒ 用已安装包观测 17 项 fail-closed 语义 ⇒ 纯函数判定）| 新增 `scripts/contract-sdk-scenario.mjs`、`scripts/verify-contract-sdk-package.mjs`、 `scripts/lib/contract-sdk-checks.mjs`(+`.test.mjs` 5 条，含"缺观测/空对象/单项退化"必须拒绝)； `npm run test:scripts` **44/44**；对 tarball sha256 `95858fc4…` 实跑 **17/17 判据通过、exit 0** （过程中判据真实抓到一个错误：观测脚本把 `mode` 写成 `working` 而非 `work-whitelist` ⇒ 白名单外被判 working； 修正后 `resting`）| `check` **exit 0**；`npm pack` 269 文件 |
+| R29 | **公开库 UI 边界**（用户决策：只有 CLI 在公开库，TUI+GUI 统一私有库）：新增活规则守卫 + 接缝清点 | 新增 `tests/architecture/public-ui-boundary.test.ts`（3 条）：公开源码里的 UI 引用必须**精确等于钉住白名单** （新增即红）、白名单条目**迁走后必须删除**（否则红，防假通过）、私有 UI 文件不计入公开边界； 实测清点：公开库对 UI 的依赖**只剩 2 条** —— `commands.ts` 的 `gui serve`（静态可解析的动态导入，**待迁**） 与 `cli.tsx` 的 `./cli/tui.js`（可选动态导入，缺失即明确提示并非 0 退出）； **证据**：临时移走 `packages/gui` 后 `tsc --noEmit` **只有 1 条产品错误**（`commands.ts(3983)` 找不到 gui-server）， 移回后文件数不变（4/4）| `typecheck`/`lint` exit 0；该守卫 3/3 |
 
 > **R14 推送状态（如实）**：R13 提交 `c7c45e3a` 在本轮**再次连续 5 次**推送失败（128），`git ls-remote` 探针亦失败
 > ⇒ 远端 SSH 通道持续不可达。按纪律继续累积，下一阶段合并 `c7c45e3a`、R14 提交重试（≤5 次）。
@@ -767,6 +768,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 | 项 | 需要什么 |
 | --- | --- |
 | TUI/GUI 入口（FOLDER-01-03 余项、SECRETARY-01-04、HISTORY-01-03 余项） | UI 代码落点：公开库内 or `astarray-ui` 私有库 |
+| **UI 落点（已决策）** | **2026-10-19 用户决策（分层，正式）**：**只有 CLI 落在公开库（core+CLI）**；**TUI 与 GUI 统一放在私有库 `astarray-ui`**，公开库不含任何 UI 源码。权威副本以 `astarray-ui` 为准；公开库目录内残留的 UI 是**待删除的本地副本**（仅为当前 CLI 的 `gui serve` 类型依赖而存在）。 |
 | `RELOCATE-01-03` 路径解析/恢复门禁**接线** | 在哪一层强制（设计决定） |
 | `OBS` 的 `PERF`/`DIAG` **生产采集接线** | 是否接受采样开销/事件语义（改生产行为） |
 | `EVENT-01` | 验收口径 |
