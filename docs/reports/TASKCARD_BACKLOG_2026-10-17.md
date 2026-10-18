@@ -469,3 +469,17 @@ worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + �
 - **端到端 ✗**（红用例在 `.tmp`）
 - **下一步唯一动作**：读 `main-controller` 构造 `MissionOrchestrator` 的段落，
   查清 `workerFactories` 为何是空对象（是否只在 assist 分支传）。
+### 13.13 第 50 轮收窄：编排器由**工厂**创建，`workerFactories` 可能在工厂里被默认成 `{}`
+
+| 证据 | 内容 |
+| --- | --- |
+| 控制器里 `new MissionOrchestrator(` | **零命中** ⇒ 编排器不是直接 new 的 |
+| 两处 `workerFactories` | `L981`（`contextLifecycleModeKey: "assist"`）与 `L1081`（`"devolve"`）**都存在**，我的 spread 也都在里面 |
+| 但探针实测 | `wfReg=false wfHist=false`（连 G4 的 injector 也没到） |
+
+⇒ **唯一合理结论**：实际运行的编排器**不是**用这两个对象构造的，而是经某个**工厂函数**创建，
+工厂可能在 `workerFactories` 缺省时填 `{}`（或用了另一份参数）。
+
+**下一会话第一步（一条命令即可）**：
+`Select-String -Path packages/core/src/orchestration/*.ts -Pattern "MissionOrchestrator" | Select-String "new |create"` —— 找到工厂，
+在工厂入口打 `[F-1] wf=String(workerFactories)` 探针，即可确定实际传入的是什么。
