@@ -265,6 +265,46 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "lesson-main-agent-write-allowed",
+    targetFile: "packages/core/src/orchestration/lesson-record-contract.ts",
+    find: "  if (input.isMainAgentModel) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/lesson01-record-contract.test.ts"],
+    expectedFailingTestNames: ["⑨ 写入"],
+    rationale:
+      "主 Agent 模型获得写入工具 ⇒ 违反只读角色（卡内硬约束）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-reconstructed-snapshot-accepted",
+    targetFile: "packages/core/src/orchestration/lesson-record-contract.ts",
+    find: '  if (record.snapshotSource !== "runtime") {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/lesson01-record-contract.test.ts"],
+    expectedFailingTestNames: ["③ 配置快照必须取自运行时"],
+    rationale:
+      "允许写总结时重建的配置快照 ⇒ 记录的不是事件发生时的真实配置（结论不可追）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-facts-hypotheses-merge-allowed",
+    targetFile: "packages/core/src/orchestration/lesson-record-contract.ts",
+    find: "  if (hypothesisAsFact !== undefined) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/lesson01-record-contract.test.ts"],
+    expectedFailingTestNames: ["⑤ 事实/假设混写"],
+    rationale:
+      "事实与假设可混写 ⇒ 猜测被当作确定事实（卡内：不得混为确定事实）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-unknown-version-exact-match",
+    targetFile: "packages/core/src/orchestration/lesson-record-contract.ts",
+    find: '  if (hasUnknownVersion) differences.push("model-version-unknown");',
+    replace: "  if (hasUnknownVersion) void 0;",
+    testFiles: ["tests/core/unit/lesson01-record-contract.test.ts"],
+    expectedFailingTestNames: ["④ unknown 必须显式"],
+    rationale:
+      "模型版本未知时仍按精确匹配 ⇒ 未知被当成已知（卡内：未知不得当成精确匹配）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "curation-ignores-scope-expansion",
     targetFile: "packages/core/src/orchestration/curation-plan-contract.ts",
     find: '    changes.push("scope-expanded");',
