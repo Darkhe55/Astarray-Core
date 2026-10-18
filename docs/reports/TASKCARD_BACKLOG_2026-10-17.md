@@ -648,6 +648,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R12 | `EXP-01 / CURATE-01-01`：授权绑定 revision+参数指纹、未授权零自动整理、**本地确定性**重大变更矩阵、未知差异按重大、等待只暂停新方案 | 新增 `curation-plan-contract.ts` + `tests/core/unit/exp01-curation-plan.test.ts`（**9 条**）；4 条变异体（忽略范围扩大／未知差异降级／跳过指纹／连旧方案一起停）均被拦下；SDK 导出 | `check` **482/3546 exit 0**；`coverage` 分支 **85.49% exit 0** |
 | R13 | `LESSON-01-01`：沟通经验记录契约（事件时配置快照、unknown 显式、事实/假设分离、个体归属写入、匹配与自动注入） | 新增 `lesson-record-contract.ts` + `tests/core/unit/lesson01-record-contract.test.ts`（**11 条**）；4 条变异体（主 Agent 可写／接受重建快照／事实假设混写／未知版本按精确匹配）均被拦下；SDK 导出 | `check` **483/3557 exit 0**；`coverage` 分支 **85.54% exit 0** |
 | R14 | `WORKWINDOW-01-01`：工作/休息时段规则（白/黑名单、跨午夜、一次性例外优先、休息优先、项目不可覆盖全局休息）、IANA 时区与 DST、暂停原因分记、恢复六类阻塞、时钟跳变 | 新增 `work-window-contract.ts` + `tests/core/unit/workwindow01-contract.test.ts`（**12 条**）；4 条变异体（休息不再优先／例外不再优先／暂停原因被覆盖／忽略未知副作用）均被拦下；SDK 导出 | `check` **484/3569 exit 0**（首跑 `local-readonly-tools-production-wiring` 后置 EPERM rename 抖动 ⇒ 复跑全绿）；`coverage` 分支 **85.54% exit 0** |
+| R15 | `CLIENT-01 / FOLDER-01-03`（**CLI 侧**，命令名＝用户确认的选项 A）： `astarray folder request / approve / revoke / check`，复用同一判定层/存储层 | 新增 `packages/tui/src/cli/folder-command.ts` + `cli.tsx` 注册； 反例 **10 条**（进程内）+ **4 条**（真实 `dist/cli.js` argv）； 4 条变异体（复检恒成功／approve 非人工确认／接受未知权限／不可登记仍报成功）均被拦下 | `check` **486/3583 exit 0**；`coverage` 分支 **85.54% exit 0** |
 
 > **R14 推送状态（如实）**：R13 提交 `c7c45e3a` 在本轮**再次连续 5 次**推送失败（128），`git ls-remote` 探针亦失败
 > ⇒ 远端 SSH 通道持续不可达。按纪律继续累积，下一阶段合并 `c7c45e3a`、R14 提交重试（≤5 次）。

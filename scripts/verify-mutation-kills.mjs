@@ -265,6 +265,48 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "folder-cli-check-always-succeeds",
+    targetFile: "packages/tui/src/cli/folder-command.ts",
+    find: '  return decision.outcome === "allowed" ? EXIT_CODES.SUCCESS : EXIT_CODES.FAILURE;',
+    replace: "  return EXIT_CODES.SUCCESS;",
+    testFiles: ["tests/tui/unit/folder01-command.test.ts"],
+    expectedFailingTestNames: ["⑥ check"],
+    rationale:
+      "复检拒绝也返回成功 ⇒ 用户以为已授权（fail-open）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "folder-cli-approve-skips-human-confirmation",
+    targetFile: "packages/tui/src/cli/folder-command.ts",
+    find: "    isHumanConfirmed: true,",
+    replace: "    isHumanConfirmed: false,",
+    testFiles: ["tests/tui/unit/folder01-command.test.ts"],
+    expectedFailingTestNames: ["④ approve"],
+    rationale:
+      "approve 不再代表认证用户确认 ⇒ 授权无法落库（或可被非人类路径绕过）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "folder-cli-accepts-unknown-permission",
+    targetFile: "packages/tui/src/cli/folder-command.ts",
+    find: `  if (rawPermission === "read-only" || rawPermission === "read-write") return rawPermission;
+  return null;`,
+    replace: `  if (rawPermission !== undefined) return rawPermission as FolderGrantPermissionKind;
+  return null;`,
+    testFiles: ["tests/tui/unit/folder01-command.test.ts"],
+    expectedFailingTestNames: ["⑩ 取值校验"],
+    rationale:
+      "未知权限值被接受 ⇒ 含糊措辞变成权限（卡内：权限含糊先澄清）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "folder-cli-request-ignores-unacceptable",
+    targetFile: "packages/tui/src/cli/folder-command.ts",
+    find: "  if (hasUnacceptable) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/tui/unit/folder01-command.test.ts"],
+    expectedFailingTestNames: ["③ request"],
+    rationale:
+      "不可登记的候选仍返回成功 ⇒ 用户以为可以批准（且未落库却报成功）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "workwindow-rest-priority-inverted",
     targetFile: "packages/core/src/orchestration/work-window-contract.ts",
     find: `  // 作用域交集：任何作用域命中休息 ⇒ 休息（项目规则不能无声覆盖全局休息）
