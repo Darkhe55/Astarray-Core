@@ -559,3 +559,57 @@ worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + �
 > **未提交他人改动**：工作树原有的 10 个已修改文件（含 `IMPLEMENTATION_PLAN.md` 的
 > `docs/tasks/accepted/` 链接修正、`HANDOFF_2026-09-28.md` 的路径回填等）与全部未跟踪私有 UI
 > **均未暂存**；本轮提交只含 §14.2–14.4 的实际改动。
+
+---
+
+## 15. 第 54 轮（2026-10-18）：**tarball 双进程证据取得** —— 推翻 §13.2 的"未取得"理由
+
+### 15.1 结论先行
+
+| 项 | 结果 |
+| --- | --- |
+| `RELOCATE-01-04` 的 tarball 双进程证据 | **✅ 取得**（此前记为"未取得"） |
+| `HISTORY-01-04` 的 tarball 回溯部分 | **✅ 取得**（资源测量与人工体验仍未做） |
+| 上一轮理由「本机 `npm install` 不生成 `node_modules`」 | **❌ 被实测推翻**：`npm install <tarball>` **41 包 / 5 秒**，`node_modules` 正常 |
+
+### 15.2 可复跑命令与判据
+
+```powershell
+npm pack
+node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exit 0
+```
+
+脚本做了 7 件事（全部是**真实进程**，不是内存桩）：
+隔离安装 → 进程 A 只用已安装包公开出口写登记+运行历史 → **独立进程 B** 用已安装包 CLI
+① 读搬迁状态（`identity-confirmed` / 可加载历史 / **禁止执行** / `只读恢复对账`）
+② 确认**项目根条目数 0**（不自动建目录）
+③ `history list` 列出该 mission
+④ `history show` 含 `tool-call` + `tool-failure`（`permission-denied` 保留）且 `storedEventCount=3`
+⑤ 查看后 `run-history/*.json` **仍为 1**（不重放）
+⑥ 文本输出**无 ANSI/控制序列**
+
+证据文件：`docs/reports/RELOCATE01_04_TARBALL_DUAL_PROCESS_EVIDENCE_2026-10-18.md`。
+
+### 15.3 为此新增的公开出口（最小）
+
+`public-sdk.ts` 增加 `RunHistoryStore` / `resolveRunHistoryFilePath` / `validateRunHistoryDocument`
+与相关类型：宿主若自带写入方，必须与 `history` 读**同一份** schema 与路径规则，
+否则会重演本仓反复出现的"宿主写 A 处、产品读 B 处"漂移。该出口**不授予**任何执行/授权能力。
+
+### 15.4 仍未完成（如实）
+
+| 项 | 阻塞 |
+| --- | --- |
+| `RELOCATE-01-04` 的 TUI/GUI 入口、确认卡人工体验 | UI 属未跟踪私有目录；人工体验只能由用户给 |
+| `RELOCATE-01-04` 跨平台 | 本证据仅 Windows/Node v24.18.0 |
+| `HISTORY-01-03` 的 TUI 面板、GUI 时间线、虚拟列表/搜索/锚点/滚动保持 | 同 UI 落点问题 |
+| `HISTORY-01-04` 资源测量 + 人工体验 | 测量规模与体验结论需独立一片/用户执行 |
+
+### 15.5 下一轮候选
+
+| # | 动作 | 前置 |
+| --- | --- | --- |
+| 1 | `OBS-01 PERF-01-01` 的"开关前后测量"（`PLAN_STATUS` 唯一未覆盖项；`PERF` 采集本身也未接线） | 需先决定是否接线 `perfSampleSink`（改变生产行为） |
+| 2 | `HISTORY-01-04` 资源测量（大量事件 + 超长输出的首次可读延迟/内存上界） | 可本地做，需定规模与设备记录口径 |
+| 3 | TUI/GUI 历史视图（需你先定 UI 代码落点：公开库内 or `astarray-ui` 私有库） | **需用户一句话** |
+| 4 | backlog Tier 3 其余卡逐张判（多数为外部/重型） | 每张先读"未完成"段 |

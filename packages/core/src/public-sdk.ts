@@ -739,6 +739,23 @@ export {
   type RunHistoryTimelineEntry,
   type RunHistoryTimelinePage,
 } from "./orchestration/run-history-view.js";
+/**
+ * HISTORY-01-02/03（2026-10-18）：运行历史的**数据层**（写入方）。
+ *
+ * 公开理由：宿主若自带执行循环/历史写入方，必须用与产品**同一份** schema 与路径规则，
+ * 否则会出现"宿主写 A 处、`history` 读 B 处"的分叉（本仓反复出现过的同类漂移）。
+ * 它**不**授予任何执行/授权能力：只按 mission 标识追加事件。
+ */
+export {
+  RunHistoryStore,
+  resolveRunHistoryFilePath,
+  validateRunHistoryDocument,
+  type RunHistoryAppendOutcome,
+  type RunHistoryDocument,
+  type RunHistoryEvent,
+  type RunHistoryReadOutcome,
+  type RunHistorySegment,
+} from "./orchestration/run-history-store.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,

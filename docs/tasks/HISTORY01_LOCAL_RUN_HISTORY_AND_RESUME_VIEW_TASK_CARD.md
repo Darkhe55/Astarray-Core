@@ -84,7 +84,7 @@
 | HISTORY-01-01 | 审计现有日志/个体存档/恢复视图，冻结事件覆盖矩阵、缺口语义、查询接口和只读权限；不得把隐藏推理当必交付 |
 | HISTORY-01-02 | 最小历史持久化、输出分块、索引、去重和resume分段；崩溃尾部、磁盘满、坏日志、旧schema、重复反馈及读写并发反例 |
 | HISTORY-01-03 | SDK/CLI/TUI/GUI最小历史视图和显示开关；虚拟列表、安全渲染、过滤搜索、锚点和不抢滚动；关闭显示后仍保存 | **公开侧（SDK/CLI）done（2026-10-18）**：`run-history-view.ts` + `history list/show`；安全渲染、过滤、游标分页、三个显示开关、关闭后仍保存均已反例钉住。**TUI/GUI 视图、虚拟列表、搜索、锚点、滚动保持未完成** |
-| HISTORY-01-04 | 公开tarball恢复回溯、资源测量及人工体验；用户能找到旧指令、失败调用、模型说明和恢复原因，查看不重执行工具/不新增模型上下文 |
+| HISTORY-01-04 | 公开tarball恢复回溯、资源测量及人工体验；用户能找到旧指令、失败调用、模型说明和恢复原因，查看不重执行工具/不新增模型上下文 | **tarball 回溯部分 done（2026-10-18）**：`scripts/verify-relocate-tarball-dual-process.mjs` 在隔离安装的 tarball 上用**已安装包 CLI** 读回另一进程写入的运行历史（工具调用 + `permission-denied` 失败原因、`storedEventCount=3`），查看后历史文件数不变（不重放），文本输出无控制序列。**未完成**：资源测量（大规模事件的首次可读延迟/内存）与**人工体验**（卡内 §7.8：不得由自动测试冒充） |
 
 每轮一个检查点，预计超过三小时继续拆分。任务登记及共享文件修改由次级在当前检查点收口后协调，不覆盖其他Agent在途改动。
 
@@ -157,3 +157,18 @@
 | --- | --- | --- |
 | `tests/core/unit/agent-lifecycle-and-memory.test.ts`「两个同级 Agent…记忆完全隔离」失败 | 工作树里有一处**未提交**的改动把 `sourceAgentInstanceId` 记成 `runtimeAgentInstanceId`（等于「去除来源冒充自身记忆」，与该文件注释和 §4 记忆隔离契约直接冲突；也正是变异体 `memory-observation-source-replaced-by-owner` 的注入形态） | 恢复为 `input.sourceAgentInstanceId`（与 HEAD 一致）；该用例 14/14 转绿 |
 | `tests/gui/integration/gui02-04-package-entry.test.ts` 4 条失败 | 分层提交 `d3f01be6` 只把 `tests/gui/**` 写进 `coverage.exclude`、没写进 `test.exclude`，而该文件的验收前提「GUI 必须有公开包入口」已被 `0cf91b24` **刻意移除** | 只排除**这一个已作废的文件**（不整目录排除）；**不改私有用例**。初次整目录排除时 `verify:mutation-kills` 立刻掉了 6 条（GUI-02-03 历史视图守卫全部"存活"）⇒ 已收窄 |
+
+## 10. `HISTORY-01-04` 的 tarball 回溯证据（2026-10-18）
+
+**可复跑**：`npm pack` ⇒ `node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz`（exit 0）。
+
+**实际证明的**（不是"组件存在"，而是**已安装的公开包**里跑通）：
+
+1. 隔离目录 `npm install <tarball>`（41 包）后，**进程 A** 只用 `import { RunHistoryStore } from "astarray"` 写入历史；
+2. **独立进程 B** 用已安装包 CLI：`history list --json` 列出该 mission；`history show --mission … --json`
+   返回 `kinds: ["tool-call","tool-failure"]`、失败原因 `permission-denied` 保留、`storedEventCount: 3`；
+3. **查看不重放**：查看后 `run-history/*.json` 数量仍为 **1**（没有新写入）；
+4. **不新建模型上下文**：CLI 只读查询，无模型/Provider 调用（本脚本不注入任何 Provider 凭据）；
+5. 文本输出**不含** ANSI/控制序列。
+
+**未覆盖**：资源测量（大量事件/超长输出的首次可读延迟与内存上界）与**人工体验** ⇒ 本检查点**不判 done**。
