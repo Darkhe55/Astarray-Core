@@ -54,6 +54,30 @@ export async function executeProjectStatusCommand(
     );
   }
 
+  /**
+   * `relocation` 段：**仅在存在重定位状态时出现**（用户 2026-10-19 决策：可选段、向后兼容）。
+   *
+   * 判定依据：位置登记是**旧格式**（`legacy`）—— 旧格式按卡内纪律**不得自动升级**，
+   * 必须走用户显式关联/对账流程，这正是"有重定位待处理"的时刻。
+   *
+   * 其它情形（`absent` / `valid` / `invalid`）**不加**该段：`invalid` 属于登记损坏，
+   * 已由既有字段（`registrationReadKind` + `requiredUserAction` + `reason`）如实表达，
+   * 不新造语义、不改变既有输出结构。
+   */
+  const relocationSection =
+    description.registrationReadKind === "legacy"
+      ? {
+          registrationReadKind: description.registrationReadKind,
+          classification: description.outcome.classification,
+          isHistoryLoadable: description.outcome.isHistoryLoadable,
+          isExecutionAllowed: description.outcome.isExecutionAllowed,
+          requiredUserAction: description.outcome.requiredUserAction,
+          reason: description.outcome.reason,
+          /** 对账入口提示：命令名与输入形态（不猜历史库，需显式 JSON）。 */
+          reconcileCommandHint: "astarray project reconcile --input <reconcile-input.json> --json",
+        }
+      : null;
+
   const payload = {
     projectIdentifier: input.projectIdentifier,
     currentRootPath: input.currentRootPath,
@@ -63,6 +87,7 @@ export async function executeProjectStatusCommand(
     isExecutionAllowed: description.outcome.isExecutionAllowed,
     requiredUserAction: description.outcome.requiredUserAction,
     reason: description.outcome.reason,
+    ...(relocationSection === null ? {} : { relocation: relocationSection }),
   };
 
   if (input.isJsonOutput) {
