@@ -9,6 +9,11 @@ import {
   executeProjectReconcileCommand,
   executeProjectStatusCommand,
 } from "./cli/project-relocation-command.js";
+// OBS-01（2026-10-19 R38）：性能/诊断的只读查询入口。
+import {
+  executeObsDiagCommand,
+  executeObsPerfCommand,
+} from "./cli/observability-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
   DEFAULT_HISTORY_PAGE_SIZE,
@@ -686,6 +691,83 @@ projectCommand
       isJsonOutput: options.json === true,
     });
   });
+
+const obsCommand = program
+  .command("obs")
+  .description("观测（只读；性能样本与诊断摘要，本地数据，不上传）");
+obsCommand
+  .command("perf")
+  .description("查询性能样本（摘要或明细分页；无样本不等于用量为零）")
+  .option("--since <iso>", "时间窗下界（含）")
+  .option("--until <iso>", "时间窗上界（含）")
+  .option("--detail", "返回明细分页（默认摘要）")
+  .option("--page-size <number>", "每页条数")
+  .option("--cursor <cursor>", "分页游标")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      since?: string;
+      until?: string;
+      detail?: boolean;
+      pageSize?: string;
+      cursor?: string;
+      json?: boolean;
+    }) => {
+      const pageSize = options.pageSize === undefined ? undefined : Number(options.pageSize);
+      if (pageSize !== undefined && (!Number.isInteger(pageSize) || pageSize <= 0)) {
+        process.stderr.write("astarray: --page-size 必须是正整数\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      process.exitCode = await executeObsPerfCommand({
+        stateDirectory: defaultStateDirectory(),
+        ...(options.since === undefined ? {} : { windowStartIso: options.since }),
+        ...(options.until === undefined ? {} : { windowEndIso: options.until }),
+        detailLevel: options.detail === true ? "detail" : "summary",
+        ...(pageSize === undefined ? {} : { pageSize }),
+        ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+obsCommand
+  .command("diag")
+  .description("查询诊断摘要（按指纹聚合；事实与推断分列）")
+  .option("--mission <id>", "限定 mission")
+  .option("--agent <agent-instance-id>", "限定具体个体（不得读取同级记录）")
+  .option("--since <iso>", "时间窗下界（含）")
+  .option("--until <iso>", "时间窗上界（含）")
+  .option("--page-size <number>", "每页分组数")
+  .option("--cursor <cursor>", "分页游标")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      mission?: string;
+      agent?: string;
+      since?: string;
+      until?: string;
+      pageSize?: string;
+      cursor?: string;
+      json?: boolean;
+    }) => {
+      const pageSize = options.pageSize === undefined ? undefined : Number(options.pageSize);
+      if (pageSize !== undefined && (!Number.isInteger(pageSize) || pageSize <= 0)) {
+        process.stderr.write("astarray: --page-size 必须是正整数\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      process.exitCode = await executeObsDiagCommand({
+        stateDirectory: defaultStateDirectory(),
+        ...(options.mission === undefined ? {} : { missionIdentifier: options.mission }),
+        ...(options.agent === undefined ? {} : { sourceAgentInstanceId: options.agent }),
+        ...(options.since === undefined ? {} : { windowStartIso: options.since }),
+        ...(options.until === undefined ? {} : { windowEndIso: options.until }),
+        ...(pageSize === undefined ? {} : { pageSize }),
+        ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
 
 const historyCommand = program
   .command("history")
