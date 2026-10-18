@@ -10,6 +10,7 @@ import { buildToolPublicDocumentation } from "../tools/tool-public-documentation
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import { buildFullDocumentation } from "../tools/tool-documentation-recall.js";
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
+import type { RunHistoryStore } from "./run-history-store.js";
 import { spawnSync } from "node:child_process";
 
 import type {
@@ -65,6 +66,8 @@ export interface OrchestratorWorkerFactories {
   toolDocumentationRegistry?: Record<string, ToolPublicDocumentationRegistryEntry>;
   /** G4（第 282 轮）：工具说明注入器（缺省 ⇒ 不注入）。 */
   toolDocumentationInjector?: ToolDocumentationRecallInjector;
+  /** HISTORY-01-02（第 42 轮）：运行历史存储（缺省 ⇒ 不记录）。 */
+  runHistoryStore?: RunHistoryStore | null;
   runtimeFactory: (
     agentInstanceId: string,
     task: TaskDependencyNode,
@@ -910,6 +913,10 @@ export class MissionOrchestrator {
       ...(this.options.workerFactories.toolDocumentationInjector === undefined
         ? {}
         : { toolDocumentationInjector: this.options.workerFactories.toolDocumentationInjector }),
+      /** HISTORY-01-02（第 42 轮）：运行历史存储透传给 worker。 */
+      ...(this.options.workerFactories.runHistoryStore === undefined
+        ? {}
+        : { runHistoryStore: this.options.workerFactories.runHistoryStore }),
       onEarlyStopDetected: (observation) => {
         this.earlyStopObservationsByTask.set(options.task.id, observation);
         options.onEarlyStopDetected?.(observation);

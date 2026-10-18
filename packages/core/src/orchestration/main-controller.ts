@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
+import type { RunHistoryStore } from "./run-history-store.js";
 import { evaluateMergeReadinessWithProvider } from "./git-merge-readiness.js";
 import type { GitMergeReadinessEvidence } from "./git-merge-readiness.js";
 
@@ -234,6 +235,8 @@ export interface MainControllerOptions {
   toolDocumentationRegistry?: Record<string, ToolPublicDocumentationRegistryEntry>;
   /** G4（第 281 轮）：工具说明注入器（缺省 ⇒ 不注入）。 */
   toolDocumentationInjector?: ToolDocumentationRecallInjector;
+  /** HISTORY-01-02（第 42 轮）：运行历史存储（缺省 ⇒ 不记录）。 */
+  runHistoryStore?: RunHistoryStore | null;
   /**
    * G1 Step 3（2026-11-08 第 264 轮）：**合并证据提供者**（可选）。
    *
@@ -1004,6 +1007,10 @@ export class MainController {
         ...(this.options.toolDocumentationInjector === undefined
           ? {}
           : { toolDocumentationInjector: this.options.toolDocumentationInjector }),
+        /** HISTORY-01-02（第 42 轮）：运行历史存储透传。 */
+        ...(this.options.runHistoryStore === undefined
+          ? {}
+          : { runHistoryStore: this.options.runHistoryStore }),
         // DIAG-01 采集（第 85 轮接线）：缺省 ⇒ 不采集
         ...(this.options.diagnosticEventPort === undefined
           ? {}
