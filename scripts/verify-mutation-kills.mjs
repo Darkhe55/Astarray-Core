@@ -265,6 +265,36 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "docview-filtered-view-writeback-allowed",
+    targetFile: "packages/core/src/orchestration/document-view-contract.ts",
+    find: "      isFullFileWriteBackAllowed: false,",
+    replace: "      isFullFileWriteBackAllowed: true,",
+    testFiles: ["tests/core/unit/docview01-contract.test.ts"],
+    expectedFailingTestNames: ["⑥ 过滤视图"],
+    rationale:
+      "允许用过滤视图覆盖写回原文件 ⇒ 丢失的样式/内容被永久写入（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "docview-scanned-pdf-reported-supported",
+    targetFile: "packages/core/src/orchestration/document-view-contract.ts",
+    find: '  if (input.format === "pdf" && input.isPdfReliablyExtractable === false) {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/docview01-contract.test.ts"],
+    expectedFailingTestNames: ["② 能力矩阵"],
+    rationale:
+      "扫描件 PDF 伪报支持 ⇒ 用户以为已完整读取（卡内：不伪报）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "docview-unknown-mode-defaults-content",
+    targetFile: "packages/core/src/orchestration/document-view-contract.ts",
+    find: '  if (rawMode === "content" || rawMode === "structure" || rawMode === "layout") return rawMode;\n  return null;',
+    replace: "  return (rawMode ?? \"content\") as DocumentPresentationMode;",
+    testFiles: ["tests/core/unit/docview01-contract.test.ts"],
+    expectedFailingTestNames: ["① 模式枚举"],
+    rationale:
+      "未知模式被当成有效值 ⇒ 冲突的布尔式参数回来了（卡内要求枚举、未知不猜）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "folder-cli-check-always-succeeds",
     targetFile: "packages/tui/src/cli/folder-command.ts",
     find: '  return decision.outcome === "allowed" ? EXIT_CODES.SUCCESS : EXIT_CODES.FAILURE;',

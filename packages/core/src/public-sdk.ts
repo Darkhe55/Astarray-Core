@@ -953,6 +953,23 @@ export {
   type WorkWindowRule,
   type WorkWindowState,
 } from "./orchestration/work-window-contract.js";
+/**
+ * DOCVIEW-01-01（2026-10-18）：格式适配的内容优先读取（模式枚举、能力矩阵、损失提示、写回禁止）。
+ *
+ * 纯判定：不解析文件、不渲染、不执行宏/脚本、不写回。
+ */
+export {
+  buildDocumentViewReceipt,
+  canWriteBackFromFilteredView,
+  evaluateDocumentViewCapability,
+  listDefaultOmittedCategories,
+  resolveDocumentPresentationMode,
+  shouldReadStyleDetails,
+  type DocumentFormatKind,
+  type DocumentOmittedCategory,
+  type DocumentPresentationMode,
+  type DocumentViewReceiptV1,
+} from "./orchestration/document-view-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
