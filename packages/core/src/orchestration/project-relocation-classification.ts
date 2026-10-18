@@ -65,6 +65,24 @@ function isBlank(value: string | null): boolean {
 }
 
 /**
+ * 共享兜底标识（2026-10-18 第 9 轮审计发现）。
+ *
+ * `application-runtime.ts` 用 `options.projectIdentifier ?? "workspace"` 兜底 ⇒
+ * **所有未显式命名的项目会共享同一个标识 `workspace`**。若把它当作真正的身份，
+ * 冷启动就会把**不同项目**误判为"身份一致"（正是卡内禁止的"同名目录不能单独证明身份"）。
+ *
+ * ⇒ 本判定把该兜底值视为**不可辨识身份**（同"标识缺失"处理，fail-closed）。
+ */
+export const SHARED_FALLBACK_PROJECT_IDENTIFIER = "workspace";
+
+/** 是否为**可辨识**的项目身份标识（非空且不是共享兜底值）。 */
+export function isIdentifiableProjectIdentifier(value: string | null): boolean {
+  if (value === null) return false;
+  const trimmed = value.trim();
+  return trimmed !== "" && trimmed !== SHARED_FALLBACK_PROJECT_IDENTIFIER;
+}
+
+/**
  * 冷启动身份分类。
  *
  * 判定顺序是**刻意的 fail-closed 顺序**：越"不确定"的情况越先返回，避免流到"身份一致"分支。
@@ -85,7 +103,7 @@ export function classifyProjectRelocation(
 
   // ② 完全没有登记（标识与根都缺失）
   if (
-    isBlank(observation.registeredProjectIdentifier) &&
+    !isIdentifiableProjectIdentifier(observation.registeredProjectIdentifier) &&
     isBlank(observation.registeredRootPath)
   ) {
     return {
@@ -98,7 +116,7 @@ export function classifyProjectRelocation(
   }
 
   // ③ 有根但标识缺失 ⇒ 旧格式（不得推断）
-  if (isBlank(observation.registeredProjectIdentifier)) {
+  if (!isIdentifiableProjectIdentifier(observation.registeredProjectIdentifier)) {
     return {
       classification: "identity-missing",
       isHistoryLoadable: false,
@@ -135,7 +153,7 @@ export function classifyProjectRelocation(
   }
 
   // ⑥ 当前根读不到标识 ⇒ 无法验证，不得乐观放行
-  if (isBlank(observation.observedProjectIdentifierAtCurrentRoot)) {
+  if (!isIdentifiableProjectIdentifier(observation.observedProjectIdentifierAtCurrentRoot)) {
     return {
       classification: "identity-missing",
       isHistoryLoadable: false,
