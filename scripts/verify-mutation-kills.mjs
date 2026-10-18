@@ -1690,6 +1690,24 @@ export const MUTATIONS = [
     expectedFailingTestNames: ["③ 正常应用"],
     rationale: "必须先备份后写；跳过备份 ⇒ 顺序反例必须变红",
   },
+  {
+    mutationIdentifier: "relocate-path-resolution-ignores-whitelist",
+    targetFile: "packages/core/src/orchestration/project-relocation-path-resolution.ts",
+    find: `  if (!input.declaredStructuredResourceKinds.includes(reference.resourceKind)) {`,
+    replace: `  if (false) {`,
+    testFiles: ["tests/core/unit/relocate01-path-resolution.test.ts"],
+    expectedFailingTestNames: ["② 未声明的种类"],
+    rationale: "只有 schema 声明过的结构化资源才可改写；放行全部 ⇒ 未声明种类反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-recovery-replays-completed",
+    targetFile: "packages/core/src/orchestration/project-relocation-recovery-gate.ts",
+    find: `  if (operation.isCompleted) {`,
+    replace: `  if (false) {`,
+    testFiles: ["tests/core/unit/relocate01-recovery-gate.test.ts"],
+    expectedFailingTestNames: ["① 已确认完成"],
+    rationale: "已确认完成的操作绝不重放；放行 ⇒ 重放反例必须变红",
+  },
 ];
 
 function sha256OfFile(filePath) {
