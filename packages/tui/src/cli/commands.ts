@@ -1505,7 +1505,22 @@ export async function executeCrossProjectListCommand(
         ? {}
         : { receivingAgentInstanceId: options.receivingAgentInstanceId }),
     });
-    const copySummary = await summarizeCopyReceipts({ store });
+    const copySummary = await summarizeCopyReceipts({
+      store,
+      // 过滤必须同时作用于**副本回执**：否则 `--agent` 只过滤授权，
+      // 甲的查询仍能看到乙的副本（串数据）。
+      filter: {
+        ...(options.sourceProjectIdentifier === undefined
+          ? {}
+          : { sourceProjectIdentifier: options.sourceProjectIdentifier }),
+        ...(options.targetProjectIdentifier === undefined
+          ? {}
+          : { targetProjectIdentifier: options.targetProjectIdentifier }),
+        ...(options.receivingAgentInstanceId === undefined
+          ? {}
+          : { receivingAgentInstanceId: options.receivingAgentInstanceId }),
+      },
+    });
 
     if (options.isJsonOutput) {
       printJson({
