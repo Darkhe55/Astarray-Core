@@ -152,3 +152,32 @@
    ③多候选同身份 ⇒ 需用户选择；④标识缺失 ⇒ 不伪称成功；⑤`old-project-extra` 不算包含关系。
 3. **只读纪律**：模块不得读文件、不得启动模型、不得改任务状态（由纯函数保证）。
 4. 记录：卡检查点 01 状态 + `PLAN_STATUS` + 本 backlog。
+
+---
+
+## 10. `RELOCATE-01` 阶段成果与基线（2026-10-18，第 8–26 轮）
+
+| 项 | 值 |
+| --- | --- |
+| 检查点 | **01 / 02 / 03 本地可证部分 done**；03 的**只读控制面已接线（SDK 可达）**；04 pending（命令名/输出格式待用户确认） |
+| 模块 | 8 个（分类器、登记 schema、确认状态机、备份/应用、副本身份、路径解析、恢复门禁、登记存储、只读控制器） |
+| 反例 | **65 条** |
+| 拔线验证 | 10 次（每次至少 1 条反例变红） |
+| 变异体 | **69/69 全部拦下** |
+| 全量基线 | `check` **469 文件 / 3420 用例** exit 0；`npm pack` **273 文件**；`verify-package` / `verify-sdk-consumer` exit 0 |
+
+### 10.1 期间被**架构守卫**抓到并修复的真实违规（值得留档）
+
+`tests/architecture/destructive-file-api-guard.test.ts`（T12-05）报：
+`project-location-registration-store.ts: 不在白名单却使用破坏性 API writeFile,rename`
+
+**正解不是加白名单特例**，而是复用已白名单的 `core/src/infra/atomic-json.ts`
+（`writeAtomicJson` + `backupExistingFile`）⇒ 修复后守卫 2/2 通过（`763c6f2`）。
+
+### 10.2 未完成（不得声称 complete）
+
+| 项 | 阻塞 |
+| --- | --- |
+| 检查点 04 的 CLI/TUI 入口 | **命令名与输出字段属产品文案**，需用户确认（我给出 A/B/C 三选项） |
+| tarball 双进程搬迁恢复证据 | 依赖上述 CLI 入口 |
+| 真实设备/跨平台、GUI 确认卡交互 | 只能由用户/平台提供 |
