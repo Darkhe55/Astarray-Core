@@ -1399,6 +1399,13 @@ export interface CopyReceiptSummaryEntry {
   targetProjectIdentifier: string;
   targetResourcePath: string;
   contentHash: string;
+  /**
+   * 接收该副本的**具体同级个体**（由回执所属授权解析而来）。
+   *
+   * `null` = 该副本未限定接收个体（会话级/上层授权）。
+   * 多同级个体必须可追溯、**不串数据**：按个体过滤时这是唯一依据。
+   */
+  receivingAgentInstanceId: string | null;
   isCopyOfExternalSource: true;
   isOriginal: false;
 }
@@ -1408,17 +1415,67 @@ export interface CopyReceiptSummary {
   count: number;
 }
 
+/** 副本摘要过滤条件（与 `cross-project list` 的过滤参数一致）。 */
+export interface CopyReceiptSummaryFilter {
+  sourceProjectIdentifier?: string;
+  targetProjectIdentifier?: string;
+  receivingAgentInstanceId?: string;
+}
+
 /**
  * 副本摘要（公开入口）：**人工可分辨副本与原件**。
- * 只读：仅读已落盘回执，不联网、不写盘。
+ *
+ * **过滤是数据隔离要求**：`cross-project list --agent <id>` 必须只返回该个体的副本，
+ * 否则甲个体能看到乙个体的副本（串数据）。实现上按回执的 `authorizationIdentifier`
+ * 关联授权记录解析 `receivingAgentInstanceId`（回执本身不存个体，保持旧格式兼容）。
+ *
+ * 只读：仅读已落盘回执与授权，不联网、不写盘。
  */
 export async function summarizeCopyReceipts(input: {
   store: CrossProjectAuthorizationStore;
+  filter?: CopyReceiptSummaryFilter;
 }): Promise<CopyReceiptSummary> {
   const receipts = await input.store.listCopyReceipts();
+  const authorizations = await input.store.listAuthorizations({});
+  const receivingAgentByAuthorizationIdentifier = new Map<string, string | null>(
+    authorizations.map((authorization) => [
+      authorization.authorizationIdentifier,
+      authorization.receivingAgentInstanceId ?? null,
+    ]),
+  );
+
+  const filter = input.filter ?? {};
+  const filteredReceipts = receipts
+    .map((receipt) => ({
+      receipt,
+      receivingAgentInstanceId:
+        receivingAgentByAuthorizationIdentifier.get(receipt.authorizationIdentifier) ?? null,
+    }))
+    .filter((entry) => {
+      if (
+        filter.sourceProjectIdentifier !== undefined &&
+        entry.receipt.sourceProjectIdentifier !== filter.sourceProjectIdentifier
+      ) {
+        return false;
+      }
+      if (
+        filter.targetProjectIdentifier !== undefined &&
+        entry.receipt.targetProjectIdentifier !== filter.targetProjectIdentifier
+      ) {
+        return false;
+      }
+      if (
+        filter.receivingAgentInstanceId !== undefined &&
+        entry.receivingAgentInstanceId !== filter.receivingAgentInstanceId
+      ) {
+        return false;
+      }
+      return true;
+    });
+
   return {
-    count: receipts.length,
-    receipts: receipts.map((receipt) => ({
+    count: filteredReceipts.length,
+    receipts: filteredReceipts.map(({ receipt, receivingAgentInstanceId }) => ({
       receiptIdentifier: receipt.receiptIdentifier,
       displayLabel:
         "[副本] " +
@@ -1440,6 +1497,7 @@ export async function summarizeCopyReceipts(input: {
       targetProjectIdentifier: receipt.targetProjectIdentifier,
       targetResourcePath: receipt.targetResourcePath,
       contentHash: receipt.contentHash,
+      receivingAgentInstanceId,
       isCopyOfExternalSource: true,
       isOriginal: false,
     })),
