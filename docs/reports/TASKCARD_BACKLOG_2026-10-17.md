@@ -652,6 +652,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R16 | **5 轮一次全量门禁**：变异全量（115 条）+ 隔离包三项 | — | 变异 **114/115**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed`（未跟踪私有 GUI 用例负载抖动） ⇒ **单独复跑 2/2 被拦下**；`npm pack` **269 文件** sha256 `95c207f6…`； `verify-package` / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
 | R17 | `DOCVIEW-01-01`：内容/结构/布局三模式能力矩阵与**损失提示**（枚举、扫描件不伪报、过滤视图不可写回、缓存隔离、样式详情按任务展开） | 新增 `document-view-contract.ts` + `tests/core/unit/docview01-contract.test.ts`（**8 条**）； 3 条变异体（允许写回／扫描件伪报支持／未知模式当有效）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **487/3591 exit 0**（默认并发抖动用例见 R16 记录） |
 | R18 | `CONFIGCHAT-01-01`：公开设置白名单/来源/作用域/风险矩阵与幂等——秘密不进对话、 文档注入与模型伪造用户拒绝、含糊范围先询问、旧 revision 拒绝、风险修改必须显式确认、 等待安全点不等于已生效 | 新增 `config-chat-contract.ts` + `tests/core/unit/configchat01-contract.test.ts`（**8 条**）； 4 条变异体（来源放行／旧 revision／跳过风险确认／秘密进对话）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **488/3599 exit 0** |
+| R19 | **门禁可复现性**：新增 `npm run check:low-parallel`（`vitest run --maxWorkers=2`）， 并在 `AGENTS.md` 常用命令里登记；用于默认并发下的负载抖动 | `package.json` + `AGENTS.md` | 该脚本实跑 **488/3599 exit 0**（339s）；默认并发抖动证据见 R16 |
 
 > **R14 推送状态（如实）**：R13 提交 `c7c45e3a` 在本轮**再次连续 5 次**推送失败（128），`git ls-remote` 探针亦失败
 > ⇒ 远端 SSH 通道持续不可达。按纪律继续累积，下一阶段合并 `c7c45e3a`、R14 提交重试（≤5 次）。
