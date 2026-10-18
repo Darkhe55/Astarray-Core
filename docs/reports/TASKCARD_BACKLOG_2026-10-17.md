@@ -637,3 +637,28 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R1 | `HISTORY-01-03` 余项：**关键词检索**（纯子串/大小写不敏感/不解释正则/只搜可见事件）+ **稳定证据锚点** `run-history:<mission>#<序号>`；CLI `--search` | `run-history-view.ts`、`history-command.ts`、`cli.tsx`；反例 +4（15+7+13=**35**）；新变异体 `run-history-view-ignores-search-query` | `check` **474/3463 exit 0**；`coverage` 分支 **85.22% exit 0**；单条变异被拦下 |
 | R2 | `HISTORY-01-04` **资源测量**：新增 `scripts/measure-run-history-view.mjs`（父进程落夹具、子进程只测读，避免把夹具垃圾算进内存） | 1k/10k/50k（372 KB/3.7 MB/18.8 MB）⇒ 首页 **1.2/10.0/47.4 ms**、检索 **2.7/25.6/110.7 ms**、rss **+9.4/+153.8/+193.5 MB**；列表 203 mission 一页只读 **20** 文件（12 ms）。报告 `HISTORY01_04_RESOURCE_MEASUREMENT_2026-10-18.md` | 脚本 exit 0（测量，非门禁）；`check` 沿用 R1 结果并在本轮末复跑 |
 | R3 | `CLIENT-01 / FOLDER-01-01`：文件夹授权的**纯判定层**（候选分类、短授权卡、批量逐项、逐段包含、真实路径不一致提示） | 新增 `folder-grant-request.ts` + `tests/core/unit/folder01-grant-request.test.ts`（**13 条**）；3 条变异体（模型代签／父目录放行／前缀包含）均被拦下；SDK 导出 | `check` **475/3476 exit 0**；`coverage` 分支 **85.22% exit 0** |
+| R4 | `CLIENT-01 / FOLDER-01-02`：根登记事务与**执行前复检**（签发先评估、幂等重放、同 ID 异参冲突、陈旧 revision 拒绝、原子写+写前备份、撤销、八类 fail-closed 复检、重启持久化） | 新增 `folder-grant-store.ts` + `tests/core/unit/folder01-grant-store.test.ts`（**14 条**）；3 条变异体（忽略撤销／只读放行写／旧 revision 放行）均被拦下；SDK 导出 | `check` **476/3490 exit 0**；`coverage` 分支 **85.25% exit 0** |
+
+### 16.1 未阻塞队列（2026-10-18 R4 分诊，按可本地验证程度排序）
+
+| 顺序 | 项 | 为什么未阻塞 |
+| --- | --- | --- |
+| 1 | `CLIENT-01 FOLDER-01-03` | SDK 入口已有（判定层+存储层）；差 CLI/TUI/GUI 共用入口与包验收（UI 落点需用户定，但 **CLI 侧可先做**） |
+| 2 | `CLIENT-01 SECRETARY-01-01` | 卡内是"实验开关/同级身份/目录边界/只读报告契约"，纯判定 + 开关，本地可做 |
+| 3 | `EXP01` 的 `FOLD/EXPLORE/CURATE-01-01` | 三个 01 都是契约层（复用契约/问题指纹/授权矩阵），默认关，本地可做 |
+| 4 | `LESSON01` | 沟通记忆的 schema/隔离/有效性状态，本地可做（无外部依赖） |
+| 5 | `2026-10-01` 的 `DOCVIEW/CONFIGCHAT/WORKWINDOW-01-01` | 三个卡的第一检查点都是契约层；默认关，本地可做 |
+| 6 | `PROJECT-01-04` 余项 | 多项目多同级个体经编排器的端到端压力（本地可做，较重） |
+| 7 | `RELIABILITY-01-04` 返修项 | 幂等账目/并发/备份的返修与回归（本地可做） |
+| 8 | `B6R-04b`（TUI 权限组控制面） | 需先定 UI 代码落点 ⇒ 与 §14.5 #3 同一决策 |
+
+### 16.2 明确阻塞（不在本轮推进，等用户/平台）
+
+| 项 | 阻塞原因 |
+| --- | --- |
+| `RELOCATE-01-03` 的路径解析/恢复门禁**产品接线** | 需要设计决定（在哪一层强制） |
+| `OBS` 的 `PERF`/`DIAG` **生产采集接线** | 会改变生产行为（采样开销/事件语义），需用户决定 |
+| `EVENT-01` | 验收口径未定（卡内为 pending，无完成证据口径） |
+| `SUM-01` 人工标注、`TOOLKIT-01` 真实 token 额度 | 只能由用户/平台提供 |
+| `GUI-01-R` / `GUI-02` / `WB-00` 人工体验 | 只能由用户执行 |
+| `SMART-01` / `AR-07` / `B6R-10` / `BRIDGE-01` 的 macOS/Linux 证据 | 本环境无法产生（WSL 已有，macOS 无） |

@@ -779,6 +779,20 @@ export {
   type NormalizedFolderPath,
   type ProjectRootRegistration,
 } from "./orchestration/folder-grant-request.js";
+/**
+ * CLIENT-01 / FOLDER-01-02（2026-10-18）：文件夹授权的**登记存储与执行前复检**。
+ *
+ * 公开理由同 FOLDER-01-01：签发/撤销/复检必须与判定层**同一实现**。
+ * 它只回答"该目录 + 该权限是否被登记批准"，**不**产生工具/安装/模式授权。
+ */
+export {
+  FolderGrantStore,
+  type FolderGrantCollectionV1,
+  type FolderGrantDecision,
+  type FolderGrantIssueOutcome,
+  type FolderGrantReadOutcome,
+  type FolderGrantRecordV1,
+} from "./orchestration/folder-grant-store.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,

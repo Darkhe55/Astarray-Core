@@ -265,6 +265,41 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "folder-grant-store-revocation-ignored",
+    targetFile: "packages/core/src/orchestration/folder-grant-store.ts",
+    find: "      (grant) => !grant.isRevoked && isPathInsideOrEqual(normalizedTarget.comparisonPath, grant.normalizedRootPath),",
+    replace:
+      "      (grant) => isPathInsideOrEqual(normalizedTarget.comparisonPath, grant.normalizedRootPath),",
+    testFiles: ["tests/core/unit/folder01-grant-store.test.ts"],
+    expectedFailingTestNames: ["⑩ 撤销"],
+    rationale:
+      "撤销被忽略 ⇒ 已撤销的目录仍可读（撤销形同虚设）⇒ 撤销反例必须变红",
+  },
+  {
+    mutationIdentifier: "folder-grant-store-write-via-readonly-allowed",
+    targetFile: "packages/core/src/orchestration/folder-grant-store.ts",
+    find: `  if (granted === "read-write") return true;
+  return required === "read-only";`,
+    replace: `  void granted;
+  void required;
+  return true;`,
+    testFiles: ["tests/core/unit/folder01-grant-store.test.ts"],
+    expectedFailingTestNames: ["⑧ 已授权"],
+    rationale: "只读授权放行写操作 ⇒ 目录许可变成写权限（越权）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "folder-grant-store-stale-revision-accepted",
+    targetFile: "packages/core/src/orchestration/folder-grant-store.ts",
+    find: `    const revisionMatched = usable.filter(
+      (grant) => grant.projectRevision === input.projectRevision,
+    );`,
+    replace: `    const revisionMatched = usable;`,
+    testFiles: ["tests/core/unit/folder01-grant-store.test.ts"],
+    expectedFailingTestNames: ["⑪ 过期"],
+    rationale:
+      "项目 revision 前进后旧许可仍有效 ⇒ 变更后的项目沿用旧授权（卡内要求变更即失效）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "folder-grant-model-signature-accepted",
     targetFile: "packages/core/src/orchestration/folder-grant-request.ts",
     find: "  const requiresAuthenticatedUserConfirmation = true;",
