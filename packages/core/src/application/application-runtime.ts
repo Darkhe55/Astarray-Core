@@ -25,6 +25,7 @@ import { PerfEventStore } from "../orchestration/perf-event-store.js";
 import { DiagnosticEventStore } from "../orchestration/diagnostic-event-store.js";
 import { LocalProgressAndCycleGuard } from "../tools/local-progress-and-cycle-guard.js";
 import { TaskCallBudgetLedger } from "../infra/task-call-budget-ledger.js";
+import { RunHistoryStore } from "../orchestration/run-history-store.js";
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import {
   ToolDocumentationRecallInjector,
@@ -1128,6 +1129,13 @@ export async function createApplicationRuntime(
       : undefined;
 
   const controller = new MainController({
+      /**
+       * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
+       *
+       * **默认保存**：卡内要求"关闭显示后仍保存" —— 保存与展示分离，不随视图开关；
+       * 也不与其它特性耦合（此前误放进工具说明的三元里，已移出）。
+       */
+      runHistoryStore: new RunHistoryStore({ baseDirectory: options.stateDirectory }),
     /**
      * G4（第 281 轮）：构造**工具说明注入器**（回执存储落 stateDirectory）+ 透传登记表。
      * 未提供登记表 ⇒ 不构造、不注入（提示词逐字不变）。
