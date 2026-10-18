@@ -709,3 +709,64 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 > `npm pack` 的 prepack（默认并发 check）随后也通过。
 > ⇒ 判定为**默认并发下的负载敏感抖动**，非本次改动缺陷；**未改任何断言/超时**。
 > 建议（留给后续）：为这几个异步完成类用例补显式预算，或把门禁脚本改为低并发运行。
+
+---
+
+## 17. R20 暂停快照（2026-10-18，按用户指示在第 20 轮暂停）
+
+### 17.1 代码与提交
+
+| 项 | 值 |
+| --- | --- |
+| 本地 HEAD | 见 `git rev-parse HEAD`（R1–R20 共 20 轮提交） |
+| 远端 | `origin/main` 可能落后（本快照前后推送多次遇到 `Connection reset … port 22`，按纪律累积重试） |
+| 未推送提交 | 以 `git log --oneline origin/main..HEAD` 为准（不在此硬编码，避免过期） |
+
+### 17.2 本轮窗口交付（R1–R19）
+
+| 类别 | 内容 |
+| --- | --- |
+| 新判定层模块（11 个） | `run-history-view`、`folder-grant-request`、`folder-grant-store`、`folder-grant-command`(CLI)、`secretary-agent-contract`、`secretary-relay-contract`、`secretary-first-start`、`workflow-fold-contract`、`explore-plan-contract`、`curation-plan-contract`、`lesson-record-contract`、`work-window-contract`、`document-view-contract`、`config-chat-contract` |
+| 新永久变异体 | **57 条**（R1–R18），全部逐条验证被拦下 |
+| 新反例 | 约 **150 条**（各模块 8–14 条 + CLI 进程内/argv 两层） |
+| 门禁 | 每次提交前跑定向反例 + 全量测试；R5/R10/R16 跑全量变异 + `npm pack` 三项 |
+
+### 17.3 最近一次基线（R19 实测）
+
+```
+check:low-parallel   488 文件 / 3599 用例   exit 0   （339s，--maxWorkers=2）
+mutation（R16）      114/115 被拦下         唯一"存活"= 未跟踪私有 GUI 用例负载抖动，单跑 2/2 拦下
+npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-sdk-consumer / tarball 双进程 均 exit 0
+```
+
+> **默认并发抖动（已留证据）**：`npm run check` 在默认并发下连续两次失败于**不同**异步用例
+> （`gui-verification-decision`、`g2-guard-positive-path`），两个文件单独复跑均通过；
+> 已新增 `npm run check:low-parallel` 作为可复现门禁（R19），**未改任何断言/超时**。
+
+### 17.4 未阻塞队列（下一轮可直接开工）
+
+| 顺序 | 项 | 说明 |
+| --- | --- | --- |
+| 1 | `EXP-01 / FOLD-01-02` | 候选→组合包→独立验证→注册（契约已在 R9 落地，02 可基于它做） |
+| 2 | `EXP-01 / EXPLORE-01-02` | 有界试验执行/隔离/重启预算不刷新（契约已在 R11） |
+| 3 | `EXP-01 / CURATE-01-02` | 周期增量执行/个体隔离/计划锁（契约已在 R12） |
+| 4 | `PROJECT-01-04` | 多项目多同级个体经编排器的端到端压力 |
+| 5 | `RELIABILITY-01-04` | 幂等账目/并发/备份返修回归（需先复核现状） |
+| 6 | `TOOLKIT-01` 剩余 | 真实 token 消耗等须真实额度项 ⇒ **外部** |
+
+### 17.5 仍待用户决策（推进这些需要一句话）
+
+| 项 | 需要什么 |
+| --- | --- |
+| TUI/GUI 入口（FOLDER-01-03 余项、SECRETARY-01-04、HISTORY-01-03 余项） | UI 代码落点：公开库内 or `astarray-ui` 私有库 |
+| `RELOCATE-01-03` 路径解析/恢复门禁**接线** | 在哪一层强制（设计决定） |
+| `OBS` 的 `PERF`/`DIAG` **生产采集接线** | 是否接受采样开销/事件语义（改生产行为） |
+| `EVENT-01` | 验收口径 |
+| 人工体验 / macOS 证据 / 真实凭据 | 只能由用户或平台提供 |
+
+### 17.6 施工纪律沉淀（本轮新增）
+
+1. **含反引号/多行的文本一律写进 `.mjs` 再执行**（PowerShell 双引号会把反引号当转义符；本轮踩了 3 次）。
+2. **追加表格行要"插入"而不是"替换上一行"**：本轮有 2 次把上一轮的行覆盖掉，均已修复；判定方法是插入后立刻 `Select-String '^\| R'` 数一遍。
+3. **默认并发抖动用 `check:low-parallel`** 取可复现证据；不因此放宽断言。
+4. **未跟踪私有 UI 的守卫不在公开门禁范围内**：出现"存活"先逐条单独复跑，再判定。
