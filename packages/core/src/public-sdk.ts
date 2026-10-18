@@ -1035,6 +1035,25 @@ export {
   type CurationRunLockV1,
   type CurationRunStartDecision,
 } from "./orchestration/curation-execution-contract.js";
+/**
+ * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
+ *
+ * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
+ */
+export {
+  DEFAULT_ONBOARDING_HINT_INTERVAL_DAYS,
+  FIRST_ONBOARDING_HINT_TEXT,
+  applyOnboardingHintOutcome,
+  createOnboardingHintState,
+  describeOnboardingMetadataBoundary,
+  evaluateOnboardingHint,
+  evaluateRecommendationConsent,
+  type OnboardingHintContext,
+  type OnboardingHintDecision,
+  type OnboardingHintOutcome,
+  type OnboardingHintStateV1,
+  type OnboardingTriggerSignals,
+} from "./orchestration/onboarding-hint-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,

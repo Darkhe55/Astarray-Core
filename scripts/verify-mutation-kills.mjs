@@ -265,6 +265,36 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "onboarding-never-show-again-ignored",
+    targetFile: "packages/core/src/orchestration/onboarding-hint-contract.ts",
+    find: "  if (input.state.isNeverShowAgain) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-onboarding-hint.test.ts"],
+    expectedFailingTestNames: ["② 「不再提示」持久化生效"],
+    rationale:
+      "「不再提示」被忽略 ⇒ 用户拒绝后仍反复弹提示（卡内：换文案也不能绕过拒绝）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "onboarding-hint-during-authorization",
+    targetFile: "packages/core/src/orchestration/onboarding-hint-contract.ts",
+    find: "  if (input.context.isAuthorizationPending) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-onboarding-hint.test.ts"],
+    expectedFailingTestNames: ["④ 忙碌类上下文"],
+    rationale:
+      "授权裁决中弹提示 ⇒ 与重要授权卡混排、诱导误点（卡内禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "onboarding-recommendation-implies-authorization",
+    targetFile: "packages/core/src/orchestration/onboarding-hint-contract.ts",
+    find: "    impliesAuthorization: false,",
+    replace: "    impliesAuthorization: true,",
+    testFiles: ["tests/core/unit/client01-onboarding-hint.test.ts"],
+    expectedFailingTestNames: ["⑦ 推荐不构成授权"],
+    rationale:
+      "推荐话术被当成授权 ⇒ 用户只是「了解方案」就被执行/安装 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "curation-run-rest-period-ignored",
     targetFile: "packages/core/src/orchestration/curation-execution-contract.ts",
     find: "  if (input.isRestPeriod) {",
