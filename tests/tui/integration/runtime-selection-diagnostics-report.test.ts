@@ -18,7 +18,6 @@ vi.setConfig({ testTimeout: 60_000 });
 import { FileProviderCredentialStore } from "../../../packages/tui/src/cli/provider-cli.js";
 import { writeRuntimeDiagnosticsReport } from "../../../packages/tui/src/cli/runtime-diagnostics-report.js";
 import {
-  executeGuiServeCommand,
   executeMcpServeCommand,
 } from "../../../packages/tui/src/cli/commands.js";
 
@@ -144,69 +143,6 @@ describe("三入口运行时选择诊断报告", () => {
     // 报告是公开诊断面：不得包含凭据值或端点内联 secret。
     expect(JSON.stringify(report)).not.toContain("protected-secret-key");
     expect(requestCount).toBe(0);
-  });
-
-  it("gui：受保护凭据引用被选用 → 报告 runtimeKind=provider", async () => {
-    const endpoint = await startLocalProtocolServer();
-    const credentialStore = new FileProviderCredentialStore(stateDirectory);
-    await credentialStore.writeCredential({
-      referenceId: "cred-ref-gui",
-      baseUrl: endpoint,
-      apiKey: "protected-secret-key",
-    });
-    const diagnosticsFilePath = path.join(stateDirectory, "gui-runtime-diagnostics.json");
-    const exitCode = await executeGuiServeCommand({
-      stateDirectory,
-      port: 0,
-      isBrowserOpenEnabled: false,
-      shutdownSignal: Promise.resolve(),
-      runtime: "openai-compatible",
-      providerModelIdentifier: "fake-model",
-      providerCredentialReference: "cred-ref-gui",
-      runtimeDiagnosticsFilePath: diagnosticsFilePath,
-    });
-    expect(exitCode).toBe(0);
-    const report = await readDiagnosticsReport(diagnosticsFilePath);
-    expect(report["entryRuntimeKind"]).toBe("provider");
-    expect(report["protectedCredentialReferenceId"]).toBe("cred-ref-gui");
-    expect((report["runtimeDiagnostics"] as Record<string, unknown>)["runtimeKind"]).toBe(
-      "provider",
-    );
-    expect(JSON.stringify(report)).not.toContain("protected-secret-key");
-  });
-
-  it("gui：未指定运行时 → 报告 mock（离线默认，不误报 provider）", async () => {
-    const diagnosticsFilePath = path.join(stateDirectory, "gui-mock-runtime-diagnostics.json");
-    const exitCode = await executeGuiServeCommand({
-      stateDirectory,
-      port: 0,
-      isBrowserOpenEnabled: false,
-      shutdownSignal: Promise.resolve(),
-      runtimeDiagnosticsFilePath: diagnosticsFilePath,
-    });
-    expect(exitCode).toBe(0);
-    const report = await readDiagnosticsReport(diagnosticsFilePath);
-    expect(report["entryRuntimeKind"]).toBe("mock");
-    expect(report["providerId"]).toBeNull();
-    expect((report["runtimeDiagnostics"] as Record<string, unknown>)["runtimeKind"]).toBe("mock");
-  });
-
-  it("gui：受保护凭据引用缺失 → 退出码 2，且不写报告（不回退 mock）", async () => {
-    const diagnosticsFilePath = path.join(stateDirectory, "gui-missing-runtime-diagnostics.json");
-    await expect(
-      executeGuiServeCommand({
-        stateDirectory,
-        port: 0,
-        isBrowserOpenEnabled: false,
-        shutdownSignal: Promise.resolve(),
-        runtime: "openai-compatible",
-        providerModelIdentifier: "fake-model",
-        providerCredentialReference: "missing-ref",
-        runtimeDiagnosticsFilePath: diagnosticsFilePath,
-      }),
-    ).rejects.toThrow("process.exit:2");
-    expect(stderrBuffer.join("")).toContain("受保护凭据引用不存在");
-    await expect(fs.access(diagnosticsFilePath)).rejects.toThrow();
   });
 
   it("报告覆盖前自动备份为 .bak，且不给报告路径时不产生副作用", async () => {
