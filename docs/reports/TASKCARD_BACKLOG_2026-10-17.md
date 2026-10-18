@@ -483,3 +483,21 @@ worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + �
 **下一会话第一步（一条命令即可）**：
 `Select-String -Path packages/core/src/orchestration/*.ts -Pattern "MissionOrchestrator" | Select-String "new |create"` —— 找到工厂，
 在工厂入口打 `[F-1] wf=String(workerFactories)` 探针，即可确定实际传入的是什么。
+### 13.14 `HISTORY-01-02` **闭合**（2026-10-18 第 51–52 轮）
+
+| 项 | 结果 |
+| --- | --- |
+| 根因 | 控制器有**两处** `workerFactories`（assist L981 / devolve L1081），第 42 轮只补了 assist ⇒ devolve 路径（测试走那条）漏了 `runHistoryStore` |
+| 修复 | 两处都补 spread（计数=2）✓ `be573cd` |
+| **端到端** | `history01-run-history-e2e.test.ts`：假 Provider 发 `tool_call` ⇒ 真实 mission ⇒ **`stateDirectory/run-history/*.json` 出现且含 `tool-call` + `factVerification`** ✓ **1/1 绿** |
+| 单元 | `history01-run-history-store.test.ts` **8/8**（去重/分段/坏文件拒绝覆盖/钩子两路径） |
+| 变异 | **69/69** ✓ |
+| 隔离包 | **273 文件** ✓ |
+
+**第 52 轮全量 `check`**：**471 通过 + 1 失败**
+（`sensitive-content-production-wiring` 的 ADR-0018 用例）。
+**该用例单独运行 2/2 通过** ⇒ 属仓库已记录的"间歇性全量门禁抖动"家族（见 `CROSS_CARD_RECONCILIATION` §4），
+**不是本次改动引起**；**如实记录，不宣称全绿**。
+
+**教训（写进纪律）**：`insertAfterLine` 这类"首个匹配"插入，**必须先数目标出现次数**；
+本轮正是靠"两处 `workerFactories`"这个计数发现问题的。
