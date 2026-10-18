@@ -635,3 +635,4 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | 轮 | 内容 | 证据 | 门禁 |
 | --- | --- | --- | --- |
 | R1 | `HISTORY-01-03` 余项：**关键词检索**（纯子串/大小写不敏感/不解释正则/只搜可见事件）+ **稳定证据锚点** `run-history:<mission>#<序号>`；CLI `--search` | `run-history-view.ts`、`history-command.ts`、`cli.tsx`；反例 +4（15+7+13=**35**）；新变异体 `run-history-view-ignores-search-query` | `check` **474/3463 exit 0**；`coverage` 分支 **85.22% exit 0**；单条变异被拦下 |
+| R2 | `HISTORY-01-04` **资源测量**：新增 `scripts/measure-run-history-view.mjs`（父进程落夹具、子进程只测读，避免把夹具垃圾算进内存） | 1k/10k/50k（372 KB/3.7 MB/18.8 MB）⇒ 首页 **1.2/10.0/47.4 ms**、检索 **2.7/25.6/110.7 ms**、rss **+9.4/+153.8/+193.5 MB**；列表 203 mission 一页只读 **20** 文件（12 ms）。报告 `HISTORY01_04_RESOURCE_MEASUREMENT_2026-10-18.md` | 脚本 exit 0（测量，非门禁）；`check` 沿用 R1 结果并在本轮末复跑 |
