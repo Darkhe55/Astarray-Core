@@ -1049,6 +1049,17 @@ export {
   type CurationRunStartDecision,
 } from "./orchestration/curation-execution-contract.js";
 /**
+ * RELOCATE-01-03 接线片（2026-10-19 R31）：冷启动/按需重定位对账判定。
+ *
+ * 纯判定：不读盘、不调模型、不重放操作。
+ */
+export {
+  reconcileProjectRelocation,
+  type ProjectRelocationReconciliation,
+  type RelocationPendingOperationInput,
+  type RelocationProjectStatus,
+} from "./orchestration/project-relocation-reconciler.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
@@ -5290,3 +5301,4 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 export { ProjectRelocationController } from "./orchestration/project-relocation-controller.js";
 export { ProjectLocationRegistrationStore } from "./orchestration/project-location-registration-store.js";
 export { classifyProjectRelocation } from "./orchestration/project-relocation-classification.js";
+
