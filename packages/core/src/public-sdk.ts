@@ -835,6 +835,23 @@ export {
   type SecretaryReportAttachmentV1,
   type SecretaryWorkingMode,
 } from "./orchestration/secretary-relay-contract.js";
+/**
+ * CLIENT-01 / SECRETARY-01-03（2026-10-18）：次日首次启动判定、同日领取与历史收拢契约。
+ *
+ * 纯判定：不读时钟、不写盘、不调模型、不启动服务。时区由 IANA 名称显式给出。
+ */
+export {
+  applyDailyProcessingClaim,
+  buildCollapsedSecretaryView,
+  computeLocalCalendarDate,
+  evaluateSecretaryFirstStartOfDay,
+  type CollapsedSecretaryView,
+  type DailyClaimOutcome,
+  type SecretaryDailyProcessingClaimV1,
+  type SecretaryFirstStartDecision,
+  type SecretarySummaryCategory,
+  type SecretaryViewItem,
+} from "./orchestration/secretary-first-start.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
