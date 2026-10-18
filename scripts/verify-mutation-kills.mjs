@@ -372,6 +372,36 @@ export const MUTATIONS = [
       "重启后无快照却返回 restored（用 null 预算）⇒ 等于重启刷新预算 ⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "fold-lifecycle-rollback-with-unknown-side-effects",
+    targetFile: "packages/core/src/orchestration/workflow-fold-lifecycle.ts",
+    find: "  if (input.hasUnknownSideEffects) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-fold-lifecycle.test.ts"],
+    expectedFailingTestNames: ["⑤ 回退阻塞"],
+    rationale:
+      "有未知副作用仍允许回退 ⇒ 可能以'实验失败'重放非幂等副作用（卡内明令）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "fold-lifecycle-auto-rerun-old-workflow",
+    targetFile: "packages/core/src/orchestration/workflow-fold-lifecycle.ts",
+    find: "    shouldAutoRerunOldWorkflow: false,",
+    replace: "    shouldAutoRerunOldWorkflow: true,",
+    testFiles: ["tests/core/unit/exp01-fold-lifecycle.test.ts"],
+    expectedFailingTestNames: ["⑥ 发现回归"],
+    rationale:
+      "回归后自动重跑旧工作流 ⇒ 卡内明确禁止（可能重复副作用）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "fold-lifecycle-reuse-retired-version",
+    targetFile: "packages/core/src/orchestration/workflow-fold-lifecycle.ts",
+    find: "  if (isRetired) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-fold-lifecycle.test.ts"],
+    expectedFailingTestNames: ["② 停用版本"],
+    rationale:
+      "已停用的版本仍可复用 ⇒ 回归版本继续产生错误输出（卡内：停用新版本）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "fold-package-author-self-verification-accepted",
     targetFile: "packages/core/src/orchestration/workflow-fold-package.ts",
     find: "  if (input.verification.verifierAgentInstanceId === input.authorAgentInstanceId) {",
