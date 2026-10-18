@@ -642,11 +642,20 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R6 | `CLIENT-01 / SECRETARY-01-01`：实验性同级秘书**契约层**（默认关闭、认证用户、工作区边界、能力矩阵、可见列表默认空、任务转交不广播） | 新增 `secretary-agent-contract.ts` + `tests/core/unit/client01-secretary-contract.test.ts`（**9 条**）；3 条变异体（默认开启／源文件读取放行／目标不明当可派发）均被拦下；SDK 导出 | `check` **477/3499 exit 0**；`coverage` 分支 **85.28% exit 0** —— 第一次在覆盖率插桩下 `g5-early-stop-resume ①` 抖动，**单独复跑 2/2 通过**（如实记录，未改断言） |
 | R7 | `CLIENT-01 / SECRETARY-01-02`：项目/汇总模式、**最小报告附件**（来源/项目/revision/时间/哈希）、新鲜度（过期如实给最后更新时间）、任务行键含项目（不串线）、派发幂等/冲突、回执只能前进、同级回派有界 | 新增 `secretary-relay-contract.ts` + `tests/core/unit/client01-secretary-relay.test.ts`（**9 条**）；4 条变异体（串线／重复派发／状态倒退／复制历史）均被拦下；SDK 导出 | `check` **478/3508 exit 0**（首跑 `completion-gate-counterexamples A0` 抖动 ⇒ 单跑 8/8、复跑全绿）；`coverage` **478 文件 / 3508 用例、分支 85.32% exit 0**（首跑 `anthropic-messages-runtime ⑰` 抖动 ⇒ 复跑全绿） |
 | R8 | `CLIENT-01 / SECRETARY-01-03`：次日首次启动判定（IANA 时区/DST）、同日领取排他、历史收拢（收拢不删除、旧未决可见） | 新增 `secretary-first-start.ts` + `tests/core/unit/client01-secretary-first-start.test.ts`（**11 条**）；4 条变异体（忽略离线阈值／重复处理同日／领取不排他／收拢当删除）均被拦下；SDK 导出 | `check` **479/3519 exit 0**；`coverage` 分支 **85.33% exit 0** |
+| R9 | `EXP-01 / FOLD-01-01`：等价折叠的**复用契约**（十项必填候选、明确前置条件、步骤偏序、不可折叠项冻结、副作用参数、版本化登记、回退守卫） | 新增 `workflow-fold-contract.ts` + `tests/core/unit/exp01-fold-contract.test.ts`（**9 条**）；4 条变异体（折入不可折叠项／跳过副作用参数校验／关掉逐步骤授权／复用旧许可）均被拦下；SDK 导出 | `check` **480/3528 exit 0**；`coverage` 分支 **85.39% exit 0** |
 
 > **R5 记一条 harness 可靠性观察（如实）**：`gui0203-views-runtime-state-collapsed` 在**全量**运行里报"存活"、
 > **单独**运行被拦下（且早前全量也曾拦下）。这与本仓已记录的"负载下门禁抖动"同族（GUI 用例会起本地服务）。
 > **处置**：把"存活"条目**逐条单独复跑**作为判定前的必要步骤（本轮已做），不直接据此认定断言空洞；
 > 未改 harness 语义（改判定会掩盖真实缺口）。
+
+> **R9 记一条方法学教训（与 AGENTS 既有第 6 条同源，但更具体）**：用 `node -e` + PowerShell 双引号拼
+> **含反引号**的中文长行时，反引号被 PowerShell 当转义符吃掉 —— 本轮把 `folder-grant-request.ts` 写成
+> `older-grant-request.ts`（吞掉 `f`）、`evaluate()` 写成 `valuate()`。**已就地修复并全文正则复查**（`[^A-Za-z]older-grant` 等零命中）。
+> **纪律**：凡含反引号/多行的文本，**一律写进 `.mjs` 文件再执行**（本轮 `PLAN_STATUS` 的 R6/R7 补救即用此法）。
+
+> **R8 推送失败与恢复（如实）**：`8959beff` 曾连续 5 次 `Connection reset … port 22`（探针 `ls-remote` 有时成功），
+> 按纪律记为跳过；**下一轮（R9）首次重试即成功**（`a0e56c32..8959beff`）。
 
 ### 16.1 未阻塞队列（2026-10-18 R4 分诊，按可本地验证程度排序）
 
@@ -671,3 +680,6 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | `SUM-01` 人工标注、`TOOLKIT-01` 真实 token 额度 | 只能由用户/平台提供 |
 | `GUI-01-R` / `GUI-02` / `WB-00` 人工体验 | 只能由用户执行 |
 | `SMART-01` / `AR-07` / `B6R-10` / `BRIDGE-01` 的 macOS/Linux 证据 | 本环境无法产生（WSL 已有，macOS 无） |
+> **R8 推送状态（如实）**：提交 `8959beff` 已在本地；`git push` **连续 5 次失败**（`Connection reset by 20.205.243.166 port 22`，
+> 探针 `git ls-remote` 有时成功 ⇒ 已知的 SSH 写通道抖动）。按纪律记为本阶段**跳过**，
+> 下一阶段把该提交与后续提交**合并重试**（≤5 次）。

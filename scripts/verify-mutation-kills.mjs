@@ -265,6 +265,48 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "workflow-fold-accepts-non-foldable",
+    targetFile: "packages/core/src/orchestration/workflow-fold-contract.ts",
+    find: "  if (offendingItem !== undefined) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-fold-contract.test.ts"],
+    expectedFailingTestNames: ["④ 不可折叠项"],
+    rationale:
+      "不可折叠项（授权/结果/回执/裁决/nonce/批准指纹）被折进模板 ⇒ 复用上次许可或伪装上次结果 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workflow-fold-skips-side-effect-parameter-schema",
+    targetFile: "packages/core/src/orchestration/workflow-fold-contract.ts",
+    find: `      (parameter.effectKind === "content" || parameter.effectKind === "target") &&
+      (!isNonBlank(parameter.parameterName) || !isNonBlank(parameter.schemaJson)),`,
+    replace: `      (parameter.effectKind === "content" || parameter.effectKind === "target") &&
+      (false),`,
+    testFiles: ["tests/core/unit/exp01-fold-contract.test.ts"],
+    expectedFailingTestNames: ["⑤ 影响副作用的参数"],
+    rationale:
+      "副作用参数不校验名称/schema ⇒ 不同写入内容可能映射成同一授权/幂等身份 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workflow-per-step-authorization-disabled",
+    targetFile: "packages/core/src/orchestration/workflow-fold-contract.ts",
+    find: "      requiresPerStepAuthorization: true,",
+    replace: "      requiresPerStepAuthorization: false,",
+    testFiles: ["tests/core/unit/exp01-fold-contract.test.ts"],
+    expectedFailingTestNames: ["⑦ 登记"],
+    rationale:
+      "外层一次批准即可覆盖展开后的内部步骤 ⇒ 内部安装/外部写入/备份删除被掩盖 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workflow-reuses-previous-authorization",
+    targetFile: "packages/core/src/orchestration/workflow-fold-contract.ts",
+    find: "      reusesPreviousAuthorization: false,",
+    replace: "      reusesPreviousAuthorization: true,",
+    testFiles: ["tests/core/unit/exp01-fold-contract.test.ts"],
+    expectedFailingTestNames: ["⑦ 登记"],
+    rationale:
+      "复用上次操作许可 ⇒ 折叠等于把旧授权带到新调用（卡内：只复用方法，不复用上次许可）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "secretary-first-start-ignores-offline-threshold",
     targetFile: "packages/core/src/orchestration/secretary-first-start.ts",
     find: "  if (offlineDurationMinutes < input.minimumClientClosedDurationMinutes) {",
