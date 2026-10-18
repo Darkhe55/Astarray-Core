@@ -185,3 +185,47 @@
 | 检查点 04 的 CLI/TUI 入口 | **命令名与输出字段属产品文案**，需用户确认（我给出 A/B/C 三选项） |
 | tarball 双进程搬迁恢复证据 | 依赖上述 CLI 入口 |
 | 真实设备/跨平台、GUI 确认卡交互 | 只能由用户/平台提供 |
+
+---
+
+## 11. **全部 42 张卡的状态台账**（2026-10-18，逐卡读第 3 行状态）
+
+### 11.A 已完成（`done`）—— 11 张
+
+`BRIDGE01`（仅缺 macOS/Linux）· `INT00` · `T05D` · `T07D` · `T07D_R1` · `T07D_R2` · `T07E` · `T08C/T07C` · `T08D` · `T09A_R1` · `T12` · `T12A_R1` · `T12A_SESSION`（后两者带**范围纠偏**：历史 done 只到模块级，产品接线见 INT00 报告）· `T09A`（2026-11-08 补记 01–04 完成）
+
+### 11.B 进行中 / 复验中 —— 9 张
+
+| 卡 | 状态原文要点 |
+| --- | --- |
+| `AR07_FINAL_ACCEPTANCE` | `in_progress` |
+| `GUI01_R` | in_progress：01–03、04a done；**04b 仅剩真实人工体验 + Linux/macOS 证据** |
+| `PROJECT01` | in_progress：**已修资源 I/O 接线**；跨项目规则与多项目压力未完成 |
+| `OBS01` | `re-verifying`：已有存储/查询/部分采集，**逐组核对未完成** |
+| `SMART01` | in_progress：02/03 done；04 SDK 入口已接线（2026-10-10） |
+| `SESSION_SUMMARY` | `re-verifying`（SUM-01/02/GUIDE-01）；**真实数据源接线未完成**；SUM-01 标注属外部 |
+| `TOOLKIT01` | **部分实施**（第 40 轮订正） |
+| `COMM01` | 01 done；**02 进行中**（切片① 2026-10-18）；剩余需"协作收件箱"设计决定 |
+| **`RELOCATE01`** | 原 `pending` ⇒ **本会话推进到 01–03 done、03 只读控制面已接线**；04 待 CLI 命名 |
+
+### 11.C 未开始（`pending` / 待执行）—— 16 张
+
+`2026-09-16_INCREMENTAL_DESIGN` · `2026-10-01_RUNTIME_USABILITY`（RELIABILITY-01 in_progress，R4 幂等/并发/备份待返修）· `B6R-04b` · `BATCH6_REPAIR` · `CLIENT01` · `E2E01` · `EXP01` · `GUI_MVP`（由 GUI-01-R 接管）· `GUI02` · `HISTORY01` · `LESSON01` · `WB00` · `B6R-11` · `B6R00` · `T07D00` · `PRODUCT_INTEGRATION_ROLLOUT`
+
+### 11.D 被平台阻塞 —— 1 张
+
+`B6R10_FINAL_ACCEPTANCE`：**未通过（保持）**，证据缺失＝**Linux Node 20/新版本矩阵、macOS Node 20/新版本矩阵** ⇒ 只能由外部提供。
+
+### 11.E 汇总
+
+| 类别 | 张数 |
+| --- | --- |
+| done | 11 |
+| in_progress / re-verifying | 9（其中 1 张由本会话推进） |
+| pending / 待执行 | 16 |
+| 平台阻塞 | 1 |
+| 索引类（README / PRODUCT_INTEGRATION_ROLLOUT） | 2 |
+| **合计** | **42**（含重叠口径，见各卡原文） |
+
+> **口径提醒**：`done` 不等于"产品可用" —— `T07D`/`T12A_SESSION` 都带"历史 done 仅模块级"的纠偏；
+> 本会话推进的 `RELOCATE01` 也是"本地可证部分 done"，且 **04 未做**。
