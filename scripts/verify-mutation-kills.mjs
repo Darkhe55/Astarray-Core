@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "relocate-cli-write-exit-zero",
+    targetFile: "packages/tui/src/cli/project-relocation-command.ts",
+    find: "  return reconciliation.isExecutionAllowed ? EXIT_CODES.SUCCESS : EXIT_CODES.FAILURE;",
+    replace: "  return EXIT_CODES.SUCCESS;",
+    testFiles: ["tests/tui/unit/relocate01-project-reconcile-command.test.ts"],
+    expectedFailingTestNames: ["② 含写/外部副作用"],
+    rationale:
+      "含写/需人工确认也返回 0 ⇒ 脚本会误判为「已恢复」并继续（用户决策：含写必须人工确认）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-cli-blocks-become-success",
+    targetFile: "packages/tui/src/cli/project-relocation-command.ts",
+    find: "      (reference) => reference.wasRewritten,",
+    replace: "      (reference) => false,",
+    testFiles: ["tests/tui/unit/relocate01-project-reconcile-command.test.ts"],
+    expectedFailingTestNames: ["① 只读且解析成功"],
+    rationale:
+      "改写计数恒为 0 ⇒ 报告与实际解析结果不一致（人工据此判断会看错）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "relocate-reconciler-completed-replayed",
     targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
     find: '  if (input.projectStatus === "completed") {',
@@ -2500,6 +2520,8 @@ function main() {
 }
 
 main();
+
+
 
 
 

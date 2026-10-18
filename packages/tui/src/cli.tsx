@@ -5,7 +5,10 @@ import packageMetadata from "../../../package.json" with { type: "json" };
 import { defaultStateDirectory } from "./cli/run-command.js";
 import { executeRunCommand } from "./cli/run-command.js";
 // RELOCATE-01-04（2026-10-18）：冷启动重定位状态只读查询（命令名经用户确认=项目状态）。
-import { executeProjectStatusCommand } from "./cli/project-relocation-command.js";
+import {
+  executeProjectReconcileCommand,
+  executeProjectStatusCommand,
+} from "./cli/project-relocation-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
   DEFAULT_HISTORY_PAGE_SIZE,
@@ -672,6 +675,18 @@ projectCommand
  * 只读：不恢复 mission、不调模型、不注入上下文、**不重放工具**。
  * 显示开关只影响视图 —— 隐藏后事件仍保存在本地（`storedEventCount` 会如实报告）。
  */
+projectCommand
+  .command("reconcile")
+  .description("重定位对账：判断换路径后能否自动恢复（只读；含写需人工确认，不重放已完成操作）")
+  .requiredOption("--input <path>", "对账输入 JSON 文件（显式的项目状态/映射/引用/未决操作）")
+  .option("--json", "JSON 输出")
+  .action(async (options: { input: string; json?: boolean }) => {
+    process.exitCode = await executeProjectReconcileCommand({
+      inputFilePath: options.input,
+      isJsonOutput: options.json === true,
+    });
+  });
+
 const historyCommand = program
   .command("history")
   .description("本地运行历史（只读；分页查看工具调用/失败/过程说明/恢复分界）");
