@@ -4,6 +4,8 @@ import { Command } from "commander";
 import packageMetadata from "../../../package.json" with { type: "json" };
 import { defaultStateDirectory } from "./cli/run-command.js";
 import { executeRunCommand } from "./cli/run-command.js";
+// RELOCATE-01-04（2026-10-18）：冷启动重定位状态只读查询（命令名经用户确认=项目状态）。
+import { executeProjectStatusCommand } from "./cli/project-relocation-command.js";
 import {
   executeCancelCommand,
   executeConfigContextBudgetCommand,
@@ -583,6 +585,38 @@ settingsCommand
 /**
  * PROJECT-01-04：跨项目授权与副本的公开只读入口。
  */
+/**
+ * `project status`：冷启动重定位状态（RELOCATE-01-04）。
+ *
+ * 产品文案（命令名与字段）经用户 2026-10-18 确认。**只读**：不写登记、不执行任务、不启动模型。
+ */
+const projectCommand = program
+  .command("project")
+  .description("项目（只读；冷启动与重定位状态）");
+projectCommand
+  .command("status")
+  .description("查询项目的冷启动状态：能否加载旧历史、能否执行任务、需要用户做什么")
+  .requiredOption("--project <project-id>", "项目标识")
+  .requiredOption("--root <path>", "当前选择的项目根路径")
+  .option("--observed-identifier <id>", "当前根观测到的项目标识（不提供则按无法验证处理）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      project: string;
+      root: string;
+      observedIdentifier?: string;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeProjectStatusCommand({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: options.project,
+        currentRootPath: options.root,
+        observedProjectIdentifier: options.observedIdentifier ?? null,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
 const crossProjectCommand = program
   .command("cross-project")
   .description("跨项目授权与副本（只读；按来源/目标/个体过滤，不串数据）");
