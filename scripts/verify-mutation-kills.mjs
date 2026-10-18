@@ -265,6 +265,16 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "relocate-reconciler-malformed-observation-passes",
+    targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
+    find: "  if (malformedPendingOperations.length > 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/relocate01-reconciler.test.ts"],
+    expectedFailingTestNames: ["⑨ 未决操作观测残缺"],
+    rationale:
+      "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "relocate-reconciler-completed-replayed",
     targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
     find: '  if (input.projectStatus === "completed") {',
@@ -2490,5 +2500,6 @@ function main() {
 }
 
 main();
+
 
 
