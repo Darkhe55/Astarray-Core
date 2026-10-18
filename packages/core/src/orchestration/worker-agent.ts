@@ -37,6 +37,7 @@ import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-
 import { buildFullDocumentation } from "../tools/tool-documentation-recall.js";
 import { renderToolGroupDocumentation } from "../tools/tool-documentation-renderer.js";
 import { runToolLoop } from "../runtime/tool-loop.js";
+import type { RunHistoryStore } from "./run-history-store.js";
 import type {
   GuidanceSafePointPort,
   ToolLoopDiagnosticFailureSink,
@@ -106,6 +107,12 @@ export interface WorkerAgentOptions {
    * 缺省 ⇒ 不采集（与既有"可选能力"口径一致）。
    */
   perfSampleSink?: ToolLoopPerfSampleSink;
+  /**
+   * HISTORY-01-02（2026-10-18 第 41 轮）：运行历史存储。
+   *
+   * 由装配层构造并经 `workerFactories` 透传；**缺省 ⇒ 不记录**（不改变既有行为）。
+   */
+  runHistoryStore?: RunHistoryStore | null;
   /**
    * DIAG-01 采集（2026-11-08，第 85 轮）：诊断失败事件 sink。
    * 同样**由编排层构造**（身份/任务在闭包里补齐），本层只转交工具循环；缺省 ⇒ 不采集。
@@ -502,7 +509,36 @@ export class WorkerAgent {
           if (toolName === "factVerification") {
             this.capturedFactVerificationOutput = outputText;
           }
+          /**
+           * HISTORY-01-02（2026-10-18 第 41 轮）：把**成功工具调用**写进运行历史。
+           * 缺省未提供 store ⇒ 不写（不改变既有行为）。
+           */
+          if (this.options.runHistoryStore !== undefined && this.options.runHistoryStore !== null) {
+            void this.options.runHistoryStore
+              .recordToolCall({
+                missionIdentifier: this.options.missionId,
+                toolName,
+                outputText,
+              })
+              .catch(() => {
+                // 历史观测失败不得阻塞业务
+              });
+          }
           this.options.onToolSucceeded?.(toolName, outputText);
+        },
+        /** HISTORY-01-02（2026-10-18）：失败工具调用也进历史（此前失败分支无出口）。 */
+        onToolFailed: (toolName: string, failureReason: string) => {
+          if (this.options.runHistoryStore !== undefined && this.options.runHistoryStore !== null) {
+            void this.options.runHistoryStore
+              .recordToolFailure({
+                missionIdentifier: this.options.missionId,
+                toolName,
+                failureReason,
+              })
+              .catch(() => {
+                // 历史观测失败不得阻塞业务
+              });
+          }
         },
         ...(this.options.onEarlyStopDetected === undefined
           ? {}
