@@ -12,7 +12,7 @@
 
 不设置 Agent 存活时间或调用次数准入硬门槛；所有个体可以记录，长时/复用个体是主要受益对象。首期不新增专门总结 Agent 或常驻总结服务。
 
-开始编码前完整读取 AGENTS.md 指定的四份治理文档及相关当前 ADR，遵守 [产品接线共同规则](./PRODUCT_INTEGRATION_ROLLOUT.md)。权限以接入时最新有效规则为准，不能从历史任务卡恢复已被替代的安装规则。
+开始编码前完整读取 docs/PRODUCT_BEHAVIOUR_CONTRACT.md 指定的四份治理文档及相关当前 ADR，遵守 [产品接线共同规则](./PRODUCT_INTEGRATION_ROLLOUT.md)。权限以接入时最新有效规则为准，不能从历史任务卡恢复已被替代的安装规则。
 
 ### 避免并行编辑冲突
 
