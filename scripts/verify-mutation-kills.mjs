@@ -1697,6 +1697,24 @@ export const MUTATIONS = [
     expectedFailingTestNames: ["① 已确认完成"],
     rationale: "已确认完成的操作绝不重放；放行 ⇒ 重放反例必须变红",
   },
+  {
+    mutationIdentifier: "relocate-controller-legacy-as-unregistered",
+    targetFile: "packages/core/src/orchestration/project-relocation-controller.ts",
+    find: `        isRegistrationCorrupted: readOutcome.kind === "legacy",`,
+    replace: `        isRegistrationCorrupted: false,`,
+    testFiles: ["tests/core/integration/relocate01-readonly-controller.test.ts"],
+    expectedFailingTestNames: ["④ 旧格式登记"],
+    rationale: "旧格式登记必须走旧格式流程而不是记为未登记；退化 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-store-corrupt-as-absent",
+    targetFile: "packages/core/src/orchestration/project-location-registration-store.ts",
+    find: `      return { kind: "invalid", reason: "登记文件不是合法 JSON；需按待恢复处理，不伪称验证成功。" };`,
+    replace: `      return { kind: "absent", reason: "MUTANT：坏 JSON 当作未登记" };`,
+    testFiles: ["tests/core/unit/relocate01-registration-store.test.ts"],
+    expectedFailingTestNames: ["④ 登记文件是坏 JSON"],
+    rationale: "坏 JSON 必须如实报 invalid；当作 absent ⇒ 该反例必须变红",
+  },
 ];
 
 function sha256OfFile(filePath) {
