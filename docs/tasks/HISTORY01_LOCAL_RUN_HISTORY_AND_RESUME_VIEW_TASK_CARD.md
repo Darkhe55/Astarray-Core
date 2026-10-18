@@ -139,7 +139,9 @@
   （阈值 85%）。**如实记录**：第一版只有子进程用例时 `history-command.ts` 覆盖率是 **0%**
   （v8 不把 `dist` 子进程的执行归属到 `src`）⇒ 全局分支跌到 **84.82% 未过阈值**；
   补 §8.2 的**进程内**用例后回到 85.20%。
-- `verify:mutation-kills` **73/73 被拦下**（含本检查点新增 3 条）。
+- `verify:mutation-kills` **73/73 被拦下**（含本检查点新增 3 条）。**计数口径**：73 = **已提交 72 条**
+  + 工作树里上一会话遗留、**未提交**的 `run-history-drops-dedupe` 1 条（按暂存纪律未提交）
+  ⇒ **干净检出（HEAD）为 72/72**。
 - 隔离包：`npm pack` ⇒ `astarray-0.1.0.tgz`（**269 文件**），
   `verify-package.mjs` exit 0、`verify-sdk-consumer.mjs` exit 0。
 - 顺带修掉两处**基线红灯**（见 §9），并更新 `PLAN_STATUS.md` 与 backlog。
