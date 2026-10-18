@@ -1652,6 +1652,26 @@ export const MUTATIONS = [
     expectedFailingTestNames: ["整组：**末尾必须附固定提醒**（模型据此请求帮助）"],
     rationale: "漏掉提醒 ⇒ 渲染器【末尾提醒】反例必须变红",
   },
+  {
+    mutationIdentifier: "relocate-classification-execution-allowed",
+    targetFile: "packages/core/src/orchestration/project-relocation-classification.ts",
+    find: `    isExecutionAllowed: false,
+    requiredUserAction: "只读恢复对账",`,
+    replace: `    isExecutionAllowed: true,
+    requiredUserAction: "只读恢复对账",`,
+    testFiles: ["tests/core/unit/relocate01-cold-start-classification.test.ts"],
+    expectedFailingTestNames: ["① 路径可访问且身份一致"],
+    rationale: "身份一致也只允许只读对账；若改成允许执行，【加载历史≠批准执行】反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-registration-accepts-unknown-version",
+    targetFile: "packages/core/src/orchestration/project-location-registration.ts",
+    find: `  if (rawSchemaVersion !== 1) {`,
+    replace: `  if (false) {`,
+    testFiles: ["tests/core/unit/relocate01-location-registration.test.ts"],
+    expectedFailingTestNames: ["④ 不认识的 schemaVersion"],
+    rationale: "未知版本必须拒绝；若放行，版本反例必须变红",
+  },
 ];
 
 function sha256OfFile(filePath) {
