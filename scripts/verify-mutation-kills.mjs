@@ -265,6 +265,46 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "configchat-accepts-non-user-source",
+    targetFile: "packages/core/src/orchestration/config-chat-contract.ts",
+    find: '  if (proposal.sourceKind !== "authenticated-user") {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/configchat01-contract.test.ts"],
+    expectedFailingTestNames: ["② 工具输出"],
+    rationale:
+      "工具输出/文档/经验文字可冒充用户设置指令 ⇒ 提示注入改配置（卡内硬禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-ignores-stale-revision",
+    targetFile: "packages/core/src/orchestration/config-chat-contract.ts",
+    find: "  if (proposal.expectedRevision !== proposal.currentRevision) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/configchat01-contract.test.ts"],
+    expectedFailingTestNames: ["④ 旧 revision"],
+    rationale:
+      "旧 revision 仍可写入 ⇒ 覆盖用户随后作出的新修改（卡内：期望 revision 原子提交）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-skips-risk-confirmation",
+    targetFile: "packages/core/src/orchestration/config-chat-contract.ts",
+    find: "  if (riskyKinds.length > 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/configchat01-contract.test.ts"],
+    expectedFailingTestNames: ["⑤ 风险类别"],
+    rationale:
+      "扩大权限/断连类修改不再显式确认 ⇒ 用户被一次含糊指令改掉权限边界 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-allows-secret-into-chat",
+    targetFile: "packages/core/src/orchestration/config-chat-contract.ts",
+    find: "  if (CHAT_SETTING_SECRET_KEYS.includes(proposal.settingKey)) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/configchat01-contract.test.ts"],
+    expectedFailingTestNames: ["① 秘密类设置"],
+    rationale:
+      "秘密类设置进入对话 ⇒ 凭据会写入对话/历史（卡内：必须走受保护入口）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "docview-filtered-view-writeback-allowed",
     targetFile: "packages/core/src/orchestration/document-view-contract.ts",
     find: "      isFullFileWriteBackAllowed: false,",
