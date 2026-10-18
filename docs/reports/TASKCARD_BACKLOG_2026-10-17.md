@@ -261,3 +261,25 @@ npm pack 273 文件             exit 0；两项 verify exit 0
 4. **未跟踪的新文件不能靠 `git checkout` 回退**，用文本恢复；
 5. **破坏性文件 API 必须用白名单模块**（`infra/atomic-json`），否则 T12-05 架构守卫会红；
 6. **PowerShell 拼多行代码必丢换行**，一律用 Node + `'\n'.join`。
+
+---
+
+## 13. `RELOCATE-01-04` 进展（2026-10-18 第 32–33 轮）
+
+### 13.1 已完成
+
+| 项 | 证据 |
+| --- | --- |
+| **CLI 入口 `project status`**（命令名经用户确认＝选项 A） | `packages/tui/src/cli/project-relocation-command.ts` + 在 `cli.tsx` 注册 `project`/`status`（`85a9efb`） |
+| **argv 级实测** | `node dist/cli.js project status --project project-alpha --root "D:/work/alpha" --json` ⇒ `unregistered`、5 字段齐全、exit 0、**未创建任何目录** |
+| 执行器反例 3 条 | 无登记／有效登记+观测一致／**未提供观测 ⇒ identity-missing（fail-closed）** |
+| **双进程证据** | 进程 A 用 `dist/public-sdk.js` 写登记 ⇒ **独立进程 B** 读出 `{kind:"valid", classification:"identity-confirmed", isHistoryLoadable:true, isExecutionAllowed:false}` ✓ |
+| 全量门禁 | `check` **470 文件 / 3423 用例**、变异 **69/69**、包 **273 文件**（均 exit 0） |
+
+### 13.2 未完成（如实）
+
+| 项 | 状态 |
+| --- | --- |
+| **tarball** 双进程搬迁证据 | ⚠️ 尝试过用 tarball 安装做同一证据，但本机 `npm install` 未生成 `node_modules`（沙箱内安装失败）⇒ **用的是仓库 `dist`**，不是隔离包。**不得声称已有 tarball 证据** |
+| TUI / GUI 入口 | 未做（GUI 属外部人工体验） |
+| `--observed-identifier` 的来源 | 目前由调用方提供；项目内标识文件形态由项目自定义，CLI 不假设 |
