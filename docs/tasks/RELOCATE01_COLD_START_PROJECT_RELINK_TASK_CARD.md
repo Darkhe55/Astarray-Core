@@ -1,6 +1,11 @@
 # RELOCATE-01：冷启动项目定位、重新关联与历史恢复
 
-日期：2026-10-17。状态：pending（方案已确认，未实施、未验收）。
+日期：2026-10-17；**状态：in_progress（2026-10-18 更新）**。
+
+> **状态口径（2026-10-18）**：01–03 **本地可证部分 done**（03 的路径解析/恢复门禁**尚未接线**，见该行）；
+> 04 的 **CLI 入口**与 **tarball 双进程证据**均已完成（证据
+> `docs/reports/RELOCATE01_04_TARBALL_DUAL_PROCESS_EVIDENCE_2026-10-18.md`）。
+> **仍未完成**：TUI/GUI 入口、人工体验（确认卡交互）、跨平台证据。**不主张整卡 done。**
 
 **计划状态修改：必须，用户已授权。** 开始、阻塞及交付时更新本卡检查点、`PLAN_STATUS.md` 当前有效表和必要索引。按 `IMPLEMENTATION_PLAN.md` §8.4 保留证据、备份和并行修改；共享文件不能安全修改时提交独立状态补丁，不覆盖他人工作，不虚报 done。
 
@@ -59,7 +64,7 @@
 | RELOCATE-01-01 身份与检测 | **本地可证部分 done（2026-10-18）** | 审计 ID/存储/恢复入口 ✓（发现并修掉共享兜底标识 `workspace` 的身份碰撞）；最小 schema 与旧格式策略 ✓（`project-location-registration.ts`：旧格式不得自动升级、未知版本不得按 v1 解释、模型不得作为确认来源）；冷启动只读分类 ✓（`project-relocation-classification.ts`：5 情况 + 无登记，全部 fail-closed；**加载历史 ≠ 批准执行**）。**共 21 条反例 + 3 次拔线**。**未验**：真实设备/跨平台实测、UI 入口 |
 | RELOCATE-01-02 确认与登记 | **本地可证部分 done（2026-10-18）** | 用户确认 ✓（`project-relocation-confirmation.ts`：`isHumanConfirmed!==true` 直接拒；**模型/自动流程不得代签**，代签优先于 revision 冲突报错）；revision/幂等 ✓（同 revision+同目标 ⇒ `isIdempotentReplay`，revision 不递增；冲突拒绝且**不返回新登记**）；执行前复检 ✓（`identity-mismatch`：null 也拒）；备份/原子 ✓（`project-relocation-apply.ts`：**先备份后写**、写失败回滚旧登记、幂等不重复写、未注入端口 `no-io-port` 拒绝）；副本 ✓（`createCopiedProjectIdentity`：新身份/revision=1/无 previousRootPath/**继承状态全 0**）。**共 16 条反例 + 2 次拔线 + 2 条变异体**。**未验**：真实登记文件读写的崩溃一致性、UI 确认卡交互 | 用户确认、受限候选核验、revision/幂等、备份/原子恢复、副本处理；模型不能自行确认 |
 | RELOCATE-01-03 解析与恢复 | **纯模块 done（2026-10-18）；⚠️ 尚未接线** | 结构化路径解析 ✓（`project-relocation-path-resolution.ts`：种类**由 schema 声明**、绑定项目+设备+revision、重叠/歧义拒绝、保留原请求路径、禁前缀判定）；恢复门禁 ✓（`project-relocation-recovery-gate.ts`：**已完成绝不重放**、旧一次性许可/临时提升不恢复、**新位置必须重检当前权限**、未知非幂等副作用 blocked）。**共 18 条反例 + 2 次拔线 + 2 条变异体**。**⚠️ 未接线**：这两个模块**尚未被门面/装配调用**，故**不主张"路径解析已在产品中生效"**。**未验**：真实历史库上的批量解析、符号链接/敏感路径的现场复检 | 公共结构化路径解析接线、权限复检、未决操作对账；重启不误归属、不盲目重放 |
-| RELOCATE-01-04 入口与包验收 | **CLI 入口已接（本地可证）；tarball/TUI/GUI 未完成** | `project status --project <id> --root <path> [--observed-identifier <id>] [--json]`（命令名经用户 2026-10-18 确认＝选项 A）；argv 级实测 `unregistered` 且**不建目录**；**双进程**：进程 A 写 → 独立进程 B 读出 `identity-confirmed`/可加载历史/**禁止执行**（`85a9efb`）。**未完成**：① **tarball** 双进程证据：本机 `npm install` 不生成 `node_modules`；改**解包直跑**时 `dist` 报 `ERR_MODULE_NOT_FOUND: zod`（tarball 不含依赖，必须真实安装）⇒ 双进程证据用的是**仓库 `dist`**，**不得声称已有 tarball 双进程证据**（隔离包方面已有 `verify-package`/`verify-sdk-consumer` exit 0） ② TUI/GUI 入口 ③ 人工体验 | SDK 侧已可达：`public-sdk.ts` 导出 `ProjectRelocationController` / `ProjectLocationRegistrationStore` / `classifyProjectRelocation`（`6b9ddd2`）；门面级反例 5 条（含"只读不建目录"与"旧格式⇒走旧格式流程"）；变异 69/69。**仍缺**：CLI/TUI 共用入口、tarball 双进程搬迁恢复证据（**命令名与输出格式属产品文案，待用户确认**） | SDK/CLI/TUI/GUI 共用控制面；真实确认入口及 tarball 双进程搬迁恢复证据，各平台范围如实登记 |
+| RELOCATE-01-04 入口与包验收 | **CLI 入口 + tarball 双进程证据 done（本地可证）；TUI/GUI 与人工体验未完成** | `project status --project <id> --root <path> [--observed-identifier <id>] [--json]`（命令名经用户 2026-10-18 确认＝选项 A）；argv 级实测 `unregistered` 且**不建目录**。**✅ tarball 双进程证据已取得（2026-10-18，本轮）**：`node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz` **exit 0** —— 隔离目录 `npm install`（**41 包 / 5 秒**，`node_modules` 正常生成）后，**进程 A** 只用已安装包的公开出口写位置登记与运行历史，**独立进程 B** 用已安装包的 CLI 读出 `identity-confirmed` / `isHistoryLoadable:true` / **`isExecutionAllowed:false`** / `requiredUserAction:"只读恢复对账"`，且**项目根条目数 0**（不自动建目录）、查看历史后 `run-history/*.json` **仍为 1**（不重放）。证据：`docs/reports/RELOCATE01_04_TARBALL_DUAL_PROCESS_EVIDENCE_2026-10-18.md`。**⇒ 上一版"本机 npm install 不生成 node_modules ⇒ 不得声称已有 tarball 证据"的说法已被实测推翻并就地更正**（`verify-sdk-consumer.mjs` 一直在做同样的隔离安装）。**未完成**：① TUI/GUI 入口；② 人工体验（确认卡交互）；③ 跨平台（本证据仅 Windows/Node v24.18.0） | SDK 侧已可达：`public-sdk.ts` 导出 `ProjectRelocationController` / `ProjectLocationRegistrationStore` / `classifyProjectRelocation`（`6b9ddd2`）；门面级反例 5 条（含"只读不建目录"与"旧格式⇒走旧格式流程"）；变异 73/73。**仍缺**：TUI/GUI 共用入口与人工体验 | SDK/CLI/TUI/GUI 共用控制面；真实确认入口及 tarball 双进程搬迁恢复证据，各平台范围如实登记 |
 
 严格 01 → 02 → 03 → 04；每轮一个检查点，预计超过 3 小时先拆子卡。04 可按入口拆分，所有子片完成前父项不标 done。不与工作中迁移、移动端或无关恢复重构合批；等待人工作业时不得代签，可开展已获授权且无依赖的其他工作。
 
