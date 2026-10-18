@@ -6,6 +6,12 @@ import { defaultStateDirectory } from "./cli/run-command.js";
 import { executeRunCommand } from "./cli/run-command.js";
 // RELOCATE-01-04（2026-10-18）：冷启动重定位状态只读查询（命令名经用户确认=项目状态）。
 import { executeProjectStatusCommand } from "./cli/project-relocation-command.js";
+// HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
+import {
+  DEFAULT_HISTORY_PAGE_SIZE,
+  executeHistoryListCommand,
+  executeHistoryShowCommand,
+} from "./cli/history-command.js";
 import {
   executeCancelCommand,
   executeConfigContextBudgetCommand,
@@ -630,6 +636,88 @@ projectCommand
         projectIdentifier: options.project,
         currentRootPath: options.root,
         observedProjectIdentifier: options.observedIdentifier ?? null,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+/**
+ * `history`：本地运行历史的**只读**视图（HISTORY-01-03，2026-10-18）。
+ *
+ * 只读：不恢复 mission、不调模型、不注入上下文、**不重放工具**。
+ * 显示开关只影响视图 —— 隐藏后事件仍保存在本地（`storedEventCount` 会如实报告）。
+ */
+const historyCommand = program
+  .command("history")
+  .description("本地运行历史（只读；分页查看工具调用/失败/过程说明/恢复分界）");
+
+historyCommand
+  .command("list")
+  .description("列出有运行历史的 mission（最近优先，分页）")
+  .option("--page-size <count>", "每页条数", String(DEFAULT_HISTORY_PAGE_SIZE))
+  .option("--page <index>", "页码（0 起）")
+  .option("--after <mission-id>", "游标：只列出该 mission 之后的条目")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      pageSize?: string;
+      page?: string;
+      after?: string;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeHistoryListCommand({
+        stateDirectory: defaultStateDirectory(),
+        ...(options.pageSize === undefined
+          ? {}
+          : { pageSize: Number(options.pageSize) }),
+        ...(options.page === undefined ? {} : { pageIndex: Number(options.page) }),
+        ...(options.after === undefined ? {} : { afterMissionIdentifier: options.after }),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+historyCommand
+  .command("show")
+  .description("查看某个 mission 的运行历史（按游标分页；只读，不重放工具）")
+  .requiredOption("--mission <mission-id>", "mission 标识")
+  .option("--page-size <count>", "每页条数", String(DEFAULT_HISTORY_PAGE_SIZE))
+  .option("--cursor <sequence>", "上一页最后一条的序号")
+  .option(
+    "--kind <kind>",
+    "只显示这些种类（可重复：tool-call/tool-failure/model-note/checkpoint/resume-boundary）",
+    (value: string, previous: string[] | undefined) => [...(previous ?? []), value],
+  )
+  .option("--hide-run-history", "关闭总显示开关（只隐藏，不删除）")
+  .option("--show-process-explanations", "显示过程说明（默认为隐藏）")
+  .option("--hide-tool-calls", "隐藏工具调用（只隐藏，不删除）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      mission: string;
+      pageSize?: string;
+      cursor?: string;
+      kind?: string[];
+      hideRunHistory?: boolean;
+      showProcessExplanations?: boolean;
+      hideToolCalls?: boolean;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeHistoryShowCommand({
+        stateDirectory: defaultStateDirectory(),
+        missionIdentifier: options.mission,
+        ...(options.pageSize === undefined
+          ? {}
+          : { pageSize: Number(options.pageSize) }),
+        ...(options.cursor === undefined ? {} : { cursor: Number(options.cursor) }),
+        ...(options.kind === undefined ? {} : { includedKinds: options.kind }),
+        displaySettings: {
+          ...(options.hideRunHistory === true ? { showRunHistory: false } : {}),
+          ...(options.showProcessExplanations === true
+            ? { showProcessExplanations: true }
+            : {}),
+          ...(options.hideToolCalls === true ? { showToolCalls: false } : {}),
+        },
         isJsonOutput: options.json === true,
       });
     },

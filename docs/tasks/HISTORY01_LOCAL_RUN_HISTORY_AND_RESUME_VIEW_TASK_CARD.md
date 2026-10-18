@@ -1,6 +1,16 @@
 # HISTORY-01：本地运行历史与恢复后回溯界面
 
-日期：2026-10-01；状态 pending，仅设计布置，未实施/验收。
+日期：2026-10-01；**状态：in_progress**（2026-10-18 更新）。
+
+> **状态口径（2026-10-18，逐项如实）**
+> - `HISTORY-01-01`（审计冻结）与 `HISTORY-01-02`（最小持久化 + 端到端写入）**已完成**，
+>   证据见 `docs/reports/TASKCARD_BACKLOG_2026-10-17.md` §13.3/§13.14。
+> - `HISTORY-01-03` **只完成公开侧（SDK + CLI）**：只读查询层、游标分页、种类过滤、
+>   三个显示开关、不可信文本安全渲染、列表只读当前页。**未完成**：TUI 面板、GUI 页面
+>   （GUI 属私有/未跟踪目录，其 mission 列表/详情已由 GUI-02-03 单独交付）、
+>   虚拟列表、关键词搜索、证据锚点、滚动保持。
+> - `HISTORY-01-04` **未开始**（tarball 恢复回溯 + 人工体验，属外部/交付门禁）。
+> - 本卡**不主张整卡通过**；逐条证据见文末 §8。
 
 ## 1. 目标与范围
 
@@ -73,7 +83,7 @@
 |---|---|
 | HISTORY-01-01 | 审计现有日志/个体存档/恢复视图，冻结事件覆盖矩阵、缺口语义、查询接口和只读权限；不得把隐藏推理当必交付 |
 | HISTORY-01-02 | 最小历史持久化、输出分块、索引、去重和resume分段；崩溃尾部、磁盘满、坏日志、旧schema、重复反馈及读写并发反例 |
-| HISTORY-01-03 | SDK/CLI/TUI/GUI最小历史视图和显示开关；虚拟列表、安全渲染、过滤搜索、锚点和不抢滚动；关闭显示后仍保存 |
+| HISTORY-01-03 | SDK/CLI/TUI/GUI最小历史视图和显示开关；虚拟列表、安全渲染、过滤搜索、锚点和不抢滚动；关闭显示后仍保存 | **公开侧（SDK/CLI）done（2026-10-18）**：`run-history-view.ts` + `history list/show`；安全渲染、过滤、游标分页、三个显示开关、关闭后仍保存均已反例钉住。**TUI/GUI 视图、虚拟列表、搜索、锚点、滚动保持未完成** |
 | HISTORY-01-04 | 公开tarball恢复回溯、资源测量及人工体验；用户能找到旧指令、失败调用、模型说明和恢复原因，查看不重执行工具/不新增模型上下文 |
 
 每轮一个检查点，预计超过三小时继续拆分。任务登记及共享文件修改由次级在当前检查点收口后协调，不覆盖其他Agent在途改动。
@@ -92,3 +102,58 @@
 运行定向测试、npm run check、适用安全与状态机覆盖率；交付npm pack、verify-package.mjs、smoke-install.mjs，经公开入口验证。记录提交/dirty基线、命令退出码、平台、包哈希、截图/人工结论和未满足项。未执行平台保留未验证。阶段验收和本地提交后按常设节奏推送；不提交别人的修改。
 
 首期不建设可编辑历史、自动重演工具、完整推理抓取或复杂可视化拓扑。任务索引与状态表由集成者在可安全编辑时更新；本卡pending不代表功能已上线。
+
+## 8. HISTORY-01-03 交付记录（2026-10-18，公开侧）
+
+### 8.1 新增/修改的代码
+
+| 文件 | 作用 |
+| --- | --- |
+| `packages/core/src/orchestration/run-history-view.ts`（新增） | 只读视图层：游标分页、种类过滤、三个显示开关、安全渲染、mission 列表（只读当前页）、`queryRunHistoryTimeline()` |
+| `packages/core/src/orchestration/run-history-store.ts` | 抽出**唯一**路径规则 `resolveRunHistoryFilePath()` 与结构校验 `validateRunHistoryDocument()`（视图层不再复制文件名规则，避免两处漂移） |
+| `packages/core/src/public-sdk.ts` | 公开导出视图层 API（消费者不依赖内部路径） |
+| `packages/tui/src/cli/history-command.ts`（新增） | `history list` / `history show`：分页、`--kind` 过滤、`--hide-run-history` / `--show-process-explanations` / `--hide-tool-calls`、`--json` |
+| `packages/tui/src/cli.tsx` | 注册 `history` 命令与两个子命令 |
+
+### 8.2 反例（先写后实现；**31 条**）
+
+| 文件 | 条数 | 覆盖 |
+| --- | --- | --- |
+| `tests/core/unit/history01-run-history-view.test.ts` | 13 | 跨段序号/段号/标签；游标分页不重复不漏页（含追加后）；关闭工具显示后磁盘仍在；过程说明缺失 vs 隐藏两种文案；总开关关闭仍报计数（隐藏数=全部）；ANSI/OSC/控制字节移除；长详情截断；非法 payload；页大小夹取（含 <1）；空数组种类过滤；`absent`/`invalid` 如实；列表只读本页 + 最近优先 + 损坏条目保留 + 文件名与内部标识不一致不误判；负数页码/未知游标/原始值 payload |
+| `tests/tui/unit/history01-run-history-cli-entry.test.ts` | 6 | 真实 `dist/cli.js` 子进程：`list --json`；`show --json` 默认隐藏过程说明且翻页不重复；`--show-process-explanations`；无历史 ⇒ exit 1；未知 `--kind` ⇒ exit 2；stdout 无 ANSI |
+| `tests/tui/unit/history01-run-history-command.test.ts` | 12 | **进程内**调用命令函数（子进程用例的覆盖率不归属 `src`）：`list` 文本/JSON/空列表/损坏条目/目录不可读；`show` 文本（标签、段号、非法 JSON、截断、游标）、JSON、absent、invalid、读取抛错、总开关关闭；`resolveIncludedKinds` 三态 |
+
+### 8.3 拔线与变异
+
+- **拔线（3 次，手工探针，未入库）**：显示设置不再隐藏（2 条用例变红）、游标被忽略（1 条）、
+  不脱敏（1 条）⇒ 还原后逐字节一致。
+- **永久变异体（3 条，`scripts/verify-mutation-kills.mjs`）**：
+  `run-history-view-ignores-display-settings`、`run-history-view-ignores-cursor`、
+  `run-history-view-skips-display-sanitization` —— 单条复跑**均被拦下**。
+
+### 8.4 门禁（如实）
+
+- `npm run check` **exit 0**：**474 文件 / 3459 用例**全部通过（其中含 30 个私有 GUI 用例文件、
+  仅排除 1 个**前提已作废**的文件，见 §9）。
+- `test:coverage` **exit 0**：行 **92.64%** / 分支 **85.20%** / 函数 **93.33%** / 语句 **92.71%**
+  （阈值 85%）。**如实记录**：第一版只有子进程用例时 `history-command.ts` 覆盖率是 **0%**
+  （v8 不把 `dist` 子进程的执行归属到 `src`）⇒ 全局分支跌到 **84.82% 未过阈值**；
+  补 §8.2 的**进程内**用例后回到 85.20%。
+- `verify:mutation-kills` **73/73 被拦下**（含本检查点新增 3 条）。
+- 隔离包：`npm pack` ⇒ `astarray-0.1.0.tgz`（**269 文件**），
+  `verify-package.mjs` exit 0、`verify-sdk-consumer.mjs` exit 0。
+- 顺带修掉两处**基线红灯**（见 §9），并更新 `PLAN_STATUS.md` 与 backlog。
+
+### 8.5 未完成（不得声称 done 的部分）
+
+1. **TUI 面板**（`packages/tui/src/ui/**` 属未跟踪私有目录，本检查点未改）；
+2. **GUI 页面**：mission 列表/详情已由 GUI-02-03 交付，但**运行历史时间线**在 GUI 尚无视图；
+3. **虚拟列表、关键词搜索、证据锚点、滚动位置保持**（卡内 §4/§5）——未实现，CLI 侧以分页代替；
+4. **`HISTORY-01-04`**：tarball 恢复回溯 + 人工体验，未开始。
+
+## 9. 本轮顺带修复的基线红灯（如实记录，非本卡功能）
+
+| 红灯 | 根因 | 处置 |
+| --- | --- | --- |
+| `tests/core/unit/agent-lifecycle-and-memory.test.ts`「两个同级 Agent…记忆完全隔离」失败 | 工作树里有一处**未提交**的改动把 `sourceAgentInstanceId` 记成 `runtimeAgentInstanceId`（等于「去除来源冒充自身记忆」，与该文件注释和 §4 记忆隔离契约直接冲突；也正是变异体 `memory-observation-source-replaced-by-owner` 的注入形态） | 恢复为 `input.sourceAgentInstanceId`（与 HEAD 一致）；该用例 14/14 转绿 |
+| `tests/gui/integration/gui02-04-package-entry.test.ts` 4 条失败 | 分层提交 `d3f01be6` 只把 `tests/gui/**` 写进 `coverage.exclude`、没写进 `test.exclude`，而该文件的验收前提「GUI 必须有公开包入口」已被 `0cf91b24` **刻意移除** | 只排除**这一个已作废的文件**（不整目录排除）；**不改私有用例**。初次整目录排除时 `verify:mutation-kills` 立刻掉了 6 条（GUI-02-03 历史视图守卫全部"存活"）⇒ 已收窄 |

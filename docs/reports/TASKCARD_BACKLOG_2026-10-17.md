@@ -501,3 +501,61 @@ worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + �
 
 **教训（写进纪律）**：`insertAfterLine` 这类"首个匹配"插入，**必须先数目标出现次数**；
 本轮正是靠"两处 `workerFactories`"这个计数发现问题的。
+
+---
+
+## 14. 第 53 轮（2026-10-18，新会话接手）：HISTORY-01-03 公开侧交付 + 两处基线红灯
+
+### 14.1 开工前的基线核对（如实）
+
+| 检查 | 结果 |
+| --- | --- |
+| `git log/status` | HEAD = `b603ad6f` = `origin/main`；**工作树不干净**：10 个已修改文件 + 未跟踪的私有 UI（`packages/gui/`、`packages/tui/src/ui/`、`tests/gui/` 等）—— 均**非本轮产生**，按纪律**不动、不提交** |
+| `npm run typecheck` / `lint` | exit 0 |
+| `npm run build` | 在沙箱下 `spawn EPERM`（esbuild 需管道 stdio）；改用完整文件权限后 exit 0 |
+| `npm run test` | **2 文件 / 5 用例失败** ⇒ 基线**不是绿的**，先修（见 §14.2）|
+
+### 14.2 两处基线红灯的根因与处置
+
+| 红灯 | 根因 | 处置 |
+| --- | --- | --- |
+| `agent-lifecycle-and-memory.test.ts`（记忆隔离）| 工作树里有一处**未提交**改动把观察的 `sourceAgentInstanceId` 记成 `runtimeAgentInstanceId` —— 等于「去除来源、冒充自身记忆」，与该文件注释及 §4 记忆隔离契约冲突；**恰好就是变异体 `memory-observation-source-replaced-by-owner` 的注入形态** | 恢复为 `input.sourceAgentInstanceId`（回到 HEAD 内容）；14/14 转绿 |
+| `tests/gui/integration/gui02-04-package-entry.test.ts`（4 条）| 分层提交 `d3f01be6` 把 `tests/gui/**` 只写进 `coverage.exclude`，**没写进 `test.exclude`**；该文件的验收前提「GUI 必须有公开包入口」已被 `0cf91b24` **刻意移除** | 只排除**这一个已作废文件**（不整目录排除）：初版整目录排除后 `verify:mutation-kills` 立刻从 73/73 掉到 67/73 —— 6 条 `gui0203-*` 守卫全部"存活" ⇒ **收窄为单文件排除**，6 条恢复被拦下；**不改私有用例** |
+
+### 14.3 HISTORY-01-03 公开侧（SDK + CLI）交付
+
+| 项 | 内容 |
+| --- | --- |
+| 新模块 | `packages/core/src/orchestration/run-history-view.ts`：游标分页、种类过滤、三个显示开关、ANSI/OSC/控制字节移除（留可见占位）、详情截断标记、mission 列表（**只读当前页**）、`queryRunHistoryTimeline()` |
+| 数据层收口 | `run-history-store.ts` 抽出**唯一**路径规则 `resolveRunHistoryFilePath()` 与 `validateRunHistoryDocument()`，视图层不再复制文件名规则 |
+| 公开面 | `public-sdk.ts` 导出视图 API；`astarray history list` / `history show`（`--kind`、`--cursor`、`--page-size`、`--hide-run-history`、`--show-process-explanations`、`--hide-tool-calls`、`--json`） |
+| 反例 | **31 条**（13 视图单测 + 12 进程内命令 + 6 条真实 `dist/cli.js` 子进程） |
+| 拔线 | 3 次手工探针（显示设置/游标/脱敏）均变红，还原逐字节一致 |
+| 永久变异 | 3 条（`run-history-view-ignores-display-settings` / `-ignores-cursor` / `-skips-display-sanitization`），单条复跑**均被拦下** |
+| 全量门禁 | `npm run check` **exit 0：474 文件 / 3459 用例**；`test:coverage` exit 0（行 92.64% / 分支 85.20%）；变异 **73/73 被拦下**；`npm pack` **269 文件** + `verify-package` / `verify-sdk-consumer` 均 exit 0 |
+
+> **覆盖率差点被我弄红（如实记）**：只写"真实子进程"用例时 `history-command.ts` 覆盖率是 **0%**
+> （v8 不把 `dist` 子进程执行归属到 `src`）⇒ 全局分支跌到 **84.82% < 85%**，`test:coverage` exit 1。
+> 补**进程内**调用命令函数的 12 条用例后回到 **85.20%**。⇒ **纪律**：新增 CLI 命令不能只靠子进程用例。
+
+### 14.4 已闭合的状态订正
+
+- `RELOCATE-01-04`：命令名早已经用户确认（选项 A）且 CLI 已入库（`4e43ad48`），
+  但 `PLAN_STATUS` 仍写「04 pending（命令名待确认）」⇒ 已就地订正，并补本轮复跑证据
+  （`project status --json` exit 0、`unregistered`、**未创建目录**）。
+  仍缺：**tarball 双进程证据**、TUI/GUI 入口。
+- `HISTORY-01`：`PLAN_STATUS` 新增独立行（此前该卡无行），口径为
+  「01/02 done；03 公开侧 done；04 未开始」，**不主张整卡通过**。
+
+### 14.5 下一轮可直接开工的候选（按"本地可证"排序）
+
+| # | 动作 | 前置 |
+| --- | --- | --- |
+| 1 | `HISTORY-01-03` 余项：TUI 面板（`packages/tui/src/ui/**` 属未跟踪私有目录，需先确认是否可提交）或 GUI 运行历史时间线视图 | 分层决策：UI 代码不入公开库 ⇒ **需用户确认落点** |
+| 2 | `HISTORY-01-04`：tarball 恢复回溯（`npm pack` 后隔离安装 + 真实 CLI 读历史）—— **本地可做**，先验证 `npm install <tgz>` 能否真实生成 `node_modules` | 无（上一轮失败原因是本地 `npm install` 未生成 `node_modules`，需先诊断） |
+| 3 | `RELOCATE-01-04` 的 tarball 双进程证据 | 同上 |
+| 4 | backlog Tier 3 队列里其余卡（多数为外部/重型，逐张判） | 每张先读"未完成"段 |
+
+> **未提交他人改动**：工作树原有的 10 个已修改文件（含 `IMPLEMENTATION_PLAN.md` 的
+> `docs/tasks/accepted/` 链接修正、`HANDOFF_2026-09-28.md` 的路径回填等）与全部未跟踪私有 UI
+> **均未暂存**；本轮提交只含 §14.2–14.4 的实际改动。
