@@ -424,3 +424,26 @@ check    471 文件 / 3431 用例    exit 0
 —— 若 `wfReg=true` 而 `wfHist=false`，说明**控制器那处 spread 没生效**（同一对象里一个有一个无 ⇒ 我看错了对象）。
 
 **注意**：我在这一卡上已连续 4 轮未收口（42–47），按纪律**下一轮只做这一个探针**，不再尝试修改。
+### 13.11 第 48 轮探针（决定性）：`workerFactories` 在这条路径里**是空的**
+
+```
+[O-1] wfReg=false wfHist=false
+```
+
+（插在 `buildWorkerAgent` 首行；`wfReg` = G4 的工具说明注入器，`wfHist` = 运行历史存储）
+
+**含意（重要）**：
+
+1. **不只是历史存储没到** —— **G4 的注入器也没到** ⇒ 这条 e2e 路径里
+   `this.options.workerFactories` 是**空对象**；
+2. 而 G4 的端到端用例**是通过的** ⇒ 说明 G4 的注入在它自己那条路径上生效，
+   **与本用例的路径不同**（本用例由 `submitTask` 走主控制器的任务链，可能经
+   `main-controller.ts:897` 的工具循环 + 另一条 worker 装配）。
+
+**⇒ 结论：不要再往 `buildWorkerAgent` 上打补丁。** 必须先把"这条路径上
+worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + 任务链下发处），
+再在**那一处**接入 `runHistoryStore`。
+
+**本卡状态（如实）**：`HISTORY-01-02` 数据层 ✅、钩子 ✅、`workerFactories` 透传 ✅，
+但**实际 mission 路径不经过该透传** ⇒ 端到端未生效。**不得声称完成。**
+**红用例**：`.tmp/history01-run-history-e2e.test.ts.draft`（未入库）。
