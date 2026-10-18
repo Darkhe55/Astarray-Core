@@ -275,6 +275,36 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "obs-perf-collection-default-on",
+    targetFile: "packages/core/src/orchestration/observability-collection-contract.ts",
+    find: "  if (!input.isCollectionEnabled) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-collection-contract.test.ts"],
+    expectedFailingTestNames: ["① 默认关闭"],
+    rationale:
+      "采集无视开关（等于默认开启）⇒ 用户没同意也在采样、产生默认开销 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "obs-perf-accepts-os-level-metrics",
+    targetFile: "packages/core/src/orchestration/observability-collection-contract.ts",
+    find: "  if (invalidFieldNames.length > 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-collection-contract.test.ts"],
+    expectedFailingTestNames: ["④ 采样字段白名单"],
+    rationale:
+      "接受 OS 级/未知指标 ⇒ 跨平台语义不一致且开销不可控（用户决策：只采进程内）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "obs-diag-accepts-raw-arguments",
+    targetFile: "packages/core/src/orchestration/observability-collection-contract.ts",
+    find: "  if (input.sanitization.containsRawArguments) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-collection-contract.test.ts"],
+    expectedFailingTestNames: ["⑥ DIAG"],
+    rationale:
+      "允许保存原始命令参数 ⇒ 诊断日志变成凭据/敏感数据泄漏面（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "relocate-status-relocation-section-always",
     targetFile: "packages/tui/src/cli/project-relocation-command.ts",
     find: '  const relocationSection =\n    description.registrationReadKind === "legacy"',
