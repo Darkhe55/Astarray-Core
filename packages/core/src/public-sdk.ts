@@ -889,6 +889,23 @@ export {
   type ExplorationStartDecision,
   type ExplorationStopDecision,
 } from "./orchestration/explore-plan-contract.js";
+/**
+ * EXP-01 / CURATE-01-01（2026-10-18）：授权式历史梳理的方案、首次授权与重大变更矩阵。
+ *
+ * 纯判定：不调度、不调模型、不写盘、不删原文。
+ */
+export {
+  compareCurationPlans,
+  computeCurationPlanFingerprint,
+  evaluateCurationPlanTransition,
+  evaluateCurationRun,
+  type CurationAuthorizationV1,
+  type CurationChangeKind,
+  type CurationPlanComparison,
+  type CurationPlanTransition,
+  type CurationPlanV1,
+  type CurationRunDecision,
+} from "./orchestration/curation-plan-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
