@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "obs-perf-empty-reported-as-zero",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "    hasSamples: result.coverage.matchedSampleCount > 0,",
+    replace: "    hasSamples: true,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["① 无样本"],
+    rationale:
+      "无样本却报 hasSamples=true ⇒ 调用方会把\"没采到\"当成\"有用量\"（卡内：unknown 不记作零）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "obs-command-crashes-on-read-failure",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "  } catch (error) {\n    /**\n     * **观测故障不得阻塞业务**",
+    replace: "  } catch (error) {\n    throw error;\n    /**\n     * **观测故障不得阻塞业务**",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑤ 真实读取失败"],
+    rationale:
+      "查询失败直接把错误抛给调用方 ⇒ 观测故障阻塞业务（R37 契约明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "obs-perf-collection-default-on",
     targetFile: "packages/core/src/orchestration/observability-collection-contract.ts",
     find: "  if (!input.isCollectionEnabled) {",
@@ -2616,6 +2636,7 @@ function main() {
 }
 
 main();
+
 
 
 
