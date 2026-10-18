@@ -363,3 +363,26 @@ check    471 文件 / 3431 用例    exit 0
 因为现有可用 mission 用例都不调用工具，而 store 只在工具事件时写。
 **下一步唯一动作**：写一个假 Provider 先发 `tool_call` 再发完成标记的用例，断言
 `stateDirectory/run-history/<missionId>.json` 出现且含 `tool-call` 事件。
+### 13.8 端到端探针结果（第 45 轮）：**store 未到达 worker**
+
+写了端到端用例（假 Provider 先发 `tool_call` 再发完成标记），**如期红**（`run-history` 文件 0 个）⇒ 接线未生效。
+
+**探针（在 worker 的 `onToolSucceeded` 内打点）**：
+
+```
+[H-P] tool=factVerification store=false mission=mission-a9230ab7
+```
+
+| 结论 | 证据 |
+| --- | --- |
+| 钩子**确实被调用** | `tool=factVerification` ✓（工具真的执行了） |
+| `runHistoryStore` **没到 worker** | `store=false` ✗ |
+| 四处代码**位置都正确**（已逐个核对） | 装配层 `L1138` 在 `new MainController({` 内 ✓；控制器 `L1011` 在含 `toolDocumentationInjector` 的块内 ✓；编排器 `L917` 在 `buildWorkerAgent` 内（`onEarlyStopDetected` 之前）✓；worker 选项 ✓ |
+
+**⇒ 代码位置全对但值没到** ⇒ 最可能是 **G4 当年踩过的同类**：worker 有多条构造路径 / 工具循环选项在多处构造，
+我改的那处**不是**本次 mission 实际走的那处（`store` 从没进过那个对象）。
+
+**下一步（唯一）**：在**每个** `new WorkerAgent(` 站点与**每个** `runToolLoop(` 调用点各打一个探针
+（`workerFactories.runHistoryStore !== undefined`），找出实际路径后再接 —— **不要再盲改**。
+
+**红测试**：`.tmp/history01-run-history-e2e.test.ts.draft`（**未入库**，如实标注为红）。
