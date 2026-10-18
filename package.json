@@ -48,7 +48,8 @@
     "verify:toolkit-package": "node scripts/verify-toolkit-package.mjs",
     "verify:u2-flash-probe": "node scripts/verify-u2-flash-continuous-reception.mjs --probe-only",
     "verify:u2-flash-continuous-reception": "node scripts/verify-u2-flash-continuous-reception.mjs",
-    "test:scripts": "node --test \"scripts/lib/*.test.mjs\""
+    "test:scripts": "node --test \"scripts/lib/*.test.mjs\"",
+    "verify:contract-sdk": "node scripts/verify-contract-sdk-package.mjs"
   },
   "dependencies": {
     "commander": "^15.0.0",
