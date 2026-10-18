@@ -757,6 +757,28 @@ export {
   type RunHistoryReadOutcome,
   type RunHistorySegment,
 } from "./orchestration/run-history-store.js";
+/**
+ * CLIENT-01 / FOLDER-01-01（2026-10-18）：对话式文件夹授权的**纯判定层**。
+ *
+ * 公开理由：判定必须在 SDK/CLI/TUI/GUI **共用一个实现**（卡内 FOLDER-01-03），
+ * 否则"卡片显示可批准、底层另判一套"就是本仓反复出现的双实现漂移。
+ * 该模块**只判定**：不写盘、不解析链接、不发起授权、不产生批准动作。
+ */
+export {
+  assessFolderGrantCandidate,
+  buildFolderGrantCard,
+  buildFolderGrantCardQueue,
+  isPathInsideOrEqual,
+  normalizeFolderPathForComparison,
+  type FolderGrantAssessment,
+  type FolderGrantCandidateInput,
+  type FolderGrantCardViewModel,
+  type FolderGrantClassification,
+  type FolderGrantDurationKind,
+  type FolderGrantPermissionKind,
+  type NormalizedFolderPath,
+  type ProjectRootRegistration,
+} from "./orchestration/folder-grant-request.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
