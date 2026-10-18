@@ -1107,6 +1107,10 @@ export class MainController {
         ...(this.options.toolDocumentationInjector === undefined
           ? {}
           : { toolDocumentationInjector: this.options.toolDocumentationInjector }),
+          /** HISTORY-01-02（第 51 轮修复）：devolve 路径同样透传运行历史存储。 */
+          ...(this.options.runHistoryStore === undefined
+            ? {}
+            : { runHistoryStore: this.options.runHistoryStore }),
         // DIAG-01 采集（第 85 轮接线）：缺省 ⇒ 不采集
         ...(this.options.diagnosticEventPort === undefined
           ? {}
