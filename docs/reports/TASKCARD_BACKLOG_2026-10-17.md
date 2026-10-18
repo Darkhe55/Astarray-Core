@@ -643,6 +643,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R7 | `CLIENT-01 / SECRETARY-01-02`：项目/汇总模式、**最小报告附件**（来源/项目/revision/时间/哈希）、新鲜度（过期如实给最后更新时间）、任务行键含项目（不串线）、派发幂等/冲突、回执只能前进、同级回派有界 | 新增 `secretary-relay-contract.ts` + `tests/core/unit/client01-secretary-relay.test.ts`（**9 条**）；4 条变异体（串线／重复派发／状态倒退／复制历史）均被拦下；SDK 导出 | `check` **478/3508 exit 0**（首跑 `completion-gate-counterexamples A0` 抖动 ⇒ 单跑 8/8、复跑全绿）；`coverage` **478 文件 / 3508 用例、分支 85.32% exit 0**（首跑 `anthropic-messages-runtime ⑰` 抖动 ⇒ 复跑全绿） |
 | R8 | `CLIENT-01 / SECRETARY-01-03`：次日首次启动判定（IANA 时区/DST）、同日领取排他、历史收拢（收拢不删除、旧未决可见） | 新增 `secretary-first-start.ts` + `tests/core/unit/client01-secretary-first-start.test.ts`（**11 条**）；4 条变异体（忽略离线阈值／重复处理同日／领取不排他／收拢当删除）均被拦下；SDK 导出 | `check` **479/3519 exit 0**；`coverage` 分支 **85.33% exit 0** |
 | R9 | `EXP-01 / FOLD-01-01`：等价折叠的**复用契约**（十项必填候选、明确前置条件、步骤偏序、不可折叠项冻结、副作用参数、版本化登记、回退守卫） | 新增 `workflow-fold-contract.ts` + `tests/core/unit/exp01-fold-contract.test.ts`（**9 条**）；4 条变异体（折入不可折叠项／跳过副作用参数校验／关掉逐步骤授权／复用旧许可）均被拦下；SDK 导出 | `check` **480/3528 exit 0**；`coverage` 分支 **85.39% exit 0** |
+| R10 | **5 轮一次全量门禁**：变异全量（95 条）+ 隔离包三项 | — | 变异 **94/95**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed` ⇒ **单独复跑 2/2 被拦下**（与 R5 同一 GUI 用例的负载抖动；**该守卫与用例都在未跟踪私有 UI**，公开门禁不保证它）⇒ 如实记录、不当作缺口；`npm pack` **269 文件** sha256 `a30c0cf4…`；`verify-package` / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
 
 > **R5 记一条 harness 可靠性观察（如实）**：`gui0203-views-runtime-state-collapsed` 在**全量**运行里报"存活"、
 > **单独**运行被拦下（且早前全量也曾拦下）。这与本仓已记录的"负载下门禁抖动"同族（GUI 用例会起本地服务）。
