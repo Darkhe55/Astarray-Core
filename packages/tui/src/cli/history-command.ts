@@ -34,6 +34,8 @@ export interface HistoryShowCommandInput {
   readonly cursor?: number;
   /** 种类过滤（原样来自 argv，由本命令校验；未知种类 ⇒ 用法错误）。 */
   readonly includedKinds?: ReadonlyArray<string>;
+  /** 关键词检索（纯子串、大小写不敏感；不解释正则/通配符）。 */
+  readonly searchQuery?: string;
   readonly displaySettings?: Partial<RunHistoryDisplaySettings>;
   readonly isJsonOutput: boolean;
 }
@@ -133,6 +135,7 @@ export async function executeHistoryShowCommand(
       ...(input.pageSize === undefined ? {} : { pageSize: input.pageSize }),
       ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
       ...(resolvedKinds.kinds === null ? {} : { includedKinds: resolvedKinds.kinds }),
+      ...(input.searchQuery === undefined ? {} : { searchQuery: input.searchQuery }),
       ...(input.displaySettings === undefined
         ? {}
         : { displaySettings: input.displaySettings }),
@@ -161,13 +164,17 @@ export async function executeHistoryShowCommand(
   }
 
   const lines: string[] = [];
+  const searchSummary =
+    page.searchMatchCount === null
+      ? ""
+      : `，检索「${page.searchQuery ?? ""}」命中 ${page.searchMatchCount} 条`;
   lines.push(
-    `运行历史：${page.missionIdentifier}（${page.segmentCount} 段 / 存储 ${page.storedEventCount} 条事件，本页显示 ${page.entries.length} 条）`,
+    `运行历史：${page.missionIdentifier}（${page.segmentCount} 段 / 存储 ${page.storedEventCount} 条事件，本页显示 ${page.entries.length} 条${searchSummary}）`,
   );
   if (page.notice !== null) lines.push(`提示：${page.notice}`);
   for (const entry of page.entries) {
     lines.push(
-      `#${entry.sequenceNumber} [${entry.kindLabel}] ${entry.recordedAtIso}（第 ${entry.segmentRevision} 段）`,
+      `#${entry.sequenceNumber} [${entry.kindLabel}] ${entry.recordedAtIso}（第 ${entry.segmentRevision} 段；证据 ${entry.evidenceAnchor}）`,
     );
     for (const detailLine of entry.detailText.split("\n")) {
       lines.push(`    ${detailLine}`);

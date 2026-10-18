@@ -104,6 +104,13 @@ export interface RunHistoryTimelineEntry {
   recordedAtIso: string;
   /** 事件去重键（可回指磁盘记录）。 */
   eventIdentifier: string;
+  /**
+   * **稳定证据锚点**（卡内 §5「复用稳定证据锚点」）：`run-history:<mission>#<序号>`。
+   *
+   * 为什么用序号而不是 eventIdentifier：序号在**追加与分页**下保持单调（不会因去重键
+   * 含内容哈希而变化），因此摘要/报告可以长期引用同一位置；序号只在**同一 mission**内唯一。
+   */
+  evidenceAnchor: string;
   /** 已脱敏的详情文本。 */
   detailText: string;
   /** payload 不是合法 JSON ⇒ 如实标记（不伪造结构化字段）。 */
@@ -131,6 +138,10 @@ export interface RunHistoryTimelinePage {
   effectivePageSize: number;
   /** 下一页游标；无更多则为 null。 */
   nextCursor: number | null;
+  /** 本页生效的检索词（未检索为 null）。 */
+  searchQuery: string | null;
+  /** 命中检索词的事件数（**分页前**计数；未检索为 null）。 */
+  searchMatchCount: number | null;
 }
 
 /** 运行历史文件的一条**摘要**（用于列表页，不夹带正文）。 */
@@ -277,6 +288,8 @@ export function buildRunHistoryTimelinePage(input: {
   includedKinds?: ReadonlyArray<RunHistoryEventKind>;
   cursor?: number | null;
   pageSize?: number;
+  /** 关键词检索（纯子串、大小写不敏感、不解释正则；仅搜**可见**事件）。 */
+  searchQuery?: string;
 }): RunHistoryTimelinePage {
   const settings: RunHistoryDisplaySettings = {
     ...DEFAULT_RUN_HISTORY_DISPLAY_SETTINGS,
@@ -304,6 +317,8 @@ export function buildRunHistoryTimelinePage(input: {
       )
     : [];
 
+  const normalizedSearchQuery = normalizeSearchQuery(input.searchQuery);
+
   const hasModelNotes = flattened.some((item) => item.event.kind === "model-note");
   const notice = resolveTimelineNotice({ settings, hasModelNotes });
 
@@ -324,11 +339,20 @@ export function buildRunHistoryTimelinePage(input: {
       segmentCount: input.document.segments.length,
       effectivePageSize,
       nextCursor: null,
+      // 总开关关闭时**没有检索**（也就不该报「0 命中」冒充搜过）
+      searchQuery: null,
+      searchMatchCount: null,
     };
   }
 
+  const matched = normalizedSearchQuery === null
+    ? eligible
+    : eligible.filter((item) =>
+        doesPayloadMatchSearchQuery(item.event.payloadJson, normalizedSearchQuery),
+      );
+
   const cursor = input.cursor ?? 0;
-  const afterCursor = eligible.filter((item) => item.sequenceNumber > cursor);
+  const afterCursor = matched.filter((item) => item.sequenceNumber > cursor);
   const pageItems = afterCursor.slice(0, effectivePageSize);
   const entries = pageItems.map((item) => {
     const detail = renderRunHistoryPayloadDetail(item.event.payloadJson);
@@ -339,6 +363,10 @@ export function buildRunHistoryTimelinePage(input: {
       kindLabel: EVENT_KIND_LABELS[item.event.kind],
       recordedAtIso: item.event.recordedAtIso,
       eventIdentifier: item.event.eventIdentifier,
+      evidenceAnchor: buildRunHistoryEvidenceAnchor(
+        input.document.missionIdentifier,
+        item.sequenceNumber,
+      ),
       detailText: detail.detailText,
       isPayloadUnreadable: detail.isPayloadUnreadable,
       isDetailTruncated: detail.isDetailTruncated,
@@ -359,7 +387,38 @@ export function buildRunHistoryTimelinePage(input: {
     segmentCount: input.document.segments.length,
     effectivePageSize,
     nextCursor: hasMore && lastEntry !== undefined ? lastEntry.sequenceNumber : null,
+    searchQuery: normalizedSearchQuery,
+    searchMatchCount: normalizedSearchQuery === null ? null : matched.length,
   };
+}
+
+/** 稳定证据锚点：`run-history:<mission>#<序号>`（序号在同一 mission 内单调且唯一）。 */
+export function buildRunHistoryEvidenceAnchor(
+  missionIdentifier: string,
+  sequenceNumber: number,
+): string {
+  return `run-history:${missionIdentifier}#${String(sequenceNumber)}`;
+}
+
+/** 检索词归一化：去首尾空白；空串/未提供 ⇒ null（= 不检索）。 */
+function normalizeSearchQuery(searchQuery: string | undefined): string | null {
+  if (searchQuery === undefined) return null;
+  const trimmed = searchQuery.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * 事件是否命中检索词。
+ *
+ * - **纯子串、大小写不敏感**，不解释正则/通配符 ⇒ 用户输入不会被当成模式（无 ReDoS、
+ *   也不会因 `.*` 之类把全部事件搜出来）；
+ * - 比对的是**脱敏后**的展示文本（与用户看到的完全一致），因此控制序列不会成为命中源；
+ * - 代价：命中判定要逐条渲染详情（大历史下这是 O(n) 渲染），测量见
+ *   `docs/reports/HISTORY01_04_RESOURCE_MEASUREMENT_2026-10-18.md`。
+ */
+function doesPayloadMatchSearchQuery(payloadJson: string, normalizedSearchQuery: string): boolean {
+  const detailText = renderRunHistoryPayloadDetail(payloadJson).detailText;
+  return detailText.toLowerCase().includes(normalizedSearchQuery.toLowerCase());
 }
 
 function resolveTimelineNotice(input: {
@@ -395,6 +454,7 @@ export async function queryRunHistoryTimeline(input: {
   readonly includedKinds?: ReadonlyArray<RunHistoryEventKind>;
   readonly cursor?: number | null;
   readonly pageSize?: number;
+  readonly searchQuery?: string;
 }): Promise<
   | { readonly kind: "absent"; readonly reason: string }
   | { readonly kind: "invalid"; readonly reason: string }
@@ -432,6 +492,7 @@ export async function queryRunHistoryTimeline(input: {
     ...(input.includedKinds === undefined ? {} : { includedKinds: input.includedKinds }),
     ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
     ...(input.pageSize === undefined ? {} : { pageSize: input.pageSize }),
+    ...(input.searchQuery === undefined ? {} : { searchQuery: input.searchQuery }),
   });
   return { kind: "valid", page };
 }

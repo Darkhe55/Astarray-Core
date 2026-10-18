@@ -683,6 +683,7 @@ historyCommand
   .requiredOption("--mission <mission-id>", "mission 标识")
   .option("--page-size <count>", "每页条数", String(DEFAULT_HISTORY_PAGE_SIZE))
   .option("--cursor <sequence>", "上一页最后一条的序号")
+  .option("--search <text>", "关键词检索（纯子串、大小写不敏感；不解释正则）")
   .option(
     "--kind <kind>",
     "只显示这些种类（可重复：tool-call/tool-failure/model-note/checkpoint/resume-boundary）",
@@ -697,6 +698,7 @@ historyCommand
       mission: string;
       pageSize?: string;
       cursor?: string;
+      search?: string;
       kind?: string[];
       hideRunHistory?: boolean;
       showProcessExplanations?: boolean;
@@ -710,6 +712,7 @@ historyCommand
           ? {}
           : { pageSize: Number(options.pageSize) }),
         ...(options.cursor === undefined ? {} : { cursor: Number(options.cursor) }),
+        ...(options.search === undefined ? {} : { searchQuery: options.search }),
         ...(options.kind === undefined ? {} : { includedKinds: options.kind }),
         displaySettings: {
           ...(options.hideRunHistory === true ? { showRunHistory: false } : {}),
