@@ -649,6 +649,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R13 | `LESSON-01-01`：沟通经验记录契约（事件时配置快照、unknown 显式、事实/假设分离、个体归属写入、匹配与自动注入） | 新增 `lesson-record-contract.ts` + `tests/core/unit/lesson01-record-contract.test.ts`（**11 条**）；4 条变异体（主 Agent 可写／接受重建快照／事实假设混写／未知版本按精确匹配）均被拦下；SDK 导出 | `check` **483/3557 exit 0**；`coverage` 分支 **85.54% exit 0** |
 | R14 | `WORKWINDOW-01-01`：工作/休息时段规则（白/黑名单、跨午夜、一次性例外优先、休息优先、项目不可覆盖全局休息）、IANA 时区与 DST、暂停原因分记、恢复六类阻塞、时钟跳变 | 新增 `work-window-contract.ts` + `tests/core/unit/workwindow01-contract.test.ts`（**12 条**）；4 条变异体（休息不再优先／例外不再优先／暂停原因被覆盖／忽略未知副作用）均被拦下；SDK 导出 | `check` **484/3569 exit 0**（首跑 `local-readonly-tools-production-wiring` 后置 EPERM rename 抖动 ⇒ 复跑全绿）；`coverage` 分支 **85.54% exit 0** |
 | R15 | `CLIENT-01 / FOLDER-01-03`（**CLI 侧**，命令名＝用户确认的选项 A）： `astarray folder request / approve / revoke / check`，复用同一判定层/存储层 | 新增 `packages/tui/src/cli/folder-command.ts` + `cli.tsx` 注册； 反例 **10 条**（进程内）+ **4 条**（真实 `dist/cli.js` argv）； 4 条变异体（复检恒成功／approve 非人工确认／接受未知权限／不可登记仍报成功）均被拦下 | `check` **486/3583 exit 0**；`coverage` 分支 **85.54% exit 0** |
+| R16 | **5 轮一次全量门禁**：变异全量（115 条）+ 隔离包三项 | — | 变异 **114/115**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed`（未跟踪私有 GUI 用例负载抖动） ⇒ **单独复跑 2/2 被拦下**；`npm pack` **269 文件** sha256 `95c207f6…`； `verify-package` / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
 
 > **R14 推送状态（如实）**：R13 提交 `c7c45e3a` 在本轮**再次连续 5 次**推送失败（128），`git ls-remote` 探针亦失败
 > ⇒ 远端 SSH 通道持续不可达。按纪律继续累积，下一阶段合并 `c7c45e3a`、R14 提交重试（≤5 次）。
@@ -697,3 +698,11 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 
 > **R13 推送状态（如实）**：提交 `c7c45e3a` 已在本地；`git push` **5 次失败**、`git ls-remote` 探针同样失败（128）
 > ⇒ 远端 SSH 通道不可达（与 R8 同类）。按纪律记为本阶段**跳过**；下一阶段合并 `c7c45e3a` 与后续提交重试（≤5 次）。
+
+> **R16 门禁抖动（如实，重要）**：默认并发下 `npm run check` **连续 2 次失败、每次都是不同用例**
+> （① `tests/gui/integration/gui-verification-decision.test.ts` 期望 done 实得 running；
+> ② `tests/core/integration/g2-guard-positive-path.test.ts` 期望 done 实得 blocked），
+> 两个文件**单独复跑 5/5 通过**；随后 `npx vitest run --maxWorkers=2` **486 文件 / 3583 用例全绿（exit 0）**，
+> `npm pack` 的 prepack（默认并发 check）随后也通过。
+> ⇒ 判定为**默认并发下的负载敏感抖动**，非本次改动缺陷；**未改任何断言/超时**。
+> 建议（留给后续）：为这几个异步完成类用例补显式预算，或把门禁脚本改为低并发运行。
