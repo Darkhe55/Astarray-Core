@@ -1360,94 +1360,6 @@ export const MUTATIONS = [
       "未给基线时又不回退默认守卫 ⇒ 目标已存在恒 target-stale-rejected（'能读不能导'）" +
       "⇒ 该端到端用例必须变红",
   },
-  {
-    mutationIdentifier: "gui0203-history-reads-all-missions",
-    targetFile: "packages/core/src/gui/mission-history-reader.ts",
-    find: `  const pageDirectories = missionDirectories.slice(
-    startOffset,
-    startOffset + effectivePageSize,
-  );`,
-    replace: `  const pageDirectories = missionDirectories;`,
-    testFiles: ["tests/gui/integration/gui02-03-mission-history.test.ts"],
-    expectedFailingTestNames: [
-      "有 97 个 mission 时，取一页**只读该页**的 summary.json",
-      "翻页不重不漏",
-    ],
-    rationale:
-      "分页按需的要害：若一页就把全部 mission 目录都读进来，97 个 mission 会读 97 个文件" +
-      "（卡内明令'不得全量读 97 mission'）⇒ '只读本页 10 条'的反例必须变红",
-  },
-  {
-    mutationIdentifier: "gui0203-history-terminal-may-run",
-    targetFile: "packages/core/src/gui/mission-history-reader.ts",
-    find: `  const isActivelyRunning =
-    recordedStatus === "running" && (await input.isMissionActivelyRunning(input.missionIdentifier));`,
-    replace: `  const isActivelyRunning = await input.isMissionActivelyRunning(input.missionIdentifier);`,
-    testFiles: ["tests/gui/integration/gui02-03-mission-history.test.ts"],
-    expectedFailingTestNames: ["已终态（done/blocked/cancelled）不受运行态影响"],
-    rationale:
-      "去掉'recordedStatus===running'这一前置条件 ⇒ 已终态任务会被运行态查询翻回'运行中'" +
-      "⇒ 该反例必须变红（卡内要求：历史状态与运行状态分离，终态不得自称在跑）",
-  },
-  {
-    mutationIdentifier: "gui0203-history-corruption-dropped",
-    targetFile: "packages/core/src/gui/mission-history-reader.ts",
-    find: `  const totalMissionCount = missionDirectories.length;`,
-    replace: `  const totalMissionCount = missionDirectories.length;
-  // 变异：把损坏记录静默丢弃（用 0 长度占位再过滤）
-  missionDirectories.length = 0;`,
-    testFiles: ["tests/gui/integration/gui02-03-mission-history.test.ts"],
-    expectedFailingTestNames: ["有 97 个 mission 时"],
-    rationale:
-      "把枚举结果清空 ⇒ 列表为空，'损坏记录必须保留在列表中'与分页反例都会变红" +
-      "（证明'不静默丢弃'这条真的有断言在守）",
-  },
-  {
-    mutationIdentifier: "gui0203-history-blank-project-faked",
-    targetFile: "packages/core/src/gui/mission-history-reader.ts",
-    find: `    typeof rawProjectIdentifier === "string" && rawProjectIdentifier.trim().length > 0
-      ? rawProjectIdentifier.trim()
-      : null;`,
-    replace: `    typeof rawProjectIdentifier === "string"
-      ? rawProjectIdentifier
-      : null;`,
-    testFiles: ["tests/gui/integration/gui02-03-mission-history.test.ts"],
-    expectedFailingTestNames: ["空字符串项目名不得被当成有效项目"],
-    rationale:
-      "去掉'非空白'校验 ⇒ 空白项目名会被原样返回，界面显示一个'看着有值其实是空'的项目" +
-      "⇒ 该反例必须变红（不得伪装项目名）",
-  },
-  {
-    mutationIdentifier: "gui0203-views-runtime-state-collapsed",
-    targetFile: "packages/gui/src/application/gui-read-model.ts",
-    find: `    case "interrupted-needs-reconciliation":
-      return "已中断，待对账";`,
-    replace: `    case "interrupted-needs-reconciliation":
-      return "运行中";`,
-    testFiles: ["tests/gui/unit/gui02-03-mission-history-views.test.ts"],
-    expectedFailingTestNames: [
-      "**历史状态与运行状态分列**：重启前 running 不得显示成运行中",
-    ],
-    rationale:
-      "把'已中断待对账'的运行态标签改成'运行中' ⇒ 重启前的 mission 会在界面上显示成正在运行" +
-      "（正是卡内明令禁止的）⇒ 该反例必须变红" +
-      "（注意：详情视图那条用的是**已终态**记录，不经过 interrupted 分支，故**不**列入点名 —— " +
-      "把它列进来会让验证器判定'变异存活'，那是我的期望写错、不是断言空）",
-  },
-  {
-    mutationIdentifier: "gui0203-views-missing-field-blank",
-    targetFile: "packages/gui/src/application/gui-read-model.ts",
-    find: `const GUI_MISSION_UNKNOWN_TEXT = "（未知）";`,
-    replace: `const GUI_MISSION_UNKNOWN_TEXT = "";`,
-    testFiles: ["tests/gui/unit/gui02-03-mission-history-views.test.ts"],
-    expectedFailingTestNames: [
-      "损坏条目在列表里**明确标注**且不消失",
-      "详情对损坏条目**明确**说明，且缺失字段为",
-    ],
-    rationale:
-      "把缺失字段文案改成空串 ⇒ 界面看起来像'有值但为空'，用户无法区分'没有这个信息'" +
-      "⇒ 这两条反例必须变红",
-  },
   /**
    * 2026-11-08（第 92 轮）新增：把上一轮**手工**做的两个探针固化为**永久**变异体。
    *
@@ -1917,42 +1829,6 @@ export const MUTATIONS = [
    *
    * ⚠️ 该条目的 `testFiles` **由检索结果直接写入**（不手敲）。
    */
-  {
-    mutationIdentifier: "memory-observation-source-replaced-by-owner",
-    targetFile: "packages/core/src/orchestration/agent-individual-memory.ts",
-    find: `            sourceAgentInstanceId: input.sourceAgentInstanceId,`,
-    replace: `            sourceAgentInstanceId: input.runtimeAgentInstanceId,`,
-    testFiles: [
-      "tests/architecture/destructive-file-api-guard.test.ts",
-      "tests/core/integration/anthropic-messages-runtime.test.ts",
-      "tests/core/integration/diagnostic-persistent-summary.test.ts",
-      "tests/core/integration/diagnostic-readonly-query.test.ts",
-      "tests/core/integration/obs01-diag-production-collection.test.ts",
-      "tests/core/integration/obs01-perf-production-collection.test.ts",
-      "tests/core/integration/orchestration-wiring.test.ts",
-      "tests/core/integration/orchestrator-git-integration.test.ts",
-      "tests/core/integration/perf-overview-command.test.ts",
-      "tests/core/integration/perf-persistent-aggregation.test.ts",
-      "tests/core/integration/provider-request-usage-capture.test.ts",
-      "tests/core/integration/usage-ledger-persistence.test.ts",
-      "tests/core/integration/usage-overview-query.test.ts",
-      "tests/core/unit/agent-lifecycle-and-memory.test.ts",
-      "tests/core/unit/b6r10-diagnostic-merge-branches.test.ts",
-      "tests/core/unit/craftsman-schemas.test.ts",
-      "tests/core/unit/craftsman-workflow-lifecycle.test.ts",
-      "tests/core/unit/diagnostic-aggregate-branches.test.ts",
-      "tests/core/unit/main-controller-facades.test.ts",
-      "tests/core/unit/memory-and-report-security.test.ts",
-      "tests/core/unit/memory-read-gaps.test.ts",
-      "tests/gui/integration/gui-observability-overview.test.ts",
-      "tests/tui/unit/doctor-errors-command-branches.test.ts",
-      "tests/tui/unit/usage-overview-command-branches.test.ts",
-    ],
-    expectedFailingTestNames: ["两个同级 Agent 相同任务文本下记忆完全隔离"],
-    rationale:
-      "把观察的来源记成**接收方自己** ⇒ 去除来源、**冒充自身记忆**（比「记错来源」更严重：" +
-      "接受方会把他人条目当成自己的经验，跨 Agent 归属与附件哈希都失去意义）⇒ 该反例必须变红",
-  },
   /**
    * 2026-11-08（第 121 轮）新增：**专用流程不得被范围解析放宽**。
    *
@@ -1965,26 +1841,6 @@ export const MUTATIONS = [
    *
    * ⚠️ `testFiles` **由检索结果直接写入**（不手敲）。
    */
-  {
-    mutationIdentifier: "scope-dedicated-flow-relaxed",
-    targetFile: "packages/core/src/tools/scope-resolution.ts",
-    find: `      decision: "ask-user",\n      adjudicator: "dedicated-flow",`,
-    replace: `      decision: "allow",\n      adjudicator: "dedicated-flow",`,
-    testFiles: [
-      "tests/core/integration/auth-scope-install-routing.test.ts",
-      "tests/core/integration/auth-scope-resolution.test.ts",
-      "tests/core/integration/scope-tool-mapping.test.ts",
-      "tests/core/unit/gui02-02-installation-gate-guard-branches.test.ts",
-      "tests/core/unit/gui02-02-installation-gate-interface-port.test.ts",
-      "tests/core/unit/gui02-02-installation-inquiry-registry.test.ts",
-      "tests/gui/integration/gui02-02-installation-not-bypassable.test.ts",
-      "tests/gui/integration/gui02-02-permission-ask-ui-constraints.test.ts",
-    ],
-    expectedFailingTestNames: ["矩阵：协同项目内上级批准、项目外/未知人工、放权未知上级、思索只读"],
-    rationale:
-      "把专用流程（远端发布／备份删除这类独立授权门）的裁决由 `ask-user` 放宽为 `allow` ⇒ " +
-      "本模块**替专用流程放行**、绕开那套逐次授权 ⇒ 该反例必须变红",
-  },
   /**
    * 2026-11-08（第 121 轮）新增：**安装类操作必须受独立开关约束**（开关关闭一律拒绝）。
    *
@@ -2018,7 +1874,6 @@ export const MUTATIONS = [
       "tests/core/unit/gui02-02-installation-gate-guard-branches.test.ts",
       "tests/core/unit/gui02-02-installation-gate-interface-port.test.ts",
       "tests/core/unit/installation-gate-execution.test.ts",
-      "tests/gui/integration/gui02-02-installation-not-bypassable.test.ts",
     ],
     expectedFailingTestNames: ["安装类：开关关闭一律拒绝（协同/放权相同）"],
     rationale:
@@ -2140,62 +1995,6 @@ export const MUTATIONS = [
    *
    * ⚠️ `testFiles` **由检索结果直接写入**（不手敲）。
    */
-  {
-    mutationIdentifier: "argument-fingerprint-ignores-values",
-    targetFile: "packages/core/src/core/permission-policy.ts",
-    /** ⚠️ 必须用**单引号字符串**：内容含 `${…}`，写成模板串会被当插值求值（本轮实测崩溃）。 */
-    find: '    .map((key) => `${JSON.stringify(key)}:${serializeCanonical(record[key])}`)',
-    replace: '    .map((key) => `${JSON.stringify(key)}`)',
-    testFiles: [
-      "tests/core/integration/auth-scope-gate.test.ts",
-      "tests/core/integration/auth-scope-resolution.test.ts",
-      "tests/core/integration/cross-mission-isolation-regression.test.ts",
-      "tests/core/integration/diagnostic-persistent-summary.test.ts",
-      "tests/core/integration/e2e01-fixture-contract.test.ts",
-      "tests/core/integration/gui02-02-permission-ask-adjudication-safety.test.ts",
-      "tests/core/integration/instruction-window-persistence-branches.test.ts",
-      "tests/core/integration/local-preservation.test.ts",
-      "tests/core/integration/permission-authorization-hit.test.ts",
-      "tests/core/integration/read-file-view.test.ts",
-      "tests/core/integration/scope-authorization-regrant.test.ts",
-      "tests/core/integration/scope-reservation-settlement.test.ts",
-      "tests/core/integration/sum01-legacy-manifest-migration.test.ts",
-      "tests/core/integration/summary-index-publish.test.ts",
-      "tests/core/integration/task-accuracy-verifier.test.ts",
-      "tests/core/unit/agent-routing-schemas.test.ts",
-      "tests/core/unit/ar07-module-gaps-3.test.ts",
-      "tests/core/unit/b6r10-diagnostic-merge-branches.test.ts",
-      "tests/core/unit/builtins.test.ts",
-      "tests/core/unit/cache-metrics.test.ts",
-      "tests/core/unit/context-closure-schemas.test.ts",
-      "tests/core/unit/craftsman-stage-controller.test.ts",
-      "tests/core/unit/diagnostic-aggregate-branches.test.ts",
-      "tests/core/unit/evidence-verification.test.ts",
-      "tests/core/unit/gui02-01-permission-ask-decision-entry.test.ts",
-      "tests/core/unit/gui02-01-permission-ask-event.test.ts",
-      "tests/core/unit/gui02-01-permission-ask-fingerprint-gap.test.ts",
-      "tests/core/unit/gui02-01-permission-ask-request-entity.test.ts",
-      "tests/core/unit/gui02-01-r1-approval-fingerprint-reuse.test.ts",
-      "tests/core/unit/human-agent-concurrent-change.test.ts",
-      "tests/core/unit/human-worktree-observer.test.ts",
-      "tests/core/unit/merge01-instruction-merge-mapping.test.ts",
-      "tests/core/unit/permission-policy.test.ts",
-      "tests/core/unit/project-reconnaissance.test.ts",
-      "tests/core/unit/read-suppression-and-guard.test.ts",
-      "tests/core/unit/stale-write-guard.test.ts",
-      "tests/core/unit/tool-registry.test.ts",
-      "tests/core/unit/toolkit01-reauthorization-record-store.test.ts",
-      "tests/core/unit/working-set-schemas.test.ts",
-      "tests/gui/integration/gui02-02-permission-ask-registration-wiring.test.ts",
-      "tests/gui/integration/gui02-02-permission-ask-routes.test.ts",
-      "tests/tui/integration/cli-anthropic-protocol.test.ts",
-      "tests/tui/unit/permission-ask-reuse.test.ts",
-    ],
-    expectedFailingTestNames: ["指纹绑定**完整规范化参数**"],
-    rationale:
-      "让规范化后的指纹**只取决于键名、不取决于值** ⇒ 「同一路径、内容不同」也复用批准" +
-      "（**这正是 R1 修掉的历史缺陷**：与 S3「绑定完整参数指纹」冲突，用户批准被跨内容沿用）⇒ 该反例必须变红",
-  },
   /**
    * 2026-11-08（第 127 轮）新增：**投递按 idempotencyKey 去重**（同一客户端生命周期内）。
    *
@@ -2241,8 +2040,6 @@ export const MUTATIONS = [
       "tests/core/unit/feedback-supervisor.test.ts",
       "tests/core/unit/mailbox-journal.test.ts",
       "tests/core/unit/schemas.test.ts",
-      "tests/gui/integration/gui-csrf-browser-simulation.test.ts",
-      "tests/gui/integration/gui-server.test.ts",
       "tests/tui/unit/cli-commands.test.ts",
       "tests/tui/unit/run-command-gaps.test.ts",
       "tests/tui/unit/smart01-instruction-cli-entry.test.ts",
@@ -2693,4 +2490,5 @@ function main() {
 }
 
 main();
+
 

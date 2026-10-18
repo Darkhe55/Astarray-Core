@@ -32,18 +32,14 @@ const privateUiRelativePaths = ["packages/tui/src/ui/", "packages/tui/src/cli/tu
  *
  * 迁到私有库后请**删除对应条目**——本测试会因"白名单条目已不存在"而变红，提醒你同步。
  */
-const pinnedUiSeamAllowlist = [
-  {
-    filePath: "packages/tui/src/cli/commands.ts",
-    specifierFragment: "../../../gui/src/server/gui-server.js",
-    rationale: "`gui serve` 命令的实现仍内联在公开 CLI 中（应迁到 astarray-ui）；迁走后删除本条目",
-  },
-  {
-    filePath: "packages/tui/src/cli.tsx",
-    specifierFragment: "./cli/tui.js",
-    rationale: "TUI 启动桥：已是可选动态导入，缺失时给明确提示并以非 0 退出（可保留）",
-  },
-];
+/**
+ * **当前**允许的 UI 接缝：**为空**。
+ *
+ * 2026-10-19 R32 已完成收口：`gui serve` 实现迁到私有库 `astarray-ui`（公开侧只留 fail-closed 提示）、
+ * TUI 启动桥改为**非字面量**动态导入（缺失即提示 + 非 0 退出），随后删除了公开库内的 UI 本地副本。
+ * 若将来确实需要新增接缝，必须在这里显式登记并写明理由。
+ */
+const pinnedUiSeamAllowlist: Array<{ filePath: string; specifierFragment: string; rationale: string }> = [];
 
 /** 私有 UI 的**绝对**位置（解析后的目标判定，避免把 core 内部的 `gui/` 模块误判）。 */
 const privateUiRoots = [
@@ -180,4 +176,5 @@ describe("公开库 UI 边界（用户决策 2026-10-19：只有 CLI 在公开�
     }
   });
 });
+
 
