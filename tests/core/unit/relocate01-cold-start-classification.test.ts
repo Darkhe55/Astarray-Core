@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  SHARED_FALLBACK_PROJECT_IDENTIFIER,
   classifyProjectRelocation,
   isPathInsideProjectRoot,
 } from "../../../packages/core/src/orchestration/project-relocation-classification.js";
@@ -108,6 +109,16 @@ describe("RELOCATE-01-01：冷启动身份分类（必须 fail-closed）", () =>
       registeredRootPath: null,
     });
     expect(outcome.classification).toBe("unregistered");
+    expect(outcome.isHistoryLoadable).toBe(false);
+    expect(outcome.isExecutionAllowed).toBe(false);
+  });
+  it("⑪ 共享兜底标识 `workspace` ⇒ 不可辨识身份，不得判为身份一致", () => {
+    const outcome = classifyProjectRelocation({
+      ...baseObservation,
+      registeredProjectIdentifier: SHARED_FALLBACK_PROJECT_IDENTIFIER,
+      observedProjectIdentifierAtCurrentRoot: SHARED_FALLBACK_PROJECT_IDENTIFIER,
+    });
+    expect(outcome.classification).toBe("identity-missing");
     expect(outcome.isHistoryLoadable).toBe(false);
     expect(outcome.isExecutionAllowed).toBe(false);
   });
