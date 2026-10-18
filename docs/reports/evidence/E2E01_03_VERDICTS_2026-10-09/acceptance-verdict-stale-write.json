@@ -8,7 +8,7 @@
   "sourceStatus": "",
   "tarballSha256": "8b175e316893089a42cec781d1abb87ee8827d71b2c2465422a60e287e4ccb4e",
   "tarballSizeBytes": 1124541,
-  "installedCliPath": "C:\\Users\\MerchRev\\Documents\\astarray\\.tmp\\e2e01-03\\2026-10-09T13-08-12.367Z\\install\\node_modules\\astarray\\dist\\cli.js",
+  "installedCliPath": "C:\\Users\\<username>\\Documents\\astarray\\.tmp\\e2e01-03\\2026-10-09T13-08-12.367Z\\install\\node_modules\\astarray\\dist\\cli.js",
   "modelIdentifier": "step-3.7-flash",
   "providerEndpoint": "http://127.0.0.1:9646/v1/chat/completions",
   "permissionDecisionSource": "explicit-flag",
