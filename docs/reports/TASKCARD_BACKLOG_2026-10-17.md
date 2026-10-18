@@ -386,3 +386,20 @@ check    471 文件 / 3431 用例    exit 0
 （`workerFactories.runHistoryStore !== undefined`），找出实际路径后再接 —— **不要再盲改**。
 
 **红测试**：`.tmp/history01-run-history-e2e.test.ts.draft`（**未入库**，如实标注为红）。
+### 13.9 第 46 轮：worker 有**三个构造点**（关键定位）
+
+`Select-String "new WorkerAgent\("` 结果：
+
+| 站点 | 说明 |
+| --- | --- |
+| `mission-orchestrator.ts:845` | 一个构造点（**不是** `buildWorkerAgent`） |
+| `mission-orchestrator.ts:873` | 即 `buildWorkerAgent` 内（我此前只改了这一处 ✓） |
+| `mission-orchestrator.ts:1001` | 另一个构造点 |
+
+另：`runToolLoop(` 调用点为 `main-controller.ts:897`（主 Agent 路径）、`worker-agent.ts:482`、`tool-loop.ts:332`。
+
+⇒ **这解释了 `store=false`**：本次 mission 的 worker 由 **845 或 1001** 构造，而我只 patch 了 873。
+
+**踩坑记录**：我尝试给三处都插 spread，但 845/1001 **不是对象字面量起点**（`new WorkerAgent(options)` 形式）
+⇒ 插入导致 154 个语法错 ⇒ **立即回退**（`git checkout`），`typecheck` 回到 0。
+**下一轮必须先 `read` 这两处各 10 行**，看清是"对象字面量"还是"变量传参"，再决定改哪里（若是变量，则应改**构造该变量的地方**）。
