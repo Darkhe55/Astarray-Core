@@ -852,6 +852,25 @@ export {
   type SecretarySummaryCategory,
   type SecretaryViewItem,
 } from "./orchestration/secretary-first-start.js";
+/**
+ * EXP-01 / FOLD-01-01（2026-10-18）：等价折叠的复用契约与版本/权限模型。
+ *
+ * 纯判定：不执行工作流、不注册工具、不写盘、不调模型。
+ */
+export {
+  NON_FOLDABLE_ITEMS,
+  assessFoldCandidate,
+  buildReusableToolRegistration,
+  evaluateReusableToolRollback,
+  isFoldStepDependencyOrderValid,
+  type FoldCandidateAssessment,
+  type FoldCandidateInput,
+  type FoldParameter,
+  type FoldParameterEffectKind,
+  type FoldStep,
+  type ReusableToolRegistrationOutcome,
+  type ReusableToolRegistrationV1,
+} from "./orchestration/workflow-fold-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
