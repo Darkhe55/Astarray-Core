@@ -87,10 +87,28 @@ program
   .name("astarray")
   .description("TUI agent orchestration tool with Ponder / Assist / Devolve modes")
   .version(packageMetadata.version, "-v, --version")
-  .action(async () => {
-    const { launchTui } = await import("./cli/tui.js");
-    await launchTui(defaultStateDirectory());
-  });
+    .action(async () => {
+      /**
+       * 仓库分层（2026-10-18 用户决策）：终端 UI 属**私有/本地**部分，公开构建不含 `./cli/tui.js`。
+       *
+       * 只保护**模块加载**（缺失 ⇒ 明确提示 + 非 0 退出）；**不吞** TUI 运行期错误。
+       */
+      let launchTui: ((stateDirectory: string) => Promise<void>) | null = null;
+      try {
+        ({ launchTui } = await import("./cli/tui.js"));
+      } catch {
+        // 模块缺失：保持 null（公开构建不含终端 UI），下方给出明确提示
+      }
+      if (launchTui === null) {
+        process.stderr.write(
+          "此构建不含终端 UI（TUI 未随本构建发布）。\n" +
+            "请使用具体命令（如 `astarray run <prompt>`）或 `--json` 输出。\n",
+        );
+        process.exitCode = 2;
+        return;
+      }
+      await launchTui(defaultStateDirectory());
+    });
 
 program
   .command("run <prompt>")

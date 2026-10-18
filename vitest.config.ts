@@ -8,6 +8,8 @@ export default defineConfig({
       provider: "v8",
       include: ["packages/core/src/**/*.ts", "packages/tui/src/**/*.ts", "packages/tui/src/**/*.tsx"],
       exclude: [
+        /** 仓库分层（2026-10-18）：tests/gui 属私有部分。 */
+        "tests/gui/**",
         "packages/tui/src/cli.tsx",
         "packages/tui/src/ui/**",
         "packages/gui/**",
