@@ -87,12 +87,31 @@ describe("RELOCATE-01：只读控制面（门面可达）", () => {
     expect(description.outcome.requiredUserAction).toBe("只读恢复对账");
   });
 
-  /**
-   * ⚠️ **已知缺口（2026-10-18 第 19 轮发现，未修）**：旧格式登记（文件存在但缺 schemaVersion）
-   * 目前被控制器映射成 `unregistered`，而卡内要求的是「走旧格式关联/恢复流程」。
-   * 需在分类器加 `isLegacyRegistration` 并把控制器传参（我尝试时引入 typecheck 错误，已回退）。
-   * **本条不入库为绿测试**：修好后补回。
-   */
+  it("④ 旧格式登记 ⇒ identity-missing（走旧格式关联/恢复流程）", async () => {
+    const directory = path.join(baseDirectory, "project-location");
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(
+      path.join(directory, "project-alpha.json"),
+      JSON.stringify({ projectIdentifier: "project-alpha", rootPath: "D:/work/alpha" }),
+      "utf8",
+    );
+
+    const controller = new ProjectRelocationController({
+      store: new ProjectLocationRegistrationStore({ baseDirectory }),
+    });
+    const description = await controller.describeProjectRelocation({
+      projectIdentifier: "project-alpha",
+      currentRootPath: "D:/work/alpha",
+      isRegisteredRootAccessible: true,
+      observedProjectIdentifierAtCurrentRoot: "project-alpha",
+    });
+    expect(description.registrationReadKind).toBe("legacy");
+    expect(description.outcome.classification).toBe("identity-missing");
+    expect(description.outcome.requiredUserAction).toBe("走旧格式关联/恢复流程");
+    expect(description.outcome.isHistoryLoadable).toBe(false);
+  });
+
+
   it("⑤ 根不可访问 ⇒ location-unreachable（待关联，不自动新建）", async () => {
     const store = new ProjectLocationRegistrationStore({ baseDirectory });
     await store.writeWithBackup(registration);

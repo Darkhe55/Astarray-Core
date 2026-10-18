@@ -87,7 +87,13 @@ export class ProjectRelocationController {
         isRegisteredRootAccessible: query.isRegisteredRootAccessible,
         observedProjectIdentifierAtCurrentRoot: query.observedProjectIdentifierAtCurrentRoot,
         candidateIdentifiersWithSameIdentity: query.candidateIdentifiersWithSameIdentity ?? [],
-        isRegistrationCorrupted: false,
+        /**
+         * 2026-10-18 第 22 轮：**旧格式登记（文件存在但缺 schemaVersion）**
+         * 不能被当作"未登记"（那会让用户以为项目从未登记过）。
+         * 这里复用"登记不可用"的语义 ⇒ 分类为 `identity-missing`，
+         * `requiredUserAction` 为「走旧格式关联/恢复流程」，与卡内 §2 最后一行一致。
+         */
+        isRegistrationCorrupted: readOutcome.kind === "legacy",
       }),
     };
   }
