@@ -727,6 +727,7 @@ export {
   MISSING_PROCESS_EXPLANATION_NOTICE,
   REMOVED_CONTROL_SEQUENCE_PLACEHOLDER,
   RUN_HISTORY_EVENT_KINDS,
+  buildRunHistoryEvidenceAnchor,
   buildRunHistoryTimelinePage,
   listRunHistoryMissions,
   queryRunHistoryTimeline,
