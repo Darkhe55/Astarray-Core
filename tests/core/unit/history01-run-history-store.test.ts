@@ -97,6 +97,35 @@ describe("HISTORY-01-02：运行历史（最小持久化）", () => {
     expect(appendOutcome.reason).toContain("损坏");
   });
 
+  it("④b 真实钩子路径：成功与**失败**两类事件都进历史，且失败原因保留", async () => {
+    const store = new RunHistoryStore({ baseDirectory });
+    // 模拟 tool-loop 的两个钩子（onToolSucceeded / onToolFailed）
+    await store.recordToolCall({
+      missionIdentifier: "m",
+      toolName: "readFile",
+      outputText: "file-content",
+    });
+    await store.recordToolFailure({
+      missionIdentifier: "m",
+      toolName: "writeFile",
+      failureReason: "permission-denied",
+    });
+
+    const outcome = await store.read("m");
+    if (outcome.kind !== "valid") throw new Error("应为 valid");
+    const events = outcome.document.segments.flatMap((segment) => segment.events);
+    expect(events.map((event) => event.kind)).toEqual(["tool-call", "tool-failure"]);
+    expect(events[1]?.payloadJson).toContain("permission-denied");
+  });
+
+  it("④c 同一工具同一输出重复记录 ⇒ 去重（不重复增长）", async () => {
+    const store = new RunHistoryStore({ baseDirectory });
+    const first = await store.recordToolCall({ missionIdentifier: "m", toolName: "readFile", outputText: "same" });
+    const second = await store.recordToolCall({ missionIdentifier: "m", toolName: "readFile", outputText: "same" });
+    expect(first.wasAppended).toBe(true);
+    expect(second.wasAppended).toBe(false);
+  });
+
   it("⑤ 无文件 ⇒ absent", async () => {
     const store = new RunHistoryStore({ baseDirectory });
     const outcome = await store.read("nope");
