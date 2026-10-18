@@ -265,6 +265,36 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "relocate-reconciler-completed-replayed",
+    targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
+    find: '  if (input.projectStatus === "completed") {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/relocate01-reconciler.test.ts"],
+    expectedFailingTestNames: ["② 已完成项目"],
+    rationale:
+      "已完成项目被重新对账并恢复 ⇒ 重放已完成操作（卡内：已完成绝不重放）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-reconciler-write-auto-resumed",
+    targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
+    find: "  if (input.hasWriteOrExternalSideEffects) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/relocate01-reconciler.test.ts"],
+    expectedFailingTestNames: ["④ 含写/外部副作用"],
+    rationale:
+      "含写/外部副作用也自动恢复 ⇒ 未经人工确认就重放写操作（用户决策：必须人工确认）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-reconciler-blocked-ignored",
+    targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
+    find: "  if (isBlockedByOperation) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/relocate01-reconciler.test.ts"],
+    expectedFailingTestNames: ["⑤ 旧一次性许可", "⑥ 新位置权限复检"],
+    rationale:
+      "被门禁阻塞的未决操作被忽略 ⇒ 旧一次性许可/未知副作用下自动恢复 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "cross-project-copy-receipts-ignore-agent-filter",
     targetFile: "packages/core/src/orchestration/cross-project-authorization-store.ts",
     find: `      if (
@@ -2663,3 +2693,4 @@ function main() {
 }
 
 main();
+
