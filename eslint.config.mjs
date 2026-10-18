@@ -11,6 +11,11 @@ export default tseslint.config(
       ".astarray/",
       "scripts/",
       "tests/fixtures/",
+          /** 仓库分层（2026-10-18）：以下属私有/本地 UI，公开仓库不含。 */
+          "私有 TUI 包（已迁出）/",
+          "packages/tui/src/cli/tui.tsx",
+          "私有 GUI 包（已迁出）/",
+          "私有 GUI 测试（已迁出）/",
       ".verify-*/",
     ],
   },
