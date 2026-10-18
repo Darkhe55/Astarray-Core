@@ -246,8 +246,8 @@ export const MUTATIONS = [
   {
     mutationIdentifier: "run-history-view-ignores-cursor",
     targetFile: "packages/core/src/orchestration/run-history-view.ts",
-    find: "const afterCursor = eligible.filter((item) => item.sequenceNumber > cursor);",
-    replace: "const afterCursor = eligible.filter((item) => item.sequenceNumber > 0);",
+    find: "const afterCursor = matched.filter((item) => item.sequenceNumber > cursor);",
+    replace: "const afterCursor = matched.filter((item) => item.sequenceNumber > 0);",
     testFiles: ["tests/core/unit/history01-run-history-view.test.ts"],
     expectedFailingTestNames: ["② 游标分页"],
     rationale:
@@ -2458,8 +2458,54 @@ function runMutation(mutation, options) {
   };
 }
 
+/**
+ * `--check-anchors`：**只**校验每条变异的 `targetFile`/`find` 是否仍"恰好命中 1 次"。
+ *
+ * 为什么需要它：失效锚点会让变异体**静默不生效**（= 该守卫是空的），
+ * 而只有跑全量才暴露。这个模式让它变成一条**秒级**的架构测试（`tests/architecture/mutation-anchors-live.test.ts`）。
+ */
+function checkAllAnchors() {
+  const mismatches = [];
+  for (const mutation of MUTATIONS) {
+    let sourceContent;
+    try {
+      sourceContent = readFileSync(path.resolve(mutation.targetFile), "utf8");
+    } catch {
+      mismatches.push({
+        mutationIdentifier: mutation.mutationIdentifier,
+        targetFile: mutation.targetFile,
+        occurrenceCount: -1,
+        detail: "目标文件不可读",
+      });
+      continue;
+    }
+    const occurrenceCount = sourceContent.split(mutation.find).length - 1;
+    if (occurrenceCount !== 1) {
+      mismatches.push({
+        mutationIdentifier: mutation.mutationIdentifier,
+        targetFile: mutation.targetFile,
+        occurrenceCount,
+        detail: occurrenceCount === 0 ? "锚点已失效（源码改动后未同步）" : "锚点命中多次（不唯一）",
+      });
+    }
+  }
+  for (const mismatch of mismatches) {
+    process.stdout.write(
+      `❌ ${mismatch.mutationIdentifier}（${mismatch.targetFile}）：命中 ${String(mismatch.occurrenceCount)} 次 —— ${mismatch.detail}\n`,
+    );
+  }
+  process.stdout.write(
+    `锚点自检：${String(MUTATIONS.length - mismatches.length)}/${String(MUTATIONS.length)} 条有效\n`,
+  );
+  process.exitCode = mismatches.length === 0 ? 0 : 1;
+}
+
 function main() {
   const argumentsList = process.argv.slice(2);
+  if (argumentsList.includes("--check-anchors")) {
+    checkAllAnchors();
+    return;
+  }
   const isJsonOutput = argumentsList.includes("--json");
   const onlyIndex = argumentsList.indexOf("--only");
   const onlyIdentifier = onlyIndex === -1 ? null : argumentsList[onlyIndex + 1];
