@@ -5,7 +5,7 @@
 
 ## 共同规则和实施顺序
 
-开始实现前完整读取AGENTS.md要求的四份治理文档、设计依据、本卡及 [产品接线共同规则](./PRODUCT_INTEGRATION_ROLLOUT.md)。复用现有存档、T09A预算/回访、独立反馈、取消与恢复模块。核对当前动态证据，不凭历史done推断前驱可用。
+开始实现前完整读取docs/PRODUCT_BEHAVIOUR_CONTRACT.md要求的四份治理文档、设计依据、本卡及 [产品接线共同规则](./PRODUCT_INTEGRATION_ROLLOUT.md)。复用现有存档、T09A预算/回访、独立反馈、取消与恢复模块。核对当前动态证据，不凭历史done推断前驱可用。
 
 推荐顺序：SUM-01 → SUM-02 → GUIDE-01 → EVENT-01。SUM-01需要T09A-R1/T07D-R1相关接线可用；GUIDE-01另需T07D-R2-02产品循环及T12A-R1恢复路径可用。离线检查点不要求等待真实Provider凭据。已开始的返修先收口，再领取这些新节点；完成后增量回归E2E-01，不覆盖原验收记录。
 
