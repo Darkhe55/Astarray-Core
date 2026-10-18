@@ -403,3 +403,24 @@ check    471 文件 / 3431 用例    exit 0
 **踩坑记录**：我尝试给三处都插 spread，但 845/1001 **不是对象字面量起点**（`new WorkerAgent(options)` 形式）
 ⇒ 插入导致 154 个语法错 ⇒ **立即回退**（`git checkout`），`typecheck` 回到 0。
 **下一轮必须先 `read` 这两处各 10 行**，看清是"对象字面量"还是"变量传参"，再决定改哪里（若是变量，则应改**构造该变量的地方**）。
+### 13.10 第 47 轮更正：`new WorkerAgent(` 的真实站点只有**一个**
+
+| 之前判断 | 更正 |
+| --- | --- |
+| 三个构造点 845/873/1001 | **845 与 1001 都在文档注释里**（`new WorkerAgent({...})` 作为示例被写进注释）⇒ **真实构造点只有 L873（`buildWorkerAgent` 内）** |
+
+⇒ 「多构造路径」的假设**不成立**；`store=false` 另有原因。
+
+**已排除**：
+- 装配层把 store 传给控制器 ✓（`application-runtime.ts:1138` 在 `new MainController({` 内）
+- 控制器 spread ✓（`main-controller.ts:1011`，与 G4 的 injector 同块）
+- 编排器 spread ✓（`mission-orchestrator.ts:917`，在 `buildWorkerAgent` 的对象内，`onEarlyStopDetected` 之前）
+- worker 读取 ✓（`worker-agent.ts` 的 `this.options.runHistoryStore`）
+- 钩子被调用 ✓（探针 `tool=factVerification`）
+
+**⇒ 矛盾点收窄为**：`this.options.workerFactories.runHistoryStore` 在编排器里拿到的是 `undefined`
+（否则 spread 会生效）。下一轮的唯一探针：在 `buildWorkerAgent` 首行打
+`console.error("[O-1] wfReg=" + String(this.options.workerFactories.toolDocumentationInjector !== undefined) + " wfHist=" + String(this.options.workerFactories.runHistoryStore !== undefined))`
+—— 若 `wfReg=true` 而 `wfHist=false`，说明**控制器那处 spread 没生效**（同一对象里一个有一个无 ⇒ 我看错了对象）。
+
+**注意**：我在这一卡上已连续 4 轮未收口（42–47），按纪律**下一轮只做这一个探针**，不再尝试修改。
