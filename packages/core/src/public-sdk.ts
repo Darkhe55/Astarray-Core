@@ -1003,6 +1003,19 @@ export {
   type RegisteredFoldPackage,
 } from "./orchestration/workflow-fold-package.js";
 /**
+ * EXP-01 / FOLD-01-03（2026-10-19）：包的复用、停用与回退判定。
+ *
+ * 纯判定：不执行工作流、不自动重跑旧工作流、不改注册表、不写盘。
+ */
+export {
+  buildFoldPackageRetirement,
+  evaluateFoldPackageReuse,
+  evaluateFoldRegressionResponse,
+  planFoldPackageRollback,
+  type FoldPackageReuseDecision,
+  type FoldPackageRollbackDecision,
+} from "./orchestration/workflow-fold-lifecycle.js";
+/**
  * EXP-01 / EXPLORE-01-02（2026-10-19）：有界试验执行、隔离、去重与可复现记录。
  *
  * 纯判定：不启动试验、不建目录、不调模型、不写盘。
