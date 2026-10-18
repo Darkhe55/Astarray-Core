@@ -60,17 +60,35 @@ export interface RunHistoryAppendOutcome {
   readonly reason: string;
 }
 
+/**
+ * 运行历史文件的**唯一**路径规则。
+ *
+ * 为什么不写在类里：只读视图层（`run-history-view.ts`）与 CLI 都要读同一个文件，
+ * 路径规则若各写一份就会漂移（一处改 sanitize、另一处忘了改 ⇒ 读不到自己的历史）。
+ */
+export function resolveRunHistoryFilePath(
+  baseDirectory: string,
+  missionIdentifier: string,
+): string {
+  const sanitized = missionIdentifier.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 96);
+  const fileNameBase = sanitized === "" ? "unnamed" : sanitized;
+  return path.join(baseDirectory, "run-history", `${fileNameBase}.json`);
+}
+
 /** 运行历史存储（每 mission 一份文件；写盘走白名单原子写）。 */
 export class RunHistoryStore {
-  private readonly rootDirectory: string;
+  private readonly baseDirectory: string;
 
   constructor(options: { readonly baseDirectory: string }) {
-    this.rootDirectory = path.join(options.baseDirectory, "run-history");
+    this.baseDirectory = options.baseDirectory;
   }
 
   private filePath(missionIdentifier: string): string {
-    const sanitized = missionIdentifier.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 96);
-    return path.join(this.rootDirectory, (sanitized === "" ? "unnamed" : sanitized) + ".json");
+    return resolveRunHistoryFilePath(this.baseDirectory, missionIdentifier);
+  }
+
+  private get rootDirectory(): string {
+    return path.join(this.baseDirectory, "run-history");
   }
 
   /** 读取；文件不存在 ⇒ absent；坏 JSON 或结构非法 ⇒ invalid（**不伪造完整**）。 */
@@ -92,7 +110,12 @@ export class RunHistoryStore {
       return { kind: "invalid", reason: "运行历史文件不是合法 JSON；按损坏处理，不伪称完整。" };
     }
 
-    return validateDocument(parsed, missionIdentifier);
+    const validated = validateRunHistoryDocument(parsed);
+    if (validated.kind === "invalid") return validated;
+    if (validated.document.missionIdentifier !== missionIdentifier) {
+      return { kind: "invalid", reason: "运行历史所属 mission 与请求不一致。" };
+    }
+    return validated;
   }
 
   /**
@@ -215,10 +238,23 @@ export class RunHistoryStore {
   }
 }
 
-function validateDocument(
+/**
+ * 文档结构校验结论（**不比对**请求的 mission 标识 —— 见下方说明）。
+ */
+export type RunHistoryDocumentValidation =
+  | { readonly kind: "invalid"; readonly reason: string }
+  | { readonly kind: "valid"; readonly document: RunHistoryDocument };
+
+/**
+ * 只校验**文档结构**（不比对文件名/请求的 mission 标识）。
+ *
+ * 为什么单独暴露：枚举历史文件时，文件名是 `sanitize` 后的结果，
+ * 可能与文档内自述的 `missionIdentifier` 不同（例如含空格/中文的标识）。
+ * 此时**不得**把合法文档误判成损坏，也不能因为文件名对不上就丢掉真实标识。
+ */
+export function validateRunHistoryDocument(
   raw: unknown,
-  missionIdentifier: string,
-): RunHistoryReadOutcome {
+): RunHistoryDocumentValidation {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     return { kind: "invalid", reason: "运行历史不是对象。" };
   }
@@ -226,8 +262,8 @@ function validateDocument(
   if (record["schemaVersion"] !== 1) {
     return { kind: "invalid", reason: "不认识的运行历史版本；拒绝按 v1 解释。" };
   }
-  if (record["missionIdentifier"] !== missionIdentifier) {
-    return { kind: "invalid", reason: "运行历史所属 mission 与请求不一致。" };
+  if (typeof record["missionIdentifier"] !== "string") {
+    return { kind: "invalid", reason: "运行历史缺少 missionIdentifier。" };
   }
   if (!Array.isArray(record["segments"])) {
     return { kind: "invalid", reason: "运行历史缺少 segments。" };

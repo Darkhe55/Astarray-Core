@@ -711,6 +711,34 @@ export {
   type MissionRuntimeState,
   type QueryMissionHistoryInput,
 } from "./gui/mission-history-reader.js";
+/**
+ * HISTORY-01-03（2026-10-18）：**运行历史的只读视图层**（SDK 入口）。
+ *
+ * 公开导出的理由同上一块：CLI/TUI/GUI 等消费者**不得依赖内部路径**。
+ * 该模块只读：不恢复 mission、不调模型、不注入上下文、不重放工具、不写文件。
+ */
+export {
+  DEFAULT_RUN_HISTORY_DISPLAY_SETTINGS,
+  DEFAULT_RUN_HISTORY_PAGE_SIZE,
+  HIDDEN_PROCESS_EXPLANATION_NOTICE,
+  HIDDEN_RUN_HISTORY_NOTICE,
+  MAXIMUM_RUN_HISTORY_DETAIL_CHARACTERS,
+  MAXIMUM_RUN_HISTORY_PAGE_SIZE,
+  MISSING_PROCESS_EXPLANATION_NOTICE,
+  REMOVED_CONTROL_SEQUENCE_PLACEHOLDER,
+  RUN_HISTORY_EVENT_KINDS,
+  buildRunHistoryTimelinePage,
+  listRunHistoryMissions,
+  queryRunHistoryTimeline,
+  renderRunHistoryPayloadDetail,
+  sanitizeRunHistoryDisplayText,
+  type RunHistoryDisplaySettings,
+  type RunHistoryEventKind,
+  type RunHistoryMissionListPage,
+  type RunHistoryMissionSummary,
+  type RunHistoryTimelineEntry,
+  type RunHistoryTimelinePage,
+} from "./orchestration/run-history-view.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,

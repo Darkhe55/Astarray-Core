@@ -229,6 +229,42 @@ const repositoryRootDirectory = path.resolve(
  */
 export const MUTATIONS = [
   {
+    mutationIdentifier: "run-history-view-ignores-display-settings",
+    targetFile: "packages/core/src/orchestration/run-history-view.ts",
+    find: `  if (kind === "model-note") return settings.showProcessExplanations;
+  if (kind === "tool-call" || kind === "tool-failure") return settings.showToolCalls;
+  return true;`,
+    replace: `  void kind;
+  void settings;
+  return true;`,
+    testFiles: ["tests/core/unit/history01-run-history-view.test.ts"],
+    expectedFailingTestNames: ["③ 关闭工具显示", "④ 过程说明"],
+    rationale:
+      "显示开关（showToolCalls / showProcessExplanations）若不再隐藏任何事件，就成了「开关摆设」" +
+      "⇒ 卡内 §4「关闭只隐藏、不影响采集」的两条反例必须变红",
+  },
+  {
+    mutationIdentifier: "run-history-view-ignores-cursor",
+    targetFile: "packages/core/src/orchestration/run-history-view.ts",
+    find: "const afterCursor = eligible.filter((item) => item.sequenceNumber > cursor);",
+    replace: "const afterCursor = eligible.filter((item) => item.sequenceNumber > 0);",
+    testFiles: ["tests/core/unit/history01-run-history-view.test.ts"],
+    expectedFailingTestNames: ["② 游标分页"],
+    rationale:
+      "游标被忽略 ⇒ 第二页重复第一页（卡内 §5「不因新事件重复或漏页」失守）⇒ 游标分页反例必须变红",
+  },
+  {
+    mutationIdentifier: "run-history-view-skips-display-sanitization",
+    targetFile: "packages/core/src/orchestration/run-history-view.ts",
+    find: "  const sanitized = sanitizeRunHistoryDisplayText(rawText);",
+    replace: "  const sanitized = rawText;",
+    testFiles: ["tests/core/unit/history01-run-history-view.test.ts"],
+    expectedFailingTestNames: ["⑦ 长详情截断"],
+    rationale:
+      "不脱敏就把 ANSI/控制序列交给终端（卡内 §4「按不可信输入安全渲染」）" +
+      "⇒ 非法 JSON payload 的脱敏反例必须变红",
+  },
+  {
     mutationIdentifier: "cross-project-forbidden-access-target-disabled",
     targetFile: "packages/core/src/orchestration/cross-project-authorization-store.ts",
     find: `    const isForbiddenAccessTarget = this.options.isForbiddenAccessTarget;
