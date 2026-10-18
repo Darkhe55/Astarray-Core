@@ -990,6 +990,18 @@ export {
   type SettingRiskKind,
   type SettingScopeKind,
 } from "./orchestration/config-chat-contract.js";
+/**
+ * EXP-01 / FOLD-01-02（2026-10-19）：候选 → 组合包 → 独立验证 → 注册。
+ *
+ * 纯判定：不执行工作流、不注册工具、不写盘、不调模型。
+ */
+export {
+  registerFoldPackage,
+  type FoldPackageRegistrationOutcome,
+  type FoldVerificationCase,
+  type FoldVerificationRecord,
+  type RegisteredFoldPackage,
+} from "./orchestration/workflow-fold-package.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
