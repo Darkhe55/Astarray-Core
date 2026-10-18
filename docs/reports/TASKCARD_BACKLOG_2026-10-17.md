@@ -447,3 +447,25 @@ worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + �
 **本卡状态（如实）**：`HISTORY-01-02` 数据层 ✅、钩子 ✅、`workerFactories` 透传 ✅，
 但**实际 mission 路径不经过该透传** ⇒ 端到端未生效。**不得声称完成。**
 **红用例**：`.tmp/history01-run-history-e2e.test.ts.draft`（未入库）。
+### 13.12 第 49 轮取证 + **本卡收束（按纪律停手）**
+
+| 取证 | 结论 |
+| --- | --- |
+| `main-controller.ts:897` 的 `runToolLoop` | 属**思索模式（ponder）**路径，**不是**本次 mission 路径 |
+| 本次 mission 的工具调用 | 确实发生在 **`worker-agent`** 内（探针 `[H-P] tool=factVerification` 在 worker 里触发） |
+| 该 worker 的构造点 | 唯一真实站点 `mission-orchestrator.ts:873`（`buildWorkerAgent`） |
+| 但编排器探针显示 | `this.options.workerFactories` **两个字段都是 undefined** ⇒ 控制器传给编排器的 `workerFactories` 是**空对象** |
+
+⇒ 剩下的唯一问题变成：**控制器在哪条分支构造编排器、为何 `workerFactories` 为空**。
+这是**一处需要专门读控制器构造段**的收尾，不是"再改一行"。
+
+**按纪律停手**：`HISTORY-01-02` 已用 **8 轮（42–49）**，超过 ≤6 轮预算。
+**当前不声称完成**，并把已确定的结论留给下一会话：
+
+- 数据层 ✅（8 条反例）
+- `onToolFailed` 钩子 ✅
+- worker 侧写入 ✅
+- `workerFactories` 透传代码 ✅（但**实际为空** ⇒ 未生效）
+- **端到端 ✗**（红用例在 `.tmp`）
+- **下一步唯一动作**：读 `main-controller` 构造 `MissionOrchestrator` 的段落，
+  查清 `workerFactories` 为何是空对象（是否只在 assist 分支传）。
