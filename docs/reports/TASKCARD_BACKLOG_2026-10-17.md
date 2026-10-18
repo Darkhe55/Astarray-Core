@@ -117,3 +117,38 @@
 > **反例验证（关键）**：临时加入一个 `find` 只截三元表达式第一行的探针变异体 ⇒ harness 正确报
 > **「❌ 脚本错误：变异使测试文件无法收集（语法/转换错误）…首条信息：Transform failed with 1 error」**（而非"存活"）✓
 > 随后移除探针 ⇒ 变异体数回到 **62**、`syntax-break-probe` 残留 **0**、**62/62** 全拦下 ✓
+
+---
+
+## 9. 第 7 轮：确定下一个**真正未开工**的卡 = `RELOCATE-01`
+
+**为什么是它**：`PLAN_STATUS.md` L344 明标 **`RELOCATE-01  pending（2026-10-17 新增计划）`**；
+卡内(L3)「状态：pending（方案已确认，未实施、未验收）」⇒ **方案已冻结、代码零实现**，是优先级的正确落点。
+
+**卡内语义（§2–§4 已读，作为验收依据）**：
+
+| 情况 | 规定行为 |
+| --- | --- |
+| 原路径可访问且身份一致 | 加载历史，进入**只读恢复对账**，不直接重跑 |
+| 路径不存在/设备未挂载/无权限 | 显示具体原因，**待关联**；不自动新建空目录 |
+| 原路径存在但**身份不同** | **阻止**套用旧历史与项目执行 |
+| 多个候选**相同身份** | 用户选择（继续原项目 / 独立打开），**不自动猜测** |
+| 标识缺失/登记损坏 | 进入旧格式关联流程，**不伪称验证成功** |
+
+**不可退让的约束**：位置状态与任务状态**分离**；查看历史**不启动模型、不恢复任务、不执行历史命令**；
+`projectIdentifier` 稳定、名称仅展示；ID/Git 信息**只是证据**，不构成新位置的自动授权；
+同名目录/同远端**不能单独证明身份**；路径失联**不得**把任务标 done/failed，也不自动归档；
+未知新位置**不能由模型代确认**（放权模式也不自动关联）；映射**不得**用字符串前缀判包含
+（`old-project-extra` 不属于 `old-project`）。
+
+### 9.1 检查点 01（身份与检测）的落地设计（下一轮开始，预算 ≤4 轮）
+
+1. **纯判定模块**（无 I/O、可单测）：`packages/core/src/orchestration/project-relocation-classification.ts`
+   - 输入：`{ registeredProjectIdentifier, registeredRootPath, currentRootPath, isRegisteredRootAccessible,
+     observedProjectIdentifierAtCurrentRoot, candidateIdentifiers }`
+   - 输出：`{ classification, isHistoryLoadable, isExecutionAllowed, requiredUserAction, reason }`
+   - 分类枚举固定为卡内 5 行 + `unregistered`（无登记）
+2. **反例优先**（先写、确认红）：①身份不同 ⇒ 阻止；②标识相同但目录复制 ⇒ 不自动授权；
+   ③多候选同身份 ⇒ 需用户选择；④标识缺失 ⇒ 不伪称成功；⑤`old-project-extra` 不算包含关系。
+3. **只读纪律**：模块不得读文件、不得启动模型、不得改任务状态（由纯函数保证）。
+4. 记录：卡检查点 01 状态 + `PLAN_STATUS` + 本 backlog。
