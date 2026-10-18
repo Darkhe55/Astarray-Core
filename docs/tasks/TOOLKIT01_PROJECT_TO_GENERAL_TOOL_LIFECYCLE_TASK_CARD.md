@@ -400,7 +400,7 @@ CLI 每次调用都是**独立进程**，因此"停用阻止新运行"与"回滚
 
 **缺口**：检查点 06 要求"共用 SDK 与 CLI/TUI/GUI 最小管理入口、**tarball 隔离包闭环**、
 收益评估"。此前工具包能力**从未在隔离安装的 tarball 上验证过** ——
-"包级验收必须以 tarball 隔离安装为准"（AGENTS.md）这一条对 TOOLKIT-01 仍是空白。
+"包级验收必须以 tarball 隔离安装为准"（docs/PRODUCT_BEHAVIOUR_CONTRACT.md）这一条对 TOOLKIT-01 仍是空白。
 
 **本轮交付**：
 
@@ -683,7 +683,7 @@ packages/tui/src/cli.tsx:416 / 436
 - ❌ **让调用方自己算一个差异指纹传进来**：这仍然是**调用方的断言**，
   只是把"顺手传 true"变成"顺手算个哈希"——没有解决"谁来证明用户真的同意过"。
 - ❌ **只在 CLI 层加确认交互**：绕过 CLI 直接调 SDK/服务仍可放行；
-  且"门禁"必须在**服务端**成立（AGENTS.md：判定由本地确定性策略完成，
+  且"门禁"必须在**服务端**成立（docs/PRODUCT_BEHAVIOUR_CONTRACT.md：判定由本地确定性策略完成，
   不能靠调用方声明）。
 - ✅ **定稿：新增"重新授权记录"原语**（`tool-package-reauthorization-record-store.ts`）：
   - 记录**绑定**：`projectIdentifier` + `toolPackageId` + `fromVersion` + `toVersion`

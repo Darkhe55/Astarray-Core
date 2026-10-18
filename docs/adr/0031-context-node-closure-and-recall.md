@@ -2,7 +2,7 @@
 
 > 状态：已接受（T09A-01 契约冻结）
 > 日期：2026-09-09
-> 关联：`agent-main-architecture.md` §11、`docs/tasks/T09A_CONTEXT_NODE_CLOSURE_AND_RECALL_TASK_CARD.md`
+> 关联：`agent-main-architecture.md` §11、`docs/tasks/accepted/T09A_CONTEXT_NODE_CLOSURE_AND_RECALL_TASK_CARD.md`
 
 ## 背景
 
