@@ -647,6 +647,12 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R11 | `EXP-01 / EXPLORE-01-01`：问题指纹、计划必填、独立预算（**不透支**）、启动六类拒绝、停止六类条件 | 新增 `explore-plan-contract.ts` + `tests/core/unit/exp01-explore-plan.test.ts`（**9 条**）；4 条变异体（资源未知仍启动／允许透支／无进展不停／重复组合放行）均被拦下；SDK 导出 | `check` **481/3537 exit 0**；`coverage` 分支 **85.43% exit 0** |
 | R12 | `EXP-01 / CURATE-01-01`：授权绑定 revision+参数指纹、未授权零自动整理、**本地确定性**重大变更矩阵、未知差异按重大、等待只暂停新方案 | 新增 `curation-plan-contract.ts` + `tests/core/unit/exp01-curation-plan.test.ts`（**9 条**）；4 条变异体（忽略范围扩大／未知差异降级／跳过指纹／连旧方案一起停）均被拦下；SDK 导出 | `check` **482/3546 exit 0**；`coverage` 分支 **85.49% exit 0** |
 | R13 | `LESSON-01-01`：沟通经验记录契约（事件时配置快照、unknown 显式、事实/假设分离、个体归属写入、匹配与自动注入） | 新增 `lesson-record-contract.ts` + `tests/core/unit/lesson01-record-contract.test.ts`（**11 条**）；4 条变异体（主 Agent 可写／接受重建快照／事实假设混写／未知版本按精确匹配）均被拦下；SDK 导出 | `check` **483/3557 exit 0**；`coverage` 分支 **85.54% exit 0** |
+| R14 | `WORKWINDOW-01-01`：工作/休息时段规则（白/黑名单、跨午夜、一次性例外优先、休息优先、项目不可覆盖全局休息）、IANA 时区与 DST、暂停原因分记、恢复六类阻塞、时钟跳变 | 新增 `work-window-contract.ts` + `tests/core/unit/workwindow01-contract.test.ts`（**12 条**）；4 条变异体（休息不再优先／例外不再优先／暂停原因被覆盖／忽略未知副作用）均被拦下；SDK 导出 | `check` **484/3569 exit 0**（首跑 `local-readonly-tools-production-wiring` 后置 EPERM rename 抖动 ⇒ 复跑全绿）；`coverage` 分支 **85.54% exit 0** |
+
+> **R14 推送状态（如实）**：R13 提交 `c7c45e3a` 在本轮**再次连续 5 次**推送失败（128），`git ls-remote` 探针亦失败
+> ⇒ 远端 SSH 通道持续不可达。按纪律继续累积，下一阶段合并 `c7c45e3a`、R14 提交重试（≤5 次）。
+> **R14 门禁抖动**：首跑 `check` 的 484 文件/3569 用例**全部通过**，但 vitest 报 1 条**后置未处理错误**
+> （`atomic-json` 的 Windows rename 竞争重试最终 `EPERM`，发生在测试完成后）⇒ 复跑全绿；如实记录，未改断言。
 
 > **R5 记一条 harness 可靠性观察（如实）**：`gui0203-views-runtime-state-collapsed` 在**全量**运行里报"存活"、
 > **单独**运行被拦下（且早前全量也曾拦下）。这与本仓已记录的"负载下门禁抖动"同族（GUI 用例会起本地服务）。
@@ -687,3 +693,6 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 > **R8 推送状态（如实）**：提交 `8959beff` 已在本地；`git push` **连续 5 次失败**（`Connection reset by 20.205.243.166 port 22`，
 > 探针 `git ls-remote` 有时成功 ⇒ 已知的 SSH 写通道抖动）。按纪律记为本阶段**跳过**，
 > 下一阶段把该提交与后续提交**合并重试**（≤5 次）。
+
+> **R13 推送状态（如实）**：提交 `c7c45e3a` 已在本地；`git push` **5 次失败**、`git ls-remote` 探针同样失败（128）
+> ⇒ 远端 SSH 通道不可达（与 R8 同类）。按纪律记为本阶段**跳过**；下一阶段合并 `c7c45e3a` 与后续提交重试（≤5 次）。
