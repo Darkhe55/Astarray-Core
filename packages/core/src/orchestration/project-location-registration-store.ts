@@ -7,6 +7,8 @@
  * - 读取时区分 absent / invalid（JSON 坏）/ legacy / valid —— **不修补、不猜测**。
  */
 import { promises as fs } from "node:fs";
+
+import { backupExistingFile, writeAtomicJson } from "../infra/atomic-json.js";
 import path from "node:path";
 
 import {
@@ -73,27 +75,24 @@ export class ProjectLocationRegistrationStore {
     await fs.mkdir(this.registrationRootDirectory, { recursive: true });
     const filePath = this.registrationFilePath(nextRegistration.projectIdentifier);
 
-    // ① 备份现有登记（若存在）
+    // ① 备份现有登记（若存在）——由白名单原子写模块完成（架构守卫 T12-05）
     try {
       const existing = await fs.readFile(filePath, "utf8");
-      await fs.mkdir(this.backupRootDirectory, { recursive: true });
       const parsedExisting = JSON.parse(existing) as { locationRevision?: number };
       const existingRevision =
         typeof parsedExisting.locationRevision === "number" ? parsedExisting.locationRevision : 0;
-      await fs.writeFile(
+      await fs.mkdir(this.backupRootDirectory, { recursive: true });
+      await backupExistingFile(
+        filePath,
         this.backupFilePath(nextRegistration.projectIdentifier, existingRevision),
-        existing,
-        "utf8",
       );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       // 首次写入：没有旧文件可备份
     }
 
-    // ② 写临时文件后原子替换
-    const temporaryFilePath = filePath + ".tmp-" + String(process.pid);
-    await fs.writeFile(temporaryFilePath, JSON.stringify(nextRegistration, null, 2), "utf8");
-    await fs.rename(temporaryFilePath, filePath);
+    // ② 原子写（临时文件 → fsync → rename），复用已被白名单的模块
+    await writeAtomicJson(filePath, nextRegistration);
   }
 }
 
