@@ -1,7 +1,7 @@
 # T09A-R1-01 上下文装配与必要信息保护 · 证据
 
 > 检查点：T09A-R1-01　状态：done
-> 任务卡：`docs/tasks/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T07D-R1（done）、T07D-R2-02（done）
+> 任务卡：`docs/tasks/accepted/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T07D-R1（done）、T07D-R2-02（done）
 > 基线提交：`80274a4`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 实现内容

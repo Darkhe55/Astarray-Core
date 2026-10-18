@@ -1,7 +1,7 @@
 # T09A-R1-02 设置与延后片段 · 证据
 
 > 检查点：T09A-R1-02　状态：done
-> 任务卡：`docs/tasks/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T09A-R1-01（done）
+> 任务卡：`docs/tasks/accepted/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T09A-R1-01（done）
 > 基线提交：`4f7e815`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 实现内容

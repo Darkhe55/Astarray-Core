@@ -63,7 +63,7 @@ T07D-R2-04 真实收口通过：同一次运行内产物正确 + 任务 done ✓
 
 ## 5. 为什么暂不升级支撑等级（诚实边界）
 
-`docs/tasks/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md` 的定义：
+`docs/tasks/accepted/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md` 的定义：
 
 | 等级 | 定义 | 本次是否满足 |
 | --- | --- | --- |

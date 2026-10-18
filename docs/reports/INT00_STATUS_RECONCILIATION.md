@@ -10,7 +10,7 @@
 # INT-00-03 状态与依赖纠偏
 
 > 检查点：INT-00-03（状态与依赖纠偏）　状态：done
-> 任务卡：`docs/tasks/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
+> 任务卡：`docs/tasks/accepted/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
 > 日期：2026-09-10；基线提交：`c3025bd`；依据：`docs/reports/INT00_PRODUCT_PATH_MATRIX.md`、`docs/reports/INT00_BEHAVIOR_EVIDENCE.md`
 > 原则：保留历史证据，不用说明文字覆盖未满足门禁；真实服务未验证一律不得写为已支持。
 

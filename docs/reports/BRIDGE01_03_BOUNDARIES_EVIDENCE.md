@@ -1,6 +1,6 @@
 # BRIDGE-01-03 边界与断连 — 实现与证据
 
-> 检查点：BRIDGE-01-03（docs/tasks/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md）
+> 检查点：BRIDGE-01-03（docs/tasks/accepted/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md）
 > 前驱：BRIDGE-01-02（MCP 最小工具映射）。日期：2026-09-12
 
 ## 1. 交付

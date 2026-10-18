@@ -1,7 +1,7 @@
 # T07D-R1-04 消费者与入口一致性 · 证据
 
 > 检查点：T07D-R1-04　状态：done（T07D-R1 卡全部检查点通过）
-> 任务卡：`docs/tasks/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md`；前驱：T07D-R1-03（done）
+> 任务卡：`docs/tasks/accepted/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md`；前驱：T07D-R1-03（done）
 > 基线提交：`8208679`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 行为反例（先红）

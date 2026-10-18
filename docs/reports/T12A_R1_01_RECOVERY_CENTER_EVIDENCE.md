@@ -1,6 +1,6 @@
 # T12A-R1-01 恢复命令到应用服务 — 实现与入口证据
 
-> 检查点：T12A-R1-01（docs/tasks/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
+> 检查点：T12A-R1-01（docs/tasks/accepted/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
 > 前驱：T07D-R1（应用装配）已通过；本轮只执行本检查点，不领取后继。
 > 日期：2026-09-10
 

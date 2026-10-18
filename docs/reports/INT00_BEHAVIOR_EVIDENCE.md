@@ -1,7 +1,7 @@
 # INT-00-02 行为证据
 
 > 检查点：INT-00-02（行为证据）　状态：done
-> 任务卡：`docs/tasks/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
+> 任务卡：`docs/tasks/accepted/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
 > 日期：2026-09-10；基线提交：`d42fccc`；隔离目录：`.tmp/int00-02/`
 > 约束遵守：只读诊断，未安装新资源（tarball 由本仓库 `npm pack` 生成并本地解包），未触发真实付费请求，未修改产品代码。
 

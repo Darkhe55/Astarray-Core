@@ -1,7 +1,7 @@
 # T09A-R1-04 实际缓存与指标 · 证据
 
 > 检查点：T09A-R1-04　状态：done（T09A-R1 卡四个检查点全部通过）
-> 任务卡：`docs/tasks/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T09A-R1-03（done）
+> 任务卡：`docs/tasks/accepted/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T09A-R1-03（done）
 > 基线提交：`1689ccb`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 实现内容

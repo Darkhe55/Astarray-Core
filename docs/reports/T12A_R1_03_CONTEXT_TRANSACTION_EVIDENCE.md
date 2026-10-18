@@ -1,6 +1,6 @@
 # T12A-R1-03 上下文事务恢复 — 实现与部分提交重放证据
 
-> 检查点：T12A-R1-03（docs/tasks/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
+> 检查点：T12A-R1-03（docs/tasks/accepted/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
 > 前驱：T12A-R1-02（已通过，提交 `daf7cd1`/`d59cc74`）。
 > 日期：2026-09-10
 

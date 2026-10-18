@@ -1,7 +1,7 @@
 # INT-00-01 产品执行路径矩阵
 
 > 检查点：INT-00-01（入口与构建基线）　状态：done
-> 任务卡：`docs/tasks/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
+> 任务卡：`docs/tasks/accepted/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
 > 日期：2026-09-10；执行：主 Agent（只审计，不修改产品代码）
 > 说明：结论均给出代码位置、搜索范围与反例；真实命令/事件顺序的行为级证据由 INT-00-02 补齐。
 
