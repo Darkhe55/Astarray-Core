@@ -646,6 +646,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R10 | **5 轮一次全量门禁**：变异全量（95 条）+ 隔离包三项 | — | 变异 **94/95**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed` ⇒ **单独复跑 2/2 被拦下**（与 R5 同一 GUI 用例的负载抖动；**该守卫与用例都在未跟踪私有 UI**，公开门禁不保证它）⇒ 如实记录、不当作缺口；`npm pack` **269 文件** sha256 `a30c0cf4…`；`verify-package` / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
 | R11 | `EXP-01 / EXPLORE-01-01`：问题指纹、计划必填、独立预算（**不透支**）、启动六类拒绝、停止六类条件 | 新增 `explore-plan-contract.ts` + `tests/core/unit/exp01-explore-plan.test.ts`（**9 条**）；4 条变异体（资源未知仍启动／允许透支／无进展不停／重复组合放行）均被拦下；SDK 导出 | `check` **481/3537 exit 0**；`coverage` 分支 **85.43% exit 0** |
 | R12 | `EXP-01 / CURATE-01-01`：授权绑定 revision+参数指纹、未授权零自动整理、**本地确定性**重大变更矩阵、未知差异按重大、等待只暂停新方案 | 新增 `curation-plan-contract.ts` + `tests/core/unit/exp01-curation-plan.test.ts`（**9 条**）；4 条变异体（忽略范围扩大／未知差异降级／跳过指纹／连旧方案一起停）均被拦下；SDK 导出 | `check` **482/3546 exit 0**；`coverage` 分支 **85.49% exit 0** |
+| R13 | `LESSON-01-01`：沟通经验记录契约（事件时配置快照、unknown 显式、事实/假设分离、个体归属写入、匹配与自动注入） | 新增 `lesson-record-contract.ts` + `tests/core/unit/lesson01-record-contract.test.ts`（**11 条**）；4 条变异体（主 Agent 可写／接受重建快照／事实假设混写／未知版本按精确匹配）均被拦下；SDK 导出 | `check` **483/3557 exit 0**；`coverage` 分支 **85.54% exit 0** |
 
 > **R5 记一条 harness 可靠性观察（如实）**：`gui0203-views-runtime-state-collapsed` 在**全量**运行里报"存活"、
 > **单独**运行被拦下（且早前全量也曾拦下）。这与本仓已记录的"负载下门禁抖动"同族（GUI 用例会起本地服务）。

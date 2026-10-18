@@ -906,6 +906,27 @@ export {
   type CurationPlanV1,
   type CurationRunDecision,
 } from "./orchestration/curation-plan-contract.js";
+/**
+ * LESSON-01-01（2026-10-18）：沟通经验记录的契约层（事件时配置快照、个体归属、匹配与写入判定）。
+ *
+ * 纯判定：不写存档、不调模型、不注入上下文、不推广。
+ */
+export {
+  LESSON_DEFAULT_SCOPE_KIND,
+  MAIN_AGENT_LESSON_WRITE_CAPABILITY,
+  evaluateLessonWrite,
+  isLessonApplicableToTask,
+  isLessonAutoInjectible,
+  validateLessonRecord,
+  type LessonApplicabilityDecision,
+  type LessonModelSnapshot,
+  type LessonPromotionStatus,
+  type LessonRecordInput,
+  type LessonRecordValidation,
+  type LessonScopeKind,
+  type LessonValidityStatus,
+  type LessonWriteDecision,
+} from "./orchestration/lesson-record-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
