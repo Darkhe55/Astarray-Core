@@ -283,3 +283,15 @@ npm pack 273 文件             exit 0；两项 verify exit 0
 | **tarball** 双进程搬迁证据 | ⚠️ **未取得**。两条路都失败：①本机 `npm install` 不生成 `node_modules`；②**解包直跑**报 `ERR_MODULE_NOT_FOUND: zod`（tarball 不含依赖，必须真实安装）。⇒ 双进程证据用的是**仓库 `dist`**；隔离包方面只有 `verify-package`/`verify-sdk-consumer`（exit 0）。**不得声称已有 tarball 双进程证据** |
 | TUI / GUI 入口 | 未做（GUI 属外部人工体验） |
 | `--observed-identifier` 的来源 | 目前由调用方提供；项目内标识文件形态由项目自定义，CLI 不假设 |
+
+### 13.3 `HISTORY-01-01` 审计结论（2026-10-18 第 35 轮，含证据）
+
+| 检查 | 结果 |
+| --- | --- |
+| 现有历史读取器 | `packages/core/src/gui/mission-history-reader.ts`（336 行，GUI 只读视图用） |
+| 是否含**工具调用/失败调用**字段 | **没有**（该文件内 `tool`／`failure` 零命中；无结构化 `readonly` 字段声明，返回松散对象） |
+| 是否含**模型说明/过程说明** | 未发现 |
+| 结论 | `HISTORY01` 的 §2「必须保存的历史」与 §7「必需测试」**确实未实现**，卡内 `pending` 状态**属实** ✓ |
+
+⇒ **`HISTORY-01-02`（最小历史持久化）是真正的下一步工作**：需要新增结构化记录（工具调用、失败、恢复分界），
+而不是"补一个视图"。**本轮未开工实现**（预算用于审计取证）。
