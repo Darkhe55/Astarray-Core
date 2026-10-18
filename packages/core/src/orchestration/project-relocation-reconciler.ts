@@ -130,6 +130,39 @@ export function reconcileProjectRelocation(input: {
     }
   }
 
+  /**
+   * **fail-closed 的输入校验（2026-10-19 R33 实测缺陷）**：脱敏样例第一次跑批量对账时，
+   * 一条"扁平结构"的未决操作（`operationIdentifier` 在顶层、缺 `operation` 子对象）
+   * 让 `decideRecoveryAfterRelocation` 抛 `TypeError: Cannot read properties of undefined`。
+   * 未决操作**观测残缺**时必须当作**阻塞**，不得抛错、更不得放行。
+   */
+  const malformedPendingOperations = input.pendingOperations.filter(
+    (pendingOperation) =>
+      typeof pendingOperation?.operation !== "object" ||
+      pendingOperation.operation === null ||
+      typeof pendingOperation.operation.operationIdentifier !== "string" ||
+      pendingOperation.operation.operationIdentifier.trim() === "" ||
+      typeof pendingOperation.operation.isCompleted !== "boolean" ||
+      typeof pendingOperation.operation.isIdempotent !== "boolean" ||
+      typeof pendingOperation.operation.hasUnknownSideEffect !== "boolean" ||
+      typeof pendingOperation.hasCurrentPermissionAtNewLocation !== "boolean" ||
+      typeof pendingOperation.reliesOnPreviousOneTimeGrant !== "boolean" ||
+      typeof pendingOperation.reliesOnTemporaryEscalation !== "boolean",
+  );
+  if (malformedPendingOperations.length > 0) {
+    return {
+      kind: "blocked",
+      projectIdentifier: input.projectIdentifier,
+      resolvedReferences,
+      unresolvedReferences,
+      pendingOperationDecisions: [],
+      isAutoResumeAllowed: false,
+      isExecutionAllowed: false,
+      requiredUserAction:
+        "未决操作的观测字段残缺（无法判断是否已完成/是否幂等/是否依赖旧授权）：保守阻塞，请补齐观测后再对账。",
+    };
+  }
+
   const pendingOperationDecisions = input.pendingOperations.map((pendingOperation) => {
     const decision = decideRecoveryAfterRelocation({
       operation: pendingOperation.operation,
