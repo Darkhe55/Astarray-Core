@@ -25,6 +25,7 @@ import {
   MAXIMUM_RUN_HISTORY_PAGE_SIZE,
   MISSING_PROCESS_EXPLANATION_NOTICE,
   REMOVED_CONTROL_SEQUENCE_PLACEHOLDER,
+  buildRunHistoryEvidenceAnchor,
   buildRunHistoryTimelinePage,
   listRunHistoryMissions,
   queryRunHistoryTimeline,
@@ -461,5 +462,113 @@ describe("HISTORY-01-03：运行历史只读视图（分页 / 过滤 / 安全渲
     });
     expect(nextPage.entries.map((entry) => entry.missionIdentifier)).not.toContain(cursor);
     expect(nextPage.entries).toHaveLength(2);
+  });
+
+  it("⑭ 关键词检索：纯子串、大小写不敏感、不解释正则；只搜可见事件；命中数为分页前计数", () => {
+    const document: RunHistoryDocument = {
+      schemaVersion: 1,
+      missionIdentifier: "mission-search",
+      segments: [
+        {
+          segmentRevision: 1,
+          startedAtIso: "2026-10-18T00:00:00.000Z",
+          events: [
+            event("s1", "tool-call", "2026-10-18T00:00:01.000Z", {
+              toolName: "readFile",
+              outputText: "Permission DENIED for path",
+            }),
+            event("s2", "tool-call", "2026-10-18T00:00:02.000Z", {
+              outputText: "axxb looks like a pattern",
+            }),
+            event("s3", "model-note", "2026-10-18T00:00:03.000Z", {
+              note: "permission 相关的过程说明",
+            }),
+            event("s4", "tool-call", "2026-10-18T00:00:04.000Z", {
+              outputText: "nothing relevant",
+            }),
+          ],
+        },
+      ],
+    };
+
+    // 大小写不敏感 + 子串
+    const insensitive = buildRunHistoryTimelinePage({
+      document,
+      searchQuery: "permission denied",
+    });
+    expect(insensitive.entries.map((entry) => entry.eventIdentifier)).toEqual(["s1"]);
+    expect(insensitive.searchQuery).toBe("permission denied");
+    expect(insensitive.searchMatchCount).toBe(1);
+    // 分页前计数：pageSize=1 时命中总数仍是 1
+    expect(insensitive.entries).toHaveLength(1);
+
+    // **正则字符按字面量**：`a.*b` 不得把 `axxb` 搜出来
+    const literal = buildRunHistoryTimelinePage({ document, searchQuery: "a.*b" });
+    expect(literal.entries).toEqual([]);
+    expect(literal.searchMatchCount).toBe(0);
+
+    // 只搜**可见**事件：默认隐藏过程说明 ⇒ s3 不应命中
+    const hiddenKinds = buildRunHistoryTimelinePage({ document, searchQuery: "过程说明" });
+    expect(hiddenKinds.entries).toEqual([]);
+    expect(hiddenKinds.searchMatchCount).toBe(0);
+    const shownKinds = buildRunHistoryTimelinePage({
+      document,
+      searchQuery: "过程说明",
+      displaySettings: { showProcessExplanations: true },
+    });
+    expect(shownKinds.entries.map((entry) => entry.eventIdentifier)).toEqual(["s3"]);
+
+    // 空白检索词 = 不检索（不返回「0 命中」的假检索态）
+    const blank = buildRunHistoryTimelinePage({ document, searchQuery: "   " });
+    expect(blank.searchQuery).toBeNull();
+    expect(blank.searchMatchCount).toBeNull();
+    expect(blank.entries).toHaveLength(3); // 默认隐藏 model-note ⇒ 4 - 1
+
+    // 总显示开关关闭时**没有检索**（不得报 0 命中冒充搜过）
+    const hiddenAll = buildRunHistoryTimelinePage({
+      document,
+      searchQuery: "permission",
+      displaySettings: { showRunHistory: false },
+    });
+    expect(hiddenAll.searchQuery).toBeNull();
+    expect(hiddenAll.searchMatchCount).toBeNull();
+  });
+
+  it("⑮ 稳定证据锚点：格式固定、同序号唯一、跨页不漂移", () => {
+    const document = twoSegmentDocument();
+    const firstPage = buildRunHistoryTimelinePage({
+      document,
+      pageSize: 2,
+      searchQuery: undefined,
+    });
+    expect(firstPage.entries.map((entry) => entry.evidenceAnchor)).toEqual([
+      "run-history:mission-two-segments#1",
+      "run-history:mission-two-segments#2",
+    ]);
+
+    const secondPage = buildRunHistoryTimelinePage({
+      document,
+      pageSize: 2,
+      cursor: firstPage.nextCursor,
+    });
+    // 追加新事件后，既有条目的锚点**不变**（序号单调）
+    const appended = twoSegmentDocument();
+    appended.segments[0]?.events.push(
+      event("extra", "tool-call", "2026-10-18T00:00:09.000Z", { toolName: "readFile" }),
+    );
+    const appendedPage = buildRunHistoryTimelinePage({
+      document: appended,
+      pageSize: 3,
+      cursor: firstPage.nextCursor,
+    });
+    expect(secondPage.entries[0]?.sequenceNumber).toBe(appendedPage.entries[0]?.sequenceNumber);
+    expect(appendedPage.entries[0]?.evidenceAnchor).toBe(
+      buildRunHistoryEvidenceAnchor("mission-two-segments", appendedPage.entries[0]?.sequenceNumber ?? 0),
+    );
+    // 锚点按序号唯一
+    const allAnchors = [...firstPage.entries, ...secondPage.entries].map(
+      (entry) => entry.evidenceAnchor,
+    );
+    expect(new Set(allAnchors).size).toBe(allAnchors.length);
   });
 });

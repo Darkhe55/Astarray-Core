@@ -109,39 +109,41 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `packages/core/src/orchestration/run-history-view.ts`（新增） | 只读视图层：游标分页、种类过滤、三个显示开关、安全渲染、mission 列表（只读当前页）、`queryRunHistoryTimeline()` |
+| `packages/core/src/orchestration/run-history-view.ts`（新增） | 只读视图层：游标分页、种类过滤、三个显示开关、**关键词检索（纯子串、大小写不敏感、不解释正则）**、**稳定证据锚点** `run-history:<mission>#<序号>`、安全渲染、mission 列表（只读当前页）、`queryRunHistoryTimeline()` |
 | `packages/core/src/orchestration/run-history-store.ts` | 抽出**唯一**路径规则 `resolveRunHistoryFilePath()` 与结构校验 `validateRunHistoryDocument()`（视图层不再复制文件名规则，避免两处漂移） |
 | `packages/core/src/public-sdk.ts` | 公开导出视图层 API（消费者不依赖内部路径） |
-| `packages/tui/src/cli/history-command.ts`（新增） | `history list` / `history show`：分页、`--kind` 过滤、`--hide-run-history` / `--show-process-explanations` / `--hide-tool-calls`、`--json` |
+| `packages/tui/src/cli/history-command.ts`（新增） | `history list` / `history show`：分页、`--kind` 过滤、`--search` 检索、三个显示开关、`--json` |
 | `packages/tui/src/cli.tsx` | 注册 `history` 命令与两个子命令 |
 
-### 8.2 反例（先写后实现；**31 条**）
+### 8.2 反例（先写后实现；**35 条**）
 
 | 文件 | 条数 | 覆盖 |
 | --- | --- | --- |
-| `tests/core/unit/history01-run-history-view.test.ts` | 13 | 跨段序号/段号/标签；游标分页不重复不漏页（含追加后）；关闭工具显示后磁盘仍在；过程说明缺失 vs 隐藏两种文案；总开关关闭仍报计数（隐藏数=全部）；ANSI/OSC/控制字节移除；长详情截断；非法 payload；页大小夹取（含 <1）；空数组种类过滤；`absent`/`invalid` 如实；列表只读本页 + 最近优先 + 损坏条目保留 + 文件名与内部标识不一致不误判；负数页码/未知游标/原始值 payload |
-| `tests/tui/unit/history01-run-history-cli-entry.test.ts` | 6 | 真实 `dist/cli.js` 子进程：`list --json`；`show --json` 默认隐藏过程说明且翻页不重复；`--show-process-explanations`；无历史 ⇒ exit 1；未知 `--kind` ⇒ exit 2；stdout 无 ANSI |
-| `tests/tui/unit/history01-run-history-command.test.ts` | 12 | **进程内**调用命令函数（子进程用例的覆盖率不归属 `src`）：`list` 文本/JSON/空列表/损坏条目/目录不可读；`show` 文本（标签、段号、非法 JSON、截断、游标）、JSON、absent、invalid、读取抛错、总开关关闭；`resolveIncludedKinds` 三态 |
+| `tests/core/unit/history01-run-history-view.test.ts` | 15 | 跨段序号/段号/标签；游标分页不重复不漏页（含追加后）；关闭工具显示后磁盘仍在；过程说明缺失 vs 隐藏两种文案；总开关关闭仍报计数（隐藏数=全部）；ANSI/OSC/控制字节移除；长详情截断；非法 payload；页大小夹取（含 <1）；空数组种类过滤；`absent`/`invalid` 如实；列表只读本页 + 最近优先 + 损坏条目保留 + 文件名与内部标识不一致不误判；负数页码/未知游标/原始值 payload；**检索**（大小写不敏感、`a.*b` 按字面量、只搜可见事件、空白即不检索、总开关关闭不报 0 命中）；**证据锚点**（格式固定、序号唯一、追加后不漂移） |
+| `tests/tui/unit/history01-run-history-cli-entry.test.ts` | 7 | 真实 `dist/cli.js` 子进程：`list --json`；`show --json` 默认隐藏过程说明且翻页不重复；`--show-process-explanations`；无历史 ⇒ exit 1；未知 `--kind` ⇒ exit 2；stdout 无 ANSI；**`--search` 只返回命中并回显检索词/命中数** |
+| `tests/tui/unit/history01-run-history-command.test.ts` | 13 | **进程内**调用命令函数（子进程用例的覆盖率不归属 `src`）：`list` 文本/JSON/空列表/损坏条目/目录不可读；`show` 文本（标签、段号、非法 JSON、截断、游标、**检索命中数与锚点**）、JSON（**回显 searchQuery/searchMatchCount**）、absent、invalid、读取抛错、总开关关闭；`resolveIncludedKinds` 三态 |
 
 ### 8.3 拔线与变异
 
 - **拔线（3 次，手工探针，未入库）**：显示设置不再隐藏（2 条用例变红）、游标被忽略（1 条）、
   不脱敏（1 条）⇒ 还原后逐字节一致。
-- **永久变异体（3 条，`scripts/verify-mutation-kills.mjs`）**：
+- **永久变异体（4 条，`scripts/verify-mutation-kills.mjs`）**：
   `run-history-view-ignores-display-settings`、`run-history-view-ignores-cursor`、
-  `run-history-view-skips-display-sanitization` —— 单条复跑**均被拦下**。
+  `run-history-view-skips-display-sanitization`、`run-history-view-ignores-search-query`
+  —— 单条复跑**均被拦下**。
 
 ### 8.4 门禁（如实）
 
-- `npm run check` **exit 0**：**474 文件 / 3459 用例**全部通过（其中含 30 个私有 GUI 用例文件、
+- `npm run check` **exit 0**：**474 文件 / 3463 用例**全部通过（其中含 30 个私有 GUI 用例文件、
   仅排除 1 个**前提已作废**的文件，见 §9）。
-- `test:coverage` **exit 0**：行 **92.64%** / 分支 **85.20%** / 函数 **93.33%** / 语句 **92.71%**
+- `test:coverage` **exit 0**：行 **92.64%** / 分支 **85.22%** / 函数 **93.30%** / 语句 **92.71%**
   （阈值 85%）。**如实记录**：第一版只有子进程用例时 `history-command.ts` 覆盖率是 **0%**
   （v8 不把 `dist` 子进程的执行归属到 `src`）⇒ 全局分支跌到 **84.82% 未过阈值**；
-  补 §8.2 的**进程内**用例后回到 85.20%。
-- `verify:mutation-kills` **73/73 被拦下**（含本检查点新增 3 条）。**计数口径**：73 = **已提交 72 条**
+  补 §8.2 的**进程内**用例后回到 85.2x%。
+- `verify:mutation-kills` 全量 **73/73 被拦下**（2026-10-18 两轮全量复跑）；本轮新增
+  `run-history-view-ignores-search-query` 单条复跑**被拦下**。**计数口径**：73 = **已提交 72 条**
   + 工作树里上一会话遗留、**未提交**的 `run-history-drops-dedupe` 1 条（按暂存纪律未提交）
-  ⇒ **干净检出（HEAD）为 72/72**。
+  ⇒ **干净检出（HEAD）为 72/72**（本轮再 +1 条已提交的检索变异体）。
 - 隔离包：`npm pack` ⇒ `astarray-0.1.0.tgz`（**269 文件**），
   `verify-package.mjs` exit 0、`verify-sdk-consumer.mjs` exit 0。
 - 顺带修掉两处**基线红灯**（见 §9），并更新 `PLAN_STATUS.md` 与 backlog。
@@ -150,8 +152,9 @@
 
 1. **TUI 面板**（`packages/tui/src/ui/**` 属未跟踪私有目录，本检查点未改）；
 2. **GUI 页面**：mission 列表/详情已由 GUI-02-03 交付，但**运行历史时间线**在 GUI 尚无视图；
-3. **虚拟列表、关键词搜索、证据锚点、滚动位置保持**（卡内 §4/§5）——未实现，CLI 侧以分页代替；
-4. **`HISTORY-01-04`**：tarball 恢复回溯 + 人工体验，未开始。
+3. **虚拟列表、滚动位置保持**（卡内 §4/§5）——未实现（虚拟化属 UI；CLI 侧以游标分页代替）；
+   关键词检索与**稳定证据锚点**已实现（SDK + CLI）；
+4. **`HISTORY-01-04`**：tarball 回溯已证（§10）；**资源测量与人工体验**未做。
 
 ## 9. 本轮顺带修复的基线红灯（如实记录，非本卡功能）
 

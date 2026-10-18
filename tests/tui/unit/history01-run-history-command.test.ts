@@ -247,4 +247,39 @@ describe("HISTORY-01-03：history 命令函数（进程内）", () => {
     expect(stdoutText).toContain("仍保存在本地");
     expect(stdoutText).toContain("本页显示 0 条");
   });
+
+  it("⑬ 关键词检索：JSON 回显检索词与命中数，文本输出也报命中数与证据锚点", async () => {
+    await seed();
+
+    stdoutText = "";
+    expect(
+      await executeHistoryShowCommand({
+        stateDirectory,
+        missionIdentifier: "mission-text",
+        searchQuery: "not-json",
+        isJsonOutput: true,
+      }),
+    ).toBe(0);
+    const payload = JSON.parse(stdoutText) as {
+      searchQuery: string | null;
+      searchMatchCount: number | null;
+      entries: Array<{ eventIdentifier: string; evidenceAnchor: string }>;
+    };
+    expect(payload.searchQuery).toBe("not-json");
+    expect(payload.searchMatchCount).toBe(1);
+    expect(payload.entries).toHaveLength(1);
+    expect(payload.entries[0]?.evidenceAnchor).toBe("run-history:mission-text#2");
+
+    stdoutText = "";
+    expect(
+      await executeHistoryShowCommand({
+        stateDirectory,
+        missionIdentifier: "mission-text",
+        searchQuery: "not-json",
+        isJsonOutput: false,
+      }),
+    ).toBe(0);
+    expect(stdoutText).toContain("检索「not-json」命中 1 条");
+    expect(stdoutText).toContain("证据 run-history:mission-text#2");
+  });
 });

@@ -617,3 +617,21 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | 2 | `HISTORY-01-04` 资源测量（大量事件 + 超长输出的首次可读延迟/内存上界） | 可本地做，需定规模与设备记录口径 |
 | 3 | TUI/GUI 历史视图（需你先定 UI 代码落点：公开库内 or `astarray-ui` 私有库） | **需用户一句话** |
 | 4 | backlog Tier 3 其余卡逐张判（多数为外部/重型） | 每张先读"未完成"段 |
+
+---
+
+## 16. 100 轮推进日志（2026-10-18 起，逐轮追加）
+
+**门禁节奏（为让 100 轮可持续，先写清、不隐瞒）**
+
+| 每轮都跑 | 每 5 轮 / 触碰高危面时跑 |
+| --- | --- |
+| `typecheck` + `lint` + `build` + 定向反例 + **全量 `check`** | `test:coverage`、`verify:mutation-kills` **全量**、`npm pack` + `verify-package` / `verify-sdk-consumer` / 双进程脚本 |
+
+- 单轮新增变异体**必跑单条 `--only` 验证被拦下**（不把全量变异留给下一轮冒充）。
+- 全量门禁的数字**只在真跑过的那一轮写**，其余轮次写"未跑（按节奏）"。
+- 每轮仍遵守：先红后绿、拔线必失败、只按显式路径暂存、不提交他人未提交文件、提交后推送。
+
+| 轮 | 内容 | 证据 | 门禁 |
+| --- | --- | --- | --- |
+| R1 | `HISTORY-01-03` 余项：**关键词检索**（纯子串/大小写不敏感/不解释正则/只搜可见事件）+ **稳定证据锚点** `run-history:<mission>#<序号>`；CLI `--search` | `run-history-view.ts`、`history-command.ts`、`cli.tsx`；反例 +4（15+7+13=**35**）；新变异体 `run-history-view-ignores-search-query` | `check` **474/3463 exit 0**；`coverage` 分支 **85.22% exit 0**；单条变异被拦下 |

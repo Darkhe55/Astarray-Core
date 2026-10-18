@@ -221,6 +221,40 @@ describe("HISTORY-01-03：运行历史 CLI 入口（只读、分页、显示开�
     expect(stderrText).toContain("未知的事件种类");
   });
 
+  it("⑦ --search：只返回命中事件，并回显检索词与命中数", async () => {
+    await seedRunHistory();
+    const { exitCode, stdoutText } = await runCli([
+      "history",
+      "show",
+      "--mission",
+      "mission-cli",
+      "--search",
+      "permission-denied",
+      "--json",
+    ]);
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(stdoutText) as {
+      searchQuery: string | null;
+      searchMatchCount: number | null;
+      entries: Array<{ kind: string; evidenceAnchor: string }>;
+    };
+    expect(payload.searchQuery).toBe("permission-denied");
+    expect(payload.searchMatchCount).toBe(1);
+    expect(payload.entries.map((entry) => entry.kind)).toEqual(["tool-failure"]);
+    expect(payload.entries[0]?.evidenceAnchor).toMatch(/^run-history:mission-cli#\d+$/);
+
+    const textOutcome = await runCli([
+      "history",
+      "show",
+      "--mission",
+      "mission-cli",
+      "--search",
+      "permission-denied",
+    ]);
+    expect(textOutcome.exitCode).toBe(0);
+    expect(textOutcome.stdoutText).toContain("命中 1 条");
+  });
+
   it("⑥ 文本输出与 JSON 都不含 ANSI/控制序列（终端注入防线）", async () => {
     const store = new RunHistoryStore({
       baseDirectory: path.join(workingDirectory, ".astarray"),

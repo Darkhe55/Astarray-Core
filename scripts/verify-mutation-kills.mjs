@@ -265,6 +265,20 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "run-history-view-ignores-search-query",
+    targetFile: "packages/core/src/orchestration/run-history-view.ts",
+    find: `  const matched = normalizedSearchQuery === null
+    ? eligible
+    : eligible.filter((item) =>
+        doesPayloadMatchSearchQuery(item.event.payloadJson, normalizedSearchQuery),
+      );`,
+    replace: `  const matched = eligible;`,
+    testFiles: ["tests/core/unit/history01-run-history-view.test.ts"],
+    expectedFailingTestNames: ["⑭ 关键词检索"],
+    rationale:
+      "检索词被忽略 ⇒ 用户以为筛过、实际看到全量（且 searchMatchCount 谎报）⇒ 检索反例必须变红",
+  },
+  {
     mutationIdentifier: "cross-project-forbidden-access-target-disabled",
     targetFile: "packages/core/src/orchestration/cross-project-authorization-store.ts",
     find: `    const isForbiddenAccessTarget = this.options.isForbiddenAccessTarget;
