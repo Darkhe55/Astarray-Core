@@ -656,6 +656,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R21 | `EXP-01 / FOLD-01-02`：候选→组合包→独立验证→注册（作者不得自验、至少两种输入、须覆盖分支差异、 证据驱动、每步权限不得超出原批准集合、同版本幂等/异内容冲突） | 新增 `workflow-fold-package.ts` + `tests/core/unit/exp01-fold-package.test.ts`（**9 条**）； 3 条变异体（作者自验／权限扩大／单输入）均被拦下；SDK 导出 | 低并发全量 `check:low-parallel` **489/3608 exit 0**（首跑 `g2-progress-guard` 对照组抖动 ⇒ 复跑全绿） |
 | R22 | `EXP-01 / EXPLORE-01-02`：有界试验执行（真实数据/生产远端禁止、隔离必填、试验键去重、 证据哈希、重启预算不刷新） | 新增 `explore-trial-contract.ts` + `tests/core/unit/exp01-explore-trial.test.ts`（**8 条**）； 3 条变异体（真实数据放行／重复重跑／重启刷新预算）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **490/3616 exit 0** |
 | R23 | `EXP-01 / CURATE-01-02`：周期增量执行（单实例锁、错过周期合并、按游标增量、休息不运行、 授权 revision 边界、摘要失败原文不变、个体隔离、重启续处理） | 新增 `curation-execution-contract.ts` + `tests/core/unit/exp01-curation-execution.test.ts`（**8 条**）； 3 条变异体（休息仍触发／错过周期补跑／失败声称覆盖完整）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **491/3624 exit 0** |
+| R24 | `CLIENT-01 / ONBOARD-01-01`：首次/适时提示（7 天冷却、**不再提示持久化**、跳过不重复、 忙碌类抑制、迁移不重复弹、推荐不构成授权、无遥测无画像） | 新增 `onboarding-hint-contract.ts` + `tests/core/unit/client01-onboarding-hint.test.ts`（**8 条**）； 3 条变异体（忽略拒绝／授权中弹／推荐即授权）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **492/3632 exit 0** |
 
 > **R14 推送状态（如实）**：R13 提交 `c7c45e3a` 在本轮**再次连续 5 次**推送失败（128），`git ls-remote` 探针亦失败
 > ⇒ 远端 SSH 通道持续不可达。按纪律继续累积，下一阶段合并 `c7c45e3a`、R14 提交重试（≤5 次）。
