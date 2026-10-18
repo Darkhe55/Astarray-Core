@@ -97,6 +97,8 @@ export interface ToolLoopOptions {
    * 回调抛错**不得**影响业务；**缺省不提供 ⇒ 行为逐字不变**。
    */
   onToolSucceeded?: (toolName: string, outputText: string) => void;
+  /** HISTORY-01-02（2026-10-18）：失败工具调用（含失败原因）的观测出口。 */
+  onToolFailed?: (toolName: string, failureReason: string) => void;
   /**
    * G5（2026-11-08 第 199 轮）：**早停检测回调**（可选）。
    *
@@ -522,6 +524,19 @@ export async function runToolLoop(
       if (toolResult.kind === "success" && options.onToolSucceeded !== undefined) {
         try {
           options.onToolSucceeded(toolCall.toolName, toolResult.outputText);
+        } catch {
+          // 观测失败不得阻塞业务
+        }
+      }
+      /**
+       * HISTORY-01-02（2026-10-18 第 38 轮）：把**失败工具调用**（含失败原因）交给上层。
+       *
+       * 为什么需要它：运行历史必须能回溯"失败调用"，而此前只有 `onToolSucceeded`，
+       * 失败分支没有任何观测出口 ⇒ 历史会**静默丢失失败事件**。
+       */
+      if (toolResult.kind === "error" && options.onToolFailed !== undefined) {
+        try {
+          options.onToolFailed(toolCall.toolName, toolResult.errorMessage);
         } catch {
           // 观测失败不得阻塞业务
         }
