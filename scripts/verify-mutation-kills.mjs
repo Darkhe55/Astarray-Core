@@ -265,6 +265,41 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "folder-grant-model-signature-accepted",
+    targetFile: "packages/core/src/orchestration/folder-grant-request.ts",
+    find: "  const requiresAuthenticatedUserConfirmation = true;",
+    replace: "  const requiresAuthenticatedUserConfirmation = false;",
+    testFiles: ["tests/core/unit/folder01-grant-request.test.ts"],
+    expectedFailingTestNames: ["⑨ 可接受候选"],
+    rationale:
+      "模型提出的候选不需要认证用户确认 ⇒ 模型可自行赋权（卡内：模型只能提候选、不能签字）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "folder-grant-ancestor-widening-accepted",
+    targetFile: "packages/core/src/orchestration/folder-grant-request.ts",
+    find: `  const isAncestorOfAnyRoot = [...ownRootsNormalized, ...otherRootsNormalized].some((root) =>
+    isPathInsideOrEqual(root.comparisonPath, normalized.comparisonPath),
+  );`,
+    replace: `  const isAncestorOfAnyRoot = false;`,
+    testFiles: ["tests/core/unit/folder01-grant-request.test.ts"],
+    expectedFailingTestNames: ["⑧ 父目录"],
+    rationale:
+      "父目录候选被放行 ⇒ 纳入一个目录就等于覆盖其下所有项目/未授权区域（范围扩大）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "folder-grant-prefix-containment",
+    targetFile: "packages/core/src/orchestration/folder-grant-request.ts",
+    find: `  const rootWithSeparator = rootComparisonPath.endsWith("/")
+    ? rootComparisonPath
+    : \`\${rootComparisonPath}/\`;
+  return comparisonPath.startsWith(rootWithSeparator);`,
+    replace: `  return comparisonPath.startsWith(rootComparisonPath);`,
+    testFiles: ["tests/core/unit/folder01-grant-request.test.ts"],
+    expectedFailingTestNames: ["⑦ **逐段**判定"],
+    rationale:
+      "退回字符串前缀判定 ⇒ `old-project-extra` 会被当成 `old-project` 的子目录（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "run-history-view-ignores-search-query",
     targetFile: "packages/core/src/orchestration/run-history-view.ts",
     find: `  const matched = normalizedSearchQuery === null

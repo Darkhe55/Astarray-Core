@@ -1,6 +1,15 @@
 # CLIENT-01：对话文件夹授权、实验秘书与工作习惯引导
 
-日期：2026-10-02。状态pending，设计布置，未实现/验收。用户要求三个功能；具体默认值与检查点为派生方案。首轮读取AGENTS.md指定治理文档及相关ADR，核对当前实现；当前检查点收口后由次级协调公共文件所有者，不能覆盖在途改动。
+日期：2026-10-02。**状态：in_progress（2026-10-18 更新：仅 FOLDER-01-01 的纯判定层落地）**；
+SECRETARY-01 / ONBOARD(习惯引导) **仍未开始**。
+
+> **状态口径（2026-10-18）**
+> - `FOLDER-01-01` **本地可证部分 done**：`packages/core/src/orchestration/folder-grant-request.ts`
+>   + 13 条反例 + 3 条永久变异体。**它只判定**：不写盘、不解析链接、不发起授权、不产生批准。
+> - `FOLDER-01-02`（根登记事务/执行前复检/撤销/并发 revision）**未开始**；
+>   `FOLDER-01-03`（SDK/CLI/TUI/GUI 共用入口 + 人工）**未开始**。
+> - `SECRETARY-01` / 习惯引导 **未开始**（秘书涉及同级身份与独立记忆域，属高风险面）。
+> - 本卡**不主张整卡通过**。
 
 本卡关联PROJECT-01、CONFIGCHAT-01、HISTORY-01、CURATE-01、SMART-01与OBS。复用真实接线，不按历史done推断满足前驱；每轮一个检查点，超过三小时再拆分。
 
@@ -33,7 +42,7 @@
 
 | 检查点 | 产出及验收 |
 |---|---|
-| FOLDER-01-01 | 对话候选、短授权卡、作用域/归属契约；含糊路径、其他项目目录、父目录扩大范围反例 |
+| FOLDER-01-01 | 对话候选、短授权卡、作用域/归属契约；含糊路径、其他项目目录、父目录扩大范围反例 | **本地可证部分 done（2026-10-18）**。交付：`folder-grant-request.ts` —— ①**候选判定**分类（`not-absolute` / `contains-parent-traversal` / `ambiguous-path` / `ambiguous-permission` / `inside-own-project` / `inside-other-project` / `ancestor-of-project-root` / `acceptable`），全部 fail-closed，`acceptable` 也**必须**认证用户确认；②**短授权卡**视图模型（完整绝对路径、只读/读写、含子目录、期限、原因、操作；`isBatch:false`、`isDefaultApproved:false`，被拒项无 `approve-one`）；③**批量队列逐项**（不合并成一张卡）；④**逐段**包含判定（`old-project-extra` **不属于** `old-project`）；⑤真实路径复核：`resolvedRealPath` 与请求不一致 ⇒ 显式提示，未复核 ⇒ `requiresRealPathVerification=true`（不假装已验证）。**反例 13 条 + 变异体 3 条**（模型代签/父目录放行/前缀包含，均被拦下）。**未做**：真实 `realpath`/junction 解析（上层）、登记事务与执行前复检（属 02） |
 | FOLDER-01-02 | 根登记事务、执行前复检、撤销/重启及缓存失效；未批准零新增权限、并发revision冲突正确处理 |
 | FOLDER-01-03 | SDK/CLI/TUI/GUI共用入口与包验收；人工能分辨路径/读写/期限，批量请求逐项决策且不打断正常对话 |
 
