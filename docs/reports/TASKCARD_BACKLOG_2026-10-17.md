@@ -306,3 +306,30 @@ npm pack 273 文件             exit 0；两项 verify exit 0
 | 预算判断 | 加钩子（2 行）+ 两处接线 + 反例 ≈ **2 轮**；本轮仅取证，**未改代码** |
 
 **下一轮动作**：①加 `onToolFailed` 钩子（含失败原因）；②在 `RunHistoryStore` 侧提供 `recordToolCall/recordToolFailure` 便捷方法；③写"真实执行路径记录两条事件"的反例；④拔线 + 门禁。
+
+### 13.5 `HISTORY-01-02` 接线最后一跳的**取证结论与方案**（2026-10-18 第 40 轮）
+
+| 取证 | 结果 |
+| --- | --- |
+| `worker-agent.ts` 是否有 `missionIdentifier` | ❌ 无（该文件内零命中） |
+| `worker-agent.ts` 是否有 `stateDirectory` | ❌ 无 |
+| `mission-orchestrator.ts` 是否有 `missionId` | ✅ 有（如 L725/L773 传给 worker 选项） |
+| `mission-orchestrator.ts` 是否有 `stateDirectory` | ❌ 无 |
+
+⇒ **与 G4 完全同形**：需要一个"由装配层构造、经 `workerFactories` 透传的实例"，
+而不是让 worker 自己找目录。
+
+**方案（照抄 G4 已验证的路线）**：
+
+1. `workerFactories` 加可选字段 `runHistoryStore?: RunHistoryStore | null`（编排器 options）；
+2. 装配层用 `stateDirectory` 构造 `new RunHistoryStore({ baseDirectory })` ⇒ 传给控制器 ⇒ 进 `workerFactories`；
+3. 编排器在构造 worker 选项时 **spread** 该字段；
+4. `worker-agent` 选项加 `runHistoryStore?: RunHistoryStore`，在**构造 tool-loop 选项处**加：
+   `onToolSucceeded: (toolName, outputText) => void store.recordToolCall({...})`、
+   `onToolFailed: (toolName, failureReason) => void store.recordToolFailure({...})`
+   （`missionIdentifier` 用 worker 选项里已有的 mission 标识；**若没有则需先补**——下一轮先查这一条）；
+5. **端到端反例**：真实任务跑一次 ⇒ 断言 `stateDirectory/run-history/<mission>.json` 出现且含事件；
+6. 拔线（不传 store ⇒ 反例红）+ `check` + 变异 + 隔离包。
+
+**预算估计**：**3–4 轮**（G4 同类花了 5 轮，其中 3 轮用于找断点；本次有 G4 的现成锚点，风险低）。
+**风险**：第 4 步的 `missionIdentifier` 来源**尚未取证** —— 这是下一轮第一件事。
