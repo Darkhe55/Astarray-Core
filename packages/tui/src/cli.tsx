@@ -12,6 +12,23 @@ import {
   executeHistoryListCommand,
   executeHistoryShowCommand,
 } from "./cli/history-command.js";
+// FOLDER-01-03（2026-10-18）：文件夹授权的 CLI 共用入口（命令名经用户确认＝选项 A）。
+import {
+  executeFolderApproveCommand,
+  executeFolderCheckCommand,
+  executeFolderRequestCommand,
+  executeFolderRevokeCommand,
+  loadRegisteredProjectRoots,
+  mergeProjectRoots,
+  parseKnownProjectRootSpecifications,
+  resolveFolderDurationKind,
+  resolveFolderPermissionKind,
+} from "./cli/folder-command.js";
+import type {
+  FolderGrantDurationKind,
+  FolderGrantPermissionKind,
+} from "../../core/src/public-sdk.js";
+import { EXIT_CODES } from "./cli/json-output.js";
 import {
   executeCancelCommand,
   executeConfigContextBudgetCommand,
@@ -721,6 +738,222 @@ historyCommand
             : {}),
           ...(options.hideToolCalls === true ? { showToolCalls: false } : {}),
         },
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+/**
+ * `folder`：对话式文件夹授权的 CLI 共用入口（FOLDER-01-03）。
+ *
+ * 命令名经用户 2026-10-18 **确认＝选项 A**（`request|approve|revoke|check`）。
+ * `request` 只出授权卡、不落库；`approve` 才是认证用户确认；`check` 只读且 fail-closed。
+ * **不提供"全部批准"**：一张卡只处理一个文件夹。
+ */
+const folderCommand = program
+  .command("folder")
+  .description("项目文件夹授权（预览卡/批准/撤销/执行前复检；一张卡一个文件夹）");
+
+/** 组装文件夹授权候选的公共参数。 */
+function readFolderScopeOptions(options: {
+  project: string;
+  path: string | string[];
+  permission?: string;
+  includeSubdirectories?: boolean;
+  duration?: string;
+}): {
+  readonly projectIdentifier: string;
+  readonly requestedPaths: ReadonlyArray<string>;
+  readonly permissionKind: FolderGrantPermissionKind | null;
+  readonly includesSubdirectories: boolean;
+  readonly durationKind: FolderGrantDurationKind | null;
+} {
+  const requestedPaths = Array.isArray(options.path) ? options.path : [options.path];
+  return {
+    projectIdentifier: options.project,
+    requestedPaths,
+    // 默认值：只读 + 仅本次会话（卡内推荐初始选择）；**显式非法值**仍返回 null 由调用方报用法错误
+    permissionKind:
+      options.permission === undefined
+        ? "read-only"
+        : resolveFolderPermissionKind(options.permission),
+    includesSubdirectories: options.includeSubdirectories === true,
+    durationKind:
+      options.duration === undefined ? "session" : resolveFolderDurationKind(options.duration),
+  };
+}
+
+folderCommand
+  .command("request")
+  .description("生成文件夹授权卡（只预览，不落库；多个 --path 逐项出卡）")
+  .requiredOption("--project <project-id>", "项目标识")
+  .option("--path <path>", "要纳入的文件夹绝对路径（可重复；每项一张卡）", (value: string, previous: string[] | undefined) => [...(previous ?? []), value])
+  .option("--permission <kind>", "read-only（默认）或 read-write")
+  .option("--include-subdirectories", "是否包含子目录（默认不含）")
+  .option("--duration <kind>", "session（默认，仅本次会话）或 until-revoked")
+  .option("--known-project-root <project-id>=<path>", "显式声明的已知项目根（可重复；用于跨项目/父目录检查）", (value: string, previous: string[] | undefined) => [...(previous ?? []), value])
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      project: string;
+      path?: string | string[];
+      permission?: string;
+      includeSubdirectories?: boolean;
+      duration?: string;
+      knownProjectRoot?: string[];
+      json?: boolean;
+    }) => {
+      if (options.path === undefined) {
+        process.stderr.write("astarray: 至少需要一个 --path\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      const scope = readFolderScopeOptions({ ...options, path: options.path });
+      if (scope.permissionKind === null || scope.durationKind === null) {
+        process.stderr.write("astarray: --permission 只能是 read-only/read-write；--duration 只能是 session/until-revoked\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      const declared = parseKnownProjectRootSpecifications(
+        options.knownProjectRoot,
+        options.project,
+      );
+      if (declared.invalidSpecifications.length > 0) {
+        process.stderr.write(
+          `astarray: --known-project-root 需为 <project-id>=<path>；无法解析：${declared.invalidSpecifications.join(", ")}\n`,
+        );
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      const loaded = await loadRegisteredProjectRoots({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: options.project,
+      });
+      process.exitCode = await executeFolderRequestCommand({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: scope.projectIdentifier,
+        requestedPaths: scope.requestedPaths,
+        permissionKind: scope.permissionKind,
+        includesSubdirectories: scope.includesSubdirectories,
+        durationKind: scope.durationKind,
+        registeredRoots: mergeProjectRoots(loaded, declared.roots),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+folderCommand
+  .command("approve")
+  .description("认证用户批准一个文件夹（落库一条授权；一张卡一个文件夹）")
+  .requiredOption("--project <project-id>", "项目标识")
+  .requiredOption("--path <path>", "要纳入的文件夹绝对路径")
+  .option("--permission <kind>", "read-only（默认）或 read-write")
+  .option("--include-subdirectories", "是否包含子目录（默认不含）")
+  .option("--duration <kind>", "session（默认）或 until-revoked")
+  .requiredOption("--grant-id <id>", "本次授权的标识（同 ID 异参会被拒绝）")
+  .requiredOption("--revision <number>", "项目 revision（陈旧写入会被拒绝）")
+  .option("--expires-at <iso>", "过期时间（ISO）")
+  .option("--known-project-root <project-id>=<path>", "显式声明的已知项目根（可重复）", (value: string, previous: string[] | undefined) => [...(previous ?? []), value])
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      project: string;
+      path: string;
+      permission?: string;
+      includeSubdirectories?: boolean;
+      duration?: string;
+      grantId: string;
+      revision: string;
+      expiresAt?: string;
+      knownProjectRoot?: string[];
+      json?: boolean;
+    }) => {
+      const scope = readFolderScopeOptions(options);
+      if (scope.permissionKind === null || scope.durationKind === null) {
+        process.stderr.write("astarray: --permission/--duration 取值非法\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      const revision = Number(options.revision);
+      if (!Number.isInteger(revision) || revision < 1) {
+        process.stderr.write("astarray: --revision 必须是正整数\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      const declared = parseKnownProjectRootSpecifications(options.knownProjectRoot, options.project);
+      const loaded = await loadRegisteredProjectRoots({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: options.project,
+      });
+      process.exitCode = await executeFolderApproveCommand({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: scope.projectIdentifier,
+        requestedPath: scope.requestedPaths[0] ?? options.path,
+        permissionKind: scope.permissionKind,
+        includesSubdirectories: scope.includesSubdirectories,
+        durationKind: scope.durationKind,
+        grantIdentifier: options.grantId,
+        projectRevision: revision,
+        expiresAtIso: options.expiresAt ?? null,
+        registeredRoots: mergeProjectRoots(loaded, declared.roots),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+folderCommand
+  .command("revoke")
+  .description("撤销一条文件夹授权（只影响之后的操作；历史记录保留）")
+  .requiredOption("--project <project-id>", "项目标识")
+  .requiredOption("--grant-id <id>", "授权标识")
+  .requiredOption("--reason <text>", "撤销原因（如实记录）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: { project: string; grantId: string; reason: string; json?: boolean }) => {
+      process.exitCode = await executeFolderRevokeCommand({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: options.project,
+        grantIdentifier: options.grantId,
+        reason: options.reason,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+folderCommand
+  .command("check")
+  .description("执行前复检：该路径+该权限是否被批准（只读，拒绝即非 0 退出）")
+  .requiredOption("--project <project-id>", "项目标识")
+  .requiredOption("--path <path>", "待检查的目标绝对路径")
+  .option("--permission <kind>", "read-only（默认）或 read-write")
+  .requiredOption("--revision <number>", "项目 revision（变化后旧许可失效）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      project: string;
+      path: string;
+      permission?: string;
+      revision: string;
+      json?: boolean;
+    }) => {
+      const permissionKind = resolveFolderPermissionKind(options.permission);
+      if (permissionKind === null) {
+        process.stderr.write("astarray: --permission 只能是 read-only/read-write\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      const revision = Number(options.revision);
+      if (!Number.isInteger(revision) || revision < 1) {
+        process.stderr.write("astarray: --revision 必须是正整数\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      process.exitCode = await executeFolderCheckCommand({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: options.project,
+        targetPath: options.path,
+        requiredPermission: permissionKind,
+        projectRevision: revision,
         isJsonOutput: options.json === true,
       });
     },
