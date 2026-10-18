@@ -4929,3 +4929,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
   }
 }
+
+// RELOCATE-01（2026-10-18 第 19 轮）：冷启动重定位**只读**控制面（产品可达）。
+export { ProjectRelocationController } from "./orchestration/project-relocation-controller.js";
+export { ProjectLocationRegistrationStore } from "./orchestration/project-location-registration-store.js";
+export { classifyProjectRelocation } from "./orchestration/project-relocation-classification.js";
