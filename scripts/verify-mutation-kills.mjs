@@ -275,6 +275,36 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "obs-sampler-append-failure-throws",
+    targetFile: "packages/core/src/orchestration/observability-sampler.ts",
+    find: "  } catch (error) {\n    return {\n      kind: \"degraded\",\n      reason: `样本落盘失败（已降级，不阻塞业务）：${error instanceof Error ? error.message : String(error)}`,",
+    replace: "  } catch (error) {\n    throw error;\n    return {\n      kind: \"degraded\",\n      reason: `样本落盘失败（已降级，不阻塞业务）：${error instanceof Error ? error.message : String(error)}`,",
+    testFiles: ["tests/core/unit/obs01-sampler.test.ts"],
+    expectedFailingTestNames: ["⑦ 落盘失败"],
+    rationale:
+      "样本落盘失败直接抛给业务 ⇒ 观测故障阻塞业务（R37 契约明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "obs-sampler-fills-unknown-with-zero",
+    targetFile: "packages/core/src/orchestration/observability-sampler.ts",
+    find: "    fields = { ...input.ports.readProcessMetrics(), ...(input.taskFacts ?? {}) };",
+    replace: "    fields = { eventLoopDelayMs: 0, ...input.ports.readProcessMetrics(), ...(input.taskFacts ?? {}) };",
+    testFiles: ["tests/core/unit/obs01-sampler.test.ts"],
+    expectedFailingTestNames: ["⑤ 拿不到某项指标"],
+    rationale:
+      "拿不到指标就填 0 ⇒ 把 unknown 记成\"零延迟\"（卡内：unknown 不记作零）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "obs-sampler-ignores-collection-switch",
+    targetFile: "packages/core/src/orchestration/observability-sampler.ts",
+    find: "    isCollectionEnabled: input.isCollectionEnabled,",
+    replace: "    isCollectionEnabled: true,",
+    testFiles: ["tests/core/unit/obs01-sampler.test.ts"],
+    expectedFailingTestNames: ["① 默认关闭"],
+    rationale:
+      "采样器无视开关 ⇒ 即使默认 off 也在采样（用户没同意就有开销）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "obs-perf-empty-reported-as-zero",
     targetFile: "packages/tui/src/cli/observability-command.ts",
     find: "    hasSamples: result.coverage.matchedSampleCount > 0,",

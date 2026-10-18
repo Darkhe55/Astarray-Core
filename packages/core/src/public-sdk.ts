@@ -1083,6 +1083,16 @@ export {
   type PerfSampleV1,
 } from "./orchestration/observability-collection-contract.js";
 /**
+ * OBS 采样 tick（2026-10-19 R39）：把采集契约接到可测的采样动作（端口注入、失败降级）。
+ *
+ * 纯逻辑 + 注入端口：不直接读 OS、不直接落盘。
+ */
+export {
+  runPerfSamplingTick,
+  type PerfSamplingPorts,
+  type PerfSamplingTickOutcome,
+} from "./orchestration/observability-sampler.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
