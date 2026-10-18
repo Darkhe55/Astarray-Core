@@ -265,6 +265,36 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "fold-package-author-self-verification-accepted",
+    targetFile: "packages/core/src/orchestration/workflow-fold-package.ts",
+    find: "  if (input.verification.verifierAgentInstanceId === input.authorAgentInstanceId) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-fold-package.test.ts"],
+    expectedFailingTestNames: ["② 作者自己验收"],
+    rationale:
+      "作者可验收自己的产出 ⇒ 自我确认（卡内：实现者不得验收自己的产出）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "fold-package-permission-widening-accepted",
+    targetFile: "packages/core/src/orchestration/workflow-fold-package.ts",
+    find: "  if (hasUnapprovedPermission) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-fold-package.test.ts"],
+    expectedFailingTestNames: ["⑥ 展开后的步骤权限"],
+    rationale:
+      "折叠包可带未批准的步骤权限 ⇒ 借折叠扩权（卡内：每步按实际权限检查）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "fold-package-single-input-accepted",
+    targetFile: "packages/core/src/orchestration/workflow-fold-package.ts",
+    find: "  if (distinctInputFingerprints.size < 2) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-fold-package.test.ts"],
+    expectedFailingTestNames: ["③ 少于两种不同输入"],
+    rationale:
+      "单例成功即可登记 ⇒ 等价性没有证据（卡内：至少两种不同输入）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "configchat-accepts-non-user-source",
     targetFile: "packages/core/src/orchestration/config-chat-contract.ts",
     find: '  if (proposal.sourceKind !== "authenticated-user") {',
