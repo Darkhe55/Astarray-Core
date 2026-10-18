@@ -265,6 +265,48 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "secretary-task-key-ignores-project",
+    targetFile: "packages/core/src/orchestration/secretary-relay-contract.ts",
+    find: `    "secretary-task-line",
+    input.projectIdentifier,`,
+    replace: `    "secretary-task-line",
+    "",`,
+    testFiles: ["tests/core/unit/client01-secretary-relay.test.ts"],
+    expectedFailingTestNames: ["① 多项目同名任务不串线"],
+    rationale:
+      "任务行键丢掉项目标识 ⇒ 两个项目的同名任务在汇总里被合并成一条（串线）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-relay-dedup-disabled",
+    targetFile: "packages/core/src/orchestration/secretary-relay-contract.ts",
+    find: "  if (sameReceipt !== undefined) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-secretary-relay.test.ts"],
+    expectedFailingTestNames: ["⑥ 重放同"],
+    rationale:
+      "相同幂等键+目标重复派发 ⇒ 同一任务被下发两次（重复副作用）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-receipt-regression-allowed",
+    targetFile: "packages/core/src/orchestration/secretary-relay-contract.ts",
+    find: "  if (nextOrder <= currentOrder) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-secretary-relay.test.ts"],
+    expectedFailingTestNames: ["⑦ 回执状态只能前进"],
+    rationale:
+      "回执状态可倒退 ⇒ 已完成的转交被回写成已派发（状态不可信）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-mode-switch-copies-history",
+    targetFile: "packages/core/src/orchestration/secretary-relay-contract.ts",
+    find: "  copiesHistory: false,",
+    replace: "  copiesHistory: true,",
+    testFiles: ["tests/core/unit/client01-secretary-relay.test.ts"],
+    expectedFailingTestNames: ["② 模式切换的隔离"],
+    rationale:
+      "模式切换复制历史 ⇒ 汇总模式复制项目对话（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "secretary-default-enabled",
     targetFile: "packages/core/src/orchestration/secretary-agent-contract.ts",
     find: "  if (input.isExperimentEnabled !== true) {",
