@@ -1672,6 +1672,24 @@ export const MUTATIONS = [
     expectedFailingTestNames: ["④ 不认识的 schemaVersion"],
     rationale: "未知版本必须拒绝；若放行，版本反例必须变红",
   },
+  {
+    mutationIdentifier: "relocate-confirmation-allows-model-signoff",
+    targetFile: "packages/core/src/orchestration/project-relocation-confirmation.ts",
+    find: `  if (input.isHumanConfirmed !== true) {`,
+    replace: `  if (false) {`,
+    testFiles: ["tests/core/unit/relocate01-confirmation.test.ts"],
+    expectedFailingTestNames: ["① 模型/自动流程代签"],
+    rationale: "重定位必须由认证用户本人确认；放行代签 ⇒ 代签反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-apply-skips-backup",
+    targetFile: "packages/core/src/orchestration/project-relocation-apply.ts",
+    find: `    await ioPort.writeBackup(input.previousRegistration);`,
+    replace: `    void 0; // MUTANT：跳过备份`,
+    testFiles: ["tests/core/unit/relocate01-apply-and-copy.test.ts"],
+    expectedFailingTestNames: ["③ 正常应用"],
+    rationale: "必须先备份后写；跳过备份 ⇒ 顺序反例必须变红",
+  },
 ];
 
 function sha256OfFile(filePath) {

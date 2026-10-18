@@ -57,7 +57,7 @@
 | 检查点 | 状态 | 交付与通过条件 |
 |---|---|---|
 | RELOCATE-01-01 身份与检测 | **本地可证部分 done（2026-10-18）** | 审计 ID/存储/恢复入口 ✓（发现并修掉共享兜底标识 `workspace` 的身份碰撞）；最小 schema 与旧格式策略 ✓（`project-location-registration.ts`：旧格式不得自动升级、未知版本不得按 v1 解释、模型不得作为确认来源）；冷启动只读分类 ✓（`project-relocation-classification.ts`：5 情况 + 无登记，全部 fail-closed；**加载历史 ≠ 批准执行**）。**共 21 条反例 + 3 次拔线**。**未验**：真实设备/跨平台实测、UI 入口 |
-| RELOCATE-01-02 确认与登记 | pending | 用户确认、受限候选核验、revision/幂等、备份/原子恢复、副本处理；模型不能自行确认 |
+| RELOCATE-01-02 确认与登记 | **本地可证部分 done（2026-10-18）** | 用户确认 ✓（`project-relocation-confirmation.ts`：`isHumanConfirmed!==true` 直接拒；**模型/自动流程不得代签**，代签优先于 revision 冲突报错）；revision/幂等 ✓（同 revision+同目标 ⇒ `isIdempotentReplay`，revision 不递增；冲突拒绝且**不返回新登记**）；执行前复检 ✓（`identity-mismatch`：null 也拒）；备份/原子 ✓（`project-relocation-apply.ts`：**先备份后写**、写失败回滚旧登记、幂等不重复写、未注入端口 `no-io-port` 拒绝）；副本 ✓（`createCopiedProjectIdentity`：新身份/revision=1/无 previousRootPath/**继承状态全 0**）。**共 16 条反例 + 2 次拔线 + 2 条变异体**。**未验**：真实登记文件读写的崩溃一致性、UI 确认卡交互 | 用户确认、受限候选核验、revision/幂等、备份/原子恢复、副本处理；模型不能自行确认 |
 | RELOCATE-01-03 解析与恢复 | pending | 公共结构化路径解析接线、权限复检、未决操作对账；重启不误归属、不盲目重放 |
 | RELOCATE-01-04 入口与包验收 | pending | SDK/CLI/TUI/GUI 共用控制面；真实确认入口及 tarball 双进程搬迁恢复证据，各平台范围如实登记 |
 
