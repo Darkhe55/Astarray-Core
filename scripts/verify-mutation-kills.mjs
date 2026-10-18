@@ -265,6 +265,41 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "secretary-default-enabled",
+    targetFile: "packages/core/src/orchestration/secretary-agent-contract.ts",
+    find: "  if (input.isExperimentEnabled !== true) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-secretary-contract.test.ts"],
+    expectedFailingTestNames: ["① 默认关闭"],
+    rationale:
+      "实验秘书默认开启 ⇒ 未经用户显式开启就创建实例（卡内：默认关闭、默认不创建实例）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-source-read-allowed",
+    targetFile: "packages/core/src/orchestration/secretary-agent-contract.ts",
+    find: `  "read-only-report-query",
+  "status-query",
+];`,
+    replace: `  "read-only-report-query",
+  "status-query",
+  "project-source-read",
+];`,
+    testFiles: ["tests/core/unit/client01-secretary-contract.test.ts"],
+    expectedFailingTestNames: ["⑤ 能力矩阵", "⑨ 同级关系"],
+    rationale:
+      "把项目源文件读取并入允许能力 ⇒ 秘书可读项目源码（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-relay-broadcasts-all",
+    targetFile: "packages/core/src/orchestration/secretary-agent-contract.ts",
+    find: `      kind: "needs-clarification",`,
+    replace: `      kind: "proposal-created",`,
+    testFiles: ["tests/core/unit/client01-secretary-contract.test.ts"],
+    expectedFailingTestNames: ["⑧ 任务转交"],
+    rationale:
+      "目标不明时不再要求澄清 ⇒ 一条指令被当成可派发（等同广播风险）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "folder-grant-store-revocation-ignored",
     targetFile: "packages/core/src/orchestration/folder-grant-store.ts",
     find: "      (grant) => !grant.isRevoked && isPathInsideOrEqual(normalizedTarget.comparisonPath, grant.normalizedRootPath),",
