@@ -1016,6 +1016,25 @@ export {
   type ExploreTrialStartDecision,
   type TrialIsolationKind,
 } from "./orchestration/explore-trial-contract.js";
+/**
+ * EXP-01 / CURATE-01-02（2026-10-19）：周期增量执行、个体隔离、计划锁/预算/取消/恢复。
+ *
+ * 纯判定：不调度、不调模型、不写盘、不删原文。
+ */
+export {
+  acquireCurationRunLock,
+  computeCurationRunIdentifier,
+  evaluateCurationBatch,
+  evaluateCurationEntryOwnership,
+  evaluateCurationOutcome,
+  evaluateCurationResume,
+  evaluateCurationRunStart,
+  planCurationPendingRun,
+  type CurationLockOutcome,
+  type CurationOutcomeV1,
+  type CurationRunLockV1,
+  type CurationRunStartDecision,
+} from "./orchestration/curation-execution-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
