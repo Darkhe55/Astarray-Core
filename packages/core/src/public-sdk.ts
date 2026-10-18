@@ -813,6 +813,28 @@ export {
   type SecretaryTaskRelayDecision,
   type SecretaryVisibilityResult,
 } from "./orchestration/secretary-agent-contract.js";
+/**
+ * CLIENT-01 / SECRETARY-01-02（2026-10-18）：项目/汇总模式、报告附件与转交回执契约。
+ *
+ * 纯判定：不写盘、不读项目、不调模型、不发消息。
+ */
+export {
+  SECRETARY_MODE_SWITCH_ISOLATION,
+  advanceSecretaryRelayReceipt,
+  buildSecretaryReportAttachment,
+  computeRelayReceiptIdentifier,
+  computeSecretaryTaskLineKey,
+  evaluatePeerRelay,
+  evaluateReportFreshness,
+  recordSecretaryRelayDispatch,
+  type BuildReportAttachmentOutcome,
+  type RecordRelayDispatchOutcome,
+  type ReportFreshnessAssessment,
+  type SecretaryRelayReceiptState,
+  type SecretaryRelayReceiptV1,
+  type SecretaryReportAttachmentV1,
+  type SecretaryWorkingMode,
+} from "./orchestration/secretary-relay-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
