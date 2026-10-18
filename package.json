@@ -49,7 +49,8 @@
     "verify:u2-flash-probe": "node scripts/verify-u2-flash-continuous-reception.mjs --probe-only",
     "verify:u2-flash-continuous-reception": "node scripts/verify-u2-flash-continuous-reception.mjs",
     "test:scripts": "node --test \"scripts/lib/*.test.mjs\"",
-    "verify:contract-sdk": "node scripts/verify-contract-sdk-package.mjs"
+    "verify:contract-sdk": "node scripts/verify-contract-sdk-package.mjs",
+    "verify:relocation-batch": "node scripts/verify-relocation-batch-sample.mjs"
   },
   "dependencies": {
     "commander": "^15.0.0",

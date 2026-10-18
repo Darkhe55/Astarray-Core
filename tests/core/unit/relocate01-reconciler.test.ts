@@ -172,6 +172,23 @@ describe("RELOCATE-01-03：重定位对账判定", () => {
     expect(result.isAutoResumeAllowed).toBe(true);
   });
 
+  it("⑨ 未决操作观测残缺（缺 operation 子对象）⇒ blocked，不抛错、不放行", () => {
+    const malformed = {
+      projectIdentifier: "project-a",
+      projectStatus: "in-progress" as const,
+      locationMappings: [mapping()],
+      declaredStructuredResourceKinds: ["document"],
+      references: [reference()],
+      // 故意用扁平结构（缺 operation 子对象）模拟"观测残缺"：真实批量对账里踩到过 TypeError
+      pendingOperations: [{ operationIdentifier: "op-flat" } as never],
+      hasWriteOrExternalSideEffects: false,
+    };
+    const result = reconcileProjectRelocation(malformed);
+    expect(result.kind).toBe("blocked");
+    expect(result.isAutoResumeAllowed).toBe(false);
+    expect(result.isExecutionAllowed).toBe(false);
+  });
+
   it("⑧ 符号链接/junction 指向项目外 ⇒ 解析失败即 blocked（不静默跟随）", () => {
     const result = reconcileProjectRelocation(
       baseInput({
