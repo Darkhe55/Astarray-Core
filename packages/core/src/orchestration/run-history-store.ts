@@ -9,6 +9,7 @@
  *
  * 只做数据层：不做视图、不做虚拟列表（那属 03）。
  */
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -171,6 +172,46 @@ export class RunHistoryStore {
       segmentRevision: segments[segments.length - 1]?.segmentRevision ?? 0,
       reason: "已写入运行历史。",
     };
+  }
+  /** 记录一次**成功**工具调用（去重键 = 工具名 + 输出内容哈希）。 */
+  async recordToolCall(input: {
+    readonly missionIdentifier: string;
+    readonly toolName: string;
+    readonly outputText: string;
+    readonly recordedAtIso?: string;
+  }): Promise<RunHistoryAppendOutcome> {
+    const contentDigest = createHash("sha256").update(input.outputText).digest("hex");
+    return this.appendEvent({
+      missionIdentifier: input.missionIdentifier,
+      event: {
+        eventIdentifier: "tool-call:" + input.toolName + ":" + contentDigest,
+        kind: "tool-call",
+        recordedAtIso: input.recordedAtIso ?? new Date().toISOString(),
+        payloadJson: JSON.stringify({ toolName: input.toolName, outputText: input.outputText }),
+      },
+    });
+  }
+
+  /** 记录一次**失败**工具调用（保留失败原因）。 */
+  async recordToolFailure(input: {
+    readonly missionIdentifier: string;
+    readonly toolName: string;
+    readonly failureReason: string;
+    readonly recordedAtIso?: string;
+  }): Promise<RunHistoryAppendOutcome> {
+    const reasonDigest = createHash("sha256").update(input.failureReason).digest("hex");
+    return this.appendEvent({
+      missionIdentifier: input.missionIdentifier,
+      event: {
+        eventIdentifier: "tool-failure:" + input.toolName + ":" + reasonDigest,
+        kind: "tool-failure",
+        recordedAtIso: input.recordedAtIso ?? new Date().toISOString(),
+        payloadJson: JSON.stringify({
+          toolName: input.toolName,
+          failureReason: input.failureReason,
+        }),
+      },
+    });
   }
 }
 
