@@ -265,6 +265,36 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "curation-run-rest-period-ignored",
+    targetFile: "packages/core/src/orchestration/curation-execution-contract.ts",
+    find: "  if (input.isRestPeriod) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-curation-execution.test.ts"],
+    expectedFailingTestNames: ["④ 启动门禁"],
+    rationale:
+      "休息时段仍触发模型整理 ⇒ 违反卡内\"休息时不触发模型整理\"（且会消耗额度）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "curation-missed-periods-replayed",
+    targetFile: "packages/core/src/orchestration/curation-execution-contract.ts",
+    find: "    coalescedRunCount: 1,",
+    replace: "    coalescedRunCount: missedPeriodCount,",
+    testFiles: ["tests/core/unit/exp01-curation-execution.test.ts"],
+    expectedFailingTestNames: ["② 错过多个周期"],
+    rationale:
+      "错过多少周期就补跑多少次 ⇒ 重复整理与重复消耗（卡内：合并为一次）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "curation-failure-claims-full-coverage",
+    targetFile: "packages/core/src/orchestration/curation-execution-contract.ts",
+    find: "    claimsFullCoverage: false,\n    failureReason: input.failureReason ?? \"摘要失败（未提供原因）。\",",
+    replace: "    claimsFullCoverage: true,\n    failureReason: input.failureReason ?? \"摘要失败（未提供原因）。\",",
+    testFiles: ["tests/core/unit/exp01-curation-execution.test.ts"],
+    expectedFailingTestNames: ["⑤ 摘要失败"],
+    rationale:
+      "摘要失败却声称覆盖完整 ⇒ 用户以为历史已整理（卡内：不假装覆盖完整）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "explore-trial-real-user-data-allowed",
     targetFile: "packages/core/src/orchestration/explore-trial-contract.ts",
     find: "  if (input.touchesRealUserData) {",
