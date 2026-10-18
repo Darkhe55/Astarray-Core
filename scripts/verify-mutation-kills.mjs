@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "relocate-status-relocation-section-always",
+    targetFile: "packages/tui/src/cli/project-relocation-command.ts",
+    find: '  const relocationSection =\n    description.registrationReadKind === "legacy"',
+    replace: '  const relocationSection =\n    true',
+    testFiles: ["tests/tui/unit/relocate01-project-status-relocation-section.test.ts"],
+    expectedFailingTestNames: ["② 有效登记且身份一致"],
+    rationale:
+      "无条件输出 relocation 段 ⇒ 正常项目也带重定位段（误导用户以为要重定位、破坏向后兼容）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-status-legacy-hides-reconcile-hint",
+    targetFile: "packages/tui/src/cli/project-relocation-command.ts",
+    find: '          reconcileCommandHint: "astarray project reconcile --input <reconcile-input.json> --json",',
+    replace: '          reconcileCommandHint: "",',
+    testFiles: ["tests/tui/unit/relocate01-project-status-relocation-section.test.ts"],
+    expectedFailingTestNames: ["① 存在旧格式登记"],
+    rationale:
+      "旧格式登记却不给出对账入口 ⇒ 用户不知道下一步该做什么（卡内：人工确认短且易懂）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "relocate-cli-write-exit-zero",
     targetFile: "packages/tui/src/cli/project-relocation-command.ts",
     find: "  return reconciliation.isExecutionAllowed ? EXIT_CODES.SUCCESS : EXIT_CODES.FAILURE;",
