@@ -871,6 +871,24 @@ export {
   type ReusableToolRegistrationOutcome,
   type ReusableToolRegistrationV1,
 } from "./orchestration/workflow-fold-contract.js";
+/**
+ * EXP-01 / EXPLORE-01-01（2026-10-18）：边界探索的问题指纹、计划与独立预算/触发/停止契约。
+ *
+ * 纯判定：不启动探索、不调用模型、不写盘、不扣费。
+ */
+export {
+  applyExplorationBudgetConsumption,
+  assessExplorationPlan,
+  computeExplorationProblemFingerprint,
+  evaluateExplorationStart,
+  evaluateExplorationStop,
+  type BudgetConsumptionOutcome,
+  type ExplorationBudget,
+  type ExplorationPlanAssessment,
+  type ExplorationPlanInput,
+  type ExplorationStartDecision,
+  type ExplorationStopDecision,
+} from "./orchestration/explore-plan-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
