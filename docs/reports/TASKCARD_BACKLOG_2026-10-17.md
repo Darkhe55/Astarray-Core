@@ -295,3 +295,14 @@ npm pack 273 文件             exit 0；两项 verify exit 0
 
 ⇒ **`HISTORY-01-02`（最小历史持久化）是真正的下一步工作**：需要新增结构化记录（工具调用、失败、恢复分界），
 而不是"补一个视图"。**本轮未开工实现**（预算用于审计取证）。
+
+### 13.4 `HISTORY-01-02` 接线的**取证结论**（2026-10-18 第 37 轮）
+
+| 项 | 结果 |
+| --- | --- |
+| 是否有"工具成功"钩子 | ✅ 有：`packages/core/src/runtime/tool-loop.ts:99` `onToolSucceeded?: (toolName, outputText) => void`，在 **L522–524** 被调用 |
+| 是否有"工具失败"钩子 | ❌ **没有**（只有 succeeded） |
+| ⇒ 接线缺口 | 要满足卡内「失败调用也要记录」，需**先加一个失败钩子**（`onToolFailed`）再接到 `RunHistoryStore.appendEvent` |
+| 预算判断 | 加钩子（2 行）+ 两处接线 + 反例 ≈ **2 轮**；本轮仅取证，**未改代码** |
+
+**下一轮动作**：①加 `onToolFailed` 钩子（含失败原因）；②在 `RunHistoryStore` 侧提供 `recordToolCall/recordToolFailure` 便捷方法；③写"真实执行路径记录两条事件"的反例；④拔线 + 门禁。
