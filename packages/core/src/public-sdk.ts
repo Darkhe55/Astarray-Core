@@ -927,6 +927,32 @@ export {
   type LessonValidityStatus,
   type LessonWriteDecision,
 } from "./orchestration/lesson-record-contract.js";
+/**
+ * WORKWINDOW-01-01（2026-10-18）：工作/休息时段的规则、时区、暂停原因与恢复契约。
+ *
+ * 纯判定：不调度、不取消工具、不写盘、不唤醒系统服务。
+ */
+export {
+  applyPauseReasonChange,
+  computeLocalCalendarMinute,
+  computeWorkWindowRulesFingerprint,
+  createPauseReasonState,
+  detectWallClockJump,
+  evaluateResume,
+  evaluateWorkWindowState,
+  hasEnteredWorkingState,
+  isAnyPauseReasonActive,
+  isMinuteWithinRuleRange,
+  listActivePauseReasons,
+  type LocalCalendarMinute,
+  type PauseReasonKind,
+  type PauseReasonState,
+  type ResumeDecision,
+  type WorkWindowAssessment,
+  type WorkWindowMode,
+  type WorkWindowRule,
+  type WorkWindowState,
+} from "./orchestration/work-window-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,

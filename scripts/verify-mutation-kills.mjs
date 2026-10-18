@@ -265,6 +265,48 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "workwindow-rest-priority-inverted",
+    targetFile: "packages/core/src/orchestration/work-window-contract.ts",
+    find: `  // 作用域交集：任何作用域命中休息 ⇒ 休息（项目规则不能无声覆盖全局休息）
+  if (hasRestingMatch) {`,
+    replace: `  // 作用域交集：任何作用域命中休息 ⇒ 休息（项目规则不能无声覆盖全局休息）
+  if (false) {`,
+    testFiles: ["tests/core/unit/workwindow01-contract.test.ts"],
+    expectedFailingTestNames: ["② 休息黑名单跨午夜", "⑤ 同优先级冲突"],
+    rationale:
+      "休息不再优先 ⇒ 白名单/项目规则可覆盖全局休息（卡内：冲突时休息优先、项目不能无声覆盖）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-oneoff-not-prioritized",
+    targetFile: "packages/core/src/orchestration/work-window-contract.ts",
+    find: "  if (oneOffRules.length > 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/workwindow01-contract.test.ts"],
+    expectedFailingTestNames: ["④ 一次性例外"],
+    rationale:
+      "一次性例外不再优先 ⇒ 用户显式放行在周期休息区间内被忽略 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-pause-reasons-overwritten",
+    targetFile: "packages/core/src/orchestration/work-window-contract.ts",
+    find: "    pausedReasons: { ...input.current.pausedReasons, [input.reason]: input.isPaused },",
+    replace: "    pausedReasons: { [input.reason]: input.isPaused } as typeof input.current.pausedReasons,",
+    testFiles: ["tests/core/unit/workwindow01-contract.test.ts"],
+    expectedFailingTestNames: ["⑧ 暂停原因分别记录"],
+    rationale:
+      "设置一个暂停原因会清掉其它原因 ⇒ 解除时段暂停把用户暂停也一并清掉（卡内禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-resume-ignores-unknown-side-effects",
+    targetFile: "packages/core/src/orchestration/work-window-contract.ts",
+    find: '  if (input.hasUnknownSideEffects) blockedReasonCodes.push("unknown-side-effects");',
+    replace: "  if (false) void 0;",
+    testFiles: ["tests/core/unit/workwindow01-contract.test.ts"],
+    expectedFailingTestNames: ["⑨ 恢复门禁"],
+    rationale:
+      "未知副作用不再阻塞恢复 ⇒ 到点后可能重放无法确认的非幂等操作（卡内禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "lesson-main-agent-write-allowed",
     targetFile: "packages/core/src/orchestration/lesson-record-contract.ts",
     find: "  if (input.isMainAgentModel) {",
