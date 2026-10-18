@@ -265,6 +265,50 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "curation-ignores-scope-expansion",
+    targetFile: "packages/core/src/orchestration/curation-plan-contract.ts",
+    find: '    changes.push("scope-expanded");',
+    replace: "    void 0;",
+    testFiles: ["tests/core/unit/exp01-curation-plan.test.ts"],
+    expectedFailingTestNames: ["② 范围扩大"],
+    rationale:
+      "扩大项目/会话/个体/数据类别不再算重大 ⇒ 未经再次授权就扩大整理范围 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "curation-unknown-change-treated-minor",
+    targetFile: "packages/core/src/orchestration/curation-plan-contract.ts",
+    find: '    changes.push("unknown-change");',
+    replace: "    void 0;",
+    testFiles: ["tests/core/unit/exp01-curation-plan.test.ts"],
+    expectedFailingTestNames: ["⑤ 字段有差异但无法归类"],
+    rationale:
+      "无法归类的差异被当作非重大 ⇒ 模型可用'小改'绕过本地比较（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "curation-authorization-skips-fingerprint",
+    targetFile: "packages/core/src/orchestration/curation-plan-contract.ts",
+    find: "  if (input.authorization.planFingerprint !== computeCurationPlanFingerprint(input.plan)) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-curation-plan.test.ts"],
+    expectedFailingTestNames: ["① 未授权"],
+    rationale:
+      "授权不再绑定参数指纹 ⇒ 批准后偷改参数仍然有效（卡内：新授权绑定精确 revision）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "curation-transition-pauses-old-plan",
+    targetFile: "packages/core/src/orchestration/curation-plan-contract.ts",
+    find: `    decision: "keep-old-waiting",
+    isNewPlanPaused: true,
+    isOldPlanStillAllowed: true,`,
+    replace: `    decision: "keep-old-waiting",
+    isNewPlanPaused: true,
+    isOldPlanStillAllowed: false,`,
+    testFiles: ["tests/core/unit/exp01-curation-plan.test.ts"],
+    expectedFailingTestNames: ["⑦ 重大变更未获新授权"],
+    rationale:
+      "等待新授权时把旧方案也停掉 ⇒ 未经授权就改变了既有行为（卡内：只暂停新方案）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "explore-start-ignores-unknown-resource-state",
     targetFile: "packages/core/src/orchestration/explore-plan-contract.ts",
     find: "  if (input.isResourceStateUnknown && !input.hasUserApprovedLocalBudget) {",
