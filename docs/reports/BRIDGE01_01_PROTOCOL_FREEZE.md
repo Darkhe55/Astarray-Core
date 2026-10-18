@@ -1,6 +1,6 @@
 # BRIDGE-01-01 目标与协议冻结 — 证据
 
-> 检查点：BRIDGE-01-01（docs/tasks/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md）
+> 检查点：BRIDGE-01-01（docs/tasks/accepted/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md）
 > 前驱：T07D-R1（已通过）。日期：2026-09-12
 > 决策记录：docs/adr/0032-external-tool-bridge-mcp-stdio.md
 

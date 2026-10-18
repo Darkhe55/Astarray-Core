@@ -1,6 +1,6 @@
 # BRIDGE-01-02 最小工具映射 — 实现与证据
 
-> 检查点：BRIDGE-01-02（docs/tasks/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md）
+> 检查点：BRIDGE-01-02（docs/tasks/accepted/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md）
 > 前驱：BRIDGE-01-01（ADR-0032：MCP 2026-07-28 + stdio）。日期：2026-09-12
 
 ## 1. 交付

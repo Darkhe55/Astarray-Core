@@ -1,6 +1,6 @@
 # T07D-R2-04 受控在线小样本证据（真实 Provider，2026-10-01）
 
-> 检查点：`docs/tasks/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md` §T07D-R2-04（此前 `blocked`）。
+> 检查点：`docs/tasks/accepted/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md` §T07D-R2-04（此前 `blocked`）。
 > 前置：用户 2026-10-01 提供真实 Provider 凭据与费用授权（模型 `step-3.7-flash`、最多 3 次真实请求、单次超时 60s）。
 > 基线：`HEAD == origin/main == d17ff61`；本检查点未改动仓库代码（仅新增本文档 + 写状态目录）。
 

@@ -1,7 +1,7 @@
 # T09A-R1-03 关闭、人工验收与回访工具 · 证据
 
 > 检查点：T09A-R1-03　状态：done
-> 任务卡：`docs/tasks/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T09A-R1-02（done）
+> 任务卡：`docs/tasks/accepted/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md`；前驱：T09A-R1-02（done）
 > 基线提交：`c900fa9`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 实现内容
