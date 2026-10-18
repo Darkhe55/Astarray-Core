@@ -793,6 +793,26 @@ export {
   type FolderGrantReadOutcome,
   type FolderGrantRecordV1,
 } from "./orchestration/folder-grant-store.js";
+/**
+ * CLIENT-01 / SECRETARY-01-01（2026-10-18）：实验性同级秘书的**契约层**。
+ *
+ * 公开理由：开关、能力矩阵、可见列表与转交提案必须是**同一个实现**，
+ * 否则 UI 与运行时各判一套就是本仓库反复出现的双实现漂移。
+ * 该模块只判定：不创建实例、不写盘、不调模型。
+ */
+export {
+  SECRETARY_ALLOWED_CAPABILITIES,
+  SECRETARY_DENIED_CAPABILITIES,
+  buildSecretaryVisibleProjects,
+  evaluateSecretaryActivation,
+  evaluateSecretaryCapabilityRequest,
+  planSecretaryTaskRelay,
+  type SecretaryActivationAssessment,
+  type SecretaryActivationReasonCode,
+  type SecretaryCapabilityDecision,
+  type SecretaryTaskRelayDecision,
+  type SecretaryVisibilityResult,
+} from "./orchestration/secretary-agent-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
