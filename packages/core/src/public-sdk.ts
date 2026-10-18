@@ -1002,6 +1002,20 @@ export {
   type FoldVerificationRecord,
   type RegisteredFoldPackage,
 } from "./orchestration/workflow-fold-package.js";
+/**
+ * EXP-01 / EXPLORE-01-02（2026-10-19）：有界试验执行、隔离、去重与可复现记录。
+ *
+ * 纯判定：不启动试验、不建目录、不调模型、不写盘。
+ */
+export {
+  buildExploreTrialRecord,
+  computeExploreTrialKey,
+  evaluateExploreTrialStart,
+  restoreExploreBudgetAfterRestart,
+  type ExploreTrialRecordV1,
+  type ExploreTrialStartDecision,
+  type TrialIsolationKind,
+} from "./orchestration/explore-trial-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
