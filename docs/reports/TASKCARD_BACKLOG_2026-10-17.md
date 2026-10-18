@@ -350,3 +350,16 @@ npm pack 273 文件             exit 0；两项 verify exit 0
 
 **下一步（下一步的第一件事）**：写一个**会调用一次工具**的端到端用例（假 Provider 先发 tool_call 再发完成标记），
 断言 `stateDirectory/run-history/<missionId>.json` 存在且含 `tool-call` 事件。**在此之前不得声称历史已生效。**
+### 13.7 基线（2026-10-18 第 44 轮实测）
+
+```
+check    471 文件 / 3431 用例    exit 0
+变异      69/69                   exit 0
+隔离包    273 文件; verify-package / verify-sdk-consumer exit 0
+```
+
+`HISTORY-01-02` 的**代码与四层接线全部就绪**且全量门禁通过；
+**唯一缺的是端到端证据**（"跑一次真实任务 ⇒ 历史文件出现"），
+因为现有可用 mission 用例都不调用工具，而 store 只在工具事件时写。
+**下一步唯一动作**：写一个假 Provider 先发 `tool_call` 再发完成标记的用例，断言
+`stateDirectory/run-history/<missionId>.json` 出现且含 `tool-call` 事件。
