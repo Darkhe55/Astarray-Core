@@ -265,6 +265,46 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "explore-start-ignores-unknown-resource-state",
+    targetFile: "packages/core/src/orchestration/explore-plan-contract.ts",
+    find: "  if (input.isResourceStateUnknown && !input.hasUserApprovedLocalBudget) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-explore-plan.test.ts"],
+    expectedFailingTestNames: ["⑤ 启动"],
+    rationale:
+      "资源未知且无用户批准预算仍启动 ⇒ 等于猜余额/擅自消耗额度（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "explore-budget-overdraft-allowed",
+    targetFile: "packages/core/src/orchestration/explore-plan-contract.ts",
+    find: "    consumed.trials > budget.maximumTrials;",
+    replace: "    consumed.trials > budget.maximumTrials + 1000;",
+    testFiles: ["tests/core/unit/exp01-explore-plan.test.ts"],
+    expectedFailingTestNames: ["⑧ 预算扣减"],
+    rationale:
+      "允许透支试验数 ⇒ 预算不再是硬上限（可被绕过）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "explore-stop-ignores-no-progress",
+    targetFile: "packages/core/src/orchestration/explore-plan-contract.ts",
+    find: "  if (\n    Number.isFinite(input.maximumNoProgressRounds) &&\n    input.consecutiveNoProgressRounds >= input.maximumNoProgressRounds\n  ) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-explore-plan.test.ts"],
+    expectedFailingTestNames: ["⑨ 停止条件"],
+    rationale:
+      "无进展不再停止 ⇒ 探索可无限续跑（卡内禁止无限续跑）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "explore-duplicate-combination-allowed",
+    targetFile: "packages/core/src/orchestration/explore-plan-contract.ts",
+    find: "  if (input.exploredCombinationFingerprints.includes(input.targetCombinationFingerprint)) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-explore-plan.test.ts"],
+    expectedFailingTestNames: ["⑥ 启动"],
+    rationale:
+      "相同参数与版本组合重复探索 ⇒ 重复消耗预算且结论不可增量（卡内明确禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "workflow-fold-accepts-non-foldable",
     targetFile: "packages/core/src/orchestration/workflow-fold-contract.ts",
     find: "  if (offendingItem !== undefined) {",
