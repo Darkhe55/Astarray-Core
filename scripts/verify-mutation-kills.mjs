@@ -265,6 +265,36 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "explore-trial-real-user-data-allowed",
+    targetFile: "packages/core/src/orchestration/explore-trial-contract.ts",
+    find: "  if (input.touchesRealUserData) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-explore-trial.test.ts"],
+    expectedFailingTestNames: ["① 真实用户数据"],
+    rationale:
+      "允许在真实用户数据上跑试验 ⇒ 随机破坏性操作打到用户数据（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "explore-trial-duplicate-rerun-allowed",
+    targetFile: "packages/core/src/orchestration/explore-trial-contract.ts",
+    find: "  if (existingTrial !== undefined) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-explore-trial.test.ts"],
+    expectedFailingTestNames: ["④ 相同参数"],
+    rationale:
+      "相同参数/种子/版本重复重跑 ⇒ 重复消耗预算且结论不可增量（卡内禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "explore-budget-refreshed-on-restart",
+    targetFile: "packages/core/src/orchestration/explore-trial-contract.ts",
+    find: "  if (input.persistedBudget === null) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/exp01-explore-trial.test.ts"],
+    expectedFailingTestNames: ["⑦ 重启后预算不刷新"],
+    rationale:
+      "重启后无快照却返回 restored（用 null 预算）⇒ 等于重启刷新预算 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "fold-package-author-self-verification-accepted",
     targetFile: "packages/core/src/orchestration/workflow-fold-package.ts",
     find: "  if (input.verification.verifierAgentInstanceId === input.authorAgentInstanceId) {",
