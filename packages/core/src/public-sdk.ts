@@ -970,6 +970,26 @@ export {
   type DocumentPresentationMode,
   type DocumentViewReceiptV1,
 } from "./orchestration/document-view-contract.js";
+/**
+ * CONFIGCHAT-01-01（2026-10-18）：对话设置的白名单、来源、作用域、风险与幂等契约。
+ *
+ * 纯判定：不读写配置、不调用模型、不持锁。
+ */
+export {
+  CHAT_SETTING_ALLOWLIST,
+  CHAT_SETTING_SECRET_KEYS,
+  classifySettingChangeIdentity,
+  computeSettingChangeContentFingerprint,
+  evaluateSettingApplyStatus,
+  evaluateSettingChangeProposal,
+  type ChangeIdentityOutcome,
+  type SettingApplyStatus,
+  type SettingChangeProposal,
+  type SettingProposalDecision,
+  type SettingProposalSourceKind,
+  type SettingRiskKind,
+  type SettingScopeKind,
+} from "./orchestration/config-chat-contract.js";
 export {
   ACCURACY_TIERS,
   InMemoryAccuracyAttemptJournal,
