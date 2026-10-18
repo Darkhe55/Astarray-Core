@@ -46,6 +46,8 @@ export interface ProjectRelocationObservation {
   readonly candidateIdentifiersWithSameIdentity: readonly string[];
   /** 登记本身是否损坏（可解析但字段非法、或文件损坏）。 */
   readonly isRegistrationCorrupted: boolean;
+  /** 是否存在**旧格式**登记文件（无 schemaVersion；文件存在 ⇒ 不是 unregistered）。 */
+  readonly isLegacyRegistration?: boolean;
 }
 
 /** 判定结果。 */
@@ -101,7 +103,18 @@ export function classifyProjectRelocation(
     };
   }
 
-  // ② 完全没有登记（标识与根都缺失）
+  // ② 旧格式登记（文件存在但缺 schemaVersion）⇒ 走旧格式流程，不得当作未登记
+  if (observation.isLegacyRegistration === true) {
+    return {
+      classification: "identity-missing",
+      isHistoryLoadable: false,
+      isExecutionAllowed: false,
+      requiredUserAction: "走旧格式关联/恢复流程",
+      reason: "存在旧格式登记（缺少 schemaVersion）；需用户显式关联后迁移，不自动升级、不伪称验证成功。",
+    };
+  }
+
+  // ③ 完全没有登记（标识与根都缺失）
   if (
     !isIdentifiableProjectIdentifier(observation.registeredProjectIdentifier) &&
     isBlank(observation.registeredRootPath)
