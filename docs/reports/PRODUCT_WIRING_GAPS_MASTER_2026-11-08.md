@@ -2046,3 +2046,45 @@ console.error("[P-A] reg=" + String(options.toolDocumentationRegistry !== undefi
 
 **待你确认的一点**：Tier 1 那些卡的**卡内文字仍是旧状态**（本会话只更新了总表与 `PLAN_STATUS`）。
 是否回填卡内状态，是**改权威文档**的决定 —— 我不擅自动。
+
+## 35. **还剩什么**：未接线 / 未验证 / 待外部（2026-10-18 快照）
+
+### 35.1 本地可继续（我能做，不需要你输入）
+
+| 项 | 内容 | 估算 |
+| --- | --- | --- |
+| RELOCATE-01-04 | **CLI 入口**（命令名/字段待确认后 2 轮） | 2 |
+| RELOCATE-01-04 | tarball 双进程搬迁恢复证据（依赖 CLI） | 2 |
+| 变异覆盖 | 控制面/存储目前各 1 条，可按需再加 | 1–2 |
+| 逐卡判定 | backlog Tier 3 队列里 remaining 的 20+ 张卡（多数为外部/重型，需逐张判） | 每张 1 |
+
+### 35.2 **需要你一句话**（阻塞在我这轮无法决定的"产品文案"或"运行时记录"）
+
+| 项 | 需要什么 |
+| --- | --- |
+| **RELOCATE-01-04 CLI** | 命令名（A `project status` / B `relocate status` / C 你给） |
+| **G4 工具说明内容** | 某工具组的 5 项登记（`examples`/`failureCodes`/`returnSchemaJson`/`requiredCapabilities`/`limitations`），或授权我按代码事实摘录 |
+| **G1 合并授权** | 人工体验结论 + 操作授权标识符（`GH_PR_*` 或等价），代码不得代填 |
+| 回填卡内状态（Tier 1 的 7 张卡） | 是否允许我改那些卡的正文状态（改权威文档需你同意） |
+
+### 35.3 **只能由你/平台提供**（我做到 fail-closed 就停）
+
+| 项 | 说明 |
+| --- | --- |
+| `SUM-01` 人工标注 | 需你按标准标注 |
+| macOS / Linux 平台证据 | 本环境无法产生 |
+| GUI 人工体验 | 确认卡交互、历史视图观感 |
+| 真实 Provider 凭据与额度 | 端到端真机验证 |
+
+### 35.4 已闭合但**默认关**（用则开）
+
+| 能力 | 开关 | 位置 |
+| --- | --- | --- |
+| G1 受控合并 | `gitIntegration`（未传即整链不启用；即便启用，五门禁默认不满足 ⇒ 恒不可合并） | 门面选项 |
+| G2 进度守卫 | `isProgressGuardEnabled ?? false` | `public-sdk.ts` |
+| G3 高严谨性 | `isHighRigorEnforcementEnabled ?? false` | 同上 |
+| G5 检查点续跑 | `isCheckpointResumeEnabled ?? false` | 同上 |
+| G4 工具说明 | `toolDocumentationRegistry`（未传即不注入） | 门面选项 |
+| RELOCATE-01 只读控制面 | `ProjectRelocationController`（需自行构造 store） | 门面导出 |
+
+**基线**：`check` **469 文件 / 3420 用例**；变异 **69/69**；`npm pack` **273 文件**；两项 verify exit 0。
