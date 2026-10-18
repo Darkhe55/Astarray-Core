@@ -658,6 +658,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R23 | `EXP-01 / CURATE-01-02`：周期增量执行（单实例锁、错过周期合并、按游标增量、休息不运行、 授权 revision 边界、摘要失败原文不变、个体隔离、重启续处理） | 新增 `curation-execution-contract.ts` + `tests/core/unit/exp01-curation-execution.test.ts`（**8 条**）； 3 条变异体（休息仍触发／错过周期补跑／失败声称覆盖完整）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **491/3624 exit 0** |
 | R24 | `CLIENT-01 / ONBOARD-01-01`：首次/适时提示（7 天冷却、**不再提示持久化**、跳过不重复、 忙碌类抑制、迁移不重复弹、推荐不构成授权、无遥测无画像） | 新增 `onboarding-hint-contract.ts` + `tests/core/unit/client01-onboarding-hint.test.ts`（**8 条**）； 3 条变异体（忽略拒绝／授权中弹／推荐即授权）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **492/3632 exit 0** |
 | R25 | **5 轮一次全量门禁**：变异全量（134 条）+ 隔离包三项 | — | 变异 **133/134**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed` （未跟踪私有 GUI 用例负载抖动，第 3 次出现）⇒ **单独复跑 2/2 被拦下**； `npm pack` **269 文件** sha256 `e4dbf35f…`； `verify-package` / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
+| R26 | `PROJECT-01-04`：**跨项目副本回执按个体过滤**（发现并修复"list --agent 串数据"） | `summarizeCopyReceipts` 增加 `filter`（来源/目标/接收个体）并解析 `receivingAgentInstanceId`； 摘要条目新增该字段（可追溯）；CLI 三个过滤参数同时传入。 反例 `cross-project-copy-receipt-filter.test.ts`（**3 条，修复前 3 红**）； 变异 `cross-project-copy-receipts-ignore-agent-filter` 被拦下 | 低并发全量 `npx vitest run --maxWorkers=2` **493/3635 exit 0** |
 
 > **R14 推送状态（如实）**：R13 提交 `c7c45e3a` 在本轮**再次连续 5 次**推送失败（128），`git ls-remote` 探针亦失败
 > ⇒ 远端 SSH 通道持续不可达。按纪律继续累积，下一阶段合并 `c7c45e3a`、R14 提交重试（≤5 次）。

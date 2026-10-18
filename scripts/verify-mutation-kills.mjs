@@ -265,6 +265,23 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "cross-project-copy-receipts-ignore-agent-filter",
+    targetFile: "packages/core/src/orchestration/cross-project-authorization-store.ts",
+    find: `      if (
+        filter.receivingAgentInstanceId !== undefined &&
+        entry.receivingAgentInstanceId !== filter.receivingAgentInstanceId
+      ) {
+        return false;
+      }`,
+    replace: `      if (false) {
+        return false;
+      }`,
+    testFiles: ["tests/core/integration/cross-project-copy-receipt-filter.test.ts"],
+    expectedFailingTestNames: ["① list --agent"],
+    rationale:
+      "副本回执不再按个体过滤 ⇒ 甲个体能看到乙个体的副本（串数据）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "onboarding-never-show-again-ignored",
     targetFile: "packages/core/src/orchestration/onboarding-hint-contract.ts",
     find: "  if (input.state.isNeverShowAgain) {",
