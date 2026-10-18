@@ -280,6 +280,6 @@ npm pack 273 文件             exit 0；两项 verify exit 0
 
 | 项 | 状态 |
 | --- | --- |
-| **tarball** 双进程搬迁证据 | ⚠️ 尝试过用 tarball 安装做同一证据，但本机 `npm install` 未生成 `node_modules`（沙箱内安装失败）⇒ **用的是仓库 `dist`**，不是隔离包。**不得声称已有 tarball 证据** |
+| **tarball** 双进程搬迁证据 | ⚠️ **未取得**。两条路都失败：①本机 `npm install` 不生成 `node_modules`；②**解包直跑**报 `ERR_MODULE_NOT_FOUND: zod`（tarball 不含依赖，必须真实安装）。⇒ 双进程证据用的是**仓库 `dist`**；隔离包方面只有 `verify-package`/`verify-sdk-consumer`（exit 0）。**不得声称已有 tarball 双进程证据** |
 | TUI / GUI 入口 | 未做（GUI 属外部人工体验） |
 | `--observed-identifier` 的来源 | 目前由调用方提供；项目内标识文件形态由项目自定义，CLI 不假设 |
