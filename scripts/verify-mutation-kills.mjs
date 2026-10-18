@@ -265,6 +265,48 @@ export const MUTATIONS = [
       "⇒ 非法 JSON payload 的脱敏反例必须变红",
   },
   {
+    mutationIdentifier: "secretary-first-start-ignores-offline-threshold",
+    targetFile: "packages/core/src/orchestration/secretary-first-start.ts",
+    find: "  if (offlineDurationMinutes < input.minimumClientClosedDurationMinutes) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-secretary-first-start.test.ts"],
+    expectedFailingTestNames: ["② 单纯跨午夜"],
+    rationale:
+      "离线阈值被忽略 ⇒ 单纯跨午夜的短重启也会触发整理（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-first-start-reprocesses-day",
+    targetFile: "packages/core/src/orchestration/secretary-first-start.ts",
+    find: "  if (input.lastProcessedLocalDates.includes(nowLocalDate)) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-secretary-first-start.test.ts"],
+    expectedFailingTestNames: ["④ 该本地日已处理"],
+    rationale:
+      "已处理日期仍再次触发 ⇒ 同一天重复整理（重复模型调用/重复产物）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-daily-claim-allows-double",
+    targetFile: "packages/core/src/orchestration/secretary-first-start.ts",
+    find: "  if (existing !== undefined) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/client01-secretary-first-start.test.ts"],
+    expectedFailingTestNames: ["⑧ 同日领取"],
+    rationale:
+      "同日领取不再排他 ⇒ 多窗口同时整理同一天（卡内要求原子领取）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-collapse-deletes-old",
+    targetFile: "packages/core/src/orchestration/secretary-first-start.ts",
+    find: `    collapsedOlderCount,
+    areOlderDeleted: false,`,
+    replace: `    collapsedOlderCount,
+    areOlderDeleted: true,`,
+    testFiles: ["tests/core/unit/client01-secretary-first-start.test.ts"],
+    expectedFailingTestNames: ["⑨ 收拢视图"],
+    rationale:
+      "把收拢当成删除 ⇒ 旧历史被标记删除（卡内：收拢而非删除）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "secretary-task-key-ignores-project",
     targetFile: "packages/core/src/orchestration/secretary-relay-contract.ts",
     find: `    "secretary-task-line",
