@@ -42,3 +42,5 @@ id_rsa.pub
 .DS_Store
 Thumbs.db
 Desktop.ini
+# 本地施工规范（不入库，2026-10-18）
+AGENTS.md
