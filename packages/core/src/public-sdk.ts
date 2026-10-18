@@ -1060,6 +1060,29 @@ export {
   type RelocationProjectStatus,
 } from "./orchestration/project-relocation-reconciler.js";
 /**
+ * OBS-01 PERF/DIAG 采集契约（2026-10-19 R37）：默认 off、采样预算、进程内指标白名单、
+ * DIAG 只复用 DomainError/doctor、脱敏边界、观测故障不阻塞业务。
+ *
+ * 纯判定：不采样、不写盘、不上传、不调模型。
+ */
+export {
+  DEFAULT_PERF_RETENTION_HOURS,
+  DEFAULT_PERF_SAMPLE_INTERVAL_SECONDS,
+  DEFAULT_PERF_STORAGE_BUDGET_BYTES,
+  buildPerfSample,
+  computeDiagFingerprint,
+  describeObservabilityBoundary,
+  evaluateDiagEventAcceptance,
+  evaluateObservabilityFailure,
+  evaluatePerfCollection,
+  type DiagEventSourceKind,
+  type DiagEventV1,
+  type DiagSanitizationCheck,
+  type PerfCollectionDecision,
+  type PerfSampleField,
+  type PerfSampleV1,
+} from "./orchestration/observability-collection-contract.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
