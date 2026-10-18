@@ -1,7 +1,7 @@
 # T07D-R2-03 工具与多层调度 · 证据
 
 > 检查点：T07D-R2-03　状态：done
-> 任务卡：`docs/tasks/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md`；前驱：T07D-R2-02（done）
+> 任务卡：`docs/tasks/accepted/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md`；前驱：T07D-R2-02（done）
 > 基线提交：`c95a1a0`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 行为反例（先红）

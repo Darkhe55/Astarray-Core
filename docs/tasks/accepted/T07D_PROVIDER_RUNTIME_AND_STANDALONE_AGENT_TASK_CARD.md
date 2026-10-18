@@ -310,7 +310,7 @@ completionGate: passed | failed | blocked
 ```text
 完整读取 AGENTS.md、agent-main-architecture.md、designtodo.txt、
 IMPLEMENTATION_PLAN.md、PLAN_STATUS.md、ADR-0026、T07C 任务卡和
-docs/tasks/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md。
+docs/tasks/accepted/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md。
 
 先核对 T07C 的实际完成证据；未通过时只报告阻塞，不得提前实现 T07D。
 依赖通过后，本轮只执行 T07D-00，不开始 T07D-01。先建立真实 Provider

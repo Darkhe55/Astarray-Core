@@ -1,6 +1,6 @@
 # T07D-00 Provider 产品路径审计与文档纠偏（2026-08-22）
 
-> 任务卡：`docs/tasks/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md` T07D-00
+> 任务卡：`docs/tasks/accepted/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md` T07D-00
 > 只改文档、schema 与失败测试；不顺带实现 Provider。
 
 ## 1. 当前真实状态（审计结果）

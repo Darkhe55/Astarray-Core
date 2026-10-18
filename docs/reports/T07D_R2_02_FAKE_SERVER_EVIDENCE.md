@@ -1,7 +1,7 @@
 # T07D-R2-02 生产入口连通本地协议服务器 · 证据
 
 > 检查点：T07D-R2-02　状态：done
-> 任务卡：`docs/tasks/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md`；前驱：T07D-R2-01（done）
+> 任务卡：`docs/tasks/accepted/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md`；前驱：T07D-R2-01（done）
 > 基线提交：`b8d5c93`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 行为反例（先红）

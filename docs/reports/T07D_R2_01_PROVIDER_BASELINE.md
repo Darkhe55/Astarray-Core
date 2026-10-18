@@ -1,7 +1,7 @@
 # T07D-R2-01 Provider 配置与运行时注册 · 基线
 
 > 检查点：T07D-R2-01　状态：done
-> 任务卡：`docs/tasks/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md`；前驱：T07D-R1（done）
+> 任务卡：`docs/tasks/accepted/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md`；前驱：T07D-R1（done）
 > 基线提交：`1f7f3b1`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 现有 Provider 资产盘点（复用，不重写）

@@ -1,7 +1,7 @@
 # T07D-R1-02 真实提交和事件 · 证据
 
 > 检查点：T07D-R1-02　状态：done
-> 任务卡：`docs/tasks/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md`；前驱：T07D-R1-01（done）
+> 任务卡：`docs/tasks/accepted/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md`；前驱：T07D-R1-01（done）
 > 基线提交：`95b11c8`；平台：Windows / Node v24.18.0 / npm 11.16.0
 
 ## 1. 行为反例（先红）

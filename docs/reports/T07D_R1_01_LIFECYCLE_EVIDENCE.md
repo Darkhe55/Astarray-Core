@@ -1,7 +1,7 @@
 # T07D-R1-01 公共应用创建与生命周期 · 证据
 
 > 检查点：T07D-R1-01　状态：done
-> 任务卡：`docs/tasks/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
+> 任务卡：`docs/tasks/accepted/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md`；共同契约：`docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md`
 > 前驱：INT-00（INT-00-01/02/03 全部通过，见 `docs/reports/INT00_*.md`）
 > 基线提交：`86923f8`；平台：Windows / Node v24.18.0 / npm 11.16.0
 

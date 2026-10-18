@@ -1,6 +1,6 @@
 # T12A-R1-04 安装包恢复与进程收口 — 实现与跨进程/隔离安装证据
 
-> 检查点：T12A-R1-04（docs/tasks/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
+> 检查点：T12A-R1-04（docs/tasks/accepted/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
 > 前驱：T12A-R1-03（已通过，提交 `e826e12`/`d4d6083`）。
 > 日期：2026-09-10
 

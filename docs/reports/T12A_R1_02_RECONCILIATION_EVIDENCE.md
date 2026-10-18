@@ -1,6 +1,6 @@
 # T12A-R1-02 副作用与权限对账 — 实现与重启对账证据
 
-> 检查点：T12A-R1-02（docs/tasks/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
+> 检查点：T12A-R1-02（docs/tasks/accepted/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md）
 > 前驱：T12A-R1-01（已通过，提交 `7582dad`/`dcb0288`）。
 > 日期：2026-09-10
 

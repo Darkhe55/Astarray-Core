@@ -15,13 +15,13 @@
 
 | 顺序 | 任务卡 | 定位 |
 |---|---|---|
-| 1 | [INT-00](./INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md) | 入口审计、行为基线、旧状态纠偏 |
-| 2 | [T07D-R1](./T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md) | 共用应用服务与SDK真实执行 |
-| 3 | [T07D-R2](./T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md) | 首个Provider产品接线 |
-| 4 | [T09A-R1](./T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md) | 上下文预算/关闭/回访实际运行 |
-| 5 | [T12A-R1](./T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md) | 中断后的产品级恢复 |
+| 1 | [INT-00](accepted/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md) | 入口审计、行为基线、旧状态纠偏 |
+| 2 | [T07D-R1](accepted/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md) | 共用应用服务与SDK真实执行 |
+| 3 | [T07D-R2](accepted/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md) | 首个Provider产品接线 |
+| 4 | [T09A-R1](accepted/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md) | 上下文预算/关闭/回访实际运行 |
+| 5 | [T12A-R1](accepted/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md) | 中断后的产品级恢复 |
 | 6 | [E2E-01](./E2E01_STANDALONE_WORKFLOW_ACCEPTANCE_TASK_CARD.md) | 独立工作助手纵向验收 |
-| 7 | [BRIDGE-01](./BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md) | 单一外部协议MVP |
+| 7 | [BRIDGE-01](accepted/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md) | 单一外部协议MVP |
 | 8 | [GUI-01-R](./GUI01_R_PRODUCT_WORKBENCH_TASK_CARD.md) | GUI更新和实际产品接线 |
 | 9 | [WB-00](./WB00_MICRO_EDIT_WORKBENCH_PROTOTYPE_TASK_CARD.md) | 文本/代码细节微淘原型 |
 

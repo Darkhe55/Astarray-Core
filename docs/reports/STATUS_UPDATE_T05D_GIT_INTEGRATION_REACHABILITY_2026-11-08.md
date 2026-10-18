@@ -1,7 +1,7 @@
 # 状态补丁：T05D（人机并发变更 / Git 集成）可达性说明
 
 - **日期**：2026-11-08（第 148 轮）
-- **待集成到**：`docs/tasks/T05D_HUMAN_AGENT_CONCURRENT_CHANGE_TASK_CARD.md`（该卡 L3 现为「状态：`done`（T05D-01~06 全部完成）」）
+- **待集成到**：`docs/tasks/accepted/T05D_HUMAN_AGENT_CONCURRENT_CHANGE_TASK_CARD.md`（该卡 L3 现为「状态：`done`（T05D-01~06 全部完成）」）
 - **性质**：**不覆盖他人文件**，仅作独立状态补丁；不改变任何产品行为。
 
 ## 1. 为什么需要这份补丁
