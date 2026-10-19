@@ -1204,3 +1204,15 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **六项 verify 全 exit 0**（`verify-package` 267 / `verify:contract-sdk` **26/26** / `verify:relocation-batch` 11/11 /
 > `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）；
 > `vitest run --coverage --maxWorkers=2` **exit 0** —— **3591 用例**、stmts **92.10** / branches **85.40** / funcs **93.37** / lines **92.22**。
+
+> **第 100 轮（2026-10-20）轮次用尽，收尾登记（不主张目标达成）**：
+> `HEAD` **`fe1b4dcc`**（`== origin/main`、`unpushed: 0`）；最终门禁：**3591 用例 exit 0**、
+> 分支 **85.40%**、变异 **203/203**、锚点 **203/203**、包 **267 文件** sha256 `2ee3b45a…`、六项 verify 全 exit 0
+> （`contract-sdk` **26/26**、`relocation-batch` **11/11**）。
+> **未达成的部分（全部为外部条件，非代码缺失）**：
+> ①RELOCATE 真实历史库与三张 03 卡的真实入口/成本实测 —— 需**产品能端到端运行**；
+> ②macOS 平台证据 —— 需 Mac 或 CI runner；
+> ③人工体验结论 —— 需人按清单回填；
+> ④USAGE 价格/预算口径、OBS rotate 周期 —— 需产品定义（判定层已就绪）。
+> **如实说明**：这四项在本窗口内**无法由本地代码推进**；把它们继续挂在"待办"里而不给出解除条件才是问题，
+> 因此本行同时记录**每项的解除条件**（详见 `docs/reports/PHASE_SUMMARY_ROUNDS_55_99_2026-10-20.md` §6）。
