@@ -1106,6 +1106,18 @@ export {
   type ProcessSampleIntegrityReport,
 } from "./orchestration/process-sample-store.js";
 /**
+ * 进程样本保留策略（2026-10-19 R53）：10MB 预算 + 24h 保留，裁剪原因如实报告。
+ *
+ * 纯判定：不读写文件（文件重写由调用方按计划执行）。
+ */
+export {
+  DEFAULT_PROCESS_SAMPLE_BUDGET_BYTES,
+  DEFAULT_PROCESS_SAMPLE_RETENTION_HOURS,
+  planProcessSampleRetention,
+  type ProcessSampleRetentionCandidate,
+  type ProcessSampleRetentionPlan,
+} from "./orchestration/process-sample-retention.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。

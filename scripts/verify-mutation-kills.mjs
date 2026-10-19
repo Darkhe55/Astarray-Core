@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "retention-drops-newest-first",
+    targetFile: "packages/core/src/orchestration/process-sample-retention.ts",
+    find: "  for (let index = withinRetentionWindow.length - 1; index >= 0; index -= 1) {",
+    replace: "  for (let index = 0; index < withinRetentionWindow.length; index += 1) {",
+    testFiles: ["tests/core/unit/obs01-process-sample-retention.test.ts"],
+    expectedFailingTestNames: ["④ 超预算"],
+    rationale:
+      "超预算时先删**最新**样本 ⇒ 保留最旧数据、丢掉刚采的（用户要的是最新近况）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "retention-silently-zeroes-dropped-counts",
+    targetFile: "packages/core/src/orchestration/process-sample-retention.ts",
+    find: "    droppedByRetentionCount,\n    droppedByBudgetCount,",
+    replace: "    droppedByRetentionCount: 0,\n    droppedByBudgetCount: 0,",
+    testFiles: ["tests/core/unit/obs01-process-sample-retention.test.ts"],
+    expectedFailingTestNames: ["③ 超过 24h"],
+    rationale:
+      "裁剪条数被清零 ⇒ 静默删除历史（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "obs-process-empty-reported-as-samples",
     targetFile: "packages/tui/src/cli/observability-command.ts",
     find: "    hasSamples: matchedSamples.length > 0,",
