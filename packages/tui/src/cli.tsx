@@ -16,6 +16,7 @@ import {
   executeObsPerfCommand,
   executeObsProcessCommand,
 } from "./cli/observability-command.js";
+import { executeObsPerfRotateCommand } from "./cli/obs-perf-rotate-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
   DEFAULT_HISTORY_PAGE_SIZE,
@@ -731,6 +732,33 @@ obsCommand
         detailLevel: options.detail === true ? "detail" : "summary",
         ...(pageSize === undefined ? {} : { pageSize }),
         ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+obsCommand
+  .command("perf-rotate")
+  .description("预览/执行进程样本保留策略（默认只预览，不改盘；--apply 才会先备份再重写）")
+  .option("--apply", "真正执行（缺省仅预览）")
+  .option("--budget-bytes <n>", "存储预算字节数（缺省 10MB）")
+  .option("--retention-hours <n>", "保留小时数（缺省 24）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      apply?: boolean;
+      budgetBytes?: string;
+      retentionHours?: string;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeObsPerfRotateCommand({
+        stateDirectory: defaultStateDirectory(),
+        isApply: options.apply === true,
+        ...(options.budgetBytes === undefined
+          ? {}
+          : { budgetBytes: Number.parseInt(options.budgetBytes, 10) }),
+        ...(options.retentionHours === undefined
+          ? {}
+          : { retentionHours: Number.parseInt(options.retentionHours, 10) }),
         isJsonOutput: options.json === true,
       });
     },
@@ -2509,5 +2537,7 @@ process.stdout.write("", () => {
 setTimeout(() => {
   process.exit(convergenceExitCode);
 }, 1_000).unref();
+
+
 
 
