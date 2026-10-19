@@ -325,6 +325,26 @@ export const MUTATIONS = [
       "有失败运行仍宣称收益 ⇒ 把带回归的方案当成净收益（会误导推广）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "rotate-trigger-ignores-user-task",
+    targetFile: "packages/core/src/orchestration/observability-rotate-trigger.ts",
+    find: "  if (input.isUserTaskActive) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-rotate-trigger.test.ts"],
+    expectedFailingTestNames: ["② 用户任务进行中"],
+    rationale:
+      "用户任务进行中也自动整理 ⇒ 正常任务被观测整理抢占（卡内\"正常用户任务优先\"）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "rotate-trigger-guesses-unknown-storage",
+    targetFile: "packages/core/src/orchestration/observability-rotate-trigger.ts",
+    find: "  if (input.storageBytesUsed === null) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-rotate-trigger.test.ts"],
+    expectedFailingTestNames: ["③ 存储占用未知"],
+    rationale:
+      "占用未知也判预算 ⇒ 拿未知当零（或当超预算）触发整理，与\"不猜余额\"相悖 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm-topology-delivers-orphans",
     targetFile: "packages/core/src/orchestration/collaboration-topology-view.ts",
     find: "      isDeliverable: !isOrphaned && !isInCycle && isParentUsable && agent.isActive,",
