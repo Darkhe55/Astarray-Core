@@ -305,6 +305,26 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "explore-verification-accepts-single-success",
+    targetFile: "packages/core/src/orchestration/explore-verification-contract.ts",
+    find: "  if (evidencedSuccesses.length < 3) missingEvidence.push(\"successful-runs\");",
+    replace: "  if (evidencedSuccesses.length < 1) missingEvidence.push(\"successful-runs\");",
+    testFiles: ["tests/core/unit/explore01-verification-contract.test.ts"],
+    expectedFailingTestNames: ["① 一次成功"],
+    rationale:
+      "一次成功就算够 ⇒ 把\\\"一次成功\\\"称为稳定方案（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "explore-verification-auto-merges",
+    targetFile: "packages/core/src/orchestration/explore-verification-contract.ts",
+    find: "    isAutoMerged: false,\n    requiredNextStep:",
+    replace: "    isAutoMerged: true as unknown as false,\n    requiredNextStep:",
+    testFiles: ["tests/core/unit/explore01-verification-contract.test.ts"],
+    expectedFailingTestNames: ["④ 证据齐备"],
+    rationale:
+      "候选可自动合并 ⇒ 绕过普通验收与受控合并（用户最终判断被跳过）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "backup-apply-continues-after-failure",
     targetFile: "packages/core/src/orchestration/process-sample-backup-retention-apply.ts",
     find: "      return {\n        kind: \"aborted\",",
