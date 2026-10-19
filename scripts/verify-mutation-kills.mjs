@@ -305,6 +305,26 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "fold-internal-widens-scope",
+    targetFile: "packages/core/src/orchestration/workflow-fold-internal-authorization.ts",
+    find: "      if (!input.declaredCapabilityScope.has(capability)) {",
+    replace: "      if (false) {",
+    testFiles: ["tests/core/unit/fold01-internal-authorization.test.ts"],
+    expectedFailingTestNames: ["① 能力不在登记范围"],
+    rationale:
+      "折叠包内部可越出登记范围 ⇒ 用一次外层宽批准换掉原有逐步确认（权限扩张）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "fold-internal-skips-irreversible-prompt",
+    targetFile: "packages/core/src/orchestration/workflow-fold-internal-authorization.ts",
+    find: "      if (isIrreversibleCapability) {",
+    replace: "      if (false) {",
+    testFiles: ["tests/core/unit/fold01-internal-authorization.test.ts"],
+    expectedFailingTestNames: ["⑤ 不可逆能力"],
+    rationale:
+      "不可逆动作不再逐步确认 ⇒ 删文件/执行命令被一次宽授权放行 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "curation-view-shows-unsourced",
     targetFile: "packages/core/src/orchestration/curation-view-contract.ts",
     find: "    if (!hasSource) {\n      unsourcedItemCount += 1;\n      continue;\n    }",
