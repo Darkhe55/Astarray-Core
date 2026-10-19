@@ -1052,3 +1052,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 本轮把"全量用例 + 覆盖率门槛"补齐；**R97 的缺口已闭合**。
 > 全量变异与六项包 verify 仍以 R95（185 条中的 184 条全量通过 + R97 新增 1 条单独验证）与 R95 六项为准，
 > **R100 收尾轮会再跑一次完整四项**。
+
+> **R99（2026-10-20，第 99 轮全量门禁）**：变异 **185/185 全部被拦下**；`npm pack` **263 文件**
+> sha256 `23bb1104…`（先删旧产物再打包）；**六项 verify 全 exit 0**（`verify-package` 263 / `verify:contract-sdk` 17/17 /
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> 覆盖率与本轮全量用例见 R98（**3534 用例、分支 85.30%**，同一 HEAD 系）。
