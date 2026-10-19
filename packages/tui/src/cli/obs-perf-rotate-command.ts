@@ -28,6 +28,23 @@ export interface ObsPerfRotateCommandInput {
 export async function executeObsPerfRotateCommand(
   input: ObsPerfRotateCommandInput,
 ): Promise<number> {
+  /**
+   * **参数校验（R77）**：非法预算/保留时长必须**直接拒绝**，而不是把 NaN 传进计划。
+   *
+   * 事故模型：`NaN` 预算会让"字节数 ≤ 预算"恒为 false ⇒ **全部样本被判超预算**，
+   * 用户只是敲错一个参数，结果历史被裁掉。宁可少做，不可误删。
+   */
+  for (const [flagName, value] of [
+    ["--budget-bytes", input.budgetBytes],
+    ["--retention-hours", input.retentionHours],
+  ] as const) {
+    if (value === undefined) continue;
+    if (!Number.isFinite(value) || value <= 0) {
+      logToStderr(`${flagName} 必须是正的有限数（收到 ${String(value)}）；未修改任何文件。`);
+      return EXIT_CODES.FAILURE;
+    }
+  }
+
   const nowIso = input.nowIso ?? new Date().toISOString();
   const isApply = input.isApply === true;
   const store = new ProcessSampleStore({ baseDirectory: input.stateDirectory });

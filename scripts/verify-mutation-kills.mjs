@@ -275,6 +275,16 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "perf-rotate-accepts-nan-budget",
+    targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
+    find: "    if (!Number.isFinite(value) || value <= 0) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/tui/unit/obs01-perf-rotate-command.test.ts"],
+    expectedFailingTestNames: ["③ 非法预算"],
+    rationale:
+      "放行 NaN/负值 ⇒ 计划把全部样本判为超预算（敲错参数就丢历史）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "perf-rotate-dry-run-writes",
     targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
     find: "  if (!isApply) {",
