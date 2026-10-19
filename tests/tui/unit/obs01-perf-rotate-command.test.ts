@@ -93,4 +93,30 @@ describe("obs perf rotate", () => {
     // 过期样本被裁掉
     expect((await readProcessSamplesFileText(stateDirectory))?.trim()).toBe("");
   });
+
+  it("③ 非法预算/保留时长 ⇒ 直接拒绝，且**不改盘**（NaN 预算曾会裁掉全部样本）", async () => {
+    await seedExpiredSample();
+    const beforeText = await readProcessSamplesFileText(stateDirectory);
+
+    for (const invalidInput of [
+      { budgetBytes: Number.NaN },
+      { budgetBytes: -1 },
+      { retentionHours: Number.NaN },
+      { retentionHours: 0 },
+    ]) {
+      stdoutText = "";
+      const exitCode = await executeObsPerfRotateCommand({
+        stateDirectory,
+        isApply: true,
+        isJsonOutput: true,
+        nowIso: "2026-10-19T00:00:00.000Z",
+        ...invalidInput,
+      });
+      expect(exitCode).toBe(1);
+      // 报错走 stderr，且**文件一字未改**
+      expect(await readProcessSamplesFileText(stateDirectory)).toBe(beforeText);
+    }
+    const perfEntries = await fs.readdir(path.join(stateDirectory, "perf"));
+    expect(perfEntries.filter((entry) => entry.startsWith("process-samples.backup-"))).toHaveLength(0);
+  });
 });

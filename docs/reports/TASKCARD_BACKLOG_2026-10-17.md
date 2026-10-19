@@ -877,3 +877,11 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 注册为 `astarray obs perf-rotate [--apply]`（不侵占既有 `obs perf` 子命令）。
 > **2 条反例 + 2 条变异体**（预览也改盘／默认当成 apply）均被拦下；`--check-anchors` **178/178**；全量 exit 0。
 > **未做**：定时自动 rotate（需要产品决定周期与触发点）。
+
+> **R77（2026-10-19）修复 `obs perf-rotate` 的参数校验缺口（真实缺陷）**：
+> `--budget-bytes abc` ⇒ `parseInt` 得 `NaN` ⇒ "字节数 ≤ NaN" 恒 false ⇒ **全部样本被判超预算裁剪**，
+> 即"敲错一个参数就把历史删光"。现改为：`budgetBytes`/`retentionHours` 必须为**正的有限数**，
+> 否则 **exit 1 且不改盘**（不建备份）。
+> **1 条反例（③，覆盖 NaN 预算/负预算/NaN 保留/0 保留）+ 1 条变异体**（放行 NaN/负值）被拦下；
+> `--check-anchors` **179/179**；全量 exit 0。
+> **教训**：CLI 数字参数**必须在边界校验**（`parseInt` 的 NaN 会一路传进领域判定，后果是"误删"而非"报错"）。
