@@ -869,3 +869,11 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **R75（2026-10-19，第 75 轮全量门禁）**：变异 **176/176 全部被拦下**；`npm pack` **263 文件**
 > sha256 `b4c1c7d8…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
 > `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+
+> **R76（2026-10-19）`obs perf rotate`**：把 R53/R54 的保留策略变成**显式可预览**操作。
+> ①默认 **dry-run**：只报告计划（样本数/丢弃行/判定/原因），**不改盘、不产生备份**；
+> ②`--apply` 才执行（走 R54 先备份→原子重写；备份失败即放弃并 exit 1）；
+> ③支持 `--budget-bytes`/`--retention-hours` 覆盖缺省（10MB/24h）。
+> 注册为 `astarray obs perf-rotate [--apply]`（不侵占既有 `obs perf` 子命令）。
+> **2 条反例 + 2 条变异体**（预览也改盘／默认当成 apply）均被拦下；`--check-anchors` **178/178**；全量 exit 0。
+> **未做**：定时自动 rotate（需要产品决定周期与触发点）。

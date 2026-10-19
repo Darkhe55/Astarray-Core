@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "perf-rotate-dry-run-writes",
+    targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
+    find: "  if (!isApply) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/tui/unit/obs01-perf-rotate-command.test.ts"],
+    expectedFailingTestNames: ["① 默认 dry-run"],
+    rationale:
+      "预览也改盘 ⇒ 用户只想看一眼却丢了历史（且产生备份）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "perf-rotate-apply-skips-preview-path",
+    targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
+    find: "  const isApply = input.isApply === true;",
+    replace: "  const isApply = true;",
+    testFiles: ["tests/tui/unit/obs01-perf-rotate-command.test.ts"],
+    expectedFailingTestNames: ["① 默认 dry-run"],
+    rationale:
+      "默认当成 apply ⇒ 一条命令就把历史裁掉（不应默认破坏）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "usage-aggregate-mixes-estimate-into-billable",
     targetFile: "packages/core/src/orchestration/usage-ledger-aggregate.ts",
     find: "      if (entry.sourceKind === \"provider\" && entry.isBillable) {",
