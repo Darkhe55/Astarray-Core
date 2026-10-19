@@ -892,3 +892,12 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 新增活规则 `tests/architecture/cli-numeric-option-guards.test.ts`（2 条，覆盖本次两处高风险站点）；
 > 变异 **1 条**（放行 NaN 分页）被拦下；`--check-anchors` **180/180**；全量 exit 0。
 > **未做**：其余 `parseInt` 站点（如 `--timeout-seconds`）尚未逐一校验，留待后续统一。
+
+> **R79（2026-10-19）`run` 的秒数参数校验**：`--timeout-seconds abc` ⇒ `parseInt` 得 NaN ⇒
+> `setTimeout(NaN)` **退化为立即超时**（用户看到"任务莫名超时"）。现用 `parsePositiveSeconds`
+> 统一校验两个秒数参数，非法即 `USAGE_ERROR` 退出并指出参数名；选项改用**校验后的值**。
+> 守卫扩到 **3 条**（分页 / 预算保留 / 秒数）；变异 **1 条**（放行 NaN 秒数）被拦下；`--check-anchors` **181/181**。
+> **过程事故（如实）**：本轮的脚本化整文件写入一度把 `scripts/verify-mutation-kills.mjs` **写坏**
+> （文件以 `utf8` 开头、`node --check` 才发现）。已 `git checkout` 还原并用**幂等插入脚本**重做，
+> 教训与 R72 相同：**对大文件只做定点插入，写完立刻 `node --check`**。
+> 全量 exit 0（274s）。
