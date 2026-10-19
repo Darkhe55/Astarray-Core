@@ -1125,6 +1125,14 @@ export {
   type ProcessSampleRetentionApplyReport,
 } from "./orchestration/process-sample-retention-apply.js";
 /**
+ * OBS 采样调度器（2026-10-19 R56）：显式开启才排定时器、幂等 start/stop、间隔下限 5s。
+ */
+export {
+  createPerfSamplingScheduler,
+  type PerfSamplingScheduler,
+  type PerfSchedulingTimerPort,
+} from "./orchestration/observability-sampling-scheduler.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
