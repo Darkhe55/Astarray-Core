@@ -39,7 +39,7 @@ import type {
   FolderGrantDurationKind,
   FolderGrantPermissionKind,
 } from "../../core/src/public-sdk.js";
-import { EXIT_CODES } from "./cli/json-output.js";
+import { EXIT_CODES, logToStderr } from "./cli/json-output.js";
 import {
   executeCancelCommand,
   executeConfigContextBudgetCommand,
@@ -1660,11 +1660,27 @@ profileCommand
   .option("--page <n>", "页码", "1")
   .option("--page-size <n>", "每页数量", "50")
   .action(async (options: { json?: boolean; page?: string; pageSize?: string }) => {
+    /**
+     * **分页参数边界校验（R78）**：NaN / 0 / 负数曾会静默传进分页，
+     * 用户看到的是"空列表"而不是"参数写错了"。宁可报错，不可给出错误结果。
+     */
+    const page = Number.parseInt(options.page ?? "1", 10);
+    const pageSize = Number.parseInt(options.pageSize ?? "50", 10);
+    if (!Number.isInteger(page) || page < 1) {
+      logToStderr(`--page 必须是 ≥1 的整数（收到 ${String(options.page)}）。`);
+      process.exitCode = EXIT_CODES.FAILURE;
+      return;
+    }
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 500) {
+      logToStderr(`--page-size 必须是 1..500 的整数（收到 ${String(options.pageSize)}）。`);
+      process.exitCode = EXIT_CODES.FAILURE;
+      return;
+    }
     process.exitCode = await executeProfileListCommand({
       stateDirectory: defaultStateDirectory(),
       isJsonOutput: options.json === true,
-      page: Number.parseInt(options.page ?? "1", 10),
-      pageSize: Number.parseInt(options.pageSize ?? "50", 10),
+      page,
+      pageSize,
     });
   });
 profileCommand
