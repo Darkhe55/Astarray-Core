@@ -885,3 +885,10 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **1 条反例（③，覆盖 NaN 预算/负预算/NaN 保留/0 保留）+ 1 条变异体**（放行 NaN/负值）被拦下；
 > `--check-anchors` **179/179**；全量 exit 0。
 > **教训**：CLI 数字参数**必须在边界校验**（`parseInt` 的 NaN 会一路传进领域判定，后果是"误删"而非"报错"）。
+
+> **R78（2026-10-19）把 R77 的教训推广到分页参数**：`profile list --page`/`--page-size` 此前用 `parseInt`
+> 直传，`abc`/`0`/负数会**静默**变成空列表或错页。现于 CLI 边界校验（`page ≥ 1`、`1 ≤ pageSize ≤ 500`），
+> 非法即 `exit 1` 并给出具体参数名。
+> 新增活规则 `tests/architecture/cli-numeric-option-guards.test.ts`（2 条，覆盖本次两处高风险站点）；
+> 变异 **1 条**（放行 NaN 分页）被拦下；`--check-anchors` **180/180**；全量 exit 0。
+> **未做**：其余 `parseInt` 站点（如 `--timeout-seconds`）尚未逐一校验，留待后续统一。
