@@ -1199,3 +1199,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > `context-runtime-cache-events.test.ts` 期望 3 实得 2；**单跑该文件通过**（2/2），
 > 改用 `--maxWorkers=2` 全量 **3591 用例全过**、`exit 0`、分支 **85.40%**。按 AGENTS.md 的已知并发抖动处理并如实记录，
 > 不把它算作本轮回归。
+
+> **R114（2026-10-20，第 98 轮）全量门禁**：变异 **203/203 全部被拦下**；`npm pack` **267 文件** sha256 `2ee3b45a…`；
+> **六项 verify 全 exit 0**（`verify-package` 267 / `verify:contract-sdk` **26/26** / `verify:relocation-batch` 11/11 /
+> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）；
+> `vitest run --coverage --maxWorkers=2` **exit 0** —— **3591 用例**、stmts **92.10** / branches **85.40** / funcs **93.37** / lines **92.22**。
