@@ -1140,6 +1140,13 @@ export {
   type SessionPerfCollector,
 } from "./orchestration/session-perf-collector.js";
 /**
+ * `run` 命令的采集接线（2026-10-19 R68）：默认 off、只接 run、创建时不自动 start。
+ */
+export {
+  defaultSchedulingTimerPort,
+  prepareRunPerfCollection,
+} from "./orchestration/run-perf-collection.js";
+/**
  * 进程样本聚合（2026-10-19 R58）：逐字段统计、缺字段不计入分母、全缺为 null（unknown 不记作零）。
  */
 export {

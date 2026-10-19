@@ -849,3 +849,12 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 我选择 `git checkout -- packages/tui/src/cli/run-command.ts` 整体回滚（`typecheck` 已验证恢复干净），
 > 而不是在低预算下继续盲改运行时。当前状态：**helper 已就绪并被反例/变异体覆盖（R68），装配点仍未接线**。
 > 下一轮改用**人工逐段编辑**（读一段改一段、每段 typecheck），不再用整文件脚本替换。
+
+> **R73（2026-10-19）un 装配接线完成**（用户决策：只接 run、`--perf-collect`、默认 off）：
+> ①`cli.tsx` 增开关并**只在 `=== true`** 时透传；②`RunCommandOptions` 增 `isPerfCollectionEnabled`；
+> ③`executeRunCommand` 在 application 创建**之前**准备采集器（未开启 ⇒ `null`，零开销）、创建成功后 `start()`、
+> `finally` 里**先 stop 再 shutdown**（stop 内部做保留整理）；采集收口失败只降级。
+> 守卫：新增静态接线测试（3 条：开关===true／默认 off 且真 start／stop 必须在 finally 且早于 shutdown）；
+> 变异 **2 条**（开关不透传／只 start 不 stop）均被拦下；`--check-anchors` **174/174**。
+> **教训落实**：本次改为**逐段编辑 + 每段 typecheck**（R72 的整文件替换曾把 import 段改坏）。
+> **未做**：端到端 argv 冒烟（需 provider/任务轮询，未在 CI 跑）——接线正确性由静态守卫 + helper 用例覆盖。

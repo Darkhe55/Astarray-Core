@@ -415,6 +415,26 @@ export const MUTATIONS = [
       "偶数个时中位数只取上中位 ⇒ 分位数失真（性能报告的关键指标）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "run-perf-flag-not-passed-through",
+    targetFile: "packages/tui/src/cli.tsx",
+    find: "        isPerfCollectionEnabled: options.perfCollect === true,",
+    replace: "        isPerfCollectionEnabled: false,",
+    testFiles: ["tests/architecture/obs-run-collector-wiring.test.ts"],
+    expectedFailingTestNames: ["① CLI"],
+    rationale:
+      "开关不透传 ⇒ \"--perf-collect\" 变成空开关（用户以为在采集，实际没采）⇒ 该守卫必须变红",
+  },
+  {
+    mutationIdentifier: "run-perf-never-stops",
+    targetFile: "packages/tui/src/cli/run-command.ts",
+    find: "        await runPerfCollector.stop();",
+    replace: "        void runPerfCollector;",
+    testFiles: ["tests/architecture/obs-run-collector-wiring.test.ts"],
+    expectedFailingTestNames: ["③ 命令侧"],
+    rationale:
+      "只 start 不 stop ⇒ 定时器泄漏，且保留整理永不执行（文件无界增长）⇒ 该守卫必须变红",
+  },
+  {
     mutationIdentifier: "run-perf-created-while-disabled",
     targetFile: "packages/core/src/orchestration/run-perf-collection.ts",
     find: "  if (input.isPerfCollectionEnabled !== true) return null;",
@@ -2667,6 +2687,15 @@ export const MUTATIONS = [
     testFiles: ["tests/core/unit/relocate01-registration-store.test.ts"],
     expectedFailingTestNames: ["④ 登记文件是坏 JSON"],
     rationale: "坏 JSON 必须如实报 invalid；当作 absent ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "run-history-drops-dedupe",
+    targetFile: "packages/core/src/orchestration/run-history-store.ts",
+    find: `    if (isDuplicate) {`,
+    replace: `    if (false) {`,
+    testFiles: ["tests/core/unit/history01-run-history-store.test.ts"],
+    expectedFailingTestNames: ["③ 重复事件 ⇒ **去重**"],
+    rationale: "重复事件必须去重；放行 ⇒ 去重反例必须变红",
   },
 ];
 
