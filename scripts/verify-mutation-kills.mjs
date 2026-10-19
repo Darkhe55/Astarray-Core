@@ -275,6 +275,16 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "profile-list-accepts-nan-paging",
+    targetFile: "packages/tui/src/cli.tsx",
+    find: "    if (!Number.isInteger(page) || page < 1) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
+    expectedFailingTestNames: ["① profile list"],
+    rationale:
+      "放行 NaN/负页码 ⇒ 分页静默返回错误结果（用户以为没有数据）⇒ 该守卫必须变红",
+  },
+  {
     mutationIdentifier: "perf-rotate-accepts-nan-budget",
     targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
     find: "    if (!Number.isFinite(value) || value <= 0) {",
