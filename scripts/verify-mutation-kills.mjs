@@ -277,7 +277,7 @@ export const MUTATIONS = [
   {
     mutationIdentifier: "usage-overview-accepts-invalid-budget",
     targetFile: "packages/tui/src/cli/commands.ts",
-    find: "  if (parsedBudget !== undefined && (Number.isNaN(parsedBudget) || parsedBudget < 0)) {",
+    find: "    (!/^\\d+$/.test(String(options.inputTokenBudget ?? \"\").trim()) || parsedBudget < 0)",
     replace: "  if (false) {",
     testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
     expectedFailingTestNames: ["⑤ commands.ts"],

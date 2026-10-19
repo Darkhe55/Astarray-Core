@@ -939,3 +939,11 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **R85（2026-10-20，第 85 轮全量门禁）**：变异 **182/182 全部被拦下**；`npm pack` **263 文件**
 > sha256 `b5bae191…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
 > `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+
+> **R86（2026-10-20）`commands.ts` 的分页/预算也改成"严格纯数字 + 数值下限"双条件**：
+> 原来只拦 `NaN`/`≤0`，`"5abc"` 仍会被 `parseInt` 截成 5（静默按错值执行）。
+> **过程事故（重要）**：第一版我只用正则替换了原条件，**丢掉了 `≤0` 的下限检查** ⇒
+> 两个既有反例立刻变红（`--page-size 0` 被放行、perf 概览非法参数不再报错）。
+> 这说明**既有用例是有效的**、而我改错了；现已改为 `(!/^\d+$/.test(...) || parsedPageSize < 1)` 双条件并复跑通过。
+> 守卫⑤与 1 条变异体同步适配；`--check-anchors` **182/182**；全量 exit 0（287s）。
+> **教训**：用新校验**替换**旧校验时，必须逐条比对"旧校验拦住了什么"，不能只看新校验拦住了什么。

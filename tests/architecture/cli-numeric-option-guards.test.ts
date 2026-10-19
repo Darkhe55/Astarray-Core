@@ -40,15 +40,15 @@ describe("CLI 数字参数边界校验", () => {
     expect(cliText).toContain('"--task-revision"');
   });
 
-  it("⑤ commands.ts：三处 --page-size 与 --input-token-budget 已校验（防回归）", async () => {
+  it("⑤ commands.ts：三处 --page-size 与 --input-token-budget 走严格纯数字（防回归）", async () => {
     const commandsText = await readSource("packages/tui/src/cli/commands.ts");
     const pageSizeGuardCount =
       commandsText.split(
-        "if (parsedPageSize !== undefined && (Number.isNaN(parsedPageSize) || parsedPageSize <= 0)) {",
+        'if (\n    parsedPageSize !== undefined &&\n    (!/^\\d+$/.test(String(options.pageSize ?? "").trim()) || parsedPageSize < 1)\n  ) {',
       ).length - 1;
     expect(pageSizeGuardCount).toBe(3);
     expect(commandsText).toContain(
-      "if (parsedBudget !== undefined && (Number.isNaN(parsedBudget) || parsedBudget < 0)) {",
+      'if (\n    parsedBudget !== undefined &&\n    (!/^\\d+$/.test(String(options.inputTokenBudget ?? "").trim()) || parsedBudget < 0)\n  ) {',
     );
   });
 });
