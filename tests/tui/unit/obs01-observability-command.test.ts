@@ -13,10 +13,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DiagnosticEventStore,
   PerfEventStore,
+  ProcessSampleStore,
 } from "../../../packages/core/src/public-sdk.js";
 import {
   executeObsDiagCommand,
   executeObsPerfCommand,
+  executeObsProcessCommand,
 } from "../../../packages/tui/src/cli/observability-command.js";
 
 let stateDirectory: string;
@@ -208,6 +210,75 @@ describe("OBS 只读查询入口", () => {
     expect(String(payload.reason)).toContain("查询失败");
     expect(stderrText.length).toBe(0);
   });
+
+  it("⑥ obs process：无样本 ⇒ hasSamples=false 且明确「不代表没有资源消耗」", async () => {
+    const exitCode = await executeObsProcessCommand({ stateDirectory, isJsonOutput: true });
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(stdoutText) as {
+      kind: string;
+      hasSamples: boolean;
+      notice: string | null;
+      coverage: { discardedLineCount: number; droppedSampleCountTotal: number };
+    };
+    expect(payload.kind).toBe("ok");
+    expect(payload.hasSamples).toBe(false);
+    expect(String(payload.notice)).toContain("不代表没有资源消耗");
+    expect(payload.coverage.discardedLineCount).toBe(0);
+    expect(payload.coverage.droppedSampleCountTotal).toBe(0);
+  });
+
+  it("⑦ obs process：坏行如实计数、时间窗与 limit 生效、丢样累计可见", async () => {
+    const store = new ProcessSampleStore({ baseDirectory: stateDirectory });
+    await store.append({
+      observeEventVersion: 1,
+      eventType: "process",
+      recordedAtIso: "2026-10-19T00:00:00.000Z",
+      processIdentifier: 1,
+      agentInstanceIdentifier: "agent-1",
+      fields: { residentMemoryBytes: 1024 },
+      droppedSampleCount: 2,
+    });
+    await store.append({
+      observeEventVersion: 1,
+      eventType: "process",
+      recordedAtIso: "2026-10-19T02:00:00.000Z",
+      processIdentifier: 1,
+      agentInstanceIdentifier: "agent-1",
+      fields: { queueDepth: 3 },
+      droppedSampleCount: 1,
+    });
+    const filePath = path.join(stateDirectory, "perf", "process-samples.jsonl");
+    await fs.appendFile(filePath, "{ broken line\n", "utf8");
+
+    stdoutText = "";
+    await executeObsProcessCommand({
+      stateDirectory,
+      isJsonOutput: true,
+      windowStartIso: "2026-10-19T01:00:00.000Z",
+      limit: 1,
+    });
+    const filtered = JSON.parse(stdoutText) as {
+      hasSamples: boolean;
+      samples: unknown[];
+      coverage: {
+        totalSampleCount: number;
+        matchedSampleCount: number;
+        returnedSampleCount: number;
+        discardedLineCount: number;
+        droppedSampleCountTotal: number;
+      };
+    };
+    expect(filtered.hasSamples).toBe(true);
+    expect(filtered.coverage.totalSampleCount).toBe(2);
+    expect(filtered.coverage.matchedSampleCount).toBe(1);
+    expect(filtered.coverage.returnedSampleCount).toBe(1);
+    expect(filtered.samples).toHaveLength(1);
+    // 坏行必须如实计数（不得静默当 0）
+    expect(filtered.coverage.discardedLineCount).toBe(1);
+    // 丢样累计跨样本求和（观测降级可追溯）
+    expect(filtered.coverage.droppedSampleCountTotal).toBe(3);
+  });
 });
+
 
 
