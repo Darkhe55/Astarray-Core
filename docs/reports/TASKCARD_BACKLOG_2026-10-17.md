@@ -927,3 +927,11 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > `--check-anchors` **184/184**；全量 exit 0。
 > **过程事故**：同步旧锚点时曾因变量改名导致锚点失效（`--check-anchors` 立即报出，已修复）——
 > 这正是 R35 那条活规则的价值。
+
+> **R84（2026-10-19）把严格整数解析收成单一收口点**：新增 `strict-integer-option.ts` + `parseStrictPositiveIntegerOption`
+> （`^\d+$` 严格判定 + 范围检查 + 错误消息带参数名与原始输入），并把 3 处 CLI 数字选项改为走它：
+> `profile list --page/--page-size`（上界 500）、`run` 两个秒数、`workflow run --task-revision`。
+> **5 条反例（helper 单元）+ 守卫扩到 5 条 + 1 条变异体**（退回 parseInt 截断）被拦下。
+> **同步清理**：原 3 条针对旧代码行的变异体目标已不存在，按"单一收口点"原则删除（语义由 helper 变异体 +
+> 守卫断言覆盖）；`--check-anchors` **182/182**；全量 exit 0。
+> **教训**：重构要**同时**更新变异锚点，否则 `--check-anchors` 会立刻红（这次就是立刻发现的）。
