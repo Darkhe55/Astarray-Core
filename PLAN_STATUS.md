@@ -6,11 +6,11 @@
 > **入口地图**（想知道什么该看哪份报告）、**仍缺项（全部在用户/平台侧）**、**未复现抖动清单**、
 > 以及**我在本窗口犯的 7 类错与教训**（含两次"筛法太窄导致误判"）。
 >
-> **当前有效口径（2026-10-20，第 73 轮实测）**：`HEAD` **`f763a9b8`**（`== origin/main`、`unpushed: 0`）；
-> `npm run check:low-parallel` **exit 0 — 3575 用例**（`skipped 0`，**无 unhandled error**）；
-> `npm run test:coverage` **exit 0 — stmts 92.10 / branches 85.36 / funcs 93.38 / lines 92.21**（阈值 85 全过；余量 +0.28pp）；
+> **当前有效口径（2026-10-20，第 73 轮实测）**：`HEAD` **`89b0e5d3`**（`== origin/main`、`unpushed: 0`）；
+> `npx vitest run --coverage --maxWorkers=2` **exit 0 — 3591 用例**（`skipped 0`，**无 unhandled error**）；
+> `npm run test:coverage` **exit 0 — stmts 92.10 / branches 85.40 / funcs 93.37 / lines 92.22**（阈值 85 全过；余量 +0.28pp）；
 > `npm run verify:mutation-kills` **exit 0 — 185/185 被拦下**（`--check-anchors` **185/185 锚点有效**）；
-> `npm pack` **267 文件** sha256 `9f32db7f…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` **24/24** /
+> `npm pack` **267 文件** sha256 `2ee3b45a…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` **24/24** /
 > `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
 >
 > **本批（第 55–73 轮）主要交付**：① `OBS-01` 三线贯通（PERF 契约→采样→样本→保留→执行→会话采集器→聚合→`--summary`→
