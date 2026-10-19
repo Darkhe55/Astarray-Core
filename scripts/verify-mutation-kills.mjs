@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "process-sample-accepts-unknown-field",
+    targetFile: "packages/core/src/orchestration/process-sample-store.ts",
+    find: "    if (!ALLOWED_FIELD_NAMES.has(fieldName)) return false;",
+    replace: "    if (false) return false;",
+    testFiles: ["tests/core/unit/obs01-process-sample-store.test.ts"],
+    expectedFailingTestNames: ["③ 非法样本拒绝写入"],
+    rationale:
+      "接受白名单外指标 ⇒ OS 级/未知指标被写进进程样本（跨平台语义不一致）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "process-sample-silently-drops-bad-lines",
+    targetFile: "packages/core/src/orchestration/process-sample-store.ts",
+    find: "      if (!isProcessSampleEvent(parsed)) {\n        discardedLineCount += 1;\n        continue;\n      }",
+    replace: "      if (false) {\n        continue;\n      }",
+    testFiles: ["tests/core/unit/obs01-process-sample-store.test.ts"],
+    expectedFailingTestNames: ["④ 坏行如实计数"],
+    rationale:
+      "坏行被静默跳过且不计数 ⇒ 观测降级不可见（卡内：不能静默丢弃）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "obs-sampler-append-failure-throws",
     targetFile: "packages/core/src/orchestration/observability-sampler.ts",
     find: "  } catch (error) {\n    return {\n      kind: \"degraded\",\n      reason: `样本落盘失败（已降级，不阻塞业务）：${error instanceof Error ? error.message : String(error)}`,",
