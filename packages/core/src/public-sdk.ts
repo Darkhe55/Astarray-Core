@@ -1177,6 +1177,14 @@ export {
   type UsageSourceKind,
 } from "./orchestration/usage-ledger-contract.js";
 /**
+ * USAGE 账目聚合（2026-10-19 R74）：可结算/估算分开、缺失不进合计、修订不覆盖历史。
+ */
+export {
+  aggregateUsageLedger,
+  type UsageLedgerAggregate,
+  type UsageSourceSummary,
+} from "./orchestration/usage-ledger-aggregate.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
