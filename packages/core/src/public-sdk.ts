@@ -1028,6 +1028,14 @@ export {
   type FoldStepAuthorizationDecision,
 } from "./orchestration/workflow-fold-internal-authorization.js";
 /**
+ * FOLD 成本收益判定（2026-10-20 R107）：样本不足不下结论、有失败不谈收益、unknown 不记零。
+ */
+export {
+  evaluateFoldCostBenefit,
+  type FoldCostBenefitDecision,
+  type FoldRunMeasurementV1,
+} from "./orchestration/workflow-fold-cost-benefit.js";
+/**
  * EXP-01 / EXPLORE-01-02（2026-10-19）：有界试验执行、隔离、去重与可复现记录。
  *
  * 纯判定：不启动试验、不建目录、不调模型、不写盘。
