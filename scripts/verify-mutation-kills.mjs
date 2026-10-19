@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "aggregate-missing-field-counted-as-zero",
+    targetFile: "packages/core/src/orchestration/process-sample-aggregate.ts",
+    find: "      if (value === undefined) continue;",
+    replace: "      if (value === undefined) { fieldValues[fieldName].push(0); continue; }",
+    testFiles: ["tests/core/unit/obs01-process-sample-aggregate.test.ts"],
+    expectedFailingTestNames: ["① 缺字段的样本不计入该字段分母"],
+    rationale:
+      "缺字段被补 0 计入分母 ⇒ 把\"没采到\"算成\"零延迟/零队列\"（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "aggregate-median-uses-upper-middle",
+    targetFile: "packages/core/src/orchestration/process-sample-aggregate.ts",
+    find: "      : ((sortedValues[middleIndex - 1] ?? 0) + (sortedValues[middleIndex] ?? 0)) / 2;",
+    replace: "      : (sortedValues[middleIndex] ?? 0);",
+    testFiles: ["tests/core/unit/obs01-process-sample-aggregate.test.ts"],
+    expectedFailingTestNames: ["② min/max/mean/median"],
+    rationale:
+      "偶数个时中位数只取上中位 ⇒ 分位数失真（性能报告的关键指标）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "collector-samples-while-disabled",
     targetFile: "packages/core/src/orchestration/session-perf-collector.ts",
     find: "    if (!input.isCollectionEnabled) {\n      return { kind: \"skipped\", reason: \"采集未开启：不采样、不写盘。\" };\n    }",
