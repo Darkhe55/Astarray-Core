@@ -285,6 +285,16 @@ export const MUTATIONS = [
       "放行 NaN/负预算 ⇒ 预算语义失效（可能把全部调用判为超预算）⇒ 该守卫必须变红",
   },
   {
+    mutationIdentifier: "mission-history-trusts-recorded-running",
+    targetFile: "packages/core/src/gui/mission-history-reader.ts",
+    find: "    runtimeState = isActivelyRunning ? \"running\" : \"interrupted-needs-reconciliation\";",
+    replace: "    runtimeState = \"running\";",
+    testFiles: ["tests/core/unit/gui-mission-history-reader.test.ts"],
+    expectedFailingTestNames: ["③ 历史状态 vs 运行状态"],
+    rationale:
+      "只要磁盘写 running 就报运行中 ⇒ 重启后的僵尸任务被当成在跑（用户会等一个不存在的任务）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "strict-integer-helper-truncates",
     targetFile: "packages/tui/src/cli/strict-integer-option.ts",
     find: "  if (!/^\\d+$/.test(trimmedValue)) {",
