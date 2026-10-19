@@ -305,6 +305,26 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "fold-cost-benefit-accepts-thin-samples",
+    targetFile: "packages/core/src/orchestration/workflow-fold-cost-benefit.ts",
+    find: "  if (baselineKnownRuns.length < 3 || foldedKnownRuns.length < 3) {",
+    replace: "  if (baselineKnownRuns.length < 1 || foldedKnownRuns.length < 1) {",
+    testFiles: ["tests/core/unit/fold01-cost-benefit.test.ts"],
+    expectedFailingTestNames: ["① 任一侧有效样本"],
+    rationale:
+      "一次运行就能宣称收益 ⇒ 用单次样本当结论（卡内要求实测范围与局限）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "fold-cost-benefit-ignores-failures",
+    targetFile: "packages/core/src/orchestration/workflow-fold-cost-benefit.ts",
+    find: "  if (foldedFailureCount > 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/fold01-cost-benefit.test.ts"],
+    expectedFailingTestNames: ["② 折叠侧存在失败"],
+    rationale:
+      "有失败运行仍宣称收益 ⇒ 把带回归的方案当成净收益（会误导推广）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "fold-internal-widens-scope",
     targetFile: "packages/core/src/orchestration/workflow-fold-internal-authorization.ts",
     find: "      if (!input.declaredCapabilityScope.has(capability)) {",
