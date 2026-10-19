@@ -1083,3 +1083,14 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **过程事故**：第一次调用路径写错（`cd ../astarray-ui` 在 workspace 根下指向 `Documents\astarray-ui`，
 > 实际私库在 `Documents\astarray\astarray-ui`），`npm` 报 ENOENT；改正路径后通过。
 > 教训：本会话 workspace 根是 `Documents\astarray`，公开库在 `astarray/` 子目录 —— **相对路径深度容易错**（同类错误此前也发生过）。
+
+> **R102（2026-10-20）备份清理判定（补一个真实运维缺口）**：R54 的保留执行每次 `--apply` 都写一份
+> `process-samples.backup-<时间戳>.jsonl` 而**从不清理** ⇒ 备份无限增长（把"安全"变成新的存储问题）。
+> 新增 `process-sample-backup-retention.ts` + `planProcessSampleBackupRetention`（**纯判定，不删盘**）：
+> ①**永远保留最新一份**（哪怕超出条数/时限）；②超条数且超时限才可删；③**不认识的文件名保留并计数**（不擅自删）；
+> ④`nowIso` 不可解析 ⇒ no-action（不猜时间）；⑤文件名时间戳的 `:`→`-` 可正确还原。
+> **6 条反例 + 2 条变异体**（删除最新一份／静默丢弃不可解析名）被拦下；
+> `--check-anchors` **187/187**；`test:coverage` **exit 0**（**3540 用例**、分支 **85.29%**）。
+> **过程发现**：变异「删除最新一份」**第一版存活** —— 我的用例都让最新那份落在"条数内"，所以删不删都不影响结果；
+> 补了「唯一一份且超条数超时限也必须保留」的用例后才被拦下。**又一次印证：变异存活 ≈ 断言没覆盖到边界**。
+> **未做**：真正的删除执行（`--prune-backups`）与调用点接线 —— 本模块只交付判定层。
