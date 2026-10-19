@@ -828,3 +828,9 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 
 > **R67 推送状态（如实）**：提交 `49c0dc65` 连续 **5 次**推送失败（SSH `Connection reset`，exit 128），
 > 按纪律跳过本次上传、下一轮合并重试；`origin/main` 仍为 `9d96639c`。
+
+> **R69（2026-10-19，只读盘点）**：用户授权用本仓库 `.astarray` 作 RELOCATE 真实样例 ⇒ **实测该样例不足以支撑**：
+> 783 个文件里**没有** `project-location/`（位置登记）与 `run-history/`（结构化引用），
+> 抽查 40 个 mission 仅 2 个含路径类字段且不符合 `StructuredResourceReference` 结构。
+> ⇒ **"真实历史库批量解析"仍标未验证**，R33 脱敏样例仍是唯一证据。详见
+> `docs/reports/RELOCATE01_REAL_SAMPLE_INVENTORY_2026-10-19.md`（含"合格样例至少需要什么"）。
