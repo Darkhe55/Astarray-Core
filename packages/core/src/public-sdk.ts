@@ -1188,6 +1188,13 @@ export {
   type BackupRetentionApplyReport,
 } from "./orchestration/process-sample-backup-retention-apply.js";
 /**
+ * OBS 自动 rotate 触发判定（2026-10-20 R113）：未开启/用户任务/占用未知/时钟回拨一律不跑；永不自动删备份。
+ */
+export {
+  evaluateObservabilityRotateTrigger,
+  type ObservabilityRotateTriggerDecision,
+} from "./orchestration/observability-rotate-trigger.js";
+/**
  * OBS 采样调度器（2026-10-19 R56）：显式开启才排定时器、幂等 start/stop、间隔下限 5s。
  */
 export {

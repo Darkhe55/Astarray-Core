@@ -1186,3 +1186,16 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 而 R73 的教训是"接线看起来接上了、argv 层可能没生效"。新增 ⑧：①不带开关 ⇒ `backupPrune` 字段**不存在**（默认不清理）
 > ②`--prune-backups --budget-bytes 5abc` ⇒ **exit 1**（参数校验先生效）③`--apply --prune-backups` ⇒ exit 0 且
 > `backupPrune.kind` 为 `no-action`／`pruned`。实测 8/8 通过（真跑 `dist/cli.js`）。
+
+> **R113（2026-10-20）OBS 自动 rotate 的**触发判定契约**（此前被我按「需产品决定」整体挂起）**：
+> 周期本身仍留给产品配置，但"**在什么条件下允许自动触发**"可以冻结 —— 新增 ``evaluateObservabilityRotateTrigger``：
+> ①采集未开启 ⇒ 不跑②**用户任务进行中 ⇒ 不跑**（正常任务优先）③**占用未知 ⇒ 不跑**（不猜）④**时钟回拨 ⇒ 不跑**
+> ⑤超预算或到期 ⇒ 允许 rotate，但 ``isBackupPruneAllowed`` **恒 false**（清备份必须用户显式 ``--prune-backups``）
+> ⑥任何结论都带 ``reasonCode`` 与可读原因（如实报告"这次为什么没跑"）。
+> **8 条反例 + 2 条变异体**（无视用户任务／拿未知占用判预算）被拦下；``--check-anchors`` **203/203**。
+> **仍未做**：真正把触发接到定时器（需产品确定周期与触发点）；本模块只交付判定。
+
+> **R113 附记（抖动）**：`npm run test:coverage`（默认并发）本次有 **1 条既有用例抖动** ——
+> `context-runtime-cache-events.test.ts` 期望 3 实得 2；**单跑该文件通过**（2/2），
+> 改用 `--maxWorkers=2` 全量 **3591 用例全过**、`exit 0`、分支 **85.40%**。按 AGENTS.md 的已知并发抖动处理并如实记录，
+> 不把它算作本轮回归。
