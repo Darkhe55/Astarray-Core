@@ -165,4 +165,25 @@ describe("CLI 入口补做：四命令可用且只读", () => {
     expect(payload.isApply).toBe(false);
     expect(payload.backupFilePath).toBeNull();
   });
+
+  it("⑧ obs perf-rotate --prune-backups：argv 层可用，默认不清理、开启后只删计划内备份", async () => {
+    // 默认（不带开关）：dry-run 也不应产生备份清理行为
+    const previewRun = await runCli(["obs", "perf-rotate", "--json"]);
+    expect(previewRun.exitCode).toBe(0);
+    const previewPayload = JSON.parse(previewRun.stdout) as { backupPrune: unknown };
+    expect(previewPayload.backupPrune).toBeUndefined();
+
+    // 带开关 + 非法预算：参数校验仍然先生效（exit 1）
+    const invalidRun = await runCli(["obs", "perf-rotate", "--apply", "--prune-backups", "--budget-bytes", "5abc", "--json"]);
+    expect(invalidRun.exitCode).toBe(1);
+
+    // 带开关的合法调用：exit 0 且报告 prune 结论（无样本时是 no-action）
+    const pruneRun = await runCli(["obs", "perf-rotate", "--apply", "--prune-backups", "--json"]);
+    expect(pruneRun.exitCode).toBe(0);
+    const prunePayload = JSON.parse(pruneRun.stdout) as {
+      backupPrune: { kind: string; deletedFileCount: number } | null;
+    };
+    expect(prunePayload.backupPrune).not.toBeNull();
+    expect(["no-action", "pruned"]).toContain(prunePayload.backupPrune?.kind);
+  });
 });
