@@ -305,6 +305,26 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "backup-apply-continues-after-failure",
+    targetFile: "packages/core/src/orchestration/process-sample-backup-retention-apply.ts",
+    find: "      return {\n        kind: \"aborted\",",
+    replace: "      continue;\n      return {\n        kind: \"aborted\",",
+    testFiles: ["tests/core/unit/obs01-backup-retention-apply.test.ts"],
+    expectedFailingTestNames: ["③ 删除失败"],
+    rationale:
+      "删除失败仍继续删剩下的 ⇒ 半删状态被当成成功（用户以为清理完成，实际只清了一半）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "backup-apply-deletes-unplanned",
+    targetFile: "packages/core/src/orchestration/process-sample-backup-retention-apply.ts",
+    find: "  for (const fileName of plan.deleteFileNames) {",
+    replace: "  for (const fileName of backupFileNames) {",
+    testFiles: ["tests/core/unit/obs01-backup-retention-apply.test.ts"],
+    expectedFailingTestNames: ["② 只有计划内的备份被删"],
+    rationale:
+      "删除全部备份而不是计划内的 ⇒ 把用户手工备份与最新安全网一起删掉 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "backup-retention-deletes-newest",
     targetFile: "packages/core/src/orchestration/process-sample-backup-retention.ts",
     find: "    const isNewest = index === 0;",
