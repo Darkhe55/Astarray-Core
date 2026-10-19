@@ -858,3 +858,10 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 变异 **2 条**（开关不透传／只 start 不 stop）均被拦下；`--check-anchors` **174/174**。
 > **教训落实**：本次改为**逐段编辑 + 每段 typecheck**（R72 的整文件替换曾把 import 段改坏）。
 > **未做**：端到端 argv 冒烟（需 provider/任务轮询，未在 CI 跑）——接线正确性由静态守卫 + helper 用例覆盖。
+
+> **R74（2026-10-19）USAGE-01-02 账目聚合**：新增 `usage-ledger-aggregate.ts` + `aggregateUsageLedger`：
+> ①**可结算与估算分开合计**（不相加成"总用量"；估算即使被误标 isBillable 也不进可结算）；
+> ②**缺失不进 token 合计**，只计 `missingEntryCount`，缺失来源合计为 `null` 而非 0；
+> ③**逐来源保留**条数与合计；④**修订不覆盖历史**（同请求多修订 ⇒ `supersededRevisionCount`）。
+> **6 条反例 + 2 条变异体**（估算并进可结算／缺失当 0）均被拦下；`--check-anchors` **176/176**；全量 exit 0。
+> **未做**：持久化去重、分页、预算阈值与价格换算（需价格表与预算口径，属产品决策）。

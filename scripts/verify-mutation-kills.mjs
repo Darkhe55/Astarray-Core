@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "usage-aggregate-mixes-estimate-into-billable",
+    targetFile: "packages/core/src/orchestration/usage-ledger-aggregate.ts",
+    find: "      if (entry.sourceKind === \"provider\" && entry.isBillable) {",
+    replace: "      if (entry.isBillable) {",
+    testFiles: ["tests/core/unit/obs01-usage-ledger-aggregate.test.ts"],
+    expectedFailingTestNames: ["③ 估算即使被标成可结算"],
+    rationale:
+      "把估算并进可结算合计 ⇒ 报表把估算当账单（用户会按错的数对账）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "usage-aggregate-counts-missing-as-zero",
+    targetFile: "packages/core/src/orchestration/usage-ledger-aggregate.ts",
+    find: "    if (entry.sourceKind === \"missing\" || entry.totalTokens === null) {",
+    replace: "    if (entry.totalTokens === null && false) {",
+    testFiles: ["tests/core/unit/obs01-usage-ledger-aggregate.test.ts"],
+    expectedFailingTestNames: ["② 缺失条目"],
+    rationale:
+      "缺失条目当 0 计入合计 ⇒ 把 unknown 记成零（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "usage-estimate-claimed-billable",
     targetFile: "packages/core/src/orchestration/usage-ledger-contract.ts",
     find: "  if (input.sourceKind === \"local-estimate\" && isBillable) {",
