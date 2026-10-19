@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "usage-estimate-claimed-billable",
+    targetFile: "packages/core/src/orchestration/usage-ledger-contract.ts",
+    find: "  if (input.sourceKind === \"local-estimate\" && isBillable) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-usage-ledger-contract.test.ts"],
+    expectedFailingTestNames: ["⑤ 本地估算不得声明可结算"],
+    rationale:
+      "估算可声明可结算 ⇒ 把估算当账单（卡内：估算与账单边界必须清楚）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "usage-missing-zeroed",
+    targetFile: "packages/core/src/orchestration/usage-ledger-contract.ts",
+    find: "    if (\n      inputTokens !== null ||\n      outputTokens !== null ||\n      totalTokens !== null\n    ) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/obs01-usage-ledger-contract.test.ts"],
+    expectedFailingTestNames: ["② 来源缺失"],
+    rationale:
+      "缺失来源可以写 0 ⇒ 把 unknown 记成零（用户会以为真的用了 0 token）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "evidence-pack-body-ignores-sections",
     targetFile: "packages/tui/src/cli/observability-command.ts",
     find: "      ...(requestedSections.has(\"findings-summary\")",

@@ -1160,6 +1160,16 @@ export {
   type DiagnosticEvidencePackSection,
 } from "./orchestration/diagnostic-evidence-pack-contract.js";
 /**
+ * USAGE-01-01 请求级账目契约（2026-10-19 R67）：unknown 不记作零、估算不可结算、同键异参拒绝。
+ */
+export {
+  buildUsageLedgerEntry,
+  evaluateUsageLedgerAppend,
+  type UsageLedgerEntryV1,
+  type UsageLedgerWriteDecision,
+  type UsageSourceKind,
+} from "./orchestration/usage-ledger-contract.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
