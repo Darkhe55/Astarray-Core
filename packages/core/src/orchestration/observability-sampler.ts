@@ -147,3 +147,46 @@ export async function runPerfSamplingTick(input: {
  * 本轮只交付**可测的 tick 逻辑**：由调用方注入端口（指标读取/时钟/PID/落盘），
  * 生产接线在 schema 决定后进行。**不主张"采样已上线"**。
  */
+
+
+/**
+ * 生产端口：把采样 tick 接到**进程样本 store**（R51 交付的事件 schema）。
+ *
+ * 这是 R39 刻意留白的收口：进程样本用**独立事件类型 + 独立文件**，
+ * 因此不再需要"把样本塞进业务 PERF 样本"这种会伪造 `durationMilliseconds` 的做法。
+ *
+ * 失败处理与 R37 一致：**落盘失败只降级并累计丢样，不抛给业务**。
+ */
+export function createProcessSampleStorePorts(input: {
+  readonly store: {
+    append: (sample: {
+      observeEventVersion: 1;
+      eventType: "process";
+      recordedAtIso: string;
+      processIdentifier: number;
+      agentInstanceIdentifier: string | null;
+      fields: Partial<Record<PerfSampleField, number>>;
+      droppedSampleCount: number;
+    }) => Promise<void>;
+  };
+  readonly readProcessMetrics: () => Partial<Record<PerfSampleField, number>>;
+  readonly readNowIso?: () => string;
+  readonly readProcessIdentifier?: () => number;
+}): PerfSamplingPorts {
+  return {
+    readProcessMetrics: input.readProcessMetrics,
+    readNowIso: input.readNowIso ?? (() => new Date().toISOString()),
+    readProcessIdentifier: input.readProcessIdentifier ?? (() => process.pid),
+    appendSample: async (sample) => {
+      await input.store.append({
+        observeEventVersion: 1,
+        eventType: "process",
+        recordedAtIso: sample.sampledAtIso,
+        processIdentifier: sample.processIdentifier,
+        agentInstanceIdentifier: sample.agentInstanceIdentifier,
+        fields: sample.fields,
+        droppedSampleCount: sample.droppedSampleCount,
+      });
+    },
+  };
+}

@@ -1088,10 +1088,23 @@ export {
  * 纯逻辑 + 注入端口：不直接读 OS、不直接落盘。
  */
 export {
+  createProcessSampleStorePorts,
   runPerfSamplingTick,
   type PerfSamplingPorts,
   type PerfSamplingTickOutcome,
 } from "./orchestration/observability-sampler.js";
+/**
+ * 进程样本落盘（2026-10-19 R51，用户决策：独立事件类型 + 独立文件）。
+ *
+ * 指标全部可选（unknown 不记作零）；坏行如实计数；不写原始命令/路径/凭据。
+ */
+export {
+  ProcessSampleStore,
+  isProcessSampleEvent,
+  type ProcessSampleEventV1,
+  type ProcessSampleFields,
+  type ProcessSampleIntegrityReport,
+} from "./orchestration/process-sample-store.js";
 /**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
