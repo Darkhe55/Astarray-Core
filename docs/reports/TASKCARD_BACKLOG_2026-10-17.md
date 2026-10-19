@@ -986,3 +986,16 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **`test:coverage` exit 0**（分支 85.28%）。
 > **注意（流程事故）**：第一次 pack 失败后，我**先用旧 tarball 跑了六项 verify**（sha256 与 R85 相同 = `b5bae191`），
 > 那组结果**不能算数**；重新打包（`3ac712c4`）后的六项才是本轮证据。教训：**pack 失败时必须先确认产物新鲜度再跑 verify**。
+
+> **R91（2026-10-20）修掉让 
+pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
+> 现象：`check` 退出码 1、全 3528 用例通过但带 **1 个 unhandled error**：
+> `Cannot find module ...\Temp\non-existent-entry.js`（来自 `feedback-supervisor` 的坏 modulePath 重启用例）。
+> 根因：`handleChildProcessFailure` 重启后 `void this.client?.waitUntilReady().then(...)` **只接了成功分支**；
+> 坏路径时 `waitUntilReady()` reject ⇒ **未处理拒绝** ⇒ 严格模式（`--unhandled-rejections=strict`）会打崩宿主进程。
+> 修复：补 `.catch(() => {})` 并注释成因。
+> 反例：新增"坏 modulePath 重启时**不得产生未处理的 promise 拒绝**"（监听 `process.on("unhandledRejection")`，
+> 用 race 兜住一直重试的 `start()`、stop 有界）。
+> **结果**：`npm run check:low-parallel` **exit 0**、3529 用例、**无 unhandled error**。
+> **如实说明**：我试过用变异体（去掉 `.catch`）来证明因果，但**变异存活** —— 说明这条拒绝在测试窗口内未必总能复现，
+> 该变异不具决定性，已删除；保留的是"防御性修复 + 反例"。这不是"证明修对了"，只能说"修后未再复现、且不再有未处理拒绝入口"。
