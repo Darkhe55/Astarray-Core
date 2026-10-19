@@ -1007,3 +1007,9 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > `npm pack` **263 文件** sha256 `3ac712c4…`｜**六项 verify 全 exit 0**。旧数字降级为"历史口径"并标注不再代表当前状态。
 > **教训**：状态文件里"当前有效"这几个字必须**每 5 轮复核一次**，否则读者会拿过期数字做决策；
 > 本轮之前它已经过期约 70 个提交。
+
+> **R93（2026-10-20）把 `obs perf-rotate` 的校验搬到**真实 CLI 进程**验证**：新增端到端用例（`dist/cli.js` 实跑）——
+> ①`obs perf-rotate --budget-bytes 5abc --json` ⇒ **exit 1** 且 stderr 含 `--budget-bytes`；
+> ②`ob`/`s perf-rotate --budget-bytes 4096 --json` ⇒ **exit 0**、`kind=preview`、`isApply=false`、`backupFilePath=null`（证明 argv 层接线生效、dry-run 不写盘）。
+> 动机：R73 的教训——接线"看起来接上了"但 argv 层可能没生效，只有跑真进程能证明。
+> 门禁：`typecheck` 0 / `lint` 0 / `test:coverage` **exit 0**（**3530 用例**、分支 **85.29%**）。
