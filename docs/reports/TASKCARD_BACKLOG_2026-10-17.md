@@ -1149,3 +1149,12 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > ``deleteFileIfExists``（``infra/atomic-json.ts``，T12-05 守卫要求破坏性 API 集中）③只删**计划内**路径，
 > 手工备份与最新安全网不动④``--max-backups`` 可覆盖条数（缺省 5）⑤无备份可删 ⇒ ``no-action``。
 > **3 条反例 + 2 条变异体**（不加开关也清理／清理时删全部），均被拦下。
+
+> **R109（2026-10-20）把 R104–R107 的新契约纳入**包级验收**（`verify:contract-sdk`）**：
+> 此前判定 17 项，只覆盖到 R27 之前的契约 —— 而"导出存在 ≠ 打包可用"。
+> 新增 **6 条判据**（下限 16 → **20**）：⑪EXPLORE 单次成功 ⇒ `insufficient-evidence`、候选 `isAutoMerged:false` 且阴性计数；
+> ⑫CURATE 视图无来源隐藏 + 跨个体过滤 + **不删原文** + 推断标注；⑬FOLD 不可逆能力 `ask-step`（不跨 run 持久化）、
+> 越出登记范围 `deny` 且整包阻塞；⑭FOLD 成本收益单次样本 ⇒ 证据不足且不自动推广。
+> 实测：`npm pack` sha256 `9f32db7f…` ⇒ `契约 SDK 包级验收：24/24 判据通过`；全量 **3575 用例**、typecheck/lint 0。
+> **过程事故（轻）**：判定文件没有 `return checks;`（结尾是对象字面量），我的第一版脚本按该锚点插入失败；改为在
+> `const passedCount` 前插入后成功，并用空观测跑了一次判定函数确认 **24 条且 fail-closed**（空观测 ⇒ accepted:false）。

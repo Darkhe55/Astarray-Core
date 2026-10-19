@@ -13,6 +13,10 @@ import path from "node:path";
 
 import {
   CrossProjectAuthorizationStore,
+  buildCurationViewSnapshot,
+  evaluateExploreVerification,
+  evaluateFoldCostBenefit,
+  evaluateFoldPackageAuthorization,
   acquireCurationRunLock,
   assessFolderGrantCandidate,
   buildDocumentViewReceipt,
@@ -286,6 +290,171 @@ const observation = {};
     sanitizedChanged: sanitizedText !== rawText,
     containsEscape: sanitizedText.includes("\u001b"),
     evidenceAnchor: buildRunHistoryEvidenceAnchor("mission-1", 7),
+  };
+}
+
+// ── ⑪ EXPLORE-01-03：一次成功不算稳定；候选不自动合并 ────────────────
+{
+  const singleSuccess = evaluateExploreVerification({
+    trials: [
+      {
+        trialKey: "only-one",
+        seed: "seed-1",
+        inputFingerprint: "in-1",
+        isSuccess: true,
+        evidenceHash: "hash-1",
+        coversBoundary: true,
+        coversRegression: true,
+      },
+    ],
+    spentWallClockSeconds: 10,
+    spentRequestCount: 1,
+    spentEstimatedCostAmount: 0,
+    maximumWallClockSeconds: 100,
+    maximumRequestCount: 10,
+    maximumEstimatedCostAmount: null,
+    isSelfEvaluationOnly: false,
+  });
+  const sufficient = evaluateExploreVerification({
+    trials: [
+      {
+        trialKey: "a",
+        seed: "s1",
+        inputFingerprint: "in-1",
+        isSuccess: true,
+        evidenceHash: "h1",
+        coversBoundary: true,
+        coversRegression: false,
+      },
+      {
+        trialKey: "b",
+        seed: "s2",
+        inputFingerprint: "in-1",
+        isSuccess: true,
+        evidenceHash: "h2",
+        coversBoundary: false,
+        coversRegression: true,
+      },
+      {
+        trialKey: "c",
+        seed: "s2",
+        inputFingerprint: "in-2",
+        isSuccess: true,
+        evidenceHash: "h3",
+        coversBoundary: false,
+        coversRegression: false,
+      },
+      {
+        trialKey: "d",
+        seed: "s3",
+        inputFingerprint: "in-3",
+        isSuccess: false,
+        evidenceHash: "h4",
+        coversBoundary: false,
+        coversRegression: false,
+      },
+    ],
+    spentWallClockSeconds: 10,
+    spentRequestCount: 1,
+    spentEstimatedCostAmount: 0,
+    maximumWallClockSeconds: 100,
+    maximumRequestCount: 10,
+    maximumEstimatedCostAmount: null,
+    isSelfEvaluationOnly: false,
+  });
+  observation.exploreVerification = {
+    singleSuccessKind: singleSuccess.kind,
+    sufficientKind: sufficient.kind,
+    sufficientIsAutoMerged: sufficient.kind === "verified-candidate" ? sufficient.isAutoMerged : null,
+    sufficientNegativeCount: sufficient.negativeResultCount,
+  };
+}
+
+// ── ⑫ CURATE-01-03：无来源不展示、视图不删原文 ──────────────────────
+{
+  const snapshot = buildCurationViewSnapshot({
+    plans: [{ planRevision: 3, isRevoked: false, isPendingApproval: false, isSuperseded: false }],
+    items: [
+      {
+        itemIdentifier: "with-source",
+        ownerAgentInstanceIdentifier: "agent-1",
+        planRevision: 3,
+        isModelInference: true,
+        unresolvedKind: "conflict",
+        sourceMessageIdentifiers: ["message-1"],
+        sourceToolReceiptIdentifiers: [],
+      },
+      {
+        itemIdentifier: "no-source",
+        ownerAgentInstanceIdentifier: "agent-1",
+        planRevision: 3,
+        isModelInference: false,
+        unresolvedKind: null,
+        sourceMessageIdentifiers: [],
+        sourceToolReceiptIdentifiers: [],
+      },
+      {
+        itemIdentifier: "other-agent",
+        ownerAgentInstanceIdentifier: "agent-2",
+        planRevision: 3,
+        isModelInference: false,
+        unresolvedKind: null,
+        sourceMessageIdentifiers: ["message-2"],
+        sourceToolReceiptIdentifiers: [],
+      },
+    ],
+    viewerAuthorizedAgentInstanceIdentifiers: new Set(["agent-1"]),
+  });
+  observation.curateView = {
+    visibleCount: snapshot.visibleItems.length,
+    unsourcedCount: snapshot.unsourcedItemCount,
+    filteredCount: snapshot.filteredByAuthorizationCount,
+    retainedUnresolvedCount: snapshot.retainedUnresolvedCount,
+    isOriginalHistoryDeleted: snapshot.isOriginalHistoryDeleted,
+    inferenceFlagged: snapshot.visibleItems[0]?.isModelInference ?? null,
+  };
+}
+
+// ── ⑬ FOLD-01-03：不可逆逐步确认；越权拒绝 ──────────────────────────
+{
+  const irreversible = evaluateFoldPackageAuthorization({
+    steps: [{ stepIdentifier: "step-1", requiredCapabilities: ["shell-exec"] }],
+    declaredCapabilityScope: new Set(["shell-exec"]),
+    grantedCapabilitiesInRun: new Set(["shell-exec"]),
+  });
+  const outsideScope = evaluateFoldPackageAuthorization({
+    steps: [{ stepIdentifier: "step-1", requiredCapabilities: ["fs-write"] }],
+    declaredCapabilityScope: new Set(["fs-read"]),
+    grantedCapabilitiesInRun: new Set(["fs-write"]),
+  });
+  observation.foldAuthorization = {
+    irreversibleKind: irreversible.decisions[0]?.kind ?? null,
+    irreversibleFlag: irreversible.decisions[0]?.isIrreversible ?? null,
+    outsideScopeKind: outsideScope.decisions[0]?.kind ?? null,
+    outsideScopeReasonCode: outsideScope.decisions[0]?.reasonCode ?? null,
+    isBlocked: outsideScope.isPackageRunBlocked,
+    isIrreversibleGrantPersistent: irreversible.isIrreversibleGrantPersistent,
+  };
+}
+
+// ── ⑭ FOLD 成本收益：样本不足不下结论 ───────────────────────────────
+{
+  const run = (identifier, wallClockSeconds) => ({
+    runIdentifier: identifier,
+    wallClockSeconds,
+    stepCount: 5,
+    modelRequestCount: 2,
+    inputTokens: 100,
+    outputTokens: 50,
+    isFailure: false,
+  });
+  const thin = evaluateFoldCostBenefit({
+    baselineRuns: [run("b1", 100)],
+    foldedRuns: [run("f1", 50)],
+  });
+  observation.foldCostBenefit = {
+    thinSamplesKind: thin.kind,
+    thinIsAutoPromoted: thin.isAutoPromoted,
   };
 }
 
