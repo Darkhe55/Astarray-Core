@@ -1174,3 +1174,10 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > ②`issueGrant` 成功时返回的是 `issued` 而不是我猜的 `granted`；
 > ③`ProjectRootRegistration` 只有 `{projectIdentifier, rootPath}`，我多写了一个字段、`Candidate` 也缺 `proposedBy`/`durationKind`。
 > **结论**：这三次都是"**判定脚本对产品语义的假设错**"，产品行为一直是对的 —— 这类错误若不核对源码就会被误记为产品缺陷。
+
+> **R111（2026-10-20）``COMM-01-03`` 只读拓扑/投递状态判定层**：新增 ``collaboration-topology-view.ts`` ——
+> ①无上级 ⇒ ``isOrphaned`` 且不可投递（**不猜上级**）②A→B→A 环 ⇒ 环内全部不可投递且 ``hasCycle:true``
+> ③上级停用 ⇒ 不可投递④目标未登记 ⇒ ``dropped`` 如实计数⑤转达缺原来源 ⇒ ``isTraceLost``（追溯链断不隐藏）
+> ⑥暂停/丢弃分开计数⑦视图 ``isWritable:false`` 且只含标识、不含消息正文。
+> **7 条反例 + 2 条变异体**（孤立者也可投递／隐藏追溯丢失）被拦下。
+> **未做**：共用入口的真实多实例离线闭环与重启证据、tarball 包验收（``COMM-01-03`` 仍 pending，不主张通过）。

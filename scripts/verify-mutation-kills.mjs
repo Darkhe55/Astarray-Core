@@ -325,6 +325,26 @@ export const MUTATIONS = [
       "有失败运行仍宣称收益 ⇒ 把带回归的方案当成净收益（会误导推广）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm-topology-delivers-orphans",
+    targetFile: "packages/core/src/orchestration/collaboration-topology-view.ts",
+    find: "      isDeliverable: !isOrphaned && !isInCycle && isParentUsable && agent.isActive,",
+    replace: "      isDeliverable: true,",
+    testFiles: ["tests/core/unit/comm01-topology-view.test.ts"],
+    expectedFailingTestNames: ["② 无上级"],
+    rationale:
+      "无上级/环内/停用者也被标为可投递 ⇒ 消息会投到不存在的收件人（或互相当上级）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm-topology-hides-lost-trace",
+    targetFile: "packages/core/src/orchestration/collaboration-topology-view.ts",
+    find: "      isTraceLost: delivery.isRelayedRequest && delivery.originalSourceAgentInstanceIdentifier === null,",
+    replace: "      isTraceLost: false,",
+    testFiles: ["tests/core/unit/comm01-topology-view.test.ts"],
+    expectedFailingTestNames: ["⑥ 转达请求缺原来源"],
+    rationale:
+      "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "fold-internal-widens-scope",
     targetFile: "packages/core/src/orchestration/workflow-fold-internal-authorization.ts",
     find: "      if (!input.declaredCapabilityScope.has(capability)) {",
