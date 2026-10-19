@@ -17,6 +17,7 @@ import {
 } from "../../../packages/core/src/public-sdk.js";
 import {
   executeObsDiagCommand,
+  executeObsDiagExportCommand,
   executeObsPerfCommand,
   executeObsProcessCommand,
 } from "../../../packages/tui/src/cli/observability-command.js";
@@ -330,6 +331,73 @@ describe("OBS 只读查询入口", () => {
     // 该窗口内没有事件循环延迟样本 ⇒ null（unknown 不记作零）
     expect(payload.aggregate.fields.eventLoopDelayMs.sampleCount).toBe(0);
     expect(payload.aggregate.fields.eventLoopDelayMs.mean).toBeNull();
+  });
+
+  it("⑨ obs diag export：允许时写文件且未上传；缺窗口/未知章节时**不写文件**", async () => {
+    const outputFilePath = path.join(stateDirectory, "evidence-pack.json");
+    const exitCode = await executeObsDiagExportCommand({
+      outputFilePath,
+      windowStartIso: "2026-10-19T00:00:00.000Z",
+      windowEndIso: "2026-10-19T12:00:00.000Z",
+      sections: ["findings-summary", "coverage-window"],
+      astarrayVersion: "0.1.0",
+      platform: "win32-x64",
+      redactionSummary: "已脱敏：移除原始参数与凭据。",
+      isUserInitiated: true,
+      generatedAtIso: "2026-10-19T12:00:00.000Z",
+      isJsonOutput: true,
+    });
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(stdoutText) as {
+      kind: string;
+      isAutoUploaded: boolean;
+      manifest: { isAutoUploaded: boolean; sections: string[]; platform: string };
+    };
+    expect(payload.kind).toBe("exported");
+    // **不联网上传**必须如实为 false
+    expect(payload.isAutoUploaded).toBe(false);
+    expect(payload.manifest.isAutoUploaded).toBe(false);
+    expect(payload.manifest.sections).toEqual(["findings-summary", "coverage-window"]);
+    const writtenText = await fs.readFile(outputFilePath, "utf8");
+    expect(writtenText).toContain("已脱敏");
+
+    // 缺时间窗 ⇒ 拒绝且**不写文件**
+    const rejectedOutputPath = path.join(stateDirectory, "rejected-pack.json");
+    stdoutText = "";
+    const rejectedExitCode = await executeObsDiagExportCommand({
+      outputFilePath: rejectedOutputPath,
+      windowStartIso: "",
+      windowEndIso: "2026-10-19T12:00:00.000Z",
+      sections: ["findings-summary"],
+      astarrayVersion: "0.1.0",
+      platform: "win32-x64",
+      redactionSummary: "已脱敏",
+      isUserInitiated: true,
+      generatedAtIso: "2026-10-19T12:00:00.000Z",
+      isJsonOutput: true,
+    });
+    expect(rejectedExitCode).toBe(1);
+    await expect(fs.access(rejectedOutputPath)).rejects.toThrow();
+    expect(stderrText).toContain("证据包导出被拒绝");
+
+    // 未知章节 ⇒ 同样拒绝且不写文件
+    stderrText = "";
+    const unknownSectionExitCode = await executeObsDiagExportCommand({
+      outputFilePath: path.join(stateDirectory, "unknown-section-pack.json"),
+      windowStartIso: "2026-10-19T00:00:00.000Z",
+      windowEndIso: "2026-10-19T12:00:00.000Z",
+      sections: ["raw-logs"],
+      astarrayVersion: "0.1.0",
+      platform: "win32-x64",
+      redactionSummary: "已脱敏",
+      isUserInitiated: true,
+      generatedAtIso: "2026-10-19T12:00:00.000Z",
+      isJsonOutput: true,
+    });
+    expect(unknownSectionExitCode).toBe(1);
+    await expect(
+      fs.access(path.join(stateDirectory, "unknown-section-pack.json")),
+    ).rejects.toThrow();
   });
 });
 

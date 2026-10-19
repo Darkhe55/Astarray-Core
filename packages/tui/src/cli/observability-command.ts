@@ -11,6 +11,8 @@ import {
   PerfEventStore,
   ProcessSampleStore,
   aggregateProcessSamples,
+  buildDiagnosticEvidencePackManifest,
+  evaluateDiagnosticEvidencePackExport,
   queryDiagnosticSummary,
   queryPerfOverview,
 } from "../../../core/src/public-sdk.js";
@@ -270,6 +272,92 @@ export async function executeObsProcessCommand(
         `进程样本：命中 ${String(matchedSamples.length)} / 总 ${String(report.samples.length)}（丢弃行 ${String(report.discardedLineCount)}）`,
         `本次返回：${String(returnedSamples.length)} 条`,
         ...(payload.notice === null ? [] : [`说明：${payload.notice}`]),
+        "",
+      ].join("\n"),
+    );
+  }
+  return EXIT_CODES.SUCCESS;
+}
+
+
+/** `obs diag export` 输入。 */
+export interface ObsDiagExportCommandInput {
+  readonly outputFilePath: string;
+  readonly windowStartIso: string;
+  readonly windowEndIso: string;
+  readonly sections: ReadonlyArray<string>;
+  readonly astarrayVersion: string;
+  readonly platform: string;
+  readonly redactionSummary: string;
+  /** 恒为 true：只有用户主动执行命令才会走到这里。 */
+  readonly isUserInitiated: true;
+  readonly generatedAtIso: string;
+  readonly findingCount?: number;
+  readonly isJsonOutput: boolean;
+}
+
+/**
+ * 执行 `obs diag export`：**用户主动**导出证据包到指定文件。
+ *
+ * 纪律（R61 契约）：不联网上传；窗口/版本/平台/脱敏说明必须齐备；
+ * 章节走白名单；被拒绝时不写任何文件。
+ */
+export async function executeObsDiagExportCommand(
+  input: ObsDiagExportCommandInput,
+): Promise<number> {
+  const decision = evaluateDiagnosticEvidencePackExport({
+    isUserInitiated: true,
+    isNetworkUploadRequested: false,
+    windowStartIso: input.windowStartIso,
+    windowEndIso: input.windowEndIso,
+    astarrayVersion: input.astarrayVersion,
+    platform: input.platform,
+    redactionSummary: input.redactionSummary,
+    sections: input.sections,
+    containsRawArguments: false,
+    containsSecrets: false,
+  });
+  if (decision.kind === "rejected") {
+    // 被拒绝时**不写任何文件**
+    logToStderr(`证据包导出被拒绝（${decision.reasonCode}）：${decision.reason}`);
+    return EXIT_CODES.FAILURE;
+  }
+
+  const manifest = buildDiagnosticEvidencePackManifest({
+    generatedAtIso: input.generatedAtIso,
+    astarrayVersion: input.astarrayVersion,
+    platform: input.platform,
+    windowStartIso: input.windowStartIso,
+    windowEndIso: input.windowEndIso,
+    findingCount: input.findingCount ?? 0,
+    sections: input.sections as never,
+    redactionSummary: input.redactionSummary,
+  });
+
+  const { writeAtomicTextFile } = await import("../../../core/src/infra/atomic-json.js");
+  try {
+    await writeAtomicTextFile(input.outputFilePath, `${JSON.stringify(manifest, null, 2)}\n`);
+  } catch (error) {
+    logToStderr(`证据包写入失败：${error instanceof Error ? error.message : String(error)}`);
+    return EXIT_CODES.FAILURE;
+  }
+
+  const payload = {
+    kind: "exported" as const,
+    outputFilePath: input.outputFilePath,
+    manifest,
+    /** 明确报告"没有联网上传"，避免调用方误以为已外发。 */
+    isAutoUploaded: false,
+  };
+  if (input.isJsonOutput) {
+    printJson(payload);
+  } else {
+    process.stdout.write(
+      [
+        `证据包已写入：${input.outputFilePath}`,
+        `窗口：${input.windowStartIso} ~ ${input.windowEndIso}`,
+        `章节：${input.sections.join(", ")}`,
+        "说明：未联网上传；如需外发请自行处理该文件。",
         "",
       ].join("\n"),
     );

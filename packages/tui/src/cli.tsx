@@ -12,6 +12,7 @@ import {
 // OBS-01（2026-10-19 R38）：性能/诊断的只读查询入口。
 import {
   executeObsDiagCommand,
+  executeObsDiagExportCommand,
   executeObsPerfCommand,
   executeObsProcessCommand,
 } from "./cli/observability-command.js";
@@ -727,6 +728,44 @@ obsCommand
         detailLevel: options.detail === true ? "detail" : "summary",
         ...(pageSize === undefined ? {} : { pageSize }),
         ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+obsCommand
+  .command("export")
+  .description("由用户主动导出诊断证据包到指定文件（不联网上传；缺窗口/脱敏说明即拒绝）")
+  .requiredOption("--output <path>", "证据包输出路径（JSON）")
+  .requiredOption("--since <iso>", "时间窗下界（含）")
+  .requiredOption("--until <iso>", "时间窗上界（含）")
+  .requiredOption("--platform <name>", "平台标识（如 win32-x64）")
+  .requiredOption("--redaction <text>", "脱敏说明（人可读，必须非空）")
+  .option("--sections <list>", "章节（逗号分隔；缺省 findings-summary,coverage-window,redaction-notes）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      output: string;
+      since: string;
+      until: string;
+      platform: string;
+      redaction: string;
+      sections?: string;
+      json?: boolean;
+    }) => {
+      const sections =
+        options.sections === undefined
+          ? ["findings-summary", "coverage-window", "redaction-notes"]
+          : options.sections.split(",").map((section) => section.trim());
+      process.exitCode = await executeObsDiagExportCommand({
+        outputFilePath: options.output,
+        windowStartIso: options.since,
+        windowEndIso: options.until,
+        sections,
+        astarrayVersion: packageMetadata.version,
+        platform: options.platform,
+        redactionSummary: options.redaction,
+        isUserInitiated: true,
+        generatedAtIso: new Date().toISOString(),
         isJsonOutput: options.json === true,
       });
     },

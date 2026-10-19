@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "diag-export-writes-when-rejected",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "  if (decision.kind === \"rejected\") {",
+    replace: "  if (false) {",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑨ obs diag export"],
+    rationale:
+      "被拒绝仍继续写文件 ⇒ 违反\"拒绝即不落盘\"（敏感证据包可能落地）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "diag-export-drops-manifest-safety-flags",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "    isAutoUploaded: false,",
+    replace: "    isAutoUploaded: true,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑨ obs diag export"],
+    rationale:
+      "报告已自动上传 ⇒ 与\"不联网上传\"矛盾（用户会以为文件已外发）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "evidence-pack-allows-auto-upload",
     targetFile: "packages/core/src/orchestration/diagnostic-evidence-pack-contract.ts",
     find: "  if (input.isNetworkUploadRequested) {",
