@@ -198,6 +198,31 @@ program
         perfCollect?: boolean;
       },
     ) => {
+      /**
+       * **秒数参数边界校验（R79）**：`parseInt("abc")` ⇒ NaN ⇒ `setTimeout(NaN)` 退化为立即超时，
+       * 用户看到的是"任务莫名超时"。这里显式拒绝并指出参数名。
+       */
+      const parsePositiveSeconds = (
+        rawValue: string | undefined,
+        flagName: string,
+      ): number | undefined | null => {
+        if (rawValue === undefined) return undefined;
+        const parsedValue = Number.parseInt(rawValue, 10);
+        if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+          logToStderr(`${flagName} 必须是 ≥1 的整数秒（收到 ${String(rawValue)}）。`);
+          return null;
+        }
+        return parsedValue;
+      };
+      const timeoutSeconds = parsePositiveSeconds(options.timeoutSeconds, "--timeout-seconds");
+      const providerRequestTimeoutSeconds = parsePositiveSeconds(
+        options.providerRequestTimeoutSeconds,
+        "--provider-request-timeout-seconds",
+      );
+      if (timeoutSeconds === null || providerRequestTimeoutSeconds === null) {
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
       process.exitCode = await executeRunCommand({
         prompt,
         mode: options.mode,
@@ -205,10 +230,7 @@ program
         isJsonOutput: options.json === true,
         stateDirectory: defaultStateDirectory(),
         isPerfCollectionEnabled: options.perfCollect === true,
-        timeoutSeconds:
-          options.timeoutSeconds === undefined
-            ? undefined
-            : Number.parseInt(options.timeoutSeconds, 10),
+        timeoutSeconds,
         ...(options.providerEndpoint !== undefined
           ? { providerEndpoint: options.providerEndpoint }
           : {}),
@@ -224,12 +246,9 @@ program
         ...(options.providerProtocol !== undefined
           ? { providerProtocol: options.providerProtocol }
           : {}),
-        ...(options.providerRequestTimeoutSeconds !== undefined
-          ? {
-              providerRequestTimeoutMilliseconds:
-                Number.parseInt(options.providerRequestTimeoutSeconds, 10) * 1_000,
-            }
-          : {}),
+        ...(providerRequestTimeoutSeconds === undefined
+          ? {}
+          : { providerRequestTimeoutMilliseconds: providerRequestTimeoutSeconds * 1_000 }),
       });
     },
   );

@@ -275,6 +275,16 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "run-accepts-nan-seconds",
+    targetFile: "packages/tui/src/cli.tsx",
+    find: "        if (!Number.isInteger(parsedValue) || parsedValue < 1) {",
+    replace: "        if (false) {",
+    testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
+    expectedFailingTestNames: ["③ run"],
+    rationale:
+      "放行 NaN 秒数 ⇒ setTimeout(NaN) 退化为立即超时（任务莫名超时）⇒ 该守卫必须变红",
+  },
+  {
     mutationIdentifier: "profile-list-accepts-nan-paging",
     targetFile: "packages/tui/src/cli.tsx",
     find: "    if (!Number.isInteger(page) || page < 1) {",

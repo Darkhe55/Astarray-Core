@@ -27,4 +27,13 @@ describe("CLI 数字参数边界校验", () => {
     const rotateText = await readSource("packages/tui/src/cli/obs-perf-rotate-command.ts");
     expect(rotateText).toContain("if (!Number.isFinite(value) || value <= 0) {");
   });
+
+  it("③ run：--timeout-seconds / --provider-request-timeout-seconds 必须是 ≥1 的整数秒", async () => {
+    const cliText = await readSource("packages/tui/src/cli.tsx");
+    // 校验语句必须在（放行 NaN 会让 setTimeout 立即超时）
+    expect(cliText).toContain("if (!Number.isInteger(parsedValue) || parsedValue < 1) {");
+    // 并且确实用了校验后的值（不再直接 parseInt 进选项）
+    expect(cliText).toContain('parsePositiveSeconds(options.timeoutSeconds, "--timeout-seconds")');
+    expect(cliText).toContain("providerRequestTimeoutMilliseconds: providerRequestTimeoutSeconds * 1_000");
+  });
 });
