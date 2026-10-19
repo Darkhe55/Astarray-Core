@@ -18,6 +18,10 @@ export interface ObsPerfRotateCommandInput {
   readonly stateDirectory: string;
   /** 缺省 false：只预览，不改盘。 */
   readonly isApply?: boolean;
+  /** 是否在整理后清理超出条数/时限的备份（默认 false）。 */
+  readonly isPruneBackups?: boolean;
+  readonly maximumBackupCount?: number;
+  readonly maximumBackupAgeHours?: number;
   readonly nowIso?: string;
   readonly budgetBytes?: number;
   /** 原始字符串（优先）：用于**严格**整数校验，避免 parseInt 宽容截断（"5abc" ⇒ 5）。 */
@@ -121,6 +125,34 @@ export async function executeObsPerfRotateCommand(
     ...(input.budgetBytes === undefined ? {} : { budgetBytes: input.budgetBytes }),
     ...(input.retentionHours === undefined ? {} : { retentionHours: input.retentionHours }),
   });
+  /**
+   * **备份清理（R108）**：默认不清理；`--prune-backups` 才按判定结果删。
+   * 删除动作走白名单 helper（`deleteFileIfExists`），且只删**计划内**路径。
+   */
+  let backupPruneReport: { kind: string; deletedFileCount: number; reason: string } | null = null;
+  if (input.isPruneBackups === true) {
+    const { applyProcessSampleBackupRetention } = await import(
+      "../../../core/src/orchestration/process-sample-backup-retention-apply.js"
+    );
+    const { deleteFileIfExists } = await import("../../../core/src/infra/atomic-json.js");
+    const pruneReport = await applyProcessSampleBackupRetention({
+      baseDirectory: input.stateDirectory,
+      nowIso,
+      ...(input.maximumBackupCount === undefined
+        ? {}
+        : { maximumBackupCount: input.maximumBackupCount }),
+      ...(input.maximumBackupAgeHours === undefined
+        ? {}
+        : { maximumAgeHours: input.maximumBackupAgeHours }),
+      removeBackupFile: deleteFileIfExists,
+    });
+    backupPruneReport = {
+      kind: pruneReport.kind,
+      deletedFileCount: pruneReport.deletedFileNames.length,
+      reason: pruneReport.reason,
+    };
+  }
+
   const payload = {
     kind: "applied" as const,
     isApply: true,
@@ -128,6 +160,7 @@ export async function executeObsPerfRotateCommand(
     applyKind: applyReport.kind,
     retainedSampleCount: applyReport.retainedSampleCount,
     backupFilePath: applyReport.backupFilePath,
+    backupPrune: backupPruneReport,
     reason: applyReport.reason,
   };
   if (input.isJsonOutput) {

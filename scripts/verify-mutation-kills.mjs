@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "删除全部备份而不是计划内的 ⇒ 把用户手工备份与最新安全网一起删掉 ⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "perf-rotate-prunes-without-flag",
+    targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
+    find: "  if (input.isPruneBackups === true) {",
+    replace: "  if (true) {",
+    testFiles: ["tests/tui/unit/obs01-perf-rotate-prune.test.ts"],
+    expectedFailingTestNames: ["① 默认不清理"],
+    rationale:
+      "不加开关也清理备份 ⇒ 默认行为变成\"顺手删东西\"（用户没要求）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "perf-rotate-prune-deletes-everything",
+    targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
+    find: "      removeBackupFile: deleteFileIfExists,",
+    replace: "      removeBackupFile: async (absoluteFilePath: string) => {\n        const { promises: fsPromises } = await import(\"node:fs\");\n        const entries = await fsPromises.readdir(pathNode.dirname(absoluteFilePath));\n        for (const entry of entries.filter((name) => name.startsWith(\"process-samples.backup-\"))) {\n          await deleteFileIfExists(pathNode.join(pathNode.dirname(absoluteFilePath), entry));\n        }\n      },",
+    testFiles: ["tests/tui/unit/obs01-perf-rotate-prune.test.ts"],
+    expectedFailingTestNames: ["② --prune-backups"],
+    rationale:
+      "清理时把\"所有备份\"都删（含手工备份与最新安全网）⇒ 用户手工备份被抹掉 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "backup-retention-deletes-newest",
     targetFile: "packages/core/src/orchestration/process-sample-backup-retention.ts",
     find: "    const isNewest = index === 0;",

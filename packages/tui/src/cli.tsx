@@ -767,12 +767,16 @@ obsCommand
   .option("--apply", "真正执行（缺省仅预览）")
   .option("--budget-bytes <n>", "存储预算字节数（缺省 10MB）")
   .option("--retention-hours <n>", "保留小时数（缺省 24）")
+  .option("--prune-backups", "顺带清理超出条数/时限的备份（默认不清理）")
+  .option("--max-backups <n>", "备份最多保留几份（缺省 5）")
   .option("--json", "JSON 输出")
   .action(
     async (options: {
       apply?: boolean;
       budgetBytes?: string;
       retentionHours?: string;
+      pruneBackups?: boolean;
+      maxBackups?: string;
       json?: boolean;
     }) => {
       process.exitCode = await executeObsPerfRotateCommand({
@@ -782,6 +786,10 @@ obsCommand
         ...(options.retentionHours === undefined
           ? {}
           : { retentionHoursRaw: options.retentionHours }),
+        isPruneBackups: options.pruneBackups === true,
+        ...(options.maxBackups === undefined
+          ? {}
+          : { maximumBackupCount: Number.parseInt(options.maxBackups, 10) }),
         isJsonOutput: options.json === true,
       });
     },
