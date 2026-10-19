@@ -1076,3 +1076,10 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **接续方式（给下一轮或人类）**：读上述两份 + 本台账末尾三节即可，无需重新盘点仓库；
 > 5 项阻塞的解除条件逐条写在 PHASE_SUMMARY §6。
 > **不要**把这段读成"全部完成"——它是"停在一个可复核的点"。
+
+> **R101（2026-10-20，第 85 轮）私库全量门禁（本窗口首次跑 `npm run check`）**：
+> `astarray-ui` → **exit 0 — 32 文件 / 196 用例**，typecheck + lint + build 同链通过。
+> 此前本窗口对私库只跑过 `verify:package`（7/7），**未跑过完整 check** —— 这一项现在补上。
+> **过程事故**：第一次调用路径写错（`cd ../astarray-ui` 在 workspace 根下指向 `Documents\astarray-ui`，
+> 实际私库在 `Documents\astarray\astarray-ui`），`npm` 报 ENOENT；改正路径后通过。
+> 教训：本会话 workspace 根是 `Documents\astarray`，公开库在 `astarray/` 子目录 —— **相对路径深度容易错**（同类错误此前也发生过）。
