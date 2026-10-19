@@ -901,3 +901,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > （文件以 `utf8` 开头、`node --check` 才发现）。已 `git checkout` 还原并用**幂等插入脚本**重做，
 > 教训与 R72 相同：**对大文件只做定点插入，写完立刻 `node --check`**。
 > 全量 exit 0（274s）。
+
+> **R80（2026-10-19，第 80 轮全量门禁）**：变异 **181/181 全部被拦下**；`npm pack` **263 文件**
+> sha256 `440350e5…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
