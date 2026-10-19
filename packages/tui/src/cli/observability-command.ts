@@ -377,15 +377,38 @@ export async function executeObsDiagExportCommand(
     },
   }));
 
+  /**
+   * 正文**按声明章节组装**（R64）：用户选了哪些章节就只写哪些，声明与内容必须一致。
+   *
+   * - `findings-summary` ⇒ findings（指纹级）+ bySeverity/byRecoveryState
+   * - `coverage-window` ⇒ coverage
+   * - `redaction-notes` ⇒ redactionNotes（脱敏说明回显）
+   * - `degraded-status` ⇒ 观测是否降级（丢弃行/不可报告原因）
+   */
+  const requestedSections = new Set(input.sections);
   const evidencePack = {
     manifest,
     body: {
-      coverage: summary.coverage,
-      bySeverity: summary.bySeverity,
-      byRecoveryState: summary.byRecoveryState,
-      isReportable: summary.isReportable,
-      unreportableReason: summary.unreportableReason,
-      findings: findingsForPack,
+      ...(requestedSections.has("coverage-window") ? { coverage: summary.coverage } : {}),
+      ...(requestedSections.has("findings-summary")
+        ? {
+            findings: findingsForPack,
+            bySeverity: summary.bySeverity,
+            byRecoveryState: summary.byRecoveryState,
+          }
+        : {}),
+      ...(requestedSections.has("redaction-notes")
+        ? { redactionNotes: input.redactionSummary }
+        : {}),
+      ...(requestedSections.has("degraded-status")
+        ? {
+            degraded: {
+              discardedLineCount: summary.coverage.discardedLineCount,
+              isReportable: summary.isReportable,
+              unreportableReason: summary.unreportableReason,
+            },
+          }
+        : {}),
     },
   };
 
