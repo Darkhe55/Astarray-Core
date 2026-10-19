@@ -977,3 +977,12 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 分支 85.17 → **85.28**（距门槛 +0.28pp 余量）。
 > **说明**：本轮只补"输出分支"这类**低风险高确定性**的覆盖，未触碰 `run-command.ts`（48% 分支，需要注入
 > provider/权限询问桩，风险与工作量都更高）；那是下一轮的目标。
+
+> **R90（2026-10-20，第 90 轮全量门禁）**：变异 **183/183 全部被拦下**；
+> `npm pack` **263 文件** sha256 `3ac712c4…`（**第一次 pack 失败**：默认并发下 1 条用例抖动，
+> `--maxWorkers=2` 全 3528 用例通过；按 AGENTS.md 的已知并发抖动处理，重跑 pack 成功）；
+> **六项 verify 全 exit 0**（`verify-package` 263 / `verify:contract-sdk` 17/17 / `verify:relocation-batch` 11/11 /
+> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> **`test:coverage` exit 0**（分支 85.28%）。
+> **注意（流程事故）**：第一次 pack 失败后，我**先用旧 tarball 跑了六项 verify**（sha256 与 R85 相同 = `b5bae191`），
+> 那组结果**不能算数**；重新打包（`3ac712c4`）后的六项才是本轮证据。教训：**pack 失败时必须先确认产物新鲜度再跑 verify**。
