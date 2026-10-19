@@ -865,3 +865,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > ③**逐来源保留**条数与合计；④**修订不覆盖历史**（同请求多修订 ⇒ `supersededRevisionCount`）。
 > **6 条反例 + 2 条变异体**（估算并进可结算／缺失当 0）均被拦下；`--check-anchors` **176/176**；全量 exit 0。
 > **未做**：持久化去重、分页、预算阈值与价格换算（需价格表与预算口径，属产品决策）。
+
+> **R75（2026-10-19，第 75 轮全量门禁）**：变异 **176/176 全部被拦下**；`npm pack` **263 文件**
+> sha256 `b4c1c7d8…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
