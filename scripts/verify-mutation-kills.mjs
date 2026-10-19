@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "evidence-pack-body-ignores-sections",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "      ...(requestedSections.has(\"findings-summary\")",
+    replace: "      ...(true",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑪ obs diag export"],
+    rationale:
+      "无视章节声明仍写 findings ⇒ 声明与内容不一致（用户以为没导出的东西被带走）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "evidence-pack-body-drops-degraded-status",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "      ...(requestedSections.has(\"degraded-status\")",
+    replace: "      ...(false",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑪ obs diag export"],
+    rationale:
+      "要求降级状态却不写 ⇒ 读者无法判断证据是否完整（伪「一切正常」）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "evidence-pack-body-leaks-message-text",
     targetFile: "packages/tui/src/cli/observability-command.ts",
     find: "    isInference: finding.isInference,",
@@ -2886,6 +2906,7 @@ function main() {
 }
 
 main();
+
 
 
 

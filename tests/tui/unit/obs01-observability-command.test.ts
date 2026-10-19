@@ -477,6 +477,59 @@ describe("OBS 只读查询入口", () => {
     expect(written).not.toContain("OUT_OF_WINDOW_MARKER");
     expect(pack.manifest.isAutoUploaded).toBe(false);
   });
+
+  it("⑪ obs diag export：正文严格按声明章节组装（未声明的 findings 不得出现）", async () => {
+    const diagnosticStore = new DiagnosticEventStore({ baseDirectory: stateDirectory });
+    await diagnosticStore.append({
+      observeEventVersion: 1,
+      eventType: "diagnostic",
+      recordedAtIso: "2026-10-19T02:00:00.000Z",
+      sourceAgentInstanceId: "agent-1",
+      missionIdentifier: "mission-1",
+      taskIdentifier: "task-1",
+      requestIdentifier: "request-1",
+      requestRevision: 1,
+      origin: { kind: "system" },
+      errorCode: "PERMISSION_DENIED",
+      stage: "tool",
+      severity: "error",
+      component: "tool-gate",
+      messageText: "已脱敏",
+      recoveryState: "blocked-uncertain",
+      classification: "deterministic-fact",
+      chain: { rootErrorCode: "PERMISSION_DENIED", wrapperErrorCodes: [] },
+    });
+
+    const outputFilePath = path.join(stateDirectory, "evidence-sections.json");
+    const exitCode = await executeObsDiagExportCommand({
+      stateDirectory,
+      outputFilePath,
+      windowStartIso: "2026-10-19T00:00:00.000Z",
+      windowEndIso: "2026-10-19T12:00:00.000Z",
+      // 只声明覆盖窗口与降级状态：**没有** findings-summary
+      sections: ["coverage-window", "degraded-status"],
+      astarrayVersion: "0.1.0",
+      platform: "win32-x64",
+      redactionSummary: "已脱敏",
+      isUserInitiated: true,
+      generatedAtIso: "2026-10-19T12:00:00.000Z",
+      isJsonOutput: true,
+    });
+    expect(exitCode).toBe(0);
+
+    const written = await fs.readFile(outputFilePath, "utf8");
+    const pack = JSON.parse(written) as {
+      body: Record<string, unknown>;
+    };
+    // 声明的章节在
+    expect(pack.body["coverage"]).toBeDefined();
+    expect(pack.body["degraded"]).toBeDefined();
+    // 未声明的章节**不得出现**（声明与内容一致）
+    expect(pack.body["findings"]).toBeUndefined();
+    expect(pack.body["bySeverity"]).toBeUndefined();
+    expect(pack.body["redactionNotes"]).toBeUndefined();
+    expect(written).not.toContain("\"findings\"");
+  });
 });
 
 
