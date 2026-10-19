@@ -275,6 +275,16 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "usage-overview-accepts-invalid-budget",
+    targetFile: "packages/tui/src/cli/commands.ts",
+    find: "  if (parsedBudget !== undefined && (Number.isNaN(parsedBudget) || parsedBudget < 0)) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
+    expectedFailingTestNames: ["⑤ commands.ts"],
+    rationale:
+      "放行 NaN/负预算 ⇒ 预算语义失效（可能把全部调用判为超预算）⇒ 该守卫必须变红",
+  },
+  {
     mutationIdentifier: "workflow-accepts-nan-task-revision",
     targetFile: "packages/tui/src/cli.tsx",
     find: "        if (!Number.isInteger(parsedTaskRevision) || parsedTaskRevision < 1) {",

@@ -43,4 +43,17 @@ describe("CLI 数字参数边界校验", () => {
     // 并且确实用校验后的值（不再直接 parseInt 进场景选项）
     expect(cliText).toContain("...(taskRevision === undefined ? {} : { taskRevision }),");
   });
+
+  it("⑤ commands.ts：三处 --page-size 与 --input-token-budget 已校验（防回归）", async () => {
+    const commandsText = await readSource("packages/tui/src/cli/commands.ts");
+    // 三处 page-size 校验（NaN / ≤0 拒绝）
+    const pageSizeGuardCount = commandsText.split(
+      "if (parsedPageSize !== undefined && (Number.isNaN(parsedPageSize) || parsedPageSize <= 0)) {",
+    ).length - 1;
+    expect(pageSizeGuardCount).toBe(3);
+    // 预算校验（NaN / 负数拒绝）
+    expect(commandsText).toContain(
+      "if (parsedBudget !== undefined && (Number.isNaN(parsedBudget) || parsedBudget < 0)) {",
+    );
+  });
 });
