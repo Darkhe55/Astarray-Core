@@ -5,7 +5,10 @@
  */
 import path from "node:path";
 
-import { AstarrayApplicationFacade } from "../../../core/src/public-sdk.js";
+import {
+  AstarrayApplicationFacade,
+  prepareRunPerfCollection,
+} from "../../../core/src/public-sdk.js";
 import { runConfigSchema } from "../../../core/src/core/schemas.js";
 import { EXIT_CODES, failWith, logToStderr, printJson } from "./json-output.js";
 import {
@@ -53,6 +56,12 @@ export interface RunCommandOptions {
   runtime: string | undefined;
   isJsonOutput: boolean;
   stateDirectory: string;
+  /**
+   * 是否采集本进程性能样本（R73，用户决策：**只接 run**、默认 off）。
+   *
+   * 未开启 ⇒ 不创建采集器（不建目录、不排定时器）。
+   */
+  isPerfCollectionEnabled?: boolean;
   /** T07D-R2-03：等待上限秒数；缺省不设固定上限（等待任务终态）。 */
   timeoutSeconds?: number;
   /** openai-compatible 运行时的本地/远端协议端点（必填；不静默回退 mock）。 */
@@ -136,6 +145,23 @@ let registeredPermissionAsk: RegisteredPermissionAskAnchor | null = null;
  * 保留最后一次登记的 promise，供裁决前**显式等待**，消除该竞态。
  */
 let pendingRegistration: Promise<void> | null = null;
+/**
+ * OBS 会话采集（R73，用户决策：**只接 run**、`--perf-collect`、**默认 off**）。
+ *
+ * 未开启 ⇒ `prepareRunPerfCollection` 返回 `null`（**不建目录、不排定时器**，零开销）；
+ * 开启 ⇒ application 创建成功后 `start()`，并在 `finally` 里 `stop()`（内部会按保留策略整理）。
+ */
+const runPerfCollector = prepareRunPerfCollection({
+  stateDirectory: options.stateDirectory,
+  isPerfCollectionEnabled: options.isPerfCollectionEnabled === true,
+  agentInstanceIdentifier: null,
+  readProcessMetrics: () => {
+    const residentMemoryBytes = process.memoryUsage().rss;
+    return Number.isFinite(residentMemoryBytes) && residentMemoryBytes >= 0
+      ? { residentMemoryBytes }
+      : {};
+  },
+});
 const application = await AstarrayApplicationFacade.create({
     stateDirectory: options.stateDirectory,
     // GUI-02-01 片②：显式传入工作区根，使"项目标识"由**真实根目录名**推导，
@@ -208,6 +234,13 @@ const application = await AstarrayApplicationFacade.create({
       })();
     },
   });
+  /**
+   * 采集 start（R73）：application 已创建成功、任务尚未提交 ⇒ 采样覆盖整个会话。
+   * 返回 `not-started` 也不影响任务（例如采集被关闭）。
+   */
+  if (runPerfCollector !== null) {
+    runPerfCollector.start();
+  }
   try {
     application.createSession({ sessionId: "cli-run", mode: runConfig.mode });
     if (runConfig.mode === "ponder") {
@@ -382,6 +415,19 @@ const application = await AstarrayApplicationFacade.create({
     });
     return finalStatus === "done" ? EXIT_CODES.SUCCESS : EXIT_CODES.FAILURE;
   } finally {
+    /**
+     * OBS 收口（R73）：**先停采集**（stop 内部按保留策略整理一次），再关应用。
+     * 采集收口失败只降级（写 stderr），**不影响任务结果**。
+     */
+    if (runPerfCollector !== null) {
+      try {
+        await runPerfCollector.stop();
+      } catch (error) {
+        process.stderr.write(
+          `astarray: 采集收口失败（已忽略）：${error instanceof Error ? error.message : String(error)}\n`,
+        );
+      }
+    }
     // 收口必须有界（2026-10-02）：结果已打印，不能让残留句柄（如反馈子进程）
     // 把进程无限期拖住。超时即放弃等待，调用方随后显式退出。
     await Promise.race([
@@ -443,3 +489,5 @@ export async function waitForTaskTerminal(
 export function defaultStateDirectory(): string {
   return path.join(process.cwd(), ".astarray");
 }
+
+

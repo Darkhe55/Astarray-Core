@@ -179,6 +179,7 @@ program
     "--provider-request-timeout-seconds <seconds>",
     "Provider 单次请求超时秒数（缺省 30；长任务需放宽）",
   )
+  .option("--perf-collect", "采集本进程性能样本（默认关闭；仅 run 命令，R73）")
   .action(
     async (
       prompt: string,
@@ -193,6 +194,7 @@ program
         providerCredentialReference?: string;
         providerProtocol?: string;
         providerRequestTimeoutSeconds?: string;
+        perfCollect?: boolean;
       },
     ) => {
       process.exitCode = await executeRunCommand({
@@ -201,6 +203,7 @@ program
         runtime: options.runtime,
         isJsonOutput: options.json === true,
         stateDirectory: defaultStateDirectory(),
+        isPerfCollectionEnabled: options.perfCollect === true,
         timeoutSeconds:
           options.timeoutSeconds === undefined
             ? undefined
@@ -2506,4 +2509,5 @@ process.stdout.write("", () => {
 setTimeout(() => {
   process.exit(convergenceExitCode);
 }, 1_000).unref();
+
 
