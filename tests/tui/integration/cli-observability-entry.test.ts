@@ -148,4 +148,21 @@ describe("CLI 入口补做：四命令可用且只读", () => {
     const usageResult = await runCli(["usage", "overview", "--input-token-budget", "abc"]);
     expect(usageResult.exitCode).toBe(2);
   });
+
+  it("⑦ obs perf-rotate：非法预算在 argv 层被拒绝（exit 1），合法预算 dry-run 为 exit 0 且不落盘", async () => {
+    const invalidBudget = await runCli(["obs", "perf-rotate", "--budget-bytes", "5abc", "--json"]);
+    expect(invalidBudget.exitCode).toBe(1);
+    expect(invalidBudget.stderr).toContain("--budget-bytes");
+
+    const previewRun = await runCli(["obs", "perf-rotate", "--budget-bytes", "4096", "--json"]);
+    expect(previewRun.exitCode).toBe(0);
+    const payload = JSON.parse(previewRun.stdout) as {
+      kind: string;
+      isApply: boolean;
+      backupFilePath: string | null;
+    };
+    expect(payload.kind).toBe("preview");
+    expect(payload.isApply).toBe(false);
+    expect(payload.backupFilePath).toBeNull();
+  });
 });
