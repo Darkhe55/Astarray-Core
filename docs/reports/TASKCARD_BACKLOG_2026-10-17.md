@@ -1028,3 +1028,13 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **六项 verify 全 exit 0**（`verify-package` 263 / `verify:contract-sdk` 17/17 / `verify:relocation-batch` 11/11 /
 > `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）；
 > `test:coverage` **exit 0**（3531 用例、分支 **85.30%**）。
+
+> **R96（2026-10-20）卫生与隐私自检（AGENTS.md 要求的提交前例检，本轮首次系统性做）**：
+> ①**隐私扫描**：对最近 **30 个提交**的 diff 扫 `sk-*`/`ghp_*`/`AKIA*`/`PRIVATE KEY`/
+> `C:\Users\<名>`/`10.*`/`192.168.*` —— **命中 0**；
+> ②**产物卫生**：`astarray-0.1.0.tgz` **未被 git 跟踪**（在 .gitignore 内），`.tmp/` 同样未提交；
+> ③**工作树**：`git status --porcelain` **11 项**（8 改 + 3 未跟踪），逐项核对**全部属于他人**
+> （`DELIVERY_REPORT.md`/`IMPLEMENTATION_PLAN.md`/`ORGANIZATION.md`/`docs/*` 等），**本轮一个都没碰**；
+> ④`HEAD == origin/main == 89527147`，`unpushed: 0`。
+> **说明**：本轮**没有代码改动** —— 只做核对与记录。这类"无产出"的轮次在台账里要显式说明，
+> 否则会被误读成"跑了但没提交"。
