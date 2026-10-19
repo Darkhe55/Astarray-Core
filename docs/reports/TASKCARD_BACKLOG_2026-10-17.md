@@ -1181,3 +1181,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > ⑥暂停/丢弃分开计数⑦视图 ``isWritable:false`` 且只含标识、不含消息正文。
 > **7 条反例 + 2 条变异体**（孤立者也可投递／隐藏追溯丢失）被拦下。
 > **未做**：共用入口的真实多实例离线闭环与重启证据、tarball 包验收（``COMM-01-03`` 仍 pending，不主张通过）。
+
+> **R112（2026-10-20）`obs perf-rotate --prune-backups` 补**真实 CLI 进程**用例**：R108 只有进程内测试，
+> 而 R73 的教训是"接线看起来接上了、argv 层可能没生效"。新增 ⑧：①不带开关 ⇒ `backupPrune` 字段**不存在**（默认不清理）
+> ②`--prune-backups --budget-bytes 5abc` ⇒ **exit 1**（参数校验先生效）③`--apply --prune-backups` ⇒ exit 0 且
+> `backupPrune.kind` 为 `no-action`／`pruned`。实测 8/8 通过（真跑 `dist/cli.js`）。
