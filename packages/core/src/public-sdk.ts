@@ -1016,6 +1016,18 @@ export {
   type FoldPackageRollbackDecision,
 } from "./orchestration/workflow-fold-lifecycle.js";
 /**
+ * 折叠包内部逐步授权（2026-10-20 R106）：不越权、不可逆动作步步确认、未知能力拒绝。
+ */
+export {
+  FOLD_IRREVERSIBLE_CAPABILITIES,
+  FOLD_KNOWN_CAPABILITIES,
+  evaluateFoldPackageAuthorization,
+  type FoldCapability,
+  type FoldPackageAuthorizationReport,
+  type FoldPackageStep,
+  type FoldStepAuthorizationDecision,
+} from "./orchestration/workflow-fold-internal-authorization.js";
+/**
  * EXP-01 / EXPLORE-01-02（2026-10-19）：有界试验执行、隔离、去重与可复现记录。
  *
  * 纯判定：不启动试验、不建目录、不调模型、不写盘。
