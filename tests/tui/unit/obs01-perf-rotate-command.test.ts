@@ -119,4 +119,30 @@ describe("obs perf rotate", () => {
     const perfEntries = await fs.readdir(path.join(stateDirectory, "perf"));
     expect(perfEntries.filter((entry) => entry.startsWith("process-samples.backup-"))).toHaveLength(0);
   });
+
+  it("④ 严格整数：5abc/1e5/10.5 必须拒绝（parseInt 宽容截断会裁光历史）", async () => {
+    await seedExpiredSample();
+    const beforeText = await readProcessSamplesFileText(stateDirectory);
+
+    for (const rawValue of ["5abc", "1e5", "10.5", "-7", "0"]) {
+      const exitCode = await executeObsPerfRotateCommand({
+        stateDirectory,
+        isApply: true,
+        isJsonOutput: true,
+        nowIso: "2026-10-19T00:00:00.000Z",
+        budgetBytesRaw: rawValue,
+      });
+      expect(exitCode, rawValue).toBe(1);
+      expect(await readProcessSamplesFileText(stateDirectory)).toBe(beforeText);
+    }
+
+    // 合法值（含前后空白）仍应被接受
+    const okExitCode = await executeObsPerfRotateCommand({
+      stateDirectory,
+      isJsonOutput: true,
+      nowIso: "2026-10-19T00:00:00.000Z",
+      budgetBytesRaw: " 12 ",
+    });
+    expect(okExitCode).toBe(0);
+  });
 });

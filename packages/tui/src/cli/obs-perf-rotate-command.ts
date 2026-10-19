@@ -20,7 +20,10 @@ export interface ObsPerfRotateCommandInput {
   readonly isApply?: boolean;
   readonly nowIso?: string;
   readonly budgetBytes?: number;
+  /** 原始字符串（优先）：用于**严格**整数校验，避免 parseInt 宽容截断（"5abc" ⇒ 5）。 */
+  readonly budgetBytesRaw?: string;
   readonly retentionHours?: number;
+  readonly retentionHoursRaw?: string;
   readonly isJsonOutput: boolean;
 }
 
@@ -34,13 +37,26 @@ export async function executeObsPerfRotateCommand(
    * 事故模型：`NaN` 预算会让"字节数 ≤ 预算"恒为 false ⇒ **全部样本被判超预算**，
    * 用户只是敲错一个参数，结果历史被裁掉。宁可少做，不可误删。
    */
-  for (const [flagName, value] of [
-    ["--budget-bytes", input.budgetBytes],
-    ["--retention-hours", input.retentionHours],
+  /**
+   * **严格整数校验（R83）**：`parseInt` 会把 `"5abc"` 截成 `5`、`"1e5"` 截成 `1`、
+   * `"10.5"` 截成 `10` —— 一个手滑的字符就能让预算变成 5 字节，进而**裁光历史**。
+   * 因此只要拿到原始字符串，就必须是**纯数字**。
+   */
+  for (const [flagName, rawValue, numericValue] of [
+    ["--budget-bytes", input.budgetBytesRaw, input.budgetBytes],
+    ["--retention-hours", input.retentionHoursRaw, input.retentionHours],
   ] as const) {
-    if (value === undefined) continue;
-    if (!Number.isFinite(value) || value <= 0) {
-      logToStderr(`${flagName} 必须是正的有限数（收到 ${String(value)}）；未修改任何文件。`);
+    if (rawValue !== undefined) {
+      const trimmedValue = rawValue.trim();
+      if (!/^\d+$/.test(trimmedValue) || Number.parseInt(trimmedValue, 10) < 1) {
+        logToStderr(`${flagName} 必须是纯数字的正整数（收到 ${JSON.stringify(rawValue)}）；未修改任何文件。`);
+        return EXIT_CODES.FAILURE;
+      }
+      continue;
+    }
+    if (numericValue === undefined) continue;
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      logToStderr(`${flagName} 必须是正的有限数（收到 ${String(numericValue)}）；未修改任何文件。`);
       return EXIT_CODES.FAILURE;
     }
   }

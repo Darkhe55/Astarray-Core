@@ -772,12 +772,10 @@ obsCommand
       process.exitCode = await executeObsPerfRotateCommand({
         stateDirectory: defaultStateDirectory(),
         isApply: options.apply === true,
-        ...(options.budgetBytes === undefined
-          ? {}
-          : { budgetBytes: Number.parseInt(options.budgetBytes, 10) }),
+        ...(options.budgetBytes === undefined ? {} : { budgetBytesRaw: options.budgetBytes }),
         ...(options.retentionHours === undefined
           ? {}
-          : { retentionHours: Number.parseInt(options.retentionHours, 10) }),
+          : { retentionHoursRaw: options.retentionHours }),
         isJsonOutput: options.json === true,
       });
     },

@@ -25,7 +25,9 @@ describe("CLI 数字参数边界校验", () => {
 
   it("② obs perf-rotate：预算/保留时长必须校验（正的有限数）", async () => {
     const rotateText = await readSource("packages/tui/src/cli/obs-perf-rotate-command.ts");
-    expect(rotateText).toContain("if (!Number.isFinite(value) || value <= 0) {");
+    // R83 起分两段：原始字符串走严格 ^\d+$；数值输入走有限性校验
+    expect(rotateText).toContain("if (!/^\\d+$/.test(trimmedValue) || Number.parseInt(trimmedValue, 10) < 1) {");
+    expect(rotateText).toContain("if (!Number.isFinite(numericValue) || numericValue <= 0) {");
   });
 
   it("③ run：--timeout-seconds / --provider-request-timeout-seconds 必须是 ≥1 的整数秒", async () => {
@@ -57,3 +59,4 @@ describe("CLI 数字参数边界校验", () => {
     );
   });
 });
+
