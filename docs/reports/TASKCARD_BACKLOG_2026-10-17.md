@@ -1013,3 +1013,12 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > ②`ob`/`s perf-rotate --budget-bytes 4096 --json` ⇒ **exit 0**、`kind=preview`、`isApply=false`、`backupFilePath=null`（证明 argv 层接线生效、dry-run 不写盘）。
 > 动机：R73 的教训——接线"看起来接上了"但 argv 层可能没生效，只有跑真进程能证明。
 > 门禁：`typecheck` 0 / `lint` 0 / `test:coverage` **exit 0**（**3530 用例**、分支 **85.29%**）。
+
+> **R94（2026-10-20）`obs perf-rotate` 预览补上**保留窗口**：只说"会裁 N 条"不够 ——
+> 用户需要知道"**留下的是哪一段时间**"，否则无法判断数据够不够用。现在预览同时给出
+> `retainedWindow.{oldestRecordedAtIso,newestRecordedAtIso}`（JSON）与人可读行"保留窗口：… ~ …"；
+> **空窗口如实为 `null` 并显示"（无可用样本）"**，不伪装成有数据。
+> **1 条反例（⑦）+ 1 条变异体**（始终隐藏窗口）被拦下；`--check-anchors` **184/184**；
+> `test:coverage` **exit 0**（**3531 用例**、分支 **85.30%**）。
+> **说明**：本轮仍未动 `local-preservation-service.ts`（1440 行）/`instruction-merge-mapping.ts`（724 行）——
+> 在当前上下文预算下写"够格"的反例集会失控，选择先做**小而确定**的改进。
