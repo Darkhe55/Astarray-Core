@@ -10,7 +10,7 @@
  */
 
 /** 判据条数下限（少于此数视为验收脚本退化/未真正执行）。 */
-export const MINIMUM_CONTRACT_SDK_CHECK_COUNT = 20;
+export const MINIMUM_CONTRACT_SDK_CHECK_COUNT = 22;
 
 function readSection(observation, sectionName) {
   if (observation === null || typeof observation !== "object") return undefined;
@@ -197,6 +197,20 @@ export function buildContractSdkChecks(observation) {
     `kind=${String(readValue(observation, "foldCostBenefit", "thinSamplesKind"))}`,
   );
 
+  // ⑮ FOLDER-01-03：批准必须人工确认、未授权 fail-closed
+  record(
+    "folder 批准：非人工确认一律拒绝，人工确认后可登记",
+    readValue(observation, "folderApproval", "withoutHumanKind") === "rejected" &&
+      readValue(observation, "folderApproval", "withHumanKind") === "issued",
+    `withoutHuman=${String(readValue(observation, "folderApproval", "withoutHumanKind"))}, withHuman=${String(readValue(observation, "folderApproval", "withHumanKind"))}`,
+  );
+  record(
+    "folder 校验：未覆盖路径返回 denied（fail-closed）",
+    readValue(observation, "folderApproval", "deniedOutcome") === "denied" &&
+      typeof readValue(observation, "folderApproval", "deniedReasonCode") === "string",
+    `outcome=${String(readValue(observation, "folderApproval", "deniedOutcome"))}, reasonCode=${String(readValue(observation, "folderApproval", "deniedReasonCode"))}`,
+  );
+
   const passedCount = checks.filter((check) => check.passed).length;
   const isBelowMinimum = checks.length < MINIMUM_CONTRACT_SDK_CHECK_COUNT;
   const hasFailure = checks.some((check) => !check.passed);
@@ -210,3 +224,4 @@ export function buildContractSdkChecks(observation) {
       : `${String(passedCount)}/${String(checks.length)} 判据通过`,
   };
 }
+

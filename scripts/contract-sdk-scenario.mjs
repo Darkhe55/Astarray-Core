@@ -7,12 +7,13 @@
  *
  * 期望这些契约**全部**通过 `astarray` 的公开入口可用，且保持 fail-closed 语义。
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import {
   CrossProjectAuthorizationStore,
+  FolderGrantStore,
   buildCurationViewSnapshot,
   evaluateExploreVerification,
   evaluateFoldCostBenefit,
@@ -458,4 +459,68 @@ const observation = {};
   };
 }
 
+// ── ⑮ FOLDER-01-03：批准必须人工确认；未授权即 fail-closed ──────────
+{
+  const folderStateDirectory = mkdtempSync(path.join(os.tmpdir(), "astarray-folder-sdk-"));
+  try {
+    const store = new FolderGrantStore({ baseDirectory: folderStateDirectory });
+    // 文件夹授权是为"项目根**之外**"的路径签发的：所以把项目根与共享目录放成兄弟
+    const projectRootDirectory = path.join(folderStateDirectory, "project-root");
+    const grantedDirectory = path.join(folderStateDirectory, "shared-granted");
+    mkdirSync(projectRootDirectory, { recursive: true });
+    mkdirSync(grantedDirectory, { recursive: true });
+    const candidate = {
+      projectIdentifier: "project-a",
+      requestedPath: grantedDirectory,
+      permissionKind: "read-only",
+      includesSubdirectories: false,
+      durationKind: "session",
+      proposedBy: "user",
+      realPathVerification: null,
+    };
+    const registeredRoots = [
+      {
+        projectIdentifier: "project-a",
+        rootPath: projectRootDirectory,
+      },
+    ];
+    // ① 非人工确认的批准必须被拒（模型不能自行落库）
+    const withoutHuman = await store.issueGrant({
+      candidate,
+      registeredRoots,
+      grantIdentifier: "grant-agent-proposed",
+      projectRevision: 1,
+      issuedAtIso: "2026-10-19T00:00:00.000Z",
+      isHumanConfirmed: false,
+    });
+    // ② 人工确认后可登记
+    const withHuman = await store.issueGrant({
+      candidate,
+      registeredRoots,
+      grantIdentifier: "grant-human",
+      projectRevision: 1,
+      issuedAtIso: "2026-10-19T00:00:00.000Z",
+      isHumanConfirmed: true,
+    });
+    // ③ 未覆盖的路径必须被拒（fail-closed）
+    const denied = await store.evaluate({
+      projectIdentifier: "project-a",
+      targetPath: path.join(folderStateDirectory, "shared-not-granted", "file.txt"),
+      requiredPermission: "read-only",
+      projectRevision: 1,
+      nowIso: "2026-10-19T00:10:00.000Z",
+    });
+    observation.folderApproval = {
+      withoutHumanKind: withoutHuman.kind,
+      withHumanKind: withHuman.kind,
+      deniedOutcome: denied.outcome,
+      deniedReasonCode: typeof denied.reasonCode === "string" ? denied.reasonCode : null,
+    };
+  } finally {
+    rmSync(folderStateDirectory, { recursive: true, force: true });
+  }
+}
+
 process.stdout.write(`${JSON.stringify(observation)}\n`);
+
+
