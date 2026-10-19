@@ -1118,6 +1118,13 @@ export {
   type ProcessSampleRetentionPlan,
 } from "./orchestration/process-sample-retention.js";
 /**
+ * 进程样本保留**执行**（2026-10-19 R54）：先备份 → 原子重写；无需裁剪不动文件。
+ */
+export {
+  applyProcessSampleRetention,
+  type ProcessSampleRetentionApplyReport,
+} from "./orchestration/process-sample-retention-apply.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
