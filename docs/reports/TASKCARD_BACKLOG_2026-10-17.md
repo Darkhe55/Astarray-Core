@@ -1158,3 +1158,10 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 实测：`npm pack` sha256 `9f32db7f…` ⇒ `契约 SDK 包级验收：24/24 判据通过`；全量 **3575 用例**、typecheck/lint 0。
 > **过程事故（轻）**：判定文件没有 `return checks;`（结尾是对象字面量），我的第一版脚本按该锚点插入失败；改为在
 > `const passedCount` 前插入后成功，并用空观测跑了一次判定函数确认 **24 条且 fail-closed**（空观测 ⇒ accepted:false）。
+
+> **R100（2026-10-20，第 93 轮：第 100 个检查点的全量门禁）**：变异 **199/199 全部被拦下**（锚点 199/199）；
+> ``npm pack`` **267 文件** sha256 ``9f32db7f…``（先删旧产物再打包）；**六项 verify 全 exit 0**：
+> ``verify-package``（267 文件）/ ``verify:contract-sdk`` **24/24** / ``verify:relocation-batch`` **11/11** /
+> ``verify-sdk-consumer`` / tarball 双进程搬迁回溯 / 私有库 ``verify:package`` **7/7**。
+> ``test:coverage`` **exit 0** —— **3575 用例**、stmts **92.10** / branches **85.36** / funcs **93.38** / lines **92.21**。
+> **说明**：包内文件从 263 → **267**（本批新增 4 个判定模块进入产物）；判定条数 17 → **24**。
