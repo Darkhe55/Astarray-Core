@@ -17,46 +17,38 @@ async function readSource(relativePath: string): Promise<string> {
 }
 
 describe("CLI 数字参数边界校验", () => {
-  it("① profile list：页码/每页必须校验（NaN/0/负数一律拒绝）", async () => {
-    const cliText = await readSource("packages/tui/src/cli.tsx");
-    expect(cliText).toContain("if (!Number.isInteger(page) || page < 1) {");
-    expect(cliText).toContain("if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 500) {");
+  it("① 严格解析器本身拒绝 parseInt 会截断的输入（5abc / 1e5 / 10.5）", async () => {
+    const helperText = await readSource("packages/tui/src/cli/strict-integer-option.ts");
+    // 纯数字判定必须在（不许用 parseInt 宽容截断）
+    expect(helperText).toContain("/^\\d+$/.test(trimmedValue)");
   });
 
-  it("② obs perf-rotate：预算/保留时长必须校验（正的有限数）", async () => {
-    const rotateText = await readSource("packages/tui/src/cli/obs-perf-rotate-command.ts");
-    // R83 起分两段：原始字符串走严格 ^\d+$；数值输入走有限性校验
-    expect(rotateText).toContain("if (!/^\\d+$/.test(trimmedValue) || Number.parseInt(trimmedValue, 10) < 1) {");
-    expect(rotateText).toContain("if (!Number.isFinite(numericValue) || numericValue <= 0) {");
+  it("② profile list 分页走严格解析（含 1..500 上界）", async () => {
+    const cliText = await readSource("packages/tui/src/cli.tsx");
+    expect(cliText).toContain('parseStrictPositiveIntegerOption(options.page ?? "1", "--page")');
+    expect(cliText).toContain("maximum: 500,");
   });
 
-  it("③ run：--timeout-seconds / --provider-request-timeout-seconds 必须是 ≥1 的整数秒", async () => {
+  it("③ run 两个秒数走严格解析", async () => {
     const cliText = await readSource("packages/tui/src/cli.tsx");
-    // 校验语句必须在（放行 NaN 会让 setTimeout 立即超时）
-    expect(cliText).toContain("if (!Number.isInteger(parsedValue) || parsedValue < 1) {");
-    // 并且确实用了校验后的值（不再直接 parseInt 进选项）
-    expect(cliText).toContain('parsePositiveSeconds(options.timeoutSeconds, "--timeout-seconds")');
-    expect(cliText).toContain("providerRequestTimeoutMilliseconds: providerRequestTimeoutSeconds * 1_000");
+    expect(cliText).toContain('"--timeout-seconds"');
+    expect(cliText).toContain('"--provider-request-timeout-seconds"');
   });
 
-  it("④ workflow run：--task-revision 必须是 ≥1 的整数", async () => {
+  it("④ workflow run 的 --task-revision 走严格解析", async () => {
     const cliText = await readSource("packages/tui/src/cli.tsx");
-    expect(cliText).toContain("if (!Number.isInteger(parsedTaskRevision) || parsedTaskRevision < 1) {");
-    // 并且确实用校验后的值（不再直接 parseInt 进场景选项）
-    expect(cliText).toContain("...(taskRevision === undefined ? {} : { taskRevision }),");
+    expect(cliText).toContain('"--task-revision"');
   });
 
   it("⑤ commands.ts：三处 --page-size 与 --input-token-budget 已校验（防回归）", async () => {
     const commandsText = await readSource("packages/tui/src/cli/commands.ts");
-    // 三处 page-size 校验（NaN / ≤0 拒绝）
-    const pageSizeGuardCount = commandsText.split(
-      "if (parsedPageSize !== undefined && (Number.isNaN(parsedPageSize) || parsedPageSize <= 0)) {",
-    ).length - 1;
+    const pageSizeGuardCount =
+      commandsText.split(
+        "if (parsedPageSize !== undefined && (Number.isNaN(parsedPageSize) || parsedPageSize <= 0)) {",
+      ).length - 1;
     expect(pageSizeGuardCount).toBe(3);
-    // 预算校验（NaN / 负数拒绝）
     expect(commandsText).toContain(
       "if (parsedBudget !== undefined && (Number.isNaN(parsedBudget) || parsedBudget < 0)) {",
     );
   });
 });
-

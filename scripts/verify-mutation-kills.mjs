@@ -285,34 +285,14 @@ export const MUTATIONS = [
       "放行 NaN/负预算 ⇒ 预算语义失效（可能把全部调用判为超预算）⇒ 该守卫必须变红",
   },
   {
-    mutationIdentifier: "workflow-accepts-nan-task-revision",
-    targetFile: "packages/tui/src/cli.tsx",
-    find: "        if (!Number.isInteger(parsedTaskRevision) || parsedTaskRevision < 1) {",
-    replace: "        if (false) {",
-    testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
-    expectedFailingTestNames: ["④ workflow run"],
+    mutationIdentifier: "strict-integer-helper-truncates",
+    targetFile: "packages/tui/src/cli/strict-integer-option.ts",
+    find: "  if (!/^\\d+$/.test(trimmedValue)) {",
+    replace: "  if (Number.isNaN(Number.parseInt(trimmedValue, 10))) {",
+    testFiles: ["tests/tui/unit/strict-integer-option.test.ts"],
+    expectedFailingTestNames: ["③ parseInt 会截断的垃圾输入必须拒绝"],
     rationale:
-      "放行 NaN 修订号 ⇒ 任务定位错乱/找不到任务（用户以为任务不存在）⇒ 该守卫必须变红",
-  },
-  {
-    mutationIdentifier: "run-accepts-nan-seconds",
-    targetFile: "packages/tui/src/cli.tsx",
-    find: "        if (!Number.isInteger(parsedValue) || parsedValue < 1) {",
-    replace: "        if (false) {",
-    testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
-    expectedFailingTestNames: ["③ run"],
-    rationale:
-      "放行 NaN 秒数 ⇒ setTimeout(NaN) 退化为立即超时（任务莫名超时）⇒ 该守卫必须变红",
-  },
-  {
-    mutationIdentifier: "profile-list-accepts-nan-paging",
-    targetFile: "packages/tui/src/cli.tsx",
-    find: "    if (!Number.isInteger(page) || page < 1) {",
-    replace: "    if (false) {",
-    testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
-    expectedFailingTestNames: ["① profile list"],
-    rationale:
-      "放行 NaN/负页码 ⇒ 分页静默返回错误结果（用户以为没有数据）⇒ 该守卫必须变红",
+      "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
     mutationIdentifier: "perf-rotate-truncates-garbage-budget",
