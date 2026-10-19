@@ -79,10 +79,19 @@ export async function executeObsPerfRotateCommand(
 
   if (!isApply) {
     // **dry-run：绝不改盘**（连备份都不写）
+    /**
+     * **保留窗口**（R94）：只说"裁掉几条"不够 —— 用户需要知道"**留下的是哪一段时间**"，
+     * 否则无法判断这份数据够不够用。空窗口如实显示为 "（无）"，不伪装成有数据。
+     */
+    const retainedWindow =
+      plan.retainedOldestAtIso === null || plan.retainedNewestAtIso === null
+        ? null
+        : { oldestRecordedAtIso: plan.retainedOldestAtIso, newestRecordedAtIso: plan.retainedNewestAtIso };
     const payload = {
       kind: "preview" as const,
       isApply: false,
       plan,
+      retainedWindow,
       discardedLineCount: report.discardedLineCount,
       backupFilePath: null,
       notice: "这是预览：未修改任何文件。确认后加 --apply 执行（会先备份再原子重写）。",
@@ -95,6 +104,9 @@ export async function executeObsPerfRotateCommand(
           `保留策略预览（${nowIso}）`,
           `样本数：${String(candidates.length)}；丢弃行：${String(report.discardedLineCount)}`,
           `判定：${plan.kind} —— ${plan.reason}`,
+          retainedWindow === null
+            ? "保留窗口：（无可用样本）"
+            : `保留窗口：${retainedWindow.oldestRecordedAtIso} ~ ${retainedWindow.newestRecordedAtIso}`,
           "未修改任何文件；加 --apply 才会执行。",
           "",
         ].join("\n"),

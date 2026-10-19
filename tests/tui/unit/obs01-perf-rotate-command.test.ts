@@ -203,4 +203,50 @@ describe("obs perf rotate", () => {
     expect(await readProcessSamplesFileText(stateDirectory)).toBe(beforeText);
     expect(stdoutText).toContain("已执行保留策略");
   });
+
+  it("⑦ 预览必须给出**保留窗口**（留下的是哪段时间），空窗口明确写（无）", async () => {
+    await seedExpiredSample();
+    const previewExitCode = await executeObsPerfRotateCommand({
+      stateDirectory,
+      isJsonOutput: true,
+      nowIso: "2026-10-19T00:00:00.000Z",
+    });
+    expect(previewExitCode).toBe(0);
+    const previewPayload = JSON.parse(stdoutText) as {
+      retainedWindow: { oldestRecordedAtIso: string; newestRecordedAtIso: string } | null;
+    };
+    // 唯一那条样本已过期 ⇒ 窗口为空（null），不得伪造成有数据
+    expect(previewPayload.retainedWindow).toBeNull();
+
+    // 有新鲜样本时窗口应给出具体时间段
+    const store = new ProcessSampleStore({ baseDirectory: stateDirectory });
+    await store.append({
+      observeEventVersion: 1,
+      eventType: "process",
+      recordedAtIso: "2026-10-18T23:00:00.000Z",
+      processIdentifier: 1,
+      agentInstanceIdentifier: "agent-1",
+      fields: { residentMemoryBytes: 64 },
+      droppedSampleCount: 0,
+    });
+    stdoutText = "";
+    await executeObsPerfRotateCommand({
+      stateDirectory,
+      isJsonOutput: true,
+      nowIso: "2026-10-19T00:00:00.000Z",
+    });
+    const withFresh = JSON.parse(stdoutText) as {
+      retainedWindow: { oldestRecordedAtIso: string; newestRecordedAtIso: string } | null;
+    };
+    expect(withFresh.retainedWindow?.newestRecordedAtIso).toBe("2026-10-18T23:00:00.000Z");
+
+    // 人类可读输出同样给出窗口（空窗口写（无））
+    stdoutText = "";
+    await executeObsPerfRotateCommand({
+      stateDirectory,
+      isJsonOutput: false,
+      nowIso: "2026-10-19T00:00:00.000Z",
+    });
+    expect(stdoutText).toContain("保留窗口");
+  });
 });
