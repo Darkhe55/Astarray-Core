@@ -838,3 +838,9 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **R70（2026-10-19，第 70 轮全量门禁）**：变异 **172/172 全部被拦下**；`npm pack` **263 文件**
 > sha256 `0ed7a994…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
 > `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+
+
+> **R71 阻塞登记（RELOCATE 真实样例）**：用户 2026-10-19 澄清 —— ``project-location/`` 与
+> ``run-history/`` 的实物**当前无法提供**，因为**项目还不能完整运行**，生成内容不可能来自真实操作。
+> ⇒ 该证据项属于**产品能力阻塞**（缺产品端到端运行，不是缺用户文件、也不是缺代码）。
+> 解除条件：产品可完整运行后，用一次真实运行产出这两类数据，再跑同一套批量对账判定即可。
