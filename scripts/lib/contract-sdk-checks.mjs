@@ -10,7 +10,7 @@
  */
 
 /** 判据条数下限（少于此数视为验收脚本退化/未真正执行）。 */
-export const MINIMUM_CONTRACT_SDK_CHECK_COUNT = 16;
+export const MINIMUM_CONTRACT_SDK_CHECK_COUNT = 20;
 
 function readSection(observation, sectionName) {
   if (observation === null || typeof observation !== "object") return undefined;
@@ -142,6 +142,59 @@ export function buildContractSdkChecks(observation) {
     "history 证据锚点格式 run-history:<mission>#<seq>",
     readValue(observation, "history", "evidenceAnchor") === "run-history:mission-1#7",
     `anchor=${String(readValue(observation, "history", "evidenceAnchor"))}`,
+  );
+
+  // ⑪ EXPLORE-01-03：一次成功不算稳定；候选不自动合并
+  record(
+    "explore 验证：单次成功判为证据不足",
+    readValue(observation, "exploreVerification", "singleSuccessKind") === "insufficient-evidence",
+    `singleSuccessKind=${String(readValue(observation, "exploreVerification", "singleSuccessKind"))}`,
+  );
+  record(
+    "explore 验证：候选不自动合并、阴性结果计数",
+    readValue(observation, "exploreVerification", "sufficientKind") === "verified-candidate" &&
+      readValue(observation, "exploreVerification", "sufficientIsAutoMerged") === false &&
+      readValue(observation, "exploreVerification", "sufficientNegativeCount") === 1,
+    `kind=${String(readValue(observation, "exploreVerification", "sufficientKind"))}, autoMerged=${String(readValue(observation, "exploreVerification", "sufficientIsAutoMerged"))}`,
+  );
+
+  // ⑫ CURATE-01-03：无来源不展示、跨个体过滤、视图不删原文
+  record(
+    "curate 视图：无来源条目被隐藏且计数",
+    readValue(observation, "curateView", "visibleCount") === 1 &&
+      readValue(observation, "curateView", "unsourcedCount") === 1 &&
+      readValue(observation, "curateView", "filteredCount") === 1,
+    `visible=${String(readValue(observation, "curateView", "visibleCount"))}, unsourced=${String(readValue(observation, "curateView", "unsourcedCount"))}, filtered=${String(readValue(observation, "curateView", "filteredCount"))}`,
+  );
+  record(
+    "curate 视图：不删除原文且保留推断标注",
+    readValue(observation, "curateView", "isOriginalHistoryDeleted") === false &&
+      readValue(observation, "curateView", "inferenceFlagged") === true,
+    `deleted=${String(readValue(observation, "curateView", "isOriginalHistoryDeleted"))}, inference=${String(readValue(observation, "curateView", "inferenceFlagged"))}`,
+  );
+
+  // ⑬ FOLD-01-03：不可逆逐步确认、越权拒绝
+  record(
+    "fold 内部授权：不可逆能力必须逐步确认",
+    readValue(observation, "foldAuthorization", "irreversibleKind") === "ask-step" &&
+      readValue(observation, "foldAuthorization", "irreversibleFlag") === true &&
+      readValue(observation, "foldAuthorization", "isIrreversibleGrantPersistent") === false,
+    `kind=${String(readValue(observation, "foldAuthorization", "irreversibleKind"))}, flag=${String(readValue(observation, "foldAuthorization", "irreversibleFlag"))}`,
+  );
+  record(
+    "fold 内部授权：越出登记范围即拒绝并阻塞整包",
+    readValue(observation, "foldAuthorization", "outsideScopeKind") === "deny" &&
+      readValue(observation, "foldAuthorization", "outsideScopeReasonCode") === "outside-declared-scope" &&
+      readValue(observation, "foldAuthorization", "isBlocked") === true,
+    `kind=${String(readValue(observation, "foldAuthorization", "outsideScopeKind"))}, blocked=${String(readValue(observation, "foldAuthorization", "isBlocked"))}`,
+  );
+
+  // ⑭ FOLD 成本收益：样本不足不下结论
+  record(
+    "fold 成本收益：单次样本判为证据不足且不自动推广",
+    readValue(observation, "foldCostBenefit", "thinSamplesKind") === "insufficient-evidence" &&
+      readValue(observation, "foldCostBenefit", "thinIsAutoPromoted") === false,
+    `kind=${String(readValue(observation, "foldCostBenefit", "thinSamplesKind"))}`,
   );
 
   const passedCount = checks.filter((check) => check.passed).length;
