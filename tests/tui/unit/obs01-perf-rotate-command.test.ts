@@ -145,4 +145,62 @@ describe("obs perf rotate", () => {
     });
     expect(okExitCode).toBe(0);
   });
+
+  it("⑤ 人类可读输出：预览与应用各走非 JSON 分支，且 missing 文件读取返回 null", async () => {
+    await seedExpiredSample();
+    // 预览（非 JSON）
+    const previewExitCode = await executeObsPerfRotateCommand({
+      stateDirectory,
+      isJsonOutput: false,
+      nowIso: "2026-10-19T00:00:00.000Z",
+    });
+    expect(previewExitCode).toBe(0);
+    expect(stdoutText).toContain("未修改任何文件");
+
+    // 应用（非 JSON）
+    const applyExitCode = await executeObsPerfRotateCommand({
+      stateDirectory,
+      isApply: true,
+      isJsonOutput: false,
+      nowIso: "2026-10-19T00:00:00.000Z",
+    });
+    expect(applyExitCode).toBe(0);
+    expect(stdoutText).toContain("已执行保留策略");
+
+    // 无样本时 apply ⇒ no-action（仍 exit 0，不误报失败）
+    const noActionExitCode = await executeObsPerfRotateCommand({
+      stateDirectory,
+      isApply: true,
+      isJsonOutput: true,
+      nowIso: "2026-10-19T00:00:00.000Z",
+    });
+    expect(noActionExitCode).toBe(0);
+
+    // 不存在的目录 ⇒ 读取返回 null（不抛错）
+    expect(await readProcessSamplesFileText(path.join(stateDirectory, "nope"))).toBeNull();
+  });
+
+  it("⑥ 备份失败 ⇒ abandoned：文件保持原样且 exit 1（不静默丢历史）", async () => {
+    await seedExpiredSample();
+    const beforeText = await readProcessSamplesFileText(stateDirectory);
+    // 在备份路径上放一个**目录**，使备份写入必然失败（确定性、不依赖权限）
+    const backupPath = path.join(
+      stateDirectory,
+      "perf",
+      "process-samples.backup-2026-10-19T00-00-00.000Z.jsonl",
+    );
+    await fs.mkdir(backupPath, { recursive: true });
+
+    const exitCode = await executeObsPerfRotateCommand({
+      stateDirectory,
+      isApply: true,
+      isJsonOutput: false,
+      nowIso: "2026-10-19T00:00:00.000Z",
+    });
+
+    expect(exitCode).toBe(1);
+    // 原文一字未改（放弃整理而不是半途裁剪）
+    expect(await readProcessSamplesFileText(stateDirectory)).toBe(beforeText);
+    expect(stdoutText).toContain("已执行保留策略");
+  });
 });
