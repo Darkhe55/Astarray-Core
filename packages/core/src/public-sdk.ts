@@ -1125,6 +1125,15 @@ export {
   type ProcessSampleRetentionApplyReport,
 } from "./orchestration/process-sample-retention-apply.js";
 /**
+ * 备份清理判定（2026-10-20 R102）：只判定不删盘；永远保留最新一份，不认识的文件名不删。
+ */
+export {
+  PROCESS_SAMPLE_BACKUP_FILE_PREFIX,
+  parseBackupFileRecordedAtIso,
+  planProcessSampleBackupRetention,
+  type BackupRetentionPlan,
+} from "./orchestration/process-sample-backup-retention.js";
+/**
  * OBS 采样调度器（2026-10-19 R56）：显式开启才排定时器、幂等 start/stop、间隔下限 5s。
  */
 export {

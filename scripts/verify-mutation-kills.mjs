@@ -305,6 +305,26 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "backup-retention-deletes-newest",
+    targetFile: "packages/core/src/orchestration/process-sample-backup-retention.ts",
+    find: "    const isNewest = index === 0;",
+    replace: "    const isNewest = false;",
+    testFiles: ["tests/core/unit/obs01-backup-retention.test.ts"],
+    expectedFailingTestNames: ["⑥ 最新一份即使超出条数"],
+    rationale:
+      "最新一份也可能被删 ⇒ 出事时无备份可用（把安全网删掉）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "backup-retention-deletes-unparsable",
+    targetFile: "packages/core/src/orchestration/process-sample-backup-retention.ts",
+    find: "    if (recordedAtIso === null) {\n      unknown.push(fileName);\n      continue;\n    }",
+    replace: "    if (recordedAtIso === null) {\n      continue;\n    }",
+    testFiles: ["tests/core/unit/obs01-backup-retention.test.ts"],
+    expectedFailingTestNames: ["④ 不认识的文件名"],
+    rationale:
+      "不认识的文件名被静默丢弃/删除 ⇒ 用户手工备份被抹掉且无计数 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "gitignore-drops-local-state",
     targetFile: ".gitignore",
     find: ".astarray/",
@@ -3075,6 +3095,7 @@ function main() {
 }
 
 main();
+
 
 
 
