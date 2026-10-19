@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "retention-apply-skips-backup",
+    targetFile: "packages/core/src/orchestration/process-sample-retention-apply.ts",
+    find: "    await copyFileWithBackup(filePath, backupFilePath);",
+    replace: "    void copyFileWithBackup;",
+    testFiles: ["tests/core/unit/obs01-process-sample-retention-apply.test.ts"],
+    expectedFailingTestNames: ["② 过期样本被裁剪"],
+    rationale:
+      "裁剪前不备份 ⇒ 违反「清理遵循自动备份」（删历史无法回滚）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "retention-apply-keeps-oldest",
+    targetFile: "packages/core/src/orchestration/process-sample-retention-apply.ts",
+    find: "  for (let index = input.candidates.length - 1; index >= 0; index -= 1) {",
+    replace: "  for (let index = 0; index < input.candidates.length; index += 1) {",
+    testFiles: ["tests/core/unit/obs01-process-sample-retention-apply.test.ts"],
+    expectedFailingTestNames: ["③ 超预算"],
+    rationale:
+      "重写时保留最旧而非最新 ⇒ 与判定层的「新样本优先」不一致（数据自相矛盾）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "retention-drops-newest-first",
     targetFile: "packages/core/src/orchestration/process-sample-retention.ts",
     find: "  for (let index = withinRetentionWindow.length - 1; index >= 0; index -= 1) {",
@@ -2726,6 +2746,8 @@ function main() {
 }
 
 main();
+
+
 
 
 

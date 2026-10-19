@@ -190,3 +190,43 @@ export async function cleanStaleTempFiles(
       ),
   );
 }
+
+
+/**
+ * 文本原子写（2026-10-19 R54）：与 `writeAtomicJson` 同样的 temp→fsync→rename 纪律，
+ * 但**不做 JSON 序列化**（用于 JSONL 等逐行格式）。
+ *
+ * 为什么放在本模块：破坏性文件 API 必须集中在白名单模块并写明理由（架构守卫 T12-05）。
+ */
+export async function writeAtomicTextFile(filePath: string, text: string): Promise<void> {
+  const directoryPath = path.dirname(filePath);
+  await fs.mkdir(directoryPath, { recursive: true });
+  const tempFilePath = path.join(
+    directoryPath,
+    `.${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  const fileHandle = await fs.open(tempFilePath, "w");
+  try {
+    await fileHandle.writeFile(text, "utf8");
+    await fileHandle.sync();
+  } finally {
+    await fileHandle.close();
+  }
+  try {
+    await fs.rename(tempFilePath, filePath);
+  } catch (error) {
+    await fs.rm(tempFilePath, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
+/**
+ * 备份到**指定路径**（2026-10-19 R54）：用于"清理前必须先备份"的保留策略。
+ *
+ * 与 `backupExistingFile` 的区别：后者固定生成 `.bak` 路径；这里允许调用方给出带时间戳的路径。
+ */
+export async function copyFileWithBackup(sourceFilePath: string, backupFilePath: string): Promise<void> {
+  await fs.mkdir(path.dirname(backupFilePath), { recursive: true });
+  const sourceText = await fs.readFile(sourceFilePath, "utf8");
+  await writeAtomicTextFile(backupFilePath, sourceText);
+}
