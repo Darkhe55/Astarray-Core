@@ -1148,6 +1148,18 @@ export {
   type ProcessSampleFieldStatistics,
 } from "./orchestration/process-sample-aggregate.js";
 /**
+ * DIAG 证据包契约（2026-10-19 R61）：用户主动、不自动联网、窗口/版本/平台/脱敏说明齐备、
+ * 不含原始参数或凭据、只允许白名单章节。
+ */
+export {
+  DIAGNOSTIC_EVIDENCE_PACK_SECTIONS,
+  buildDiagnosticEvidencePackManifest,
+  evaluateDiagnosticEvidencePackExport,
+  type DiagnosticEvidencePackExportDecision,
+  type DiagnosticEvidencePackManifest,
+  type DiagnosticEvidencePackSection,
+} from "./orchestration/diagnostic-evidence-pack-contract.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
