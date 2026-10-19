@@ -1607,7 +1607,10 @@ export async function executeDoctorErrorsCommand(
   }
   const parsedPageSize =
     options.pageSize === undefined ? undefined : Number.parseInt(options.pageSize, 10);
-  if (parsedPageSize !== undefined && (Number.isNaN(parsedPageSize) || parsedPageSize <= 0)) {
+  if (
+    parsedPageSize !== undefined &&
+    (!/^\d+$/.test(String(options.pageSize ?? "").trim()) || parsedPageSize < 1)
+  ) {
     logToStderr("--page-size 必须是正整数（收到: " + String(options.pageSize) + "）");
     return EXIT_CODES.USAGE_ERROR;
   }
@@ -1759,7 +1762,10 @@ export async function executeUsageOverviewCommand(
   }
   const parsedPageSize =
     options.pageSize === undefined ? undefined : Number.parseInt(options.pageSize, 10);
-  if (parsedPageSize !== undefined && (Number.isNaN(parsedPageSize) || parsedPageSize <= 0)) {
+  if (
+    parsedPageSize !== undefined &&
+    (!/^\d+$/.test(String(options.pageSize ?? "").trim()) || parsedPageSize < 1)
+  ) {
     logToStderr("--page-size 必须是正整数（收到: " + String(options.pageSize) + "）");
     return EXIT_CODES.USAGE_ERROR;
   }
@@ -1767,7 +1773,10 @@ export async function executeUsageOverviewCommand(
     options.inputTokenBudget === undefined
       ? undefined
       : Number.parseInt(options.inputTokenBudget, 10);
-  if (parsedBudget !== undefined && (Number.isNaN(parsedBudget) || parsedBudget < 0)) {
+  if (
+    parsedBudget !== undefined &&
+    (!/^\d+$/.test(String(options.inputTokenBudget ?? "").trim()) || parsedBudget < 0)
+  ) {
     logToStderr(
       "--input-token-budget 必须是非负整数（收到: " + String(options.inputTokenBudget) + "）",
     );
@@ -1895,7 +1904,10 @@ export async function executePerfOverviewCommand(
   }
   const parsedPageSize =
     options.pageSize === undefined ? undefined : Number.parseInt(options.pageSize, 10);
-  if (parsedPageSize !== undefined && (Number.isNaN(parsedPageSize) || parsedPageSize <= 0)) {
+  if (
+    parsedPageSize !== undefined &&
+    (!/^\d+$/.test(String(options.pageSize ?? "").trim()) || parsedPageSize < 1)
+  ) {
     logToStderr(`--page-size 必须是正整数（收到: ${String(options.pageSize)}）`);
     return EXIT_CODES.USAGE_ERROR;
   }
