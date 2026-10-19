@@ -40,6 +40,7 @@ import type {
   FolderGrantPermissionKind,
 } from "../../core/src/public-sdk.js";
 import { EXIT_CODES, logToStderr } from "./cli/json-output.js";
+import { parseStrictPositiveIntegerOption } from "./cli/strict-integer-option.js";
 import {
   executeCancelCommand,
   executeConfigContextBudgetCommand,
@@ -202,27 +203,32 @@ program
        * **秒数参数边界校验（R79）**：`parseInt("abc")` ⇒ NaN ⇒ `setTimeout(NaN)` 退化为立即超时，
        * 用户看到的是"任务莫名超时"。这里显式拒绝并指出参数名。
        */
-      const parsePositiveSeconds = (
-        rawValue: string | undefined,
-        flagName: string,
-      ): number | undefined | null => {
-        if (rawValue === undefined) return undefined;
-        const parsedValue = Number.parseInt(rawValue, 10);
-        if (!Number.isInteger(parsedValue) || parsedValue < 1) {
-          logToStderr(`${flagName} 必须是 ≥1 的整数秒（收到 ${String(rawValue)}）。`);
-          return null;
-        }
-        return parsedValue;
-      };
-      const timeoutSeconds = parsePositiveSeconds(options.timeoutSeconds, "--timeout-seconds");
-      const providerRequestTimeoutSeconds = parsePositiveSeconds(
+      const timeoutSecondsResult = parseStrictPositiveIntegerOption(
+        options.timeoutSeconds,
+        "--timeout-seconds",
+      );
+      const providerRequestTimeoutSecondsResult = parseStrictPositiveIntegerOption(
         options.providerRequestTimeoutSeconds,
         "--provider-request-timeout-seconds",
       );
-      if (timeoutSeconds === null || providerRequestTimeoutSeconds === null) {
+      if (
+        timeoutSecondsResult?.kind === "error" ||
+        providerRequestTimeoutSecondsResult?.kind === "error"
+      ) {
+        logToStderr(
+          timeoutSecondsResult?.kind === "error"
+            ? timeoutSecondsResult.message
+            : (providerRequestTimeoutSecondsResult as { message: string }).message,
+        );
         process.exitCode = EXIT_CODES.USAGE_ERROR;
         return;
       }
+      const timeoutSeconds =
+        timeoutSecondsResult?.kind === "ok" ? timeoutSecondsResult.value : undefined;
+      const providerRequestTimeoutSeconds =
+        providerRequestTimeoutSecondsResult?.kind === "ok"
+          ? providerRequestTimeoutSecondsResult.value
+          : undefined;
       process.exitCode = await executeRunCommand({
         prompt,
         mode: options.mode,
@@ -1681,18 +1687,20 @@ profileCommand
      * **分页参数边界校验（R78）**：NaN / 0 / 负数曾会静默传进分页，
      * 用户看到的是"空列表"而不是"参数写错了"。宁可报错，不可给出错误结果。
      */
-    const page = Number.parseInt(options.page ?? "1", 10);
-    const pageSize = Number.parseInt(options.pageSize ?? "50", 10);
-    if (!Number.isInteger(page) || page < 1) {
-      logToStderr(`--page 必须是 ≥1 的整数（收到 ${String(options.page)}）。`);
-      process.exitCode = EXIT_CODES.FAILURE;
+    const pageResult = parseStrictPositiveIntegerOption(options.page ?? "1", "--page");
+    const pageSizeResult = parseStrictPositiveIntegerOption(options.pageSize ?? "50", "--page-size", {
+      minimum: 1,
+      maximum: 500,
+    });
+    if (pageResult?.kind === "error" || pageSizeResult?.kind === "error") {
+      logToStderr(
+        pageResult?.kind === "error" ? pageResult.message : (pageSizeResult as { message: string }).message,
+      );
+      process.exitCode = EXIT_CODES.USAGE_ERROR;
       return;
     }
-    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 500) {
-      logToStderr(`--page-size 必须是 1..500 的整数（收到 ${String(options.pageSize)}）。`);
-      process.exitCode = EXIT_CODES.FAILURE;
-      return;
-    }
+    const page = pageResult?.kind === "ok" ? pageResult.value : 1;
+    const pageSize = pageSizeResult?.kind === "ok" ? pageSizeResult.value : 50;
     process.exitCode = await executeProfileListCommand({
       stateDirectory: defaultStateDirectory(),
       isJsonOutput: options.json === true,
@@ -1861,18 +1869,17 @@ workflowCommand
        * **任务修订号边界校验（R81）**：`--task-revision abc` ⇒ NaN ⇒ 任务定位错乱/找不到任务。
        * 修订号语义明确（≥1 的整数），在这里就拒绝。
        */
-      let taskRevision: number | undefined;
-      if (options.taskRevision !== undefined) {
-        const parsedTaskRevision = Number.parseInt(options.taskRevision, 10);
-        if (!Number.isInteger(parsedTaskRevision) || parsedTaskRevision < 1) {
-          logToStderr(
-            `--task-revision 必须是 ≥1 的整数（收到 ${String(options.taskRevision)}）。`,
-          );
-          process.exitCode = EXIT_CODES.USAGE_ERROR;
-          return;
-        }
-        taskRevision = parsedTaskRevision;
+      const taskRevisionResult = parseStrictPositiveIntegerOption(
+        options.taskRevision,
+        "--task-revision",
+      );
+      if (taskRevisionResult?.kind === "error") {
+        logToStderr(taskRevisionResult.message);
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
       }
+      const taskRevision =
+        taskRevisionResult?.kind === "ok" ? taskRevisionResult.value : undefined;
       process.exitCode = await executeWorkflowScenarioCommand({
         stateDirectory: defaultStateDirectory(),
         scenario: options.scenario,
