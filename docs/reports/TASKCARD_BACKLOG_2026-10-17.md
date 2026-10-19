@@ -1165,3 +1165,12 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > ``verify-sdk-consumer`` / tarball 双进程搬迁回溯 / 私有库 ``verify:package`` **7/7**。
 > ``test:coverage`` **exit 0** —— **3575 用例**、stmts **92.10** / branches **85.36** / funcs **93.38** / lines **92.21**。
 > **说明**：包内文件从 263 → **267**（本批新增 4 个判定模块进入产物）；判定条数 17 → **24**。
+
+> **R110（2026-10-20）`FOLDER-01-03` 补**包级验收**（该检查点此前"未跑 pack"）**：
+> 新增 **2 条判据**（下限 20 → **22**）：⑮①**批准必须人工确认**（`isHumanConfirmed:false` ⇒ `rejected`；人工确认 ⇒ `issued`）
+> ②**校验 fail-closed**（未被授权覆盖的路径 ⇒ `denied` 且给出 `reasonCode`）。实测 tarball `9f32db7f…` ⇒ **26/26 判据通过**。
+> **过程发现（三次才写对断言，都是我的判据/夹具错，不是产品错）**：
+> ①夹具把"待授权目录"放在**项目根之内** ⇒ 分类是 `inside-own-project`（文件夹授权是给项目根**之外**的路径签发的）⇒ 正确拒绝；
+> ②`issueGrant` 成功时返回的是 `issued` 而不是我猜的 `granted`；
+> ③`ProjectRootRegistration` 只有 `{projectIdentifier, rootPath}`，我多写了一个字段、`Candidate` 也缺 `proposedBy`/`durationKind`。
+> **结论**：这三次都是"**判定脚本对产品语义的假设错**"，产品行为一直是对的 —— 这类错误若不核对源码就会被误记为产品缺陷。
