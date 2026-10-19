@@ -230,3 +230,13 @@ export async function copyFileWithBackup(sourceFilePath: string, backupFilePath:
   const sourceText = await fs.readFile(sourceFilePath, "utf8");
   await writeAtomicTextFile(backupFilePath, sourceText);
 }
+
+/**
+ * 删除单个文件（不存在时静默成功）。
+ *
+ * 用途：**保留策略清理备份**（R108）。放在本模块是因为破坏性文件 API 必须集中（守卫 T12-05）；
+ * 调用方只传**计划内**的绝对路径，不在这里做任何"扫描/猜测"。
+ */
+export async function deleteFileIfExists(absoluteFilePath: string): Promise<void> {
+  await fs.rm(absoluteFilePath, { force: true });
+}
