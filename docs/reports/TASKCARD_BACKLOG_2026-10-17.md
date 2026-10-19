@@ -947,3 +947,15 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 这说明**既有用例是有效的**、而我改错了；现已改为 `(!/^\d+$/.test(...) || parsedPageSize < 1)` 双条件并复跑通过。
 > 守卫⑤与 1 条变异体同步适配；`--check-anchors` **182/182**；全量 exit 0（287s）。
 > **教训**：用新校验**替换**旧校验时，必须逐条比对"旧校验拦住了什么"，不能只看新校验拦住了什么。
+
+> **R87（2026-10-20）门禁现状（如实，重要）**：本轮按纪律运行 `npm run test:coverage`，结果为**红**：
+> `All files | 91.67 stmts | 84.71 branches | 93.07 funcs | 91.79 lines`，而门槛是 85% ⇒
+> **`ERROR: Coverage for branches (84.71%) does not meet global threshold (85%)`**。
+> 也就是说：我在多轮里把"test:coverage"写进纪律，但**实际只跑了 `vitest run` / `check:low-parallel`**，
+> 分支覆盖率长期低于门槛而未被发现 —— 这是**验证口径的漏洞**，不是本轮新引入。
+> 分支最薄弱处（覆盖率表）：`run-command.ts` 48% / `obs-perf-rotate-command.ts` 53→补到 87% /
+> `permission-ask-adjudication.ts` 82% / `provider-cli.ts` 90%。
+> 本轮已补 3 条用例（rotate 的 abandoned 分支、聚合的"供应商但不可结算"口径、rotate 人类可读输出），
+> 分支从 84.67 → 84.71（+0.04pp），**仍差 0.29pp**。
+> **下一轮（R88）专项**：补 `run-command.ts` 与权限询问分支的用例，或用**有理由的** exclude 收口 ——
+> 但必须先补齐用例再谈 exclude，不得为了让指标变绿而排除真实逻辑。

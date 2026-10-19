@@ -100,4 +100,27 @@ describe("USAGE 账目聚合", () => {
     expect(aggregate.billableTotalTokens).toBe(0);
     expect(aggregate.bySourceKind.provider.totalTokens).toBeNull();
   });
+
+  it("⑦ 供应商但不可结算 ⇒ 只计数不进合计；估算与缺失口径不串", () => {
+    const aggregate = aggregateUsageLedger({
+      entries: [
+        entry({ requestIdentifier: "r1", totalTokens: 100, isBillable: false }),
+        entry({ requestIdentifier: "r2", sourceKind: "local-estimate", isBillable: false, totalTokens: 7 }),
+        entry({
+          requestIdentifier: "r3",
+          sourceKind: "missing",
+          inputTokens: null,
+          outputTokens: null,
+          totalTokens: null,
+          isBillable: false,
+          missingReason: "provider 未返回 usage",
+        }),
+      ],
+    });
+    // provider 但不可结算 ⇒ 不计入可结算合计，也不计入估算
+    expect(aggregate.billableTotalTokens).toBe(0);
+    expect(aggregate.estimatedTotalTokens).toBe(7);
+    expect(aggregate.missingEntryCount).toBe(1);
+    expect(aggregate.bySourceKind.provider.totalTokens).toBe(100);
+  });
 });
