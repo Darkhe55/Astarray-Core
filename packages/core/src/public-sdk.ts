@@ -1030,6 +1030,14 @@ export {
   type TrialIsolationKind,
 } from "./orchestration/explore-trial-contract.js";
 /**
+ * EXPLORE-01-03 独立验证与候选回交（2026-10-20 R104）：一次成功不算稳定、不自动合并。
+ */
+export {
+  evaluateExploreVerification,
+  type ExploreVerificationDecision,
+  type ExploreVerificationTrialSummary,
+} from "./orchestration/explore-verification-contract.js";
+/**
  * EXP-01 / CURATE-01-02（2026-10-19）：周期增量执行、个体隔离、计划锁/预算/取消/恢复。
  *
  * 纯判定：不调度、不调模型、不写盘、不删原文。
