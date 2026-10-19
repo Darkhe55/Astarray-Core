@@ -935,3 +935,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **同步清理**：原 3 条针对旧代码行的变异体目标已不存在，按"单一收口点"原则删除（语义由 helper 变异体 +
 > 守卫断言覆盖）；`--check-anchors` **182/182**；全量 exit 0。
 > **教训**：重构要**同时**更新变异锚点，否则 `--check-anchors` 会立刻红（这次就是立刻发现的）。
+
+> **R85（2026-10-20，第 85 轮全量门禁）**：变异 **182/182 全部被拦下**；`npm pack` **263 文件**
+> sha256 `b5bae191…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
