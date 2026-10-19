@@ -76,6 +76,15 @@ export {
   type RelayedCollaborationOutcome,
   type RelayedCollaborationRequest,
 } from "./orchestration/collaboration-relay-via-parent.js";
+/**
+ * COMM-01-03 只读拓扑与投递状态（2026-10-20 R111）：无上级不猜、环比不投递、只读无正文。
+ */
+export {
+  buildCollaborationTopologyView,
+  type CollaborationAgentNode,
+  type CollaborationDeliveryRecord,
+  type CollaborationTopologyView,
+} from "./orchestration/collaboration-topology-view.js";
 // 2026-10-24（TOOLKIT-01-04）：工具**升级包**必须显式声明三模式默认权限规则与理由，
 // 且升级要**新增**新功能开关、**移除**消失功能的旧开关。
 export {
