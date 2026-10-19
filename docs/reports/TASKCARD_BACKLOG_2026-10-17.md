@@ -959,3 +959,14 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 分支从 84.67 → 84.71（+0.04pp），**仍差 0.29pp**。
 > **下一轮（R88）专项**：补 `run-command.ts` 与权限询问分支的用例，或用**有理由的** exclude 收口 ——
 > 但必须先补齐用例再谈 exclude，不得为了让指标变绿而排除真实逻辑。
+
+> **R88（2026-10-20）覆盖率门禁转绿：`queryMissionHistory` 从 0% 补到可用**。
+> 动机（R87 发现）：`npm run test:coverage` 的分支门槛长期未达（84.71% < 85%）。按"先补齐用例再谈 exclude"的原则，
+> 选了**缺失分支最多且完全未测**的模块 `packages/core/src/gui/mission-history-reader.ts`（71 个分支、0% 覆盖），
+> 补 **10 条反例**：①无 missions 目录 ⇒ 空页 ②缺失/坏 JSON/数组/null ⇒ `corrupted-needs-attention` 且**保留在列表**
+> ③`running` 但未经确认 ⇒ `interrupted-needs-reconciliation`（重启后不得显示在跑）④终态映射 done/cancelled/blocked ⇒ finished、
+> 未知 ⇒ unknown ⑤空白 `projectIdentifier` ⇒ null（不伪装成有值）⑥不安全目录名/普通文件不计入 ⑦分页上界收敛与越界空页
+> ⑧游标只接受列表内真实目录名（`../../etc` ⇒ 空页）⑨非法页码/页大小明确报错 ⑩三个"仅可证伪"端口**从不被调用**。
+> **结果**：`All files | 92.04 stmts | 85.17 branches | 93.35 funcs | 92.16 lines`，`test:coverage` **exit 0**（分支 84.71 → 85.17）。
+> 变异 **1 条**（把"磁盘 running"直接当运行中）被拦下；`--check-anchors` **183/183**。
+> **更正 R87 的措辞**：分支未达门槛**并非**"长期未发现"，而是**我在 R87 才第一次真跑** `test:coverage` —— 之前各轮只跑 `vitest run`。
