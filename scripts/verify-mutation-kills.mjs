@@ -315,9 +315,19 @@ export const MUTATIONS = [
       "放行 NaN/负页码 ⇒ 分页静默返回错误结果（用户以为没有数据）⇒ 该守卫必须变红",
   },
   {
+    mutationIdentifier: "perf-rotate-truncates-garbage-budget",
+    targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
+    find: "      if (!/^\\d+$/.test(trimmedValue) || Number.parseInt(trimmedValue, 10) < 1) {",
+    replace: "      if (Number.parseInt(trimmedValue, 10) < 1) {",
+    testFiles: ["tests/tui/unit/obs01-perf-rotate-command.test.ts"],
+    expectedFailingTestNames: ["④ 严格整数"],
+    rationale:
+      "只做 parseInt 截断校验 ⇒ \"5abc\" 被当成 5 字节预算，几乎裁光历史 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "perf-rotate-accepts-nan-budget",
     targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
-    find: "    if (!Number.isFinite(value) || value <= 0) {",
+    find: "    if (!Number.isFinite(numericValue) || numericValue <= 0) {",
     replace: "    if (false) {",
     testFiles: ["tests/tui/unit/obs01-perf-rotate-command.test.ts"],
     expectedFailingTestNames: ["③ 非法预算"],
