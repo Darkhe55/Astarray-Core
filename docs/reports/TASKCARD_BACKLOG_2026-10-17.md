@@ -970,3 +970,10 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **结果**：`All files | 92.04 stmts | 85.17 branches | 93.35 funcs | 92.16 lines`，`test:coverage` **exit 0**（分支 84.71 → 85.17）。
 > 变异 **1 条**（把"磁盘 running"直接当运行中）被拦下；`--check-anchors` **183/183**。
 > **更正 R87 的措辞**：分支未达门槛**并非**"长期未发现"，而是**我在 R87 才第一次真跑** `test:coverage` —— 之前各轮只跑 `vitest run`。
+
+> **R89（2026-10-20）覆盖率余量 +0.11pp**：补 `observability-command` 的**人类可读输出**分支
+> （`obs process` / `obs perf` / `obs diag` 的非 JSON 路径各一条断言，共 1 条用例覆盖 3 条 else 分支）。
+> `All files | 92.02 stmts | 85.28 branches | 93.29 funcs | 92.14 lines`，`test:coverage` **exit 0**；
+> 分支 85.17 → **85.28**（距门槛 +0.28pp 余量）。
+> **说明**：本轮只补"输出分支"这类**低风险高确定性**的覆盖，未触碰 `run-command.ts`（48% 分支，需要注入
+> provider/权限询问桩，风险与工作量都更高）；那是下一轮的目标。
