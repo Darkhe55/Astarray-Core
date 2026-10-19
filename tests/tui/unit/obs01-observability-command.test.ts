@@ -530,6 +530,44 @@ describe("OBS 只读查询入口", () => {
     expect(pack.body["redactionNotes"]).toBeUndefined();
     expect(written).not.toContain("\"findings\"");
   });
+
+  it("⑫ 人类可读输出分支：perf/process/diag 的非 JSON 输出都写 stdout", async () => {
+    const store = new ProcessSampleStore({ baseDirectory: stateDirectory });
+    await store.append({
+      observeEventVersion: 1,
+      eventType: "process",
+      recordedAtIso: "2026-10-19T02:00:00.000Z",
+      processIdentifier: 1,
+      agentInstanceIdentifier: "agent-1",
+      fields: { residentMemoryBytes: 4096 },
+      droppedSampleCount: 0,
+    });
+
+    stdoutText = "";
+    const processExitCode = await executeObsProcessCommand({
+      stateDirectory,
+      isJsonOutput: false,
+    });
+    expect(processExitCode).toBe(0);
+    expect(stdoutText.length).toBeGreaterThan(0);
+
+    stdoutText = "";
+    const perfExitCode = await executeObsPerfCommand({
+      stateDirectory,
+      isJsonOutput: false,
+      detailLevel: "summary",
+    });
+    expect(perfExitCode).toBe(0);
+    expect(stdoutText.length).toBeGreaterThan(0);
+
+    stdoutText = "";
+    const diagExitCode = await executeObsDiagCommand({
+      stateDirectory,
+      isJsonOutput: false,
+    });
+    expect(diagExitCode).toBe(0);
+    expect(stdoutText.length).toBeGreaterThan(0);
+  });
 });
 
 
