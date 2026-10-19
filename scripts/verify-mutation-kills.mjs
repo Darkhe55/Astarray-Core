@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "evidence-pack-body-leaks-message-text",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "    isInference: finding.isInference,",
+    replace: "    isInference: finding.isInference,\n    messageText: finding.redactedSampleText,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑩ obs diag export"],
+    rationale:
+      "把错误文本写进证据包 ⇒ 导出文件可能携带敏感内容（卡内：写入前最小化，不是事后遮盖）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "evidence-pack-body-ignores-window",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "        windowStartIso: input.windowStartIso,\n        windowEndIso: input.windowEndIso,",
+    replace: "        windowStartIso: null,\n        windowEndIso: null,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑩ obs diag export"],
+    rationale:
+      "正文忽略时间窗 ⇒ 证据包覆盖范围与声明不一致（用户以为只看最近一段）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "diag-export-writes-when-rejected",
     targetFile: "packages/tui/src/cli/observability-command.ts",
     find: "  if (decision.kind === \"rejected\") {",

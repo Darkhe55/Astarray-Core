@@ -336,6 +336,7 @@ describe("OBS 只读查询入口", () => {
   it("⑨ obs diag export：允许时写文件且未上传；缺窗口/未知章节时**不写文件**", async () => {
     const outputFilePath = path.join(stateDirectory, "evidence-pack.json");
     const exitCode = await executeObsDiagExportCommand({
+      stateDirectory,
       outputFilePath,
       windowStartIso: "2026-10-19T00:00:00.000Z",
       windowEndIso: "2026-10-19T12:00:00.000Z",
@@ -365,6 +366,7 @@ describe("OBS 只读查询入口", () => {
     const rejectedOutputPath = path.join(stateDirectory, "rejected-pack.json");
     stdoutText = "";
     const rejectedExitCode = await executeObsDiagExportCommand({
+      stateDirectory,
       outputFilePath: rejectedOutputPath,
       windowStartIso: "",
       windowEndIso: "2026-10-19T12:00:00.000Z",
@@ -383,6 +385,7 @@ describe("OBS 只读查询入口", () => {
     // 未知章节 ⇒ 同样拒绝且不写文件
     stderrText = "";
     const unknownSectionExitCode = await executeObsDiagExportCommand({
+      stateDirectory,
       outputFilePath: path.join(stateDirectory, "unknown-section-pack.json"),
       windowStartIso: "2026-10-19T00:00:00.000Z",
       windowEndIso: "2026-10-19T12:00:00.000Z",
@@ -399,7 +402,84 @@ describe("OBS 只读查询入口", () => {
       fs.access(path.join(stateDirectory, "unknown-section-pack.json")),
     ).rejects.toThrow();
   });
+
+  it("⑩ obs diag export 正文：只写指纹级聚合（不含错误文本）、遵守时间窗", async () => {
+    const diagnosticStore = new DiagnosticEventStore({ baseDirectory: stateDirectory });
+    await diagnosticStore.append({
+      observeEventVersion: 1,
+      eventType: "diagnostic",
+      recordedAtIso: "2026-10-19T02:00:00.000Z",
+      sourceAgentInstanceId: "agent-1",
+      missionIdentifier: "mission-1",
+      taskIdentifier: "task-1",
+      requestIdentifier: "request-in-window",
+      requestRevision: 1,
+      origin: { kind: "system" },
+      errorCode: "PERMISSION_DENIED",
+      stage: "tool",
+      severity: "error",
+      component: "tool-gate",
+      messageText: "SECRET_MARKER_原始错误文本",
+      recoveryState: "blocked-uncertain",
+      classification: "deterministic-fact",
+      chain: { rootErrorCode: "PERMISSION_DENIED", wrapperErrorCodes: [] },
+    });
+    await diagnosticStore.append({
+      observeEventVersion: 1,
+      eventType: "diagnostic",
+      recordedAtIso: "2026-10-18T02:00:00.000Z",
+      sourceAgentInstanceId: "agent-1",
+      missionIdentifier: "mission-1",
+      taskIdentifier: "task-1",
+      requestIdentifier: "request-outside-window",
+      requestRevision: 1,
+      origin: { kind: "system" },
+      errorCode: "TOOL_FAILED",
+      stage: "tool",
+      severity: "error",
+      component: "tool-runner",
+      messageText: "OUT_OF_WINDOW_MARKER",
+      recoveryState: "blocked-uncertain",
+      classification: "deterministic-fact",
+      chain: { rootErrorCode: "TOOL_FAILED", wrapperErrorCodes: [] },
+    });
+
+    const outputFilePath = path.join(stateDirectory, "evidence-body.json");
+    const exitCode = await executeObsDiagExportCommand({
+      stateDirectory,
+      outputFilePath,
+      windowStartIso: "2026-10-19T00:00:00.000Z",
+      windowEndIso: "2026-10-19T12:00:00.000Z",
+      sections: ["findings-summary", "coverage-window"],
+      astarrayVersion: "0.1.0",
+      platform: "win32-x64",
+      redactionSummary: "已脱敏：移除原始参数、错误文本与凭据。",
+      isUserInitiated: true,
+      generatedAtIso: "2026-10-19T12:00:00.000Z",
+      isJsonOutput: true,
+    });
+    expect(exitCode).toBe(0);
+
+    const written = await fs.readFile(outputFilePath, "utf8");
+    const pack = JSON.parse(written) as {
+      manifest: { isAutoUploaded: boolean };
+      body: {
+        coverage: { matchedEventCount: number };
+        findings: Array<{ fingerprint: string; occurrenceCount: number }>;
+      };
+    };
+    // 只统计窗口内那一条
+    expect(pack.body.coverage.matchedEventCount).toBe(1);
+    expect(pack.body.findings).toHaveLength(1);
+    expect(pack.body.findings[0]?.fingerprint.length).toBeGreaterThan(0);
+    // **绝不写入原始错误文本**（无论窗口内外）
+    expect(written).not.toContain("SECRET_MARKER_原始错误文本");
+    expect(written).not.toContain("OUT_OF_WINDOW_MARKER");
+    expect(pack.manifest.isAutoUploaded).toBe(false);
+  });
 });
+
+
 
 
 

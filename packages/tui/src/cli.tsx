@@ -757,6 +757,7 @@ obsCommand
           ? ["findings-summary", "coverage-window", "redaction-notes"]
           : options.sections.split(",").map((section) => section.trim());
       process.exitCode = await executeObsDiagExportCommand({
+        stateDirectory: defaultStateDirectory(),
         outputFilePath: options.output,
         windowStartIso: options.since,
         windowEndIso: options.until,

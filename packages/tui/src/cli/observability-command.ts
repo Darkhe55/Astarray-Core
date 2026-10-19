@@ -282,6 +282,7 @@ export async function executeObsProcessCommand(
 
 /** `obs diag export` 输入。 */
 export interface ObsDiagExportCommandInput {
+  readonly stateDirectory: string;
   readonly outputFilePath: string;
   readonly windowStartIso: string;
   readonly windowEndIso: string;
@@ -334,9 +335,63 @@ export async function executeObsDiagExportCommand(
     redactionSummary: input.redactionSummary,
   });
 
+  /**
+   * **正文生成（R63）**：按用户给的窗口读取诊断摘要，只保留**指纹级聚合**。
+   *
+   * 刻意**不写** `messageText`、原始命令参数、请求头或凭据 —— 证据包的价值是"同类问题有几条、
+   * 何时首次/最后出现、证据引用了哪些回执"，而不是把原始日志搬出来。
+   */
+  const diagnosticStore = new DiagnosticEventStore({ baseDirectory: input.stateDirectory });
+  let summary;
+  try {
+    summary = await queryDiagnosticSummary({
+      store: diagnosticStore,
+      query: {
+        windowStartIso: input.windowStartIso,
+        windowEndIso: input.windowEndIso,
+      },
+    });
+  } catch (error) {
+    logToStderr(
+      `证据包正文读取失败，未写文件：${error instanceof Error ? error.message : String(error)}`,
+    );
+    return EXIT_CODES.FAILURE;
+  }
+
+  const findingsForPack = [
+    ...summary.deterministicFindings,
+    ...summary.suspectedFindings,
+    ...summary.insufficientEvidenceFindings,
+  ].map((finding) => ({
+    fingerprint: finding.fingerprint,
+    errorCode: finding.errorCode,
+    component: finding.component,
+    severity: finding.severity,
+    occurrenceCount: finding.occurrenceCount,
+    firstOccurredAtIso: finding.firstOccurredAtIso,
+    lastOccurredAtIso: finding.lastOccurredAtIso,
+    isInference: finding.isInference,
+    evidence: {
+      sourceAgentInstanceIdentifiers: finding.evidence.sourceAgentInstanceIds,
+      requestIdentifiers: finding.evidence.requestIdentifiers,
+    },
+  }));
+
+  const evidencePack = {
+    manifest,
+    body: {
+      coverage: summary.coverage,
+      bySeverity: summary.bySeverity,
+      byRecoveryState: summary.byRecoveryState,
+      isReportable: summary.isReportable,
+      unreportableReason: summary.unreportableReason,
+      findings: findingsForPack,
+    },
+  };
+
   const { writeAtomicTextFile } = await import("../../../core/src/infra/atomic-json.js");
   try {
-    await writeAtomicTextFile(input.outputFilePath, `${JSON.stringify(manifest, null, 2)}\n`);
+    await writeAtomicTextFile(input.outputFilePath, `${JSON.stringify(evidencePack, null, 2)}\n`);
   } catch (error) {
     logToStderr(`证据包写入失败：${error instanceof Error ? error.message : String(error)}`);
     return EXIT_CODES.FAILURE;
@@ -346,6 +401,8 @@ export async function executeObsDiagExportCommand(
     kind: "exported" as const,
     outputFilePath: input.outputFilePath,
     manifest,
+    findingCount: findingsForPack.length,
+    eventCount: summary.coverage.matchedEventCount,
     /** 明确报告"没有联网上传"，避免调用方误以为已外发。 */
     isAutoUploaded: false,
   };
