@@ -36,4 +36,11 @@ describe("CLI 数字参数边界校验", () => {
     expect(cliText).toContain('parsePositiveSeconds(options.timeoutSeconds, "--timeout-seconds")');
     expect(cliText).toContain("providerRequestTimeoutMilliseconds: providerRequestTimeoutSeconds * 1_000");
   });
+
+  it("④ workflow run：--task-revision 必须是 ≥1 的整数", async () => {
+    const cliText = await readSource("packages/tui/src/cli.tsx");
+    expect(cliText).toContain("if (!Number.isInteger(parsedTaskRevision) || parsedTaskRevision < 1) {");
+    // 并且确实用校验后的值（不再直接 parseInt 进场景选项）
+    expect(cliText).toContain("...(taskRevision === undefined ? {} : { taskRevision }),");
+  });
 });

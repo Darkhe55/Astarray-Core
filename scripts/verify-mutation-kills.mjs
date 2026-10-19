@@ -275,6 +275,16 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "workflow-accepts-nan-task-revision",
+    targetFile: "packages/tui/src/cli.tsx",
+    find: "        if (!Number.isInteger(parsedTaskRevision) || parsedTaskRevision < 1) {",
+    replace: "        if (false) {",
+    testFiles: ["tests/architecture/cli-numeric-option-guards.test.ts"],
+    expectedFailingTestNames: ["④ workflow run"],
+    rationale:
+      "放行 NaN 修订号 ⇒ 任务定位错乱/找不到任务（用户以为任务不存在）⇒ 该守卫必须变红",
+  },
+  {
     mutationIdentifier: "run-accepts-nan-seconds",
     targetFile: "packages/tui/src/cli.tsx",
     find: "        if (!Number.isInteger(parsedValue) || parsedValue < 1) {",
