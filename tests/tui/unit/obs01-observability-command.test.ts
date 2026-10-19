@@ -278,6 +278,59 @@ describe("OBS 只读查询入口", () => {
     // 丢样累计跨样本求和（观测降级可追溯）
     expect(filtered.coverage.droppedSampleCountTotal).toBe(3);
   });
+
+  it("⑧ obs process --summary：只给聚合（逐字段分母/缺字段 null），且**遵守时间窗**", async () => {
+    const store = new ProcessSampleStore({ baseDirectory: stateDirectory });
+    await store.append({
+      observeEventVersion: 1,
+      eventType: "process",
+      recordedAtIso: "2026-10-19T00:00:00.000Z",
+      processIdentifier: 1,
+      agentInstanceIdentifier: "agent-1",
+      fields: { residentMemoryBytes: 100 },
+      droppedSampleCount: 0,
+    });
+    await store.append({
+      observeEventVersion: 1,
+      eventType: "process",
+      recordedAtIso: "2026-10-19T02:00:00.000Z",
+      processIdentifier: 1,
+      agentInstanceIdentifier: "agent-1",
+      fields: { residentMemoryBytes: 300, queueDepth: 5 },
+      droppedSampleCount: 0,
+    });
+
+    stdoutText = "";
+    await executeObsProcessCommand({
+      stateDirectory,
+      isJsonOutput: true,
+      summarize: true,
+      windowStartIso: "2026-10-19T01:00:00.000Z",
+    });
+    const payload = JSON.parse(stdoutText) as {
+      hasSamples: boolean;
+      samples: unknown[];
+      aggregate: {
+        sampleCount: number;
+        earliestRecordedAtIso: string | null;
+        fields: {
+          residentMemoryBytes: { sampleCount: number; mean: number | null };
+          eventLoopDelayMs: { sampleCount: number; mean: number | null };
+        };
+      };
+    };
+    // 摘要模式不返回逐条样本
+    expect(payload.samples).toHaveLength(0);
+    expect(payload.aggregate).not.toBeNull();
+    // **遵守时间窗**：只统计 01:00 之后那条（300）
+    expect(payload.aggregate.sampleCount).toBe(1);
+    expect(payload.aggregate.fields.residentMemoryBytes.sampleCount).toBe(1);
+    expect(payload.aggregate.fields.residentMemoryBytes.mean).toBe(300);
+    expect(payload.aggregate.earliestRecordedAtIso).toBe("2026-10-19T02:00:00.000Z");
+    // 该窗口内没有事件循环延迟样本 ⇒ null（unknown 不记作零）
+    expect(payload.aggregate.fields.eventLoopDelayMs.sampleCount).toBe(0);
+    expect(payload.aggregate.fields.eventLoopDelayMs.mean).toBeNull();
+  });
 });
 
 

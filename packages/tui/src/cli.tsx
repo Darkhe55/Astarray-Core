@@ -737,9 +737,16 @@ obsCommand
   .option("--since <iso>", "时间窗下界（含）")
   .option("--until <iso>", "时间窗上界（含）")
   .option("--limit <number>", "最多返回条数（缺省 50）")
+  .option("--summary", "返回聚合摘要（逐字段 min/mean/median，缺字段不计入分母）")
   .option("--json", "JSON 输出")
   .action(
-    async (options: { since?: string; until?: string; limit?: string; json?: boolean }) => {
+    async (options: {
+      since?: string;
+      until?: string;
+      limit?: string;
+      summary?: boolean;
+      json?: boolean;
+    }) => {
       const limit = options.limit === undefined ? undefined : Number(options.limit);
       if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
         process.stderr.write("astarray: --limit 必须是正整数\n");
@@ -751,6 +758,7 @@ obsCommand
         ...(options.since === undefined ? {} : { windowStartIso: options.since }),
         ...(options.until === undefined ? {} : { windowEndIso: options.until }),
         ...(limit === undefined ? {} : { limit }),
+        summarize: options.summary === true,
         isJsonOutput: options.json === true,
       });
     },
