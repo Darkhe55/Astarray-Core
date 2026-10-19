@@ -905,3 +905,9 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > **R80（2026-10-19，第 80 轮全量门禁）**：变异 **181/181 全部被拦下**；`npm pack` **263 文件**
 > sha256 `440350e5…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
 > `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+
+> **R81（2026-10-19）`workflow run --task-revision` 校验**：`abc` ⇒ NaN ⇒ 任务定位错乱/"找不到任务"
+> （用户以为任务不存在）。现于 CLI 边界要求 **≥1 的整数**，非法即 `USAGE_ERROR` 并指出参数名；
+> 场景选项改用**校验后的值**。
+> 守卫扩到 **4 条**（分页 / 预算保留 / 秒数 / 修订号）；变异 **1 条**被拦下；`--check-anchors` **182/182**；全量 exit 0。
+> **仍未覆盖**：`commands.ts` 的三处 `--page-size` 与 `--input-token-budget`（同类风险，留待统一处理）。

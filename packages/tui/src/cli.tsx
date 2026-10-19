@@ -1859,6 +1859,22 @@ workflowCommand
       commit?: string;
       json?: boolean;
     }) => {
+      /**
+       * **任务修订号边界校验（R81）**：`--task-revision abc` ⇒ NaN ⇒ 任务定位错乱/找不到任务。
+       * 修订号语义明确（≥1 的整数），在这里就拒绝。
+       */
+      let taskRevision: number | undefined;
+      if (options.taskRevision !== undefined) {
+        const parsedTaskRevision = Number.parseInt(options.taskRevision, 10);
+        if (!Number.isInteger(parsedTaskRevision) || parsedTaskRevision < 1) {
+          logToStderr(
+            `--task-revision 必须是 ≥1 的整数（收到 ${String(options.taskRevision)}）。`,
+          );
+          process.exitCode = EXIT_CODES.USAGE_ERROR;
+          return;
+        }
+        taskRevision = parsedTaskRevision;
+      }
       process.exitCode = await executeWorkflowScenarioCommand({
         stateDirectory: defaultStateDirectory(),
         scenario: options.scenario,
@@ -1871,9 +1887,7 @@ workflowCommand
           ? { digestFilePath: options.digestFile }
           : {}),
         ...(options.task !== undefined ? { taskIdentifier: options.task } : {}),
-        ...(options.taskRevision !== undefined
-          ? { taskRevision: Number.parseInt(options.taskRevision, 10) }
-          : {}),
+        ...(taskRevision === undefined ? {} : { taskRevision }),
         ...(options.appointment !== undefined
           ? { appointmentId: options.appointment }
           : {}),
