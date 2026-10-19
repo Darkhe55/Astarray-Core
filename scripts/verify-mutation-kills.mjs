@@ -305,6 +305,16 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "gitignore-drops-local-state",
+    targetFile: ".gitignore",
+    find: ".astarray/",
+    replace: "# .astarray/ (removed)",
+    testFiles: ["tests/architecture/repository-hygiene.test.ts"],
+    expectedFailingTestNames: ["① 本地状态库"],
+    rationale:
+      "删掉 .astarray/ 忽略规则 ⇒ 本机运行痕迹（任务/记忆/凭据痕迹）可能被提交进公开仓库 ⇒ 该守卫必须变红",
+  },
+  {
     mutationIdentifier: "rotate-preview-hides-retained-window",
     targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
     find: "      plan.retainedOldestAtIso === null || plan.retainedNewestAtIso === null",
