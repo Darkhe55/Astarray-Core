@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "evidence-pack-allows-auto-upload",
+    targetFile: "packages/core/src/orchestration/diagnostic-evidence-pack-contract.ts",
+    find: "  if (input.isNetworkUploadRequested) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-diagnostic-evidence-pack.test.ts"],
+    expectedFailingTestNames: ["② 非用户主动"],
+    rationale:
+      "允许自动联网上传证据包 ⇒ 违反\"不自动联网发送\"（诊断数据外泄面）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "evidence-pack-allows-sensitive-content",
+    targetFile: "packages/core/src/orchestration/diagnostic-evidence-pack-contract.ts",
+    find: "  if (input.containsRawArguments || input.containsSecrets) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/obs01-diagnostic-evidence-pack.test.ts"],
+    expectedFailingTestNames: ["④ 含原始参数或凭据"],
+    rationale:
+      "允许含原始参数/凭据的证据包 ⇒ 把敏感内容导出带走（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "obs-process-summary-ignores-window",
     targetFile: "packages/tui/src/cli/observability-command.ts",
     find: "        samples: matchedSamples,\n        discardedLineCount: report.discardedLineCount,",
