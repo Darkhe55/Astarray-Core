@@ -1133,6 +1133,13 @@ export {
   type PerfSchedulingTimerPort,
 } from "./orchestration/observability-sampling-scheduler.js";
 /**
+ * OBS 会话采集器（2026-10-19 R57）：调度器 + 采样 tick + 落盘 + 关闭时保留整理。
+ */
+export {
+  createSessionPerfCollector,
+  type SessionPerfCollector,
+} from "./orchestration/session-perf-collector.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
