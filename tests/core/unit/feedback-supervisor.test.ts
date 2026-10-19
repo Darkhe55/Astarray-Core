@@ -156,4 +156,30 @@ describe.skipIf(!hasBuiltEntry)("FeedbackProcessSupervisor", () => {
     expect(supervisor.getClient()).toBeNull();
     expect(supervisor.getChildProcess()).toBeNull();
   });
+
+  it("坏 modulePath 重启时**不得产生未处理的 promise 拒绝**（严格模式会打崩宿主）", async () => {
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandledRejection);
+    const supervisor = new FeedbackProcessSupervisor({
+      modulePath: path.join(os.tmpdir(), "non-existent-entry.js"),
+      baseDirectory: path.join(os.tmpdir(), "astarray-supervisor-rejection-test"),
+      maximumRestartAttempts: 2,
+      restartBackoffMilliseconds: 10,
+      healthCheckIntervalMilliseconds: 20,
+    });
+    try {
+      // start() 在坏路径下会一直重试（既有用例同样用 race 兜底），这里只需观察窗口
+      await Promise.race([supervisor.start(), new Promise((resolve) => setTimeout(resolve, 500))]);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    } finally {
+      await Promise.race([supervisor.stop(), new Promise((resolve) => setTimeout(resolve, 2000))]);
+      process.off("unhandledRejection", onUnhandledRejection);
+    }
+    expect(unhandledRejections).toEqual([]);
+  }, 20_000);
 });
+
+
