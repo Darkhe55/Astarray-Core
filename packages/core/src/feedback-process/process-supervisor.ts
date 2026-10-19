@@ -206,9 +206,14 @@ export class FeedbackProcessSupervisor {
         return;
       }
       this.spawnChildProcess();
-      void this.client?.waitUntilReady().then(() => {
-        void this.client?.requestReplay("*").catch(() => {});
-      });
+      void this.client
+        ?.waitUntilReady()
+        .then(() => {
+          void this.client?.requestReplay("*").catch(() => {});
+        })
+        // 重启时若 modulePath 不可用，waitUntilReady 会 reject；
+        // 没有 catch 就是未处理的 promise 拒绝（严格模式下会打崩宿主进程）。
+        .catch(() => {});
     }, backoffMilliseconds);
   }
 
