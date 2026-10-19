@@ -1140,6 +1140,14 @@ export {
   type SessionPerfCollector,
 } from "./orchestration/session-perf-collector.js";
 /**
+ * 进程样本聚合（2026-10-19 R58）：逐字段统计、缺字段不计入分母、全缺为 null（unknown 不记作零）。
+ */
+export {
+  aggregateProcessSamples,
+  type ProcessSampleAggregate,
+  type ProcessSampleFieldStatistics,
+} from "./orchestration/process-sample-aggregate.js";
+/**
  * CLIENT-01 / ONBOARD-01-01（2026-10-19）：首次/适时提示的触发、冷却与拒绝状态。
  *
  * 纯判定：不发提示、不读项目、不调模型、不上传遥测、不授权。
