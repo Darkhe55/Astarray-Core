@@ -415,6 +415,16 @@ export const MUTATIONS = [
       "偶数个时中位数只取上中位 ⇒ 分位数失真（性能报告的关键指标）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "run-perf-created-while-disabled",
+    targetFile: "packages/core/src/orchestration/run-perf-collection.ts",
+    find: "  if (input.isPerfCollectionEnabled !== true) return null;",
+    replace: "  if (false) return null;",
+    testFiles: ["tests/core/unit/obs01-run-perf-collection.test.ts"],
+    expectedFailingTestNames: ["① 默认未开启"],
+    rationale:
+      "未开启也创建采集器 ⇒ 默认 off 失效、产生目录与定时器（用户没同意就有开销）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "collector-samples-while-disabled",
     targetFile: "packages/core/src/orchestration/session-perf-collector.ts",
     find: "    if (!input.isCollectionEnabled) {\n      return { kind: \"skipped\", reason: \"采集未开启：不采样、不写盘。\" };\n    }",
