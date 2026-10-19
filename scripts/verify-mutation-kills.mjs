@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "collector-samples-while-disabled",
+    targetFile: "packages/core/src/orchestration/session-perf-collector.ts",
+    find: "    if (!input.isCollectionEnabled) {\n      return { kind: \"skipped\", reason: \"采集未开启：不采样、不写盘。\" };\n    }",
+    replace: "    if (false) {\n      return { kind: \"skipped\", reason: \"x\" };\n    }",
+    testFiles: ["tests/core/unit/obs01-session-perf-collector.test.ts"],
+    expectedFailingTestNames: ["① 默认关闭"],
+    rationale:
+      "关闭时仍采样落盘 ⇒ 用户没同意就产生文件与开销（默认 off 失效）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "collector-stop-skips-retention",
+    targetFile: "packages/core/src/orchestration/session-perf-collector.ts",
+    find: "        const retentionReport = await applyProcessSampleRetention({",
+    replace: "        const retentionReport = { kind: \"no-action\" as const, reason: \"skipped\" }; void applyProcessSampleRetention; if (false) await applyProcessSampleRetention({",
+    testFiles: ["tests/core/unit/obs01-session-perf-collector.test.ts"],
+    expectedFailingTestNames: ["⑥ stop 时按保留策略"],
+    rationale:
+      "关闭时不整理 ⇒ 预算/保留策略永不生效（文件无界增长）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "scheduler-ignores-collection-switch",
     targetFile: "packages/core/src/orchestration/observability-sampling-scheduler.ts",
     find: "      if (!input.isCollectionEnabled) {",
@@ -2766,6 +2786,7 @@ function main() {
 }
 
 main();
+
 
 
 
