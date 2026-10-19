@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "obs-process-summary-ignores-window",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "        samples: matchedSamples,\n        discardedLineCount: report.discardedLineCount,",
+    replace: "        samples: report.samples,\n        discardedLineCount: report.discardedLineCount,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑧ obs process --summary"],
+    rationale:
+      "摘要忽略时间窗 ⇒ 报告的统计与用户查询的范围不一致（覆盖范围失真）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "obs-process-summary-keeps-raw-samples",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "    samples: isSummaryRequested ? [] : returnedSamples,",
+    replace: "    samples: returnedSamples,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑧ obs process --summary"],
+    rationale:
+      "摘要模式仍返回逐条样本 ⇒ 与\"摘要只给聚合\"的约定不符（也浪费输出）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "aggregate-missing-field-counted-as-zero",
     targetFile: "packages/core/src/orchestration/process-sample-aggregate.ts",
     find: "      if (value === undefined) continue;",
@@ -387,8 +407,8 @@ export const MUTATIONS = [
   {
     mutationIdentifier: "obs-process-hides-discarded-lines",
     targetFile: "packages/tui/src/cli/observability-command.ts",
-    find: "      discardedLineCount: report.discardedLineCount,",
-    replace: "      discardedLineCount: 0,",
+    find: "      returnedSampleCount: returnedSamples.length,\n      discardedLineCount: report.discardedLineCount,",
+    replace: "      returnedSampleCount: returnedSamples.length,\n      discardedLineCount: 0,",
     testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
     expectedFailingTestNames: ["⑦ obs process"],
     rationale:

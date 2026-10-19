@@ -10,6 +10,7 @@ import {
   DiagnosticEventStore,
   PerfEventStore,
   ProcessSampleStore,
+  aggregateProcessSamples,
   queryDiagnosticSummary,
   queryPerfOverview,
 } from "../../../core/src/public-sdk.js";
@@ -172,6 +173,8 @@ export async function executeObsDiagCommand(input: ObsDiagCommandInput): Promise
 /** `obs process` 输入：进程样本只读查询。 */
 export interface ObsProcessCommandInput {
   readonly stateDirectory: string;
+  /** 是否返回聚合摘要（而不是逐条样本）。 */
+  readonly summarize?: boolean;
   readonly windowStartIso?: string | null;
   readonly windowEndIso?: string | null;
   readonly limit?: number;
@@ -227,6 +230,18 @@ export async function executeObsProcessCommand(
     0,
   );
 
+  /**
+   * `--summary`：返回**聚合摘要**（R58 的 `aggregateProcessSamples`），此时不再返回逐条样本。
+   * 聚合口径与展示完全同源：缺字段不计入分母、全缺为 null（unknown 不记作零）。
+   */
+  const isSummaryRequested = input.summarize === true;
+  const aggregate = isSummaryRequested
+    ? aggregateProcessSamples({
+        samples: matchedSamples,
+        discardedLineCount: report.discardedLineCount,
+      })
+    : null;
+
   const payload = {
     kind: "ok" as const,
     coverage: {
@@ -239,7 +254,8 @@ export async function executeObsProcessCommand(
       droppedSampleCountTotal,
     },
     hasSamples: matchedSamples.length > 0,
-    samples: returnedSamples,
+    aggregate,
+    samples: isSummaryRequested ? [] : returnedSamples,
     notice:
       matchedSamples.length === 0
         ? "没有任何匹配的进程样本（不代表没有资源消耗：可能未开启采集或超出时间窗）。"
