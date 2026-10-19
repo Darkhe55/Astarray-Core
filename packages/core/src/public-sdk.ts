@@ -1134,6 +1134,13 @@ export {
   type BackupRetentionPlan,
 } from "./orchestration/process-sample-backup-retention.js";
 /**
+ * 备份清理执行（2026-10-20 R103）：删除端口由调用方注入；只删计划内、失败即停。
+ */
+export {
+  applyProcessSampleBackupRetention,
+  type BackupRetentionApplyReport,
+} from "./orchestration/process-sample-backup-retention-apply.js";
+/**
  * OBS 采样调度器（2026-10-19 R56）：显式开启才排定时器、幂等 start/stop、间隔下限 5s。
  */
 export {
