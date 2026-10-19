@@ -9,6 +9,7 @@
 import {
   DiagnosticEventStore,
   PerfEventStore,
+  ProcessSampleStore,
   queryDiagnosticSummary,
   queryPerfOverview,
 } from "../../../core/src/public-sdk.js";
@@ -167,3 +168,95 @@ export async function executeObsDiagCommand(input: ObsDiagCommandInput): Promise
   return EXIT_CODES.SUCCESS;
 }
 
+
+/** `obs process` 输入：进程样本只读查询。 */
+export interface ObsProcessCommandInput {
+  readonly stateDirectory: string;
+  readonly windowStartIso?: string | null;
+  readonly windowEndIso?: string | null;
+  readonly limit?: number;
+  readonly isJsonOutput: boolean;
+}
+
+/**
+ * 执行 `obs process`：只读查询**进程样本**（R51 的独立事件类型/独立文件）。
+ *
+ * 与 `obs perf` 同一纪律：**没有样本 ≠ 用量为零**；**观测故障降级、不阻塞业务**。
+ */
+export async function executeObsProcessCommand(
+  input: ObsProcessCommandInput,
+): Promise<number> {
+  const store = new ProcessSampleStore({ baseDirectory: input.stateDirectory });
+  let report;
+  try {
+    report = await store.readWithIntegrity();
+  } catch (error) {
+    const payload = {
+      kind: "degraded" as const,
+      sampleCount: 0,
+      hasSamples: false,
+      reason: `进程样本查询失败：${error instanceof Error ? error.message : String(error)}`,
+    };
+    if (input.isJsonOutput) printJson(payload);
+    else logToStderr(payload.reason);
+    return EXIT_CODES.SUCCESS;
+  }
+
+  const windowStartMilliseconds =
+    input.windowStartIso === undefined || input.windowStartIso === null
+      ? null
+      : Date.parse(input.windowStartIso);
+  const windowEndMilliseconds =
+    input.windowEndIso === undefined || input.windowEndIso === null
+      ? null
+      : Date.parse(input.windowEndIso);
+  const matchedSamples = report.samples.filter((sample) => {
+    const recordedAtMilliseconds = Date.parse(sample.recordedAtIso);
+    if (windowStartMilliseconds !== null && recordedAtMilliseconds < windowStartMilliseconds) {
+      return false;
+    }
+    if (windowEndMilliseconds !== null && recordedAtMilliseconds > windowEndMilliseconds) {
+      return false;
+    }
+    return true;
+  });
+  const limit = input.limit ?? 50;
+  const returnedSamples = matchedSamples.slice(0, Math.max(0, limit));
+  const droppedSampleCountTotal = report.samples.reduce(
+    (total, sample) => total + sample.droppedSampleCount,
+    0,
+  );
+
+  const payload = {
+    kind: "ok" as const,
+    coverage: {
+      totalSampleCount: report.samples.length,
+      matchedSampleCount: matchedSamples.length,
+      returnedSampleCount: returnedSamples.length,
+      discardedLineCount: report.discardedLineCount,
+      windowStartIso: input.windowStartIso ?? null,
+      windowEndIso: input.windowEndIso ?? null,
+      droppedSampleCountTotal,
+    },
+    hasSamples: matchedSamples.length > 0,
+    samples: returnedSamples,
+    notice:
+      matchedSamples.length === 0
+        ? "没有任何匹配的进程样本（不代表没有资源消耗：可能未开启采集或超出时间窗）。"
+        : null,
+  };
+
+  if (input.isJsonOutput) {
+    printJson(payload);
+  } else {
+    process.stdout.write(
+      [
+        `进程样本：命中 ${String(matchedSamples.length)} / 总 ${String(report.samples.length)}（丢弃行 ${String(report.discardedLineCount)}）`,
+        `本次返回：${String(returnedSamples.length)} 条`,
+        ...(payload.notice === null ? [] : [`说明：${payload.notice}`]),
+        "",
+      ].join("\n"),
+    );
+  }
+  return EXIT_CODES.SUCCESS;
+}

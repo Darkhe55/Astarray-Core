@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "obs-process-empty-reported-as-samples",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "    hasSamples: matchedSamples.length > 0,",
+    replace: "    hasSamples: true,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑥ obs process"],
+    rationale:
+      "无进程样本却报 hasSamples=true ⇒ 调用方把\"没采到\"当成\"有数据\"（unknown 不记作零）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "obs-process-hides-discarded-lines",
+    targetFile: "packages/tui/src/cli/observability-command.ts",
+    find: "      discardedLineCount: report.discardedLineCount,",
+    replace: "      discardedLineCount: 0,",
+    testFiles: ["tests/tui/unit/obs01-observability-command.test.ts"],
+    expectedFailingTestNames: ["⑦ obs process"],
+    rationale:
+      "坏行数恒为 0 ⇒ 观测降级不可见（卡内：不能静默丢弃）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "process-sample-accepts-unknown-field",
     targetFile: "packages/core/src/orchestration/process-sample-store.ts",
     find: "    if (!ALLOWED_FIELD_NAMES.has(fieldName)) return false;",

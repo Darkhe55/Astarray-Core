@@ -13,6 +13,7 @@ import {
 import {
   executeObsDiagCommand,
   executeObsPerfCommand,
+  executeObsProcessCommand,
 } from "./cli/observability-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
@@ -726,6 +727,30 @@ obsCommand
         detailLevel: options.detail === true ? "detail" : "summary",
         ...(pageSize === undefined ? {} : { pageSize }),
         ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+obsCommand
+  .command("process")
+  .description("查询进程样本（RSS/事件循环延迟/队列深度；无样本不等于没有消耗）")
+  .option("--since <iso>", "时间窗下界（含）")
+  .option("--until <iso>", "时间窗上界（含）")
+  .option("--limit <number>", "最多返回条数（缺省 50）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: { since?: string; until?: string; limit?: string; json?: boolean }) => {
+      const limit = options.limit === undefined ? undefined : Number(options.limit);
+      if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
+        process.stderr.write("astarray: --limit 必须是正整数\n");
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      process.exitCode = await executeObsProcessCommand({
+        stateDirectory: defaultStateDirectory(),
+        ...(options.since === undefined ? {} : { windowStartIso: options.since }),
+        ...(options.until === undefined ? {} : { windowEndIso: options.until }),
+        ...(limit === undefined ? {} : { limit }),
         isJsonOutput: options.json === true,
       });
     },
