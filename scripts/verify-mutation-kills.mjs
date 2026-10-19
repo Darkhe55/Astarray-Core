@@ -305,6 +305,26 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "curation-view-shows-unsourced",
+    targetFile: "packages/core/src/orchestration/curation-view-contract.ts",
+    find: "    if (!hasSource) {\n      unsourcedItemCount += 1;\n      continue;\n    }",
+    replace: "    if (!hasSource) {\n      unsourcedItemCount += 1;\n    }",
+    testFiles: ["tests/core/unit/curate01-view-contract.test.ts"],
+    expectedFailingTestNames: ["② 无来源条目"],
+    rationale:
+      "无来源条目也展示 ⇒ 结论无法追溯到原消息/工具回执（卡内硬要求）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "curation-view-merges-other-agents",
+    targetFile: "packages/core/src/orchestration/curation-view-contract.ts",
+    find: "    if (!input.viewerAuthorizedAgentInstanceIdentifiers.has(item.ownerAgentInstanceIdentifier)) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/curate01-view-contract.test.ts"],
+    expectedFailingTestNames: ["③ 跨个体不合并"],
+    rationale:
+      "把无权查看的其它个体条目合并进视图 ⇒ 跨个体记忆泄漏（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "explore-verification-accepts-single-success",
     targetFile: "packages/core/src/orchestration/explore-verification-contract.ts",
     find: "  if (evidencedSuccesses.length < 3) missingEvidence.push(\"successful-runs\");",
