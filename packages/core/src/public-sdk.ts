@@ -1057,6 +1057,16 @@ export {
   type CurationRunStartDecision,
 } from "./orchestration/curation-execution-contract.js";
 /**
+ * CURATE-01-03 只读视图（2026-10-20 R105）：无来源不展示、跨个体不合并、撤销不删内容。
+ */
+export {
+  buildCurationViewSnapshot,
+  type CurationDerivedItemV1,
+  type CurationPlanView,
+  type CurationPlanViewStatus,
+  type CurationViewSnapshot,
+} from "./orchestration/curation-view-contract.js";
+/**
  * RELOCATE-01-03 接线片（2026-10-19 R31）：冷启动/按需重定位对账判定。
  *
  * 纯判定：不读盘、不调模型、不重放操作。
