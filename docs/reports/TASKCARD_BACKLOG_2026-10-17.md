@@ -834,3 +834,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > 抽查 40 个 mission 仅 2 个含路径类字段且不符合 `StructuredResourceReference` 结构。
 > ⇒ **"真实历史库批量解析"仍标未验证**，R33 脱敏样例仍是唯一证据。详见
 > `docs/reports/RELOCATE01_REAL_SAMPLE_INVENTORY_2026-10-19.md`（含"合格样例至少需要什么"）。
+
+> **R70（2026-10-19，第 70 轮全量门禁）**：变异 **172/172 全部被拦下**；`npm pack` **263 文件**
+> sha256 `0ed7a994…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
