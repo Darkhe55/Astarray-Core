@@ -6,10 +6,24 @@
 > **入口地图**（想知道什么该看哪份报告）、**仍缺项（全部在用户/平台侧）**、**未复现抖动清单**、
 > 以及**我在本窗口犯的 7 类错与教训**（含两次"筛法太窄导致误判"）。
 >
-> **上一窗口（81–100）末口径（2026-11-08，**第 101 轮**实测 —— 已进入新窗口 101–140）**：上一窗口共 **20 个提交**（自 `13c3342`）；
-> `HEAD` **`c9e8146`**（`== origin/main`、`unpushed: 0`）；`check` **exit 0 — 443 文件 / 3297 用例**；
-> `verify:mutation-kills` **exit 0 — 37/37 被拦下**（自第 81–100 轮起把变异体从 **28 扩到 37**）；
-> 覆盖率 **92.5 / 85.11 / 93.21 / 92.55**（阈值 85 全过）。
+> **当前有效口径（2026-10-20，第 73 轮实测）**：`HEAD` **`f763a9b8`**（`== origin/main`、`unpushed: 0`）；
+> `npm run check:low-parallel` **exit 0 — 482 文件 / 3529 用例**（`skipped 0`，**无 unhandled error**）；
+> `npm run test:coverage` **exit 0 — stmts 92.02 / branches 85.28 / funcs 93.29 / lines 92.14**（阈值 85 全过；余量 +0.28pp）；
+> `npm run verify:mutation-kills` **exit 0 — 183/183 被拦下**（`--check-anchors` **183/183 锚点有效**）；
+> `npm pack` **263 文件** sha256 `3ac712c4…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+>
+> **本批（第 55–73 轮）主要交付**：① `OBS-01` 三线贯通（PERF 契约→采样→样本→保留→执行→会话采集器→聚合→`--summary`→
+> `run --perf-collect` 接线→`obs perf-rotate`；DIAG 证据包契约→`obs diag export`→正文→章节；USAGE 请求级账目→聚合）
+> ② CLI **数字参数全部边界校验**（分页/预算保留/秒数/修订号 + `parseInt` 截断收口 + 5 条活规则）
+> ③ 覆盖率从 **84.71 → 85.28**（`queryMissionHistory` 由 0% 补齐）④ 修掉 `npm run check` 偶发红的**未处理 promise 拒绝**
+> ⑤ `RELOCATE` 真实历史库证据**重新定性为产品能力阻塞**（项目还不能端到端运行）。
+>
+> **仍缺项（全部在用户/平台侧）**：macOS 平台证据（需 Mac/CI runner）；人工体验结论（清单已就绪，需人回填）；
+> `RELOCATE` 真实历史库样例（产品能力阻塞）；`USAGE` 预算阈值/价格换算与 `OBS` 定时 rotate（产品决策）。
+>
+> **历史口径（上一窗口 81–100 末，2026-11-08，`HEAD` `c9e8146`）**：`check` 443 文件 / 3297 用例；
+> 变异 **37/37**；覆盖率 92.5 / 85.11 / 93.21 / 92.55。后续改动已使其不再代表当前状态。
 >
 > **本窗口主要交付**：① 接通 `PERF` 与 `DIAG` 的**生产采集**（此前两组都是「组件存在但产品不可达」；
 > 均带开关且**缺省关**）② `before-dispatch-crash` 注入**从概率改为确定性** ③ 两项**测量**
