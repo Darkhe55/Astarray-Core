@@ -1022,3 +1022,9 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > `test:coverage` **exit 0**（**3531 用例**、分支 **85.30%**）。
 > **说明**：本轮仍未动 `local-preservation-service.ts`（1440 行）/`instruction-merge-mapping.ts`（724 行）——
 > 在当前上下文预算下写"够格"的反例集会失控，选择先做**小而确定**的改进。
+
+> **R95（2026-10-20，第 95 轮全量门禁）**：变异 **184/184 全部被拦下**（`--check-anchors` **184/184**）；
+> `npm pack` **263 文件** sha256 `23bb1104…`（本轮**先删除旧 tarball 再打包**，避免 R90 那种"在陈旧产物上跑 verify"）；
+> **六项 verify 全 exit 0**（`verify-package` 263 / `verify:contract-sdk` 17/17 / `verify:relocation-batch` 11/11 /
+> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）；
+> `test:coverage` **exit 0**（3531 用例、分支 **85.30%**）。
