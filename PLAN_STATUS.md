@@ -7,10 +7,10 @@
 > 以及**我在本窗口犯的 7 类错与教训**（含两次"筛法太窄导致误判"）。
 >
 > **当前有效口径（2026-10-20，第 73 轮实测）**：`HEAD` **`f763a9b8`**（`== origin/main`、`unpushed: 0`）；
-> `npm run check:low-parallel` **exit 0 — 482 文件 / 3529 用例**（`skipped 0`，**无 unhandled error**）；
+> `npm run check:low-parallel` **exit 0 — 3534 用例**（`skipped 0`，**无 unhandled error**）；
 > `npm run test:coverage` **exit 0 — stmts 92.02 / branches 85.28 / funcs 93.29 / lines 92.14**（阈值 85 全过；余量 +0.28pp）；
-> `npm run verify:mutation-kills` **exit 0 — 183/183 被拦下**（`--check-anchors` **183/183 锚点有效**）；
-> `npm pack` **263 文件** sha256 `3ac712c4…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
+> `npm run verify:mutation-kills` **exit 0 — 185/185 被拦下**（`--check-anchors` **185/185 锚点有效**）；
+> `npm pack` **263 文件** sha256 `23bb1104…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
 > `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
 >
 > **本批（第 55–73 轮）主要交付**：① `OBS-01` 三线贯通（PERF 契约→采样→样本→保留→执行→会话采集器→聚合→`--summary`→
@@ -2124,3 +2124,4 @@ T05B→T08 接入（AR-04 身份一致性及次级 Git 集成复验项）：
 - CLI 子命令为 stub，`--json` 输出约定（stdout 仅结果）尚未实施（T11）。
 - 覆盖率门槛 85% 已在 vitest 配置生效；95% 专项门槛（状态机/权限/DAG/反馈协议等）在相关任务完成后追加。
 - `cli.tsx` 已从覆盖率统计中排除（入口文件，无领域逻辑）。
+
