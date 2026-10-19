@@ -275,6 +275,26 @@ export const MUTATIONS = [
       "观测残缺的未决操作直接放行 ⇒ 既可能抛错中断批量对账、也可能在未知状态下继续执行（卡内：未知状态不放行）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "scheduler-ignores-collection-switch",
+    targetFile: "packages/core/src/orchestration/observability-sampling-scheduler.ts",
+    find: "      if (!input.isCollectionEnabled) {",
+    replace: "      if (false) {",
+    testFiles: ["tests/core/unit/obs01-sampling-scheduler.test.ts"],
+    expectedFailingTestNames: ["① 默认关闭"],
+    rationale:
+      "无视采集开关 ⇒ 默认 off 也在排定时器（用户没同意就有常驻开销）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "scheduler-duplicates-timer-on-restart",
+    targetFile: "packages/core/src/orchestration/observability-sampling-scheduler.ts",
+    find: "      if (timerHandle !== null) {\n        return { kind: \"not-started\", reason: \"已在运行：重复 start 不会创建第二个定时器。\" };\n      }",
+    replace: "      if (false) {\n        return { kind: \"not-started\", reason: \"x\" };\n      }",
+    testFiles: ["tests/core/unit/obs01-sampling-scheduler.test.ts"],
+    expectedFailingTestNames: ["② 开启后 start"],
+    rationale:
+      "重复 start 各排一个定时器 ⇒ 采样频率翻倍、资源泄漏（且 stop 只清一个）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "retention-apply-skips-backup",
     targetFile: "packages/core/src/orchestration/process-sample-retention-apply.ts",
     find: "    await copyFileWithBackup(filePath, backupFilePath);",
