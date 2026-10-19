@@ -305,6 +305,16 @@ export const MUTATIONS = [
       "退回 parseInt 宽容截断 ⇒ \"5abc\" 变 5（预算/页码/超时都被静默改小）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "rotate-preview-hides-retained-window",
+    targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
+    find: "      plan.retainedOldestAtIso === null || plan.retainedNewestAtIso === null",
+    replace: "      true",
+    testFiles: ["tests/tui/unit/obs01-perf-rotate-command.test.ts"],
+    expectedFailingTestNames: ["⑦ 预览必须给出"],
+    rationale:
+      "始终隐藏保留窗口 ⇒ 用户无法判断留下的数据够不够用（只能盲信\"已裁剪\"）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "perf-rotate-truncates-garbage-budget",
     targetFile: "packages/tui/src/cli/obs-perf-rotate-command.ts",
     find: "      if (!/^\\d+$/.test(trimmedValue) || Number.parseInt(trimmedValue, 10) < 1) {",
