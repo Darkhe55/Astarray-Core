@@ -980,6 +980,19 @@ export {
   type DocumentViewReceiptV1,
 } from "./orchestration/document-view-contract.js";
 /**
+ * DOCVIEW-01-02 首批适配器（2026-10-20）：块级定位回执、降级如实标注、损坏即拒绝。
+ */
+export {
+  MAXIMUM_DOCUMENT_BLOCKS,
+  MAXIMUM_DOCUMENT_BLOCK_CHARACTERS,
+  detectFirstBatchDocumentFormat,
+  extractDocumentBlocks,
+  type DocumentBlockKind,
+  type DocumentBlockReceipt,
+  type DocumentExtractionResult,
+  type FirstBatchDocumentFormat,
+} from "./orchestration/document-view-adapter.js";
+/**
  * CONFIGCHAT-01-01（2026-10-18）：对话设置的白名单、来源、作用域、风险与幂等契约。
  *
  * 纯判定：不读写配置、不调用模型、不持锁。
