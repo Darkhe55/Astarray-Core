@@ -1033,6 +1033,19 @@ export {
   type SettingChangeLedgerEntry,
 } from "./orchestration/config-chat-control-plane.js";
 /**
+ * CONFIGCHAT-01-03 模型切换保护：切断通信即拒绝、在途任务走安全点（不谎称生效）、重启对账。
+ */
+export {
+  computeCommunicationModelSwitchFingerprint,
+  describeCommunicationModelSwitchUiState,
+  planCommunicationModelSwitch,
+  reconcileCommunicationModelSwitchAfterRestart,
+  type CommunicationModelSwitchOutcome,
+  type CommunicationModelSwitchPlan,
+  type CommunicationModelSwitchRequest,
+  type CommunicationModelSwitchUiState,
+} from "./orchestration/communication-model-switch.js";
+/**
  * EXP-01 / FOLD-01-02（2026-10-19）：候选 → 组合包 → 独立验证 → 注册。
  *
  * 纯判定：不执行工作流、不注册工具、不写盘、不调模型。

@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "configchat-switch-breaks-communication",
+    targetFile: "packages/core/src/orchestration/communication-model-switch.ts",
+    find: '  if (usableModels.length === 0) {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/configchat03-model-switch.test.ts"],
+    expectedFailingTestNames: ["② 禁用最后一个可用模型"],
+    rationale:
+      "禁用最后一个可用模型也照做 ⇒ 通信直接中断且用户无模型可用（卡内点名的\"最后模型禁用\"）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-safe-point-claims-switched",
+    targetFile: "packages/core/src/orchestration/communication-model-switch.ts",
+    find: '      isEffective: false,',
+    replace: "      isEffective: true as unknown as false,",
+    testFiles: ["tests/core/unit/configchat03-model-switch.test.ts"],
+    expectedFailingTestNames: ["⑦ 在途任务"],
+    rationale:
+      "在途任务时宣称已生效 ⇒ 用户以为模型已切换而实际仍跑旧模型 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-restart-lies-about-switch",
+    targetFile: "packages/core/src/orchestration/communication-model-switch.ts",
+    find: '  if (input.runtimeEffectiveModelIdentifier === input.persistedTargetModelIdentifier) {',
+    replace: "  if (true) {",
+    testFiles: ["tests/core/unit/configchat03-model-switch.test.ts"],
+    expectedFailingTestNames: ["⑩ 重启对账"],
+    rationale:
+      "持久化写了就算已切换 ⇒ 重启后运行时其实还是旧模型（最容易被谎报的一步）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "configchat-replays-as-fresh-apply",
     targetFile: "packages/core/src/orchestration/config-chat-control-plane.ts",
     find: '  if (identity.kind === "idempotent-replay") {',
