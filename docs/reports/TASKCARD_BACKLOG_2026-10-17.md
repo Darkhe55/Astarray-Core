@@ -1249,3 +1249,9 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 同日 19:5x 的全量 3607 用例还是绿的）。修法：该端口改为 `() => new Date().toISOString()`（测试内的时钟不再随日历过期），
 > 其余断言不变（⑥ 的 2026-10-17 预置样本仍早于 24h 窗口，继续验证真实裁剪）。
 > 归类：**测试夹具缺陷**（产品逻辑未改）。这不是本批三件交付引入的问题，但会卡住 `npm pack` 的 prepack `check`。
+
+> **2026-10-20 ``DOCVIEW-01-03``：计量与语义覆盖（公开入口 + tarball 验收 done）**。
+> 新增 ``document-view-measurement.ts`` + ``scripts/verify-docview-measurement.mjs``：字节/块数/降级数/截断/耗时 +
+> **逐类语义覆盖（expected vs preserved）**，token 明确标注 ``characters/4-estimate``（不冒充真 tokenizer）；
+> 判定只看语义覆盖、**不看长度下降**。安装包实测：md 190→188B、html 150→55B、txt 20→20B，覆盖全部 complete；损坏文件报 corrupted。
+> **13 条反例 + 3 条变异体**（覆盖永真／token 口径换字节／隐藏截断）；``--check-anchors`` **209/209**。

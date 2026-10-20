@@ -993,6 +993,15 @@ export {
   type FirstBatchDocumentFormat,
 } from "./orchestration/document-view-adapter.js";
 /**
+ * DOCVIEW-01-03 计量与语义覆盖：字节/块数/降级数 + 逐类 expected vs preserved。
+ */
+export {
+  measureDocumentExtraction,
+  type DocumentSemanticCategory,
+  type DocumentSemanticCoverageEntry,
+  type DocumentViewMeasurement,
+} from "./orchestration/document-view-measurement.js";
+/**
  * CONFIGCHAT-01-01（2026-10-18）：对话设置的白名单、来源、作用域、风险与幂等契约。
  *
  * 纯判定：不读写配置、不调用模型、不持锁。
