@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "configchat-replays-as-fresh-apply",
+    targetFile: "packages/core/src/orchestration/config-chat-control-plane.ts",
+    find: '  if (identity.kind === "idempotent-replay") {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/configchat01-control-plane.test.ts"],
+    expectedFailingTestNames: ["② 重复提交"],
+    rationale:
+      "重复提交被当成新变更重新落地 ⇒ 设置被重复应用/审计账目重复（卡内点名反例）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-ignores-stale-revision",
+    targetFile: "packages/core/src/orchestration/config-chat-contract.ts",
+    find: "      reasonCode: \"stale-revision\",",
+    replace: "      reasonCode: \"not-in-public-allowlist\",",
+    testFiles: ["tests/core/unit/configchat01-control-plane.test.ts"],
+    expectedFailingTestNames: ["④ 并发编辑"],
+    rationale:
+      "并发编辑被报成\"不在白名单\" ⇒ 用户被误导去改无关设置（真正问题是 revision 落后）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-safe-point-claims-effective",
+    targetFile: "packages/core/src/orchestration/config-chat-control-plane.ts",
+    find: "        isEffective: false,",
+    replace: "        isEffective: true as unknown as false,",
+    testFiles: ["tests/core/unit/configchat01-control-plane.test.ts"],
+    expectedFailingTestNames: ["⑧ 影响在途任务"],
+    rationale:
+      "安全点未到却宣称已生效 ⇒ 用户以为权限/模型已切换（在途任务行为不一致）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "sum01-publish-accepts-mismatched-payload",
     targetFile: "packages/tui/src/cli/commands.ts",
     find: "        reason: \"payload-kind-mismatch：来源种类 \" + sourceKind + \" 需要 \" + fieldName + \"，但载荷里是 \" + knownField,",
