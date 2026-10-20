@@ -1340,3 +1340,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **2026-10-20 ``LESSON-01-03`` 分派节点接线（公开库）**：``MissionOrchestratorOptions.lessonDispatchPort``（可选）。
 > 派发前调用投递端口；**拒绝/抛错都不阻塞派发**（教训建议性），缺省不投递。**4 条接线反例 + 2 条变异体**。
 > **未做**：接收/审查节点、真实存档装配、场景 A/B/C 端到端。
+
+> **2026-10-20 ``LESSON-01-03`` 接收/审查节点接线（公开库）**：``lessonReceivePort``（run 之前）+ ``lessonReviewPort``（收口时，携带真实结局）。
+> 三节点（dispatch/receive/review）**均已接线**且都建议性（抛错不阻塞）。**6 条真实派发路径反例 + 2 条变异体**。
+> **未做**：真实存档装配、场景 A/B/C 端到端、UI 投递状态。

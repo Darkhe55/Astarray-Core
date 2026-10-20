@@ -365,6 +365,26 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "lesson-review-port-never-called",
+    targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
+    find: "    if (this.options.lessonReviewPort !== undefined) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/integration/lesson01-receive-review-wiring.test.ts"],
+    expectedFailingTestNames: ["② 审查端口携带真实结局"],
+    rationale:
+      "审查节点从不被调用 ⇒ 推广永远不发生（接线形同虚设）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-review-miscounts-outcome",
+    targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
+    find: '          outcome: outcome.outcome === "success" ? "success" : outcome.outcome === "ambiguous" ? "ambiguous" : "failure",',
+    replace: '          outcome: "success",',
+    testFiles: ["tests/core/integration/lesson01-receive-review-wiring.test.ts"],
+    expectedFailingTestNames: ["③ 审查端口看到 failure"],
+    rationale:
+      "失败结局被报成 success ⇒ 审查把失败教训当成功推广（污染记忆）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "lesson-dispatch-port-never-called",
     targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
     find: "    if (this.options.lessonDispatchPort !== undefined) {",

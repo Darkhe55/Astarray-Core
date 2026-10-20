@@ -248,6 +248,17 @@ export interface MissionOrchestratorOptions {
    *
    * 教训是**建议性**的：投递失败/被拒绝**不得阻塞派发**（与门禁相反）。
    */
+  /** LESSON-01-03（2026-10-20）：**接收节点**端口（可选；建议性，不阻塞执行）。 */
+  lessonReceivePort?: (input: {
+    missionId: string;
+    taskIdentifier: string;
+  }) => Promise<void>;
+  /** LESSON-01-03（2026-10-20）：**审查节点**端口（可选；建议性，携带真实结局）。 */
+  lessonReviewPort?: (input: {
+    missionId: string;
+    taskIdentifier: string;
+    outcome: "success" | "failure" | "ambiguous";
+  }) => Promise<void>;
   lessonDispatchPort?: (input: {
     missionId: string;
     taskIdentifier: string;
@@ -890,6 +901,14 @@ export class MissionOrchestrator {
       : { progressGuardPort: this.options.workerFactories.progressGuardPort }),
     });
     const workerPromise = (async () => {
+      /** LESSON-01-03 接收节点：任务已被接收、即将执行（建议性，抛错不影响执行）。 */
+      if (this.options.lessonReceivePort !== undefined) {
+        try {
+          await this.options.lessonReceivePort({ missionId, taskIdentifier: action.taskId });
+        } catch {
+          // 建议性投递失败：不影响执行
+        }
+      }
       try {
         const outcome = await worker.run();
         this.inFlightTaskIds.delete(action.taskId);
@@ -1079,6 +1098,21 @@ export class MissionOrchestrator {
      */
     ownerAgentInstanceId: string,
   ): Promise<void> {
+    /**
+     * LESSON-01-03 审查节点（2026-10-20）：把**真实结局**交给审查端口决定是否推广。
+     * 建议性：端口抛错不改变任务状态（审查不能成为收口单点故障）。
+     */
+    if (this.options.lessonReviewPort !== undefined) {
+      try {
+        await this.options.lessonReviewPort({
+          missionId: this.options.missionId,
+          taskIdentifier: taskId,
+          outcome: outcome.outcome === "success" ? "success" : outcome.outcome === "ambiguous" ? "ambiguous" : "failure",
+        });
+      } catch {
+        // 建议性投递失败：不影响任务收口
+      }
+    }
 
     /**
      * G5（2026-11-08 第 234–236 轮）：**早停 ⇒ 有界续跑**（`AGENTS.md`：
