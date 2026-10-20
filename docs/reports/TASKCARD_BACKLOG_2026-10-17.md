@@ -1278,3 +1278,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **2026-10-20 门禁备注**：``npm run check`` 默认并发偶发 1 例失败（本轮为 ``3650 passed / 1 failed``），
 > 以 ``npx vitest run --maxWorkers=2`` 复跑 **3651/3651 通过**确认与本批改动无关（已知并发抖动）。
+
+> **2026-10-20 ``WORKWINDOW-01-02`` 统一门禁（公开库）**：``work-window-gate.ts`` + ``evaluateWorkWindowGate``。
+> dispatch/model/tool-execution **同一套判定**；暂停原因**全量保留**（``mergePauseReasons`` 幂等、不清除既有）；
+> 长工具收尾允许但**不能绕过暂停**；独立反馈放行且不产生模型/业务请求；休息+暂停同时报 ``resting-and-paused``。
+> **12 条反例 + 3 条变异体**。**未做**：接到真实派发/模型/工具路径与 watchdog/权限到期的生产写入方。

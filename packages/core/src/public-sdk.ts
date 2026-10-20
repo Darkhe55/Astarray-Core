@@ -963,6 +963,17 @@ export {
   type WorkWindowState,
 } from "./orchestration/work-window-contract.js";
 /**
+ * WORKWINDOW-01-02 统一门禁：派发/模型/工具执行前同一套判定，暂停原因不互相覆盖。
+ */
+export {
+  evaluateWorkWindowGate,
+  mergePauseReasons,
+  readActivePauseReasonKinds,
+  type WorkWindowGateDecision,
+  type WorkWindowGatePoint,
+  type WorkWindowGateRequest,
+} from "./orchestration/work-window-gate.js";
+/**
  * DOCVIEW-01-01（2026-10-18）：格式适配的内容优先读取（模式枚举、能力矩阵、损失提示、写回禁止）。
  *
  * 纯判定：不解析文件、不渲染、不执行宏/脚本、不写回。
