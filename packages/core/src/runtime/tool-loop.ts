@@ -58,6 +58,23 @@ export interface ToolLoopOptions {
    */
   perfSampleSink?: ToolLoopPerfSampleSink;
   /**
+   * WORKWINDOW-01-02（2026-10-20）：**工具执行前**统一门禁（可选；缺省 ⇒ 行为逐字不变）。
+   *
+   * 拒绝 ⇒ **不执行工具**（无副作用），把原因写进工具结果并列出全部暂停原因。
+   */
+  workWindowGate?: (input: {
+    toolName: string;
+    gatePoint: "tool-execution";
+  }) => Promise<
+    | { readonly kind: "allow"; readonly reason: string }
+    | {
+        readonly kind: "deny";
+        readonly reasonCode: string;
+        readonly reason: string;
+        readonly activePauseReasonKinds?: ReadonlyArray<string>;
+      }
+  >;
+  /**
    * DIAG-01 生产采集（2026-11-08，第 85 轮）：**诊断事件端口**（可选）。
    *
    * 只在**真实执行失败**时上报 —— 卡内明令「正常计划暂停、**用户拒绝、取消**与程序故障
@@ -501,13 +518,47 @@ export async function runToolLoop(
         isProgressGuardAborted = true;
         break;
       }
-      const toolResult: ToolCallResult = isGated
+    /**
+     * WORKWINDOW 工具执行前门禁（2026-10-20）：**先问门禁再执行**。
+     * 拒绝 ⇒ 不调用 toolPort.execute（无副作用），原因与全部暂停原因写进结果。
+     */
+    let workWindowGateDenial: {
+      reason: string;
+      reasonCode: string;
+      activePauseReasonKinds: ReadonlyArray<string>;
+    } | null = null;
+    if (options.workWindowGate !== undefined && !isGated) {
+      const gateDecision = await options.workWindowGate({
+        toolName: toolCall.toolName,
+        gatePoint: "tool-execution",
+      });
+      if (gateDecision.kind === "deny") {
+        workWindowGateDenial = {
+          reason: gateDecision.reason,
+          reasonCode: gateDecision.reasonCode,
+          activePauseReasonKinds: gateDecision.activePauseReasonKinds ?? [],
+        };
+      }
+    }
+    const toolResult: ToolCallResult = isGated
+      ? {
+          kind: "error",
+          callId: toolCall.callId,
+          errorCode: "guidance-gate-requested-pause",
+          errorMessage:
+            "运行中指导要求立即门禁：已阻止本次工具执行并请求暂停以获得人工裁决",
+          isIdempotencyConfirmed: true,
+        }
+      : workWindowGateDenial !== null
         ? {
             kind: "error",
             callId: toolCall.callId,
-            errorCode: "guidance-gate-requested-pause",
+            errorCode: "work-window-gate-denied",
             errorMessage:
-              "运行中指导要求立即门禁：已阻止本次工具执行并请求暂停以获得人工裁决",
+              workWindowGateDenial.reason +
+              (workWindowGateDenial.activePauseReasonKinds.length === 0
+                ? ""
+                : "（生效中的暂停原因：" + workWindowGateDenial.activePauseReasonKinds.join(", ") + "）"),
             isIdempotencyConfirmed: true,
           }
         : await options.toolPort.execute(

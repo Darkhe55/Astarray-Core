@@ -1324,3 +1324,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **2026-10-20 ``CONFIGCHAT-01-02`` 端口接线（公开库）**：``applyChatSettingChange()`` 接真实 ``switchPermissionProfile`` 并**读回确认**；
 > 账目落盘 ``config-chat/setting-change-ledger.json``（重启后仍判幂等）；无 setter 的键 ⇒ ``failed`` + ``previousValueKept`` 且真实权限组未变。
 > **8 条真实运行时反例 + 2 条变异体**。**未做**：其余白名单键的写入接口。
+
+> **2026-10-20 ``WORKWINDOW-01-02`` 工具执行前门禁（公开库）**：``ToolLoopOptions.workWindowGate`` + Worker/编排器逐层透传；
+> ``deny`` ⇒ **不调 toolPort.execute**、结果 ``work-window-gate-denied``、列出全部暂停原因；缺省不变。
+> **5 条接线反例 + 2 条变异体**。**未做**：模型执行前（provider 调用）门禁。
