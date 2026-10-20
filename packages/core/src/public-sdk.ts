@@ -974,6 +974,18 @@ export {
   type WorkWindowGateRequest,
 } from "./orchestration/work-window-gate.js";
 /**
+ * WORKWINDOW-01-03 恢复与停止：睡眠后只恢复一次、手动取消不复活、停止超时如实显示未停止。
+ */
+export {
+  buildWorkWindowSettingsView,
+  describeWorkWindowStopCapability,
+  evaluateWorkWindowResume,
+  type WorkWindowResumeDecision,
+  type WorkWindowResumeRequest,
+  type WorkWindowSettingsView,
+  type WorkWindowStopCapability,
+} from "./orchestration/work-window-resume.js";
+/**
  * DOCVIEW-01-01（2026-10-18）：格式适配的内容优先读取（模式枚举、能力矩阵、损失提示、写回禁止）。
  *
  * 纯判定：不解析文件、不渲染、不执行宏/脚本、不写回。
