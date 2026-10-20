@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "docview-measurement-fakes-complete",
+    targetFile: "packages/core/src/orchestration/document-view-measurement.ts",
+    find: "      isComplete: expectedCount === 0 ? true : preservedCount >= expectedCount,",
+    replace: "      isComplete: true,",
+    testFiles: ["tests/core/unit/docview01-measurement.test.ts"],
+    expectedFailingTestNames: ["⑥ 覆盖不完整"],
+    rationale:
+      "覆盖永远报「完整」⇒ 语义丢失被计量掩盖（比丢内容更危险）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "docview-measurement-token-basis-wrong",
+    targetFile: "packages/core/src/orchestration/document-view-measurement.ts",
+    find: "    tokenEstimate: Math.ceil(input.content.length / 4),",
+    replace: "    tokenEstimate: Buffer.byteLength(input.content, \"utf8\"),",
+    testFiles: ["tests/core/unit/docview01-measurement.test.ts"],
+    expectedFailingTestNames: ["② token 一律标注为"],
+    rationale:
+      "把字符估算换成字节数 ⇒ 口径错了却仍标成\"估算\"（数字虚高，用户按它算钱）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "docview-measurement-hides-truncation",
+    targetFile: "packages/core/src/orchestration/document-view-measurement.ts",
+    find: "    isTruncated: extraction.isTruncated,",
+    replace: "    isTruncated: false,",
+    testFiles: ["tests/core/unit/docview01-measurement.test.ts"],
+    expectedFailingTestNames: ["⑬ 截断必须如实暴露"],
+    rationale:
+      "截断被隐藏 ⇒ 用户以为读全了（漏读不自知）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "docview-adapter-drops-tables",
     targetFile: "packages/core/src/orchestration/document-view-adapter.ts",
     find: "        kind: \"table\",\n        lineStart: startLine,\n        lineEnd: index,",
@@ -3007,6 +3037,15 @@ export const MUTATIONS = [
     testFiles: ["tests/core/unit/relocate01-registration-store.test.ts"],
     expectedFailingTestNames: ["④ 登记文件是坏 JSON"],
     rationale: "坏 JSON 必须如实报 invalid；当作 absent ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "run-history-drops-dedupe",
+    targetFile: "packages/core/src/orchestration/run-history-store.ts",
+    find: `    if (isDuplicate) {`,
+    replace: `    if (false) {`,
+    testFiles: ["tests/core/unit/history01-run-history-store.test.ts"],
+    expectedFailingTestNames: ["③ 重复事件 ⇒ **去重**"],
+    rationale: "重复事件必须去重；放行 ⇒ 去重反例必须变红",
   },
 ];
 
