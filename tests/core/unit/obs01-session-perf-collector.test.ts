@@ -47,7 +47,8 @@ function buildSamplingPorts(options: {
 }): PerfSamplingPorts {
   return {
     readProcessMetrics: () => options.metrics ?? { residentMemoryBytes: 1024 },
-    readNowIso: () => "2026-10-19T12:00:00.000Z",
+    /** 采样时钟用真实时间：固定常量会随日历过期（2026-10-20 实测：24h 保留窗口把旧样本裁掉，反例假红）。 */
+    readNowIso: () => new Date().toISOString(),
     readProcessIdentifier: () => 7,
     appendSample: async (sample) => {
       if (options.appendFailure !== undefined) throw options.appendFailure;
@@ -177,5 +178,6 @@ describe("OBS 会话采集器", () => {
     expect(stopOutcome.retention?.kind).toBe("rewritten");
     expect((await store.readWithIntegrity()).samples).toHaveLength(0);
   });});
+
 
 
