@@ -423,6 +423,19 @@ export {
   type PerfSampleEvent,
   type PerfSamplePage,
 } from "./orchestration/perf-event-store.js";
+/**
+ * PERF-01-02 聚合/分页/告警：队列溢出与时钟异常如实计数、监测器失败不报零。
+ */
+export {
+  DEFAULT_PERF_AGGREGATION_POLICY,
+  aggregatePerfSamplesIntoBuckets,
+  paginatePerfBuckets,
+  type PerfAggregationBucket,
+  type PerfAggregationPolicy,
+  type PerfAggregationResult,
+  type PerfAggregationSample,
+  type PerfBucketAlert,
+} from "./orchestration/perf-aggregation.js";
 export {
   UsageLedgerStore,
   aggregateUsageEntries,
