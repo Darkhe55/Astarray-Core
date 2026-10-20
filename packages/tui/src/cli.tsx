@@ -92,6 +92,7 @@ import {
   executeGuideSubmitCommand,
   executeMcpServeCommand,
   executeSummaryBuildCommand,
+  executeSummaryPublishCommand,
   executeSummaryListCommand,
   executeSummaryShowCommand,
   executeStatusCommand,
@@ -292,6 +293,10 @@ usageCommand
   .description("用量最小概览：范围/明细分页/预算（只报本地账目估算，不冒充官方余额）")
   .option("--mission <mission-id>", "限定可见范围（mission）")
   .option("--agent <agent-instance-id>", "限定可见范围（具体 agentInstanceId，避免读取他人明细）")
+  .option(
+    "--source-kind <kind>",
+    "来源种类：work-archive（缺省）| conversation | report | deferred-file",
+  )
   .option("--detail <level>", "summary | detail（缺省 summary）")
   .option("--page-size <count>", "detail 模式每页条数（缺省 20）")
   .option("--cursor <cursor>", "detail 模式分页游标（上一页 nextCursor）")
@@ -2293,6 +2298,38 @@ summaryCommand
       isJsonOutput: options.json === true,
     });
   });
+summaryCommand
+  .command("publish")
+  .description("发布调用方提供的摘要来源（conversation / report / deferred-file）")
+  .requiredOption("--source-kind <kind>", "来源种类：conversation | report | deferred-file（work-archive 用 build）")
+  .requiredOption("--source <identifier>", "来源标识（如 session-1 / report-set / deferred-queue）")
+  .requiredOption("--payload <path>", "载荷 JSON 文件路径（形如 { \"turns\": [...] }）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      sourceKind: string;
+      source: string;
+      payload: string;
+      json?: boolean;
+    }) => {
+      const allowedSourceKinds = ["conversation", "report", "deferred-file"] as const;
+      if (!allowedSourceKinds.includes(options.sourceKind as (typeof allowedSourceKinds)[number])) {
+        // 用法错误：明确列出允许值，不猜
+        logToStderr(
+          "unsupported-source-kind: --source-kind 只接受 " + allowedSourceKinds.join(" | ") + "（work-archive 请用 summary build）",
+        );
+        process.exitCode = EXIT_CODES.USAGE_ERROR;
+        return;
+      }
+      process.exitCode = await executeSummaryPublishCommand({
+        stateDirectory: defaultStateDirectory(),
+        sourceKind: options.sourceKind as (typeof allowedSourceKinds)[number],
+        sourceIdentifier: options.source,
+        payloadPath: options.payload,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
 summaryCommand
   .command("show")
   .description("读取摘要：默认概览，可用 --chunk 展开章节")
