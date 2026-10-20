@@ -1307,3 +1307,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 队列溢出**如实计数**（critical + ``isMeasurementIncomplete``）、时钟倒退/重复**排除并计数**、
 > 监测器失败**不报零**（告警写明「未测到」）、内存/延迟阈值分档、分页游标稳定不漏页、高并发计数可核对。
 > **12 条反例 + 3 条变异体**。**未做**：进程退出/监测器崩溃真实注入、持久聚合落盘接线。
+
+> **2026-10-20 ``PERF-01-03`` 公开入口包级验收（公开库）**：``scripts/verify-perf-overview-package.mjs`` + ``verify:perf-overview-package``。
+> 已安装 tarball 实测：空库 ``sampleSize=0`` 且耗时 ``null``（不报零）；25 条样本 ⇒ ``sampleSize=25``、内存保留 25（有界）；
+> 追加坏行 ⇒ ``discardedLineCount=1``（不静默）；明细 ``pageSize=10`` ⇒ 页内 10 条。**未做**：TUI/GUI 概览面板、长会话真实采样观测。
