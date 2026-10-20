@@ -1270,3 +1270,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 幂等（同 ID 同内容复用／异内容 ``conflict``）、并发 ``stale-revision``、扩大权限需显式确认且**立即拦截**、
 > 影响在途任务 ⇒ ``awaiting-safe-point`` 且 ``isEffective:false``、失败 ``previousValueKept``、秘密类不进对话。
 > **12 条反例 + 3 条变异体**。**未做**：``SettingApplyPort`` 接真实设置存储、对话候选 UI（与 01-03 一起）。
+
+> **2026-10-20 ``CONFIGCHAT-01-03`` 契约层（公开库）**：``communication-model-switch.ts``。
+> 切断通信（最后模型禁用）／目标不可用／断网／用户取消各自拒绝并给原因与仍可用模型；在途任务走 **安全点** 且 ``isEffective:false``；
+> 无在途 ⇒ 立即切换并带**回滚目标**；重启对账在「持久化≠运行时」时报 ``recovery-needed``（不谎报已切换）。**12 条反例 + 3 条变异体**。
+> **未做**：接真实模型注册表执行切换、UI 候选入口、包入口测试。
