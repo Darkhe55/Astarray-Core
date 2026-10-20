@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "docview-adapter-drops-tables",
+    targetFile: "packages/core/src/orchestration/document-view-adapter.ts",
+    find: "        kind: \"table\",\n        lineStart: startLine,\n        lineEnd: index,",
+    replace: "        kind: \"paragraph\",\n        lineStart: startLine,\n        lineEnd: index,",
+    testFiles: ["tests/core/unit/docview01-adapter.test.ts"],
+    expectedFailingTestNames: ["⑤ 表格"],
+    rationale:
+      "表格被当成普通段落 ⇒ 表头/单元格关系静默丢失（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "docview-adapter-guesses-corrupted",
+    targetFile: "packages/core/src/orchestration/document-view-adapter.ts",
+    find: "  if (content.includes(\"\\u0000\")) {\n    return \"内容包含 NUL 字节",
+    replace: "  if (false) {\n    return \"内容包含 NUL 字节",
+    testFiles: ["tests/core/unit/docview01-adapter.test.ts"],
+    expectedFailingTestNames: ["③ 损坏文件"],
+    rationale:
+      "二进制内容被当作文本继续解析 ⇒ 给出半真半假的正文（比报错更危险）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "docview-adapter-drops-anchors",
+    targetFile: "packages/core/src/orchestration/document-view-adapter.ts",
+    find: "    sourceAnchor: `${format}:line:${String(block.lineStart)}`,",
+    replace: "    sourceAnchor: `${format}:block:${String(index + 1)}`,",
+    testFiles: ["tests/core/unit/docview01-adapter.test.ts"],
+    expectedFailingTestNames: ["⑫ 每块都有"],
+    rationale:
+      "锚点从\"行号定位\"退化为\"序号\" ⇒ 无法回指原文位置（补读与证据链失效）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "fold-internal-widens-scope",
     targetFile: "packages/core/src/orchestration/workflow-fold-internal-authorization.ts",
     find: "      if (!input.declaredCapabilityScope.has(capability)) {",
@@ -2977,15 +3007,6 @@ export const MUTATIONS = [
     testFiles: ["tests/core/unit/relocate01-registration-store.test.ts"],
     expectedFailingTestNames: ["④ 登记文件是坏 JSON"],
     rationale: "坏 JSON 必须如实报 invalid；当作 absent ⇒ 该反例必须变红",
-  },
-  {
-    mutationIdentifier: "run-history-drops-dedupe",
-    targetFile: "packages/core/src/orchestration/run-history-store.ts",
-    find: `    if (isDuplicate) {`,
-    replace: `    if (false) {`,
-    testFiles: ["tests/core/unit/history01-run-history-store.test.ts"],
-    expectedFailingTestNames: ["③ 重复事件 ⇒ **去重**"],
-    rationale: "重复事件必须去重；放行 ⇒ 去重反例必须变红",
   },
 ];
 
