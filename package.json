@@ -50,7 +50,8 @@
     "verify:u2-flash-continuous-reception": "node scripts/verify-u2-flash-continuous-reception.mjs",
     "test:scripts": "node --test \"scripts/lib/*.test.mjs\"",
     "verify:contract-sdk": "node scripts/verify-contract-sdk-package.mjs",
-    "verify:relocation-batch": "node scripts/verify-relocation-batch-sample.mjs"
+    "verify:relocation-batch": "node scripts/verify-relocation-batch-sample.mjs",
+    "verify:docview-measurement": "node scripts/verify-docview-measurement.mjs --package-dir .tmp/docview-measurement-package"
   },
   "dependencies": {
     "commander": "^15.0.0",
