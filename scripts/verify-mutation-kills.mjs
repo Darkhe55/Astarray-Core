@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "lesson-delivery-duplicates-on-retry",
+    targetFile: "packages/core/src/orchestration/lesson-delivery.ts",
+    find: '  if (existing.outcome === input.outcome) {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/lesson03-delivery.test.ts"],
+    expectedFailingTestNames: ["⑤ 崩溃重试"],
+    rationale:
+      "崩溃重试重复投递 ⇒ 同一教训被投两次/重复推广（卡内点名\"崩溃重试无重复推广\"）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-delivery-ignores-switch",
+    targetFile: "packages/core/src/orchestration/lesson-delivery.ts",
+    find: "    (entry) => entry.modelFingerprint === currentFingerprint,",
+    replace: "    (entry) => true,",
+    testFiles: ["tests/core/unit/lesson03-delivery.test.ts"],
+    expectedFailingTestNames: ["⑧ 模型切换"],
+    rationale:
+      "模型切换后仍把旧模型下的教训投给新模型 ⇒ 串用（卡内点名\"模型切换不串用\"）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-delivery-auto-summarizes-when-disabled",
+    targetFile: "packages/core/src/orchestration/lesson-delivery.ts",
+    find: "  if (!input.isAutoSummaryEnabled) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/lesson03-delivery.test.ts"],
+    expectedFailingTestNames: ["② 关闭自动总结"],
+    rationale:
+      "关闭自动总结仍投递 ⇒ 后台偷偷总结（卡内点名\"关闭无自动总结/检索\"）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "lesson-cross-task-keeps-details",
     targetFile: "packages/core/src/orchestration/lesson-selection.ts",
     find: '    const isCrossTask =\n      candidate.scopeKind !== "task" && candidate.sourceTaskIdentifier !== request.taskIdentifier;',

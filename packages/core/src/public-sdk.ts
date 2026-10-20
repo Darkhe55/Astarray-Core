@@ -949,6 +949,21 @@ export {
   type LessonSelectionResult,
 } from "./orchestration/lesson-selection.js";
 /**
+ * LESSON-01-03 投递账目：三节点接线契约、关闭不自动总结、模型切换不串用、崩溃重试幂等。
+ */
+export {
+  computeLessonDeliveryKey,
+  computeLessonModelFingerprint,
+  planLessonDelivery,
+  reconcileLessonDeliveriesAfterModelSwitch,
+  recordLessonDeliveryResult,
+  type LessonDeliveryItem,
+  type LessonDeliveryLedgerEntry,
+  type LessonDeliveryPlan,
+  type LessonDeliveryPlanEntry,
+  type LessonDeliveryStage,
+} from "./orchestration/lesson-delivery.js";
+/**
  * WORKWINDOW-01-01（2026-10-18）：工作/休息时段的规则、时区、暂停原因与恢复契约。
  *
  * 纯判定：不调度、不取消工具、不写盘、不唤醒系统服务。
