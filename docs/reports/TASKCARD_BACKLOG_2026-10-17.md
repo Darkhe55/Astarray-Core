@@ -1320,3 +1320,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **2026-10-20 ``WORKWINDOW-01-02`` 派发接线（公开库）**：`MissionOrchestratorOptions.workWindowGate` + `launchWorker` 派发前调用；
 > `deny` ⇒ 不建 Worker、不调模型/工具、升级全部暂停原因、使命收口 `cancelled`；缺省门禁 ⇒ 行为逐字不变。
 > **5 条接线反例 + 2 条变异体**（拒绝仍派发／门禁从不被调用）。**未做**：模型与工具执行前两处接线。
+
+> **2026-10-20 ``CONFIGCHAT-01-02`` 端口接线（公开库）**：``applyChatSettingChange()`` 接真实 ``switchPermissionProfile`` 并**读回确认**；
+> 账目落盘 ``config-chat/setting-change-ledger.json``（重启后仍判幂等）；无 setter 的键 ⇒ ``failed`` + ``previousValueKept`` 且真实权限组未变。
+> **8 条真实运行时反例 + 2 条变异体**。**未做**：其余白名单键的写入接口。
