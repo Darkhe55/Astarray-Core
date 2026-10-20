@@ -365,6 +365,26 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "workwindow-dispatch-ignores-deny",
+    targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
+    find: '      if (gateDecision.kind === "deny") {',
+    replace: "      if (false) {",
+    testFiles: ["tests/core/integration/workwindow01-dispatch-gate.test.ts"],
+    expectedFailingTestNames: ["① 门禁拒绝"],
+    rationale:
+      "门禁拒绝仍派发 ⇒ 休息/暂停期间照跑模型与工具（越权执行）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-dispatch-never-asks-gate",
+    targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
+    find: "    if (workWindowGate !== undefined) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/integration/workwindow01-dispatch-gate.test.ts"],
+    expectedFailingTestNames: ["④ 门禁入参正确"],
+    rationale:
+      "门禁从不被调用 ⇒ 接线形同虚设（配置了也没用）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "perf-aggregation-silently-drops-overflow",
     targetFile: "packages/core/src/orchestration/perf-aggregation.ts",
     find: "    input.samples.length - policy.maximumQueuedSamples,",
