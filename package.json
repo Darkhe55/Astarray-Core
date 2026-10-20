@@ -53,7 +53,8 @@
     "verify:relocation-batch": "node scripts/verify-relocation-batch-sample.mjs",
     "verify:docview-measurement": "node scripts/verify-docview-measurement.mjs --package-dir .tmp/docview-measurement-package",
     "verify:history-measurement": "npx tsx scripts/verify-history-measurement.mjs",
-    "verify:perf-overview-package": "node scripts/verify-perf-overview-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
+    "verify:perf-overview-package": "node scripts/verify-perf-overview-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
+    "verify:project-pressure-package": "node scripts/verify-project-pressure-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
   },
   "dependencies": {
     "commander": "^15.0.0",
