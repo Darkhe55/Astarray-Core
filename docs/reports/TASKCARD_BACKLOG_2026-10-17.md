@@ -1265,3 +1265,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > （载荷种类不匹配 ⇒ ``payload-kind-mismatch`` 拒绝；非法条目指出第几项；空来源 ``no-history`` 退出码 1），
 > 并补 ``summary show --source-kind``（此前非工作存档摘要 list 可见但 show 打不开）。**7 条反例 + 3 条变异体**。
 > **未做**：TUI 面板展示、资源指标报表。
+
+> **2026-10-20 ``CONFIGCHAT-01-02`` 控制面（公开库）**：``config-chat-control-plane.ts`` + ``applySettingChangeProposal``。
+> 幂等（同 ID 同内容复用／异内容 ``conflict``）、并发 ``stale-revision``、扩大权限需显式确认且**立即拦截**、
+> 影响在途任务 ⇒ ``awaiting-safe-point`` 且 ``isEffective:false``、失败 ``previousValueKept``、秘密类不进对话。
+> **12 条反例 + 3 条变异体**。**未做**：``SettingApplyPort`` 接真实设置存储、对话候选 UI（与 01-03 一起）。

@@ -1022,6 +1022,17 @@ export {
   type SettingScopeKind,
 } from "./orchestration/config-chat-contract.js";
 /**
+ * CONFIGCHAT-01-02 配置控制面：幂等/冲突/并发 revision/撤权立即拦截/安全点/失败保留旧版本。
+ */
+export {
+  applySettingChangeProposal,
+  isSecretSettingKey,
+  type SettingApplyPort,
+  type SettingApplyPortResult,
+  type SettingChangeApplicationOutcome,
+  type SettingChangeLedgerEntry,
+} from "./orchestration/config-chat-control-plane.js";
+/**
  * EXP-01 / FOLD-01-02（2026-10-19）：候选 → 组合包 → 独立验证 → 注册。
  *
  * 纯判定：不执行工作流、不注册工具、不写盘、不调模型。
