@@ -1255,3 +1255,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **逐类语义覆盖（expected vs preserved）**，token 明确标注 ``characters/4-estimate``（不冒充真 tokenizer）；
 > 判定只看语义覆盖、**不看长度下降**。安装包实测：md 190→188B、html 150→55B、txt 20→20B，覆盖全部 complete；损坏文件报 corrupted。
 > **13 条反例 + 3 条变异体**（覆盖永真／token 口径换字节／隐藏截断）；``--check-anchors`` **209/209**。
+
+> **2026-10-20 ``HISTORY-01-04`` 资源测量（公开库）**：``scripts/verify-history-measurement.mjs`` + ``verify:history-measurement``。
+> 真实 RunHistoryStore 种子 2,000 / 20,000 条，测首页/锚点页/检索页；**分页有界**、内存 ≤64 MiB、耗时增长 ≤10×。
+> 实测：首页 3.795→3.356ms（0.88×）、锚点 1.348→2.811ms、检索 11.826→30.833ms（扫描型，如实记录）；``failures: []``。
+> 口径：本进程 heapUsed 差值 + performance.now，不含 UI 渲染与冷缓存。**剩**：人工体验。
