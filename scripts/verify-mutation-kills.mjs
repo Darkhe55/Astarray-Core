@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "workwindow-gate-ignores-pause-reasons",
+    targetFile: "packages/core/src/orchestration/work-window-gate.ts",
+    find: "  if (activePauseReasonKinds.length > 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/workwindow01-gate.test.ts"],
+    expectedFailingTestNames: ["⑤ 暂停原因存在"],
+    rationale:
+      "暂停原因被忽略 ⇒ 用户暂停/权限到期后仍继续调用模型与工具（越权执行）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-gate-only-one-gate-point",
+    targetFile: "packages/core/src/orchestration/work-window-gate.ts",
+    find: '  if (request.isLongRunningContinuation === true && activePauseReasonKinds.length === 0) {',
+    replace: '  if (request.isLongRunningContinuation === true) {',
+    testFiles: ["tests/core/unit/workwindow01-gate.test.ts"],
+    expectedFailingTestNames: ["⑨ 长工具收尾"],
+    rationale:
+      "长工具收尾绕过暂停原因 ⇒ 权限到期/用户暂停期间工具继续跑（门禁被\"收尾\"理由绕过）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-gate-collapses-reasons",
+    targetFile: "packages/core/src/orchestration/work-window-gate.ts",
+    find: "  return Object.entries(state.pausedReasons)\n    .filter(([, isPaused]) => isPaused === true)\n    .map(([kind]) => kind);",
+    replace: "  return Object.entries(state.pausedReasons)\n    .filter(([, isPaused]) => isPaused === true)\n    .map(([kind]) => kind)\n    .slice(0, 1);",
+    testFiles: ["tests/core/unit/workwindow01-gate.test.ts"],
+    expectedFailingTestNames: ["⑦ 合并暂停原因"],
+    rationale:
+      "多个暂停原因被折叠成一个 ⇒ 用户看不到全部原因（互为覆盖，卡内点名）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "configchat-switch-breaks-communication",
     targetFile: "packages/core/src/orchestration/communication-model-switch.ts",
     find: '  if (usableModels.length === 0) {',
