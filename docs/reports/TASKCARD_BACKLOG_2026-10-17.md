@@ -1283,3 +1283,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > dispatch/model/tool-execution **同一套判定**；暂停原因**全量保留**（``mergePauseReasons`` 幂等、不清除既有）；
 > 长工具收尾允许但**不能绕过暂停**；独立反馈放行且不产生模型/业务请求；休息+暂停同时报 ``resting-and-paused``。
 > **12 条反例 + 3 条变异体**。**未做**：接到真实派发/模型/工具路径与 watchdog/权限到期的生产写入方。
+
+> **2026-10-20 ``WORKWINDOW-01-03`` 恢复/停止/设置视图（公开库）**：``work-window-resume.ts``。
+> 睡眠后**只恢复一次**（同唤醒重复调用 ⇒ ``already-resumed``）、手动取消**不复活**、休息期 ``no-new-business-calls``；
+> 停止超时未确认 ⇒ ``stop-unresponsive`` + ``didStop:false`` + ``isHonestNotStopped:true``（**禁止显示已停止**）；
+> 设置视图暂停原因全列、无规则时说明「默认全天可工作」。**13 条反例 + 3 条变异体**。**未做**：对话入口 UI、重启包测试。
