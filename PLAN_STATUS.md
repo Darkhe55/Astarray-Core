@@ -2150,3 +2150,25 @@ T05B→T08 接入（AR-04 身份一致性及次级 Git 集成复验项）：
 1. **TUI 文件夹授权的批准/撤销按钮**：CLI 与 GUI 已覆盖该能力，TUI 当前只有只读面板 ⇒ 属真实未做项；
 2. **更重的集成切片**：LESSON 真实存档装配与场景 A/B/C 端到端、多项目真实业务链路（当前 mock runtime/mock 执行器）；
 3. **macOS 平台证据**（RELIABILITY-01-03 / AR-07 / B6R-10 / SMART-01 / BRIDGE-01）：只能由平台或真机提供，外部阻塞。
+
+## 2026-10-20 最终收口（A+B 全量，双库实测）
+
+| 库 | 项 | 实测 |
+|---|---|---|
+| 公开 | 全量测试（`--maxWorkers=2`） | **3,747 通过** |
+| 公开 | 覆盖率 | 行 92.13 / **分支 85.40** / 函数 93.39 / 语句 92.25 |
+| 公开 | 变异体 | **245/245 被拦下** |
+| 公开 | `npm pack` | **267 文件** sha256 `EDED582D4150FD5D…` |
+| 公开 | 验收 | verify-package 通过 / contract-sdk **26/26** / sdk-consumer 通过 / relocation **11/11** / docview 计量通过 / perf 概览通过 / project 压力通过 |
+| 私有 | `check:full` | **318 用例**；变异 **23/23**；typecheck 现覆盖 TUI |
+| 私有 | `verify:package` | **7/7** |
+
+**A 清单**：DOCVIEW-01-03 ✅；FOLDER-01-03（GUI 面板 + TUI 写动作）✅；HISTORY-01-04（GUI 历史面板 + 资源测量）✅。
+**B 清单**：SUM-01-04 ✅；CONFIGCHAT-01-02（控制面 + 真实端口接线）✅；CONFIGCHAT-01-03 ✅；
+WORKWINDOW-01-02（dispatch/model/tool-execution 三处运行时接线）✅；WORKWINDOW-01-03 ✅；LESSON-01-02 ✅；
+LESSON-01-03（dispatch/receive/review 三节点接线）✅；PERF-01-02 ✅；PERF-01-03（公开入口 + GUI 概览）✅；PROJECT-01-04 ✅。
+
+**剩余（外部/需产品决定，非本地可证）**：
+1. macOS 平台证据（RELIABILITY-01-03 / AR-07 / B6R-10 / SMART-01 / BRIDGE-01）；
+2. LESSON 真实存档装配与场景 A/B/C 端到端、多项目真实业务链路；
+3. TUI 入口 tui.tsx 的端口注入一行仍被排除在类型检查外（依赖公开库 ./bootstrap.js，分层遗留）。
