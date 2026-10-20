@@ -365,6 +365,26 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "workwindow-tool-gate-ignored",
+    targetFile: "packages/core/src/runtime/tool-loop.ts",
+    find: '      : workWindowGateDenial !== null',
+    replace: "      : false && workWindowGateDenial !== null",
+    testFiles: ["tests/core/integration/workwindow01-tool-gate.test.ts"],
+    expectedFailingTestNames: ["① 门禁拒绝"],
+    rationale:
+      "门禁拒绝仍执行工具 ⇒ 休息/暂停期间工具照跑并产生副作用（卡内点名）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-tool-gate-not-asked",
+    targetFile: "packages/core/src/runtime/tool-loop.ts",
+    find: "    if (options.workWindowGate !== undefined && !isGated) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/integration/workwindow01-tool-gate.test.ts"],
+    expectedFailingTestNames: ["⑤ 门禁入参正确"],
+    rationale:
+      "工具门禁从不被调用 ⇒ 配置了也不生效（接线形同虚设）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "configchat-port-skips-readback",
     targetFile: "packages/core/src/public-sdk.ts",
     find: "        await this.switchPermissionProfile(reference);",

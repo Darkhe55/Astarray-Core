@@ -85,6 +85,19 @@ export interface WorkerAgentOptions {
   runtime: AgentRuntime;
   /** T07D-R2-03：暴露给 Provider 的工具子集描述符（默认空 = 不暴露工具）。 */
   availableToolDescriptors?: ToolDescriptor[];
+  /** WORKWINDOW-01-02（2026-10-20）：工具执行前门禁（可选；缺省 ⇒ 不门禁）。 */
+  workWindowGate?: (input: {
+    toolName: string;
+    gatePoint: "tool-execution";
+  }) => Promise<
+    | { readonly kind: "allow"; readonly reason: string }
+    | {
+        readonly kind: "deny";
+        readonly reasonCode: string;
+        readonly reason: string;
+        readonly activePauseReasonKinds?: ReadonlyArray<string>;
+      }
+  >;
   /** T07D-R2-03：Provider 运行时必须给出本地完成控制事件才允许结案。 */
   requireCompletionEvent?: boolean;
   /**
@@ -492,6 +505,12 @@ export class WorkerAgent {
         runtime: this.options.runtime,
         toolPort: this.options.toolPort,
         maxLoopIterations: this.options.maxLoopIterations,
+        ...(this.options.workWindowGate === undefined
+          ? {}
+          : {
+              workWindowGate: (gateInput: { toolName: string; gatePoint: "tool-execution" }) =>
+                this.options.workWindowGate!(gateInput),
+            }),
         cancellationSignal: this.cancellationController.signal,
         guidanceSafePointPort: this.options.guidanceSafePointPort,
         // PERF-01-02 采集（第 83 轮接线）：未提供 ⇒ 不采集
