@@ -51,7 +51,8 @@
     "test:scripts": "node --test \"scripts/lib/*.test.mjs\"",
     "verify:contract-sdk": "node scripts/verify-contract-sdk-package.mjs",
     "verify:relocation-batch": "node scripts/verify-relocation-batch-sample.mjs",
-    "verify:docview-measurement": "node scripts/verify-docview-measurement.mjs --package-dir .tmp/docview-measurement-package"
+    "verify:docview-measurement": "node scripts/verify-docview-measurement.mjs --package-dir .tmp/docview-measurement-package",
+    "verify:history-measurement": "npx tsx scripts/verify-history-measurement.mjs"
   },
   "dependencies": {
     "commander": "^15.0.0",
@@ -76,3 +77,4 @@
     "esbuild@0.27.7": true
   }
 }
+
