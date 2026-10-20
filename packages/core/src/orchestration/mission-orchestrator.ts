@@ -246,7 +246,8 @@ export interface MissionOrchestratorOptions {
   workWindowGate?: (input: {
     missionId: string;
     taskIdentifier: string;
-    gatePoint: "dispatch";
+    gatePoint: "dispatch" | "tool-execution";
+    toolName?: string;
   }) => Promise<
     | { readonly kind: "allow"; readonly reason: string }
     | {
@@ -848,6 +849,18 @@ export class MissionOrchestrator {
                 severity: "error",
               }),
           }),
+    /** WORKWINDOW-01-02：工具执行前门禁透传（缺省 ⇒ 不传 ⇒ 不门禁）。 */
+    ...(this.options.workWindowGate === undefined
+      ? {}
+      : {
+          workWindowGate: (gateInput: { toolName: string; gatePoint: "tool-execution" }) =>
+            this.options.workWindowGate!({
+              missionId,
+              taskIdentifier: task.id,
+              gatePoint: "tool-execution",
+              toolName: gateInput.toolName,
+            }),
+        }),
     /** G2（第 130 轮）：守卫端口透传。缺省 ⇒ 不传 ⇒ 不启用。 */
     ...(this.options.workerFactories.progressGuardPort === undefined
       ? {}
