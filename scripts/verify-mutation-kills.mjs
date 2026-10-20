@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "perf-aggregation-silently-drops-overflow",
+    targetFile: "packages/core/src/orchestration/perf-aggregation.ts",
+    find: "    input.samples.length - policy.maximumQueuedSamples,",
+    replace: "    0,",
+    testFiles: ["tests/core/unit/perf01-aggregation.test.ts"],
+    expectedFailingTestNames: ["② 队列溢出"],
+    rationale:
+      "队列溢出被静默吞掉（丢弃数报 0）⇒ 用户以为样本完整（卡内点名队列溢出反例）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "perf-aggregation-reorders-clock-anomaly",
+    targetFile: "packages/core/src/orchestration/perf-aggregation.ts",
+    find: "    if (milliseconds <= previousMilliseconds) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/perf01-aggregation.test.ts"],
+    expectedFailingTestNames: ["③ 时钟倒退"],
+    rationale:
+      "时钟倒退的样本被正常接受 ⇒ 聚合窗口错乱却看不出来（卡内点名时钟变化反例）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "perf-aggregation-reports-zero-on-monitor-failure",
+    targetFile: "packages/core/src/orchestration/perf-aggregation.ts",
+    find: "    isMeasurementIncomplete: monitorFailureCount > 0 || queueOverflowDroppedSampleCount > 0,",
+    replace: "    isMeasurementIncomplete: false,",
+    testFiles: ["tests/core/unit/perf01-aggregation.test.ts"],
+    expectedFailingTestNames: ["⑤ 监测器失败"],
+    rationale:
+      "监测器失败仍报「测量完整」⇒ 上层把没测到当成 0（卡内点名「无法测量不报零」）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "lesson-delivery-duplicates-on-retry",
     targetFile: "packages/core/src/orchestration/lesson-delivery.ts",
     find: '  if (existing.outcome === input.outcome) {',
