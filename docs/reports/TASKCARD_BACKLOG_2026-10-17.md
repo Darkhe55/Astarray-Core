@@ -1260,3 +1260,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 真实 RunHistoryStore 种子 2,000 / 20,000 条，测首页/锚点页/检索页；**分页有界**、内存 ≤64 MiB、耗时增长 ≤10×。
 > 实测：首页 3.795→3.356ms（0.88×）、锚点 1.348→2.811ms、检索 11.826→30.833ms（扫描型，如实记录）；``failures: []``。
 > 口径：本进程 heapUsed 差值 + performance.now，不含 UI 渲染与冷缓存。**剩**：人工体验。
+
+> **2026-10-20 ``SUM-01-04`` CLI 接线（公开库）**：``summary publish --source-kind conversation|report|deferred-file``
+> （载荷种类不匹配 ⇒ ``payload-kind-mismatch`` 拒绝；非法条目指出第几项；空来源 ``no-history`` 退出码 1），
+> 并补 ``summary show --source-kind``（此前非工作存档摘要 list 可见但 show 打不开）。**7 条反例 + 3 条变异体**。
+> **未做**：TUI 面板展示、资源指标报表。

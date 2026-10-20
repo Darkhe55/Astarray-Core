@@ -26,7 +26,7 @@
 | SUM-01-01 | 登记未占用ADR编号，定义manifest、sourceRevision/hash、coverage、pending尾部、分块和cursor；动态详细度原型 | 长短、多分支、重复消息样本；摘要可增长且无固定总长裁剪；cursor绑定Agent/版本 |
 | SUM-01-02 | 受控保存增量索引与原子发布，本地提取权威事实，后台生成叙述；旧文件迁移/外部变化失效 | 崩溃不出现新摘要指旧正文；pending生成可续跑；读取不触发全文重摘要；single-flight有效 |
 | SUM-01-03 | 默认摘要与章节展开、分页、有界读取和来源校验 | 实测不读取原文或现场全文哈希；长摘要只读取索引及必要页；陈旧/跨Agent cursor拒绝；可定位原证据 |
-| SUM-01-04 | 应用/CLI/现有TUI接线、安装包消费与资源指标 | 从包读取大历史摘要再展开；记录磁盘I/O和模型返回量；资源不足不丢正文且状态诚实 |
+| SUM-01-04 | 应用/CLI/现有TUI接线、安装包消费与资源指标 | 从包读取大历史摘要再展开；记录磁盘I/O和模型返回量；资源不足不丢正文且状态诚实 | **CLI 接线 done（2026-10-20）**：新增 `astarray summary publish --source-kind conversation|report|deferred-file --source <id> --payload <json>`（`executeSummaryPublishCommand`）：载荷与来源种类**不匹配即拒绝**（`payload-kind-mismatch`）、非法条目**指出第几项**（不静默丢弃）、空来源 `no-history` 且退出码 1（不发布空清单冒充成功）；并补上 `summary show --source-kind`（此前固定按 work-archive 查找 ⇒ 非工作存档摘要「list 看得见、show 打不开」）。**7 条反例 + 3 条变异体**（错配照收／静默丢弃非法条目／show 忽略来源种类）。**未做**：TUI 面板展示与资源指标报表（属 SUM-01-04 余项）。 |
 
 更新以新增内容量和阶段检查点触发，具体阈值由01测量决定。动态摘要不能退化成全文副本；通过信息覆盖、重复率和任务回访质量验证，而非硬性长度限制。
 
