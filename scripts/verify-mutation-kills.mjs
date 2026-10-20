@@ -365,6 +365,26 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "workwindow-model-gate-ignored",
+    targetFile: "packages/core/src/runtime/tool-loop.ts",
+    find: '      if (modelGateDecision.kind === "deny") {',
+    replace: "      if (false) {",
+    testFiles: ["tests/core/integration/workwindow01-model-gate.test.ts"],
+    expectedFailingTestNames: ["① 门禁拒绝"],
+    rationale:
+      "模型门禁拒绝仍请求模型 ⇒ 休息期间照烧 token（卡内点名）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-model-gate-not-asked",
+    targetFile: "packages/core/src/runtime/tool-loop.ts",
+    find: "    if (options.workWindowGate !== undefined) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/integration/workwindow01-model-gate.test.ts"],
+    expectedFailingTestNames: ["⑤ 门禁入参"],
+    rationale:
+      "模型门禁从不被询问 ⇒ 三处门禁只剩两处（配置了也不生效）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "workwindow-tool-gate-ignored",
     targetFile: "packages/core/src/runtime/tool-loop.ts",
     find: '      : workWindowGateDenial !== null',

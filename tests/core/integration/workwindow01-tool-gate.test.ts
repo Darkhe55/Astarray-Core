@@ -38,10 +38,10 @@ function buildRuntime(): AgentRuntime {
 }
 
 async function runWithGate(input: {
-  gate?: (request: { toolName: string; gatePoint: "tool-execution" }) => Promise<GateDecision>;
-}): Promise<{ executeCount: number; toolErrorCodes: string[]; events: AgentEvent[]; gateInputs: Array<{ toolName: string; gatePoint: string }> }> {
+  gate?: (request: { toolName?: string; gatePoint: "model" | "tool-execution" }) => Promise<GateDecision>;
+}): Promise<{ executeCount: number; toolErrorCodes: string[]; events: AgentEvent[]; gateInputs: Array<{ toolName?: string | undefined; gatePoint: string }> }> {
   let executeCount = 0;
-  const gateInputs: Array<{ toolName: string; gatePoint: string }> = [];
+  const gateInputs: Array<{ toolName?: string | undefined; gatePoint: string }> = [];
   const toolPort: ToolPort = {
     async execute(): Promise<ToolCallResult> {
       executeCount += 1;
@@ -66,7 +66,7 @@ async function runWithGate(input: {
       ...(input.gate === undefined
         ? {}
         : {
-            workWindowGate: async (request: { toolName: string; gatePoint: "tool-execution" }) => {
+            workWindowGate: async (request: { toolName?: string; gatePoint: "model" | "tool-execution" }) => {
               gateInputs.push({ toolName: request.toolName, gatePoint: request.gatePoint });
               return await input.gate!(request);
             },
@@ -83,12 +83,15 @@ async function runWithGate(input: {
 describe("WORKWINDOW-01-02 工具执行前门禁", () => {
   it("① 门禁拒绝 ⇒ 工具**一次都没执行**，结果带 work-window-gate-denied", async () => {
     const result = await runWithGate({
-      gate: async () => ({
-        kind: "deny",
-        reasonCode: "resting",
-        reason: "当前处于休息时段：不执行工具。",
-        activePauseReasonKinds: ["user-paused", "watchdog"],
-      }),
+      gate: async (request) =>
+        request.gatePoint === "tool-execution"
+          ? {
+              kind: "deny",
+              reasonCode: "resting",
+              reason: "当前处于休息时段：不执行工具。",
+              activePauseReasonKinds: ["user-paused", "watchdog"],
+            }
+          : { kind: "allow", reason: "模型调用放行（本用例只测工具门禁）" },
     });
     expect(result.executeCount).toBe(0);
     expect(result.toolErrorCodes).toContain("work-window-gate-denied");
@@ -96,12 +99,15 @@ describe("WORKWINDOW-01-02 工具执行前门禁", () => {
 
   it("② 拒绝原因里含**全部**暂停原因（不折叠）", async () => {
     const result = await runWithGate({
-      gate: async () => ({
-        kind: "deny",
-        reasonCode: "paused",
-        reason: "存在暂停原因。",
-        activePauseReasonKinds: ["user-paused", "watchdog"],
-      }),
+      gate: async (request) =>
+        request.gatePoint === "tool-execution"
+          ? {
+              kind: "deny",
+              reasonCode: "paused",
+              reason: "存在暂停原因。",
+              activePauseReasonKinds: ["user-paused", "watchdog"],
+            }
+          : { kind: "allow", reason: "模型调用放行（本用例只测工具门禁）" },
     });
     const finished = result.events.find(
       (event) => event.kind === "toolCallFinished" && (event as { errorCode?: string }).errorCode === "work-window-gate-denied",
@@ -123,7 +129,15 @@ describe("WORKWINDOW-01-02 工具执行前门禁", () => {
 
   it("⑤ 门禁入参正确：toolName + gatePoint=tool-execution", async () => {
     const result = await runWithGate({ gate: async () => ({ kind: "allow", reason: "工作时段" }) });
-    expect(result.gateInputs).toEqual([{ toolName: "write-file", gatePoint: "tool-execution" }]);
+    expect(result.gateInputs.filter((entry) => entry.gatePoint === "tool-execution")).toEqual([
+      { toolName: "write-file", gatePoint: "tool-execution" },
+    ]);
   });
 });
+
+
+
+
+
+
 

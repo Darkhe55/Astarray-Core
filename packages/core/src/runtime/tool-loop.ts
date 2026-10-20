@@ -63,8 +63,8 @@ export interface ToolLoopOptions {
    * 拒绝 ⇒ **不执行工具**（无副作用），把原因写进工具结果并列出全部暂停原因。
    */
   workWindowGate?: (input: {
-    toolName: string;
-    gatePoint: "tool-execution";
+    toolName?: string;
+    gatePoint: "model" | "tool-execution";
   }) => Promise<
     | { readonly kind: "allow"; readonly reason: string }
     | {
@@ -401,6 +401,38 @@ export async function runToolLoop(
       options.onGuidanceApplied?.(application);
     }
 
+    /**
+     * WORKWINDOW 模型执行前门禁（2026-10-20）：**先问门禁再请求模型**。
+     * 拒绝 ⇒ 不调用 `runtime.run`（provider 调用计数保持 0），本轮即收口并写明原因。
+     */
+    if (options.workWindowGate !== undefined) {
+      const modelGateDecision = await options.workWindowGate({
+        gatePoint: "model",
+      });
+      if (modelGateDecision.kind === "deny") {
+        const modelGatePauseReasons = modelGateDecision.activePauseReasonKinds ?? [];
+        const modelGateDetail =
+          "模型执行被门禁拦截：" +
+          modelGateDecision.reason +
+          (modelGatePauseReasons.length === 0
+            ? ""
+            : "（生效中的暂停原因：" + modelGatePauseReasons.join(", ") + "）");
+        push({
+          kind: "runFinished",
+          agentId: agentRunInput.agentId,
+          reason: "error",
+          detail: modelGateDetail,
+        });
+        // 早退也必须交出**同一个**事件流（保持"每次调用都返回 AsyncIterable"的契约）
+        return {
+          [Symbol.asyncIterator]: async function* () {
+            for (const event of eventStream) {
+              yield event;
+            }
+          },
+        };
+      }
+    }
     const iterationInput: AgentRunInput = {
       ...agentRunInput,
       toolResultMessages: [...conversationMessages],
@@ -780,3 +812,5 @@ function mapOutcomeToEventReason(
 function truncate(text: string, maximumLength = 200): string {
   return text.length <= maximumLength ? text : `${text.slice(0, maximumLength)}…`;
 }
+
+
