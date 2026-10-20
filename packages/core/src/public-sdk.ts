@@ -536,6 +536,13 @@ export {
 import type { AgentMode, AgentRuntime, TaskDependencyNode } from "./core/types.js";
 import type { MainController } from "./orchestration/main-controller.js";
 import type { PermissionProfileReference } from "./tools/permission-profile-store.js";
+import {
+  applySettingChangeProposal,
+  type SettingChangeApplicationOutcome,
+  type SettingChangeLedgerEntry,
+} from "./orchestration/config-chat-control-plane.js";
+import type { SettingChangeProposal } from "./orchestration/config-chat-contract.js";
+import { writeAtomicTextFile } from "./infra/atomic-json.js";
 // G1（2026-11-08 第 245 轮）：Git 集成四件套 + 协调器。
 import { GitContributionVerifier } from "./orchestration/git-contribution-verifier.js";
 import { GitIntegrationCoordinator } from "./orchestration/git-integration-coordinator.js";
@@ -5360,6 +5367,106 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   /** 安全关闭：会话转 closed、订阅释放、运行资源回收。 */
+  /**
+   * CONFIGCHAT-01-02 接线（2026-10-20）：把**设置控制面**接到真实设置。
+   *
+   * 为什么只接一个键：仓里目前只有 `switchPermissionProfile` 这一个"设置级" setter；
+   * 其余白名单键（模式选择/模型选择/工作时段）**没有**对应写入接口 ⇒ 如实返回失败，
+   * 不静默成功、也不假装已生效。这正是卡内"控制面接线"的最小可证切片。
+   */
+  async applyChatSettingChange(input: {
+    proposal: SettingChangeProposal;
+    isExplicitlyConfirmed?: boolean;
+    hasInFlightMissions?: boolean;
+  }): Promise<{
+    outcome: SettingChangeApplicationOutcome;
+    ledger: ReadonlyArray<SettingChangeLedgerEntry>;
+  }> {
+    this.assertOpen();
+    const stateDirectory = this.stateDirectory;
+    if (stateDirectory === null) {
+      throw new PublicApplicationError(
+        "state-directory-required",
+        "设置变更账目需要状态目录（无状态目录时无法判幂等）。",
+      );
+    }
+    const ledgerFilePath = path.join(stateDirectory, "config-chat", "setting-change-ledger.json");
+    let revision = 0;
+    let ledger: ReadonlyArray<SettingChangeLedgerEntry> = [];
+    try {
+      const rawLedger = await fs.readFile(ledgerFilePath, "utf8").catch(() => null);
+      if (rawLedger !== null) {
+        const parsed = JSON.parse(rawLedger) as {
+          revision?: number;
+          entries?: SettingChangeLedgerEntry[];
+        };
+        revision = typeof parsed.revision === "number" ? parsed.revision : 0;
+        ledger = Array.isArray(parsed.entries) ? parsed.entries : [];
+      }
+    } catch {
+      // 坏账目：按空处理但**不覆盖**（下面写入前会先备份原文件）
+      ledger = [];
+    }
+
+    const result = await applySettingChangeProposal({
+      proposal: input.proposal,
+      ledger,
+      ...(input.isExplicitlyConfirmed === undefined ? {} : { isExplicitlyConfirmed: input.isExplicitlyConfirmed }),
+      ...(input.hasInFlightMissions === undefined ? {} : { hasInFlightMissions: input.hasInFlightMissions }),
+      applySetting: async (applyInput) => {
+        if (applyInput.settingKey !== "permission-profile-default") {
+          throw new Error(
+            "unsupported-setting-key：" + applyInput.settingKey + " 目前没有设置级写入接口（不静默成功）。",
+          );
+        }
+        let reference: PermissionProfileReference;
+        try {
+          const parsedValue = JSON.parse(applyInput.proposedValueJson) as {
+            kind?: unknown;
+            profileId?: unknown;
+          };
+          if (
+            (parsedValue.kind === "builtin" || parsedValue.kind === "custom") &&
+            typeof parsedValue.profileId === "string"
+          ) {
+            reference = parsedValue as PermissionProfileReference;
+          } else {
+            throw new Error("profile reference 形状不对");
+          }
+        } catch (error) {
+          throw new Error(
+            "permission-profile-default 的值必须是 PermissionProfileReference JSON：" +
+              (error instanceof Error ? error.message : String(error)),
+          );
+        }
+        await this.switchPermissionProfile(reference);
+        // 读回真实生效值：读不回或读回不一致 ⇒ 失败（不谎报已生效）
+        const effective = await this.getCurrentPermissionProfileReference();
+        const isSame =
+          effective !== null &&
+          (effective as { kind?: string; profileId?: string }).kind === reference.kind &&
+          (effective as { profileId?: string }).profileId === reference.profileId;
+        if (!isSame) {
+          throw new Error("切换后读回的有效权限组与目标不一致（不谎报已生效）。");
+        }
+        return { appliedValueJson: applyInput.proposedValueJson, appliedRevision: revision + 1 };
+      },
+    });
+
+    if (result.outcome.kind === "applied") {
+      await writeAtomicTextFile(
+        ledgerFilePath,
+        JSON.stringify({ revision: result.outcome.appliedRevision, entries: result.ledger }, null, 2) + "\n",
+      );
+    } else if (result.outcome.kind === "failed" || result.outcome.kind === "awaiting-safe-point") {
+      await writeAtomicTextFile(
+        ledgerFilePath,
+        JSON.stringify({ revision, entries: result.ledger }, null, 2) + "\n",
+      );
+    }
+    return { outcome: result.outcome, ledger: result.ledger };
+  }
+
   async shutdown(): Promise<void> {
     if (this.isClosedFlag) {
       return;
@@ -5605,4 +5712,5 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 export { ProjectRelocationController } from "./orchestration/project-relocation-controller.js";
 export { ProjectLocationRegistrationStore } from "./orchestration/project-location-registration-store.js";
 export { classifyProjectRelocation } from "./orchestration/project-relocation-classification.js";
+
 

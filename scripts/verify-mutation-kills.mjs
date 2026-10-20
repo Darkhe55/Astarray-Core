@@ -365,6 +365,25 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "configchat-port-skips-readback",
+    targetFile: "packages/core/src/public-sdk.ts",
+    find: "        await this.switchPermissionProfile(reference);",
+    replace: "        // 变异：不真正切换，只回报 applied",
+    testFiles: ["tests/core/integration/configchat01-port-wiring.test.ts"],
+    expectedFailingTestNames: ["① 切换 permission-profile-default"],
+    rationale:
+      "不真正切换却回报 applied ⇒ 读回的有效权限组没变（谎报已生效）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "configchat-port-accepts-unsupported-key",
+    targetFile: "packages/core/src/public-sdk.ts",
+    find: "        if (applyInput.settingKey !== \"permission-profile-default\") {",
+    replace: '        if (applyInput.settingKey !== "permission-profile-default") {\n          return { appliedValueJson: applyInput.proposedValueJson, appliedRevision: revision + 1 };\n        }\n        if (false) {',
+    testFiles: ["tests/core/integration/configchat01-port-wiring.test.ts"],
+    expectedFailingTestNames: ["④ 无 setter 的键"],
+    rationale:
+      "无 setter 的键也当成功 ⇒ 界面显示已保存但实际没生效（静默失败）⇒ 该反例必须变红",
+  },  {
     mutationIdentifier: "workwindow-dispatch-ignores-deny",
     targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
     find: '      if (gateDecision.kind === "deny") {',
