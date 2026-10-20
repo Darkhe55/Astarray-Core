@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "sum01-publish-accepts-mismatched-payload",
+    targetFile: "packages/tui/src/cli/commands.ts",
+    find: "        reason: \"payload-kind-mismatch：来源种类 \" + sourceKind + \" 需要 \" + fieldName + \"，但载荷里是 \" + knownField,",
+    replace: "        reason: \"ok\",",
+    testFiles: ["tests/tui/integration/sum01-summary-publish-cli.test.ts"],
+    expectedFailingTestNames: ["② 载荷与来源种类不匹配"],
+    rationale:
+      "载荷与来源种类不匹配也照收 ⇒ 按错适配器解释（数据被错误归类）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "sum01-publish-drops-invalid-items",
+    targetFile: "packages/tui/src/cli/commands.ts",
+    find: "  const invalidIndex = arrayOutcome.items.findIndex((item) => !isValidItem(item));",
+    replace: "  const invalidIndex = -1;",
+    testFiles: ["tests/tui/integration/sum01-summary-publish-cli.test.ts"],
+    expectedFailingTestNames: ["③ 非法条目"],
+    rationale:
+      "非法条目被静默丢弃 ⇒ 用户以为全部发布成功（少数据不报）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "sum01-show-ignores-source-kind",
+    targetFile: "packages/tui/src/cli/commands.ts",
+    find: "      ...(options.sourceKind === undefined ? {} : { sourceKind: options.sourceKind }),\n      ...(options.maximumReturnUnitCount",
+    replace: "      ...(options.maximumReturnUnitCount",
+    testFiles: ["tests/tui/integration/sum01-summary-publish-cli.test.ts"],
+    expectedFailingTestNames: ["⑥ 延后文件来源"],
+    rationale:
+      "show 忽略来源种类 ⇒ 已发布的非工作存档摘要\"看得见却打不开\"（即本轮修复的缺口）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "docview-measurement-fakes-complete",
     targetFile: "packages/core/src/orchestration/document-view-measurement.ts",
     find: "      isComplete: expectedCount === 0 ? true : preservedCount >= expectedCount,",

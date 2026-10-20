@@ -2,7 +2,7 @@
  * status / resume / cancel / doctor / config init 命令（T11）。
  */
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -4600,6 +4600,194 @@ export async function executeSummaryListCommand(
   }
 }
 
+export type SummaryPublishSourceKind = "conversation" | "report" | "deferred-file";
+
+export interface SummaryPublishCommandOptions {
+  stateDirectory: string;
+  sourceKind: SummaryPublishSourceKind;
+  sourceIdentifier: string;
+  payloadPath: string;
+  isJsonOutput: boolean;
+}
+
+/** 逐条校验：错误信息带条第几项，不静默丢弃非法条目。 */
+function readPayloadArray(
+  payload: unknown,
+  fieldName: string,
+  sourceKind: SummaryPublishSourceKind,
+): { readonly isOk: true; readonly items: unknown[] } | { readonly isOk: false; readonly reason: string } {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return { isOk: false, reason: "payload 必须是 JSON 对象（形如 { \"" + fieldName + "\": [...] }）" };
+  }
+  const record = payload as Record<string, unknown>;
+  const knownFields = ["turns", "reports", "deferredFiles"];
+  for (const knownField of knownFields) {
+    if (record[knownField] !== undefined && knownField !== fieldName) {
+      return {
+        isOk: false,
+        reason: "payload-kind-mismatch：来源种类 " + sourceKind + " 需要 " + fieldName + "，但载荷里是 " + knownField,
+      };
+    }
+  }
+  const value = record[fieldName];
+  if (!Array.isArray(value)) {
+    return { isOk: false, reason: "payload 缺少数组字段 " + fieldName };
+  }
+  return { isOk: true, items: value };
+}
+
+/** 校验单个会话轮次。 */
+function isConversationTurn(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record["turnIdentifier"] === "string" &&
+    typeof record["speaker"] === "string" &&
+    typeof record["text"] === "string" &&
+    typeof record["recordedAtIso"] === "string"
+  );
+}
+
+/** 校验单个报告记录。 */
+function isReportRecord(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record["reportIdentifier"] === "string" &&
+    typeof record["taskIdentifier"] === "string" &&
+    typeof record["summaryText"] === "string" &&
+    typeof record["recordedAtIso"] === "string"
+  );
+}
+
+/** 校验单个延后文件记录。 */
+function isDeferredFileRecord(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record["fileIdentifier"] === "string" &&
+    typeof record["filePath"] === "string" &&
+    typeof record["lineRangeStart"] === "number" &&
+    typeof record["lineRangeEnd"] === "number" &&
+    typeof record["excerptText"] === "string" &&
+    typeof record["recordedAtIso"] === "string"
+  );
+}
+
+/**
+ * summary publish：把**调用方提供的**会话/报告/延后文件条目发布为摘要。
+ *
+ * 为什么由调用方提供：本仓没有会话轮次与延后文件的本地存储（见 SDK 注释），
+ * 因此这三类只能由宿主传入；**不为此凭空造数据源**。
+ */
+export async function executeSummaryPublishCommand(
+  options: SummaryPublishCommandOptions,
+): Promise<number> {
+  let rawPayload: unknown;
+  try {
+    rawPayload = JSON.parse(readFileSync(options.payloadPath, "utf8"));
+  } catch (error) {
+    logToStderr("payload 读取失败：" + (error as Error).message);
+    return EXIT_CODES.USAGE_ERROR;
+  }
+
+  const fieldName =
+    options.sourceKind === "conversation"
+      ? "turns"
+      : options.sourceKind === "report"
+        ? "reports"
+        : "deferredFiles";
+  const arrayOutcome = readPayloadArray(rawPayload, fieldName, options.sourceKind);
+  if (!arrayOutcome.isOk) {
+    logToStderr(arrayOutcome.reason);
+    return EXIT_CODES.USAGE_ERROR;
+  }
+
+  const isValidItem =
+    options.sourceKind === "conversation"
+      ? isConversationTurn
+      : options.sourceKind === "report"
+        ? isReportRecord
+        : isDeferredFileRecord;
+  const invalidIndex = arrayOutcome.items.findIndex((item) => !isValidItem(item));
+  if (invalidIndex >= 0) {
+    logToStderr(
+      "payload-invalid-item：" +
+        fieldName +
+        "[" +
+        String(invalidIndex) +
+        "] 字段缺失或类型不对（不静默丢弃，请修正后重试）",
+    );
+    return EXIT_CODES.USAGE_ERROR;
+  }
+
+  const application = await createSummaryApplication(options.stateDirectory);
+  try {
+    const result = await application.publishSummarySource(
+      options.sourceKind === "conversation"
+        ? {
+            sourceKind: "conversation",
+            sourceIdentifier: options.sourceIdentifier,
+            turns: arrayOutcome.items as never,
+          }
+        : options.sourceKind === "report"
+          ? {
+              sourceKind: "report",
+              sourceIdentifier: options.sourceIdentifier,
+              reports: arrayOutcome.items as never,
+            }
+          : {
+              sourceKind: "deferred-file",
+              sourceIdentifier: options.sourceIdentifier,
+              deferredFiles: arrayOutcome.items as never,
+            },
+    );
+
+    if (result.entryCount === 0) {
+      // 诚实状态：空来源不发布空清单冒充成功
+      if (options.isJsonOutput) {
+        printJson({ status: "no-history", sourceKind: result.sourceKind, sourceIdentifier: result.sourceIdentifier });
+      } else {
+        process.stdout.write("no-history\n");
+      }
+      return EXIT_CODES.FAILURE;
+    }
+
+    if (options.isJsonOutput) {
+      printJson({
+        status: "ok",
+        sourceKind: result.sourceKind,
+        sourceIdentifier: result.sourceIdentifier,
+        manifestRevision: result.manifestRevision,
+        chunkCount: result.chunkCount,
+        coveredThroughSourceRevision: result.coveredThroughSourceRevision,
+        entryCount: result.entryCount,
+        generatorVersion: result.generatorVersion,
+      });
+    } else {
+      process.stdout.write(
+        "summary=" +
+          result.sourceKind +
+          ":" +
+          result.sourceIdentifier +
+          " r" +
+          String(result.manifestRevision) +
+          " entries=" +
+          String(result.entryCount) +
+          " chunks=" +
+          String(result.chunkCount) +
+          "\n",
+      );
+    }
+    return EXIT_CODES.SUCCESS;
+  } catch (error) {
+    logToStderr((error as Error).message);
+    return EXIT_CODES.FAILURE;
+  } finally {
+    await application.shutdown();
+  }
+}
+
 export interface SummaryBuildCommandOptions {
   stateDirectory: string;
   missionId: string;
@@ -4658,9 +4846,17 @@ export async function executeSummaryBuildCommand(
   }
 }
 
+export type SummarySourceKindOption =
+  | "work-archive"
+  | "conversation"
+  | "report"
+  | "deferred-file";
+
 export interface SummaryShowCommandOptions {
   stateDirectory: string;
   sourceIdentifier: string;
+  /** 来源种类（缺省 work-archive）；不传则只能打开工作存档摘要。 */
+  sourceKind?: SummarySourceKindOption;
   detailLevel: "summary" | "outline" | "section" | "detail";
   pageSize: number;
   chunkIdentifier: string | undefined;
@@ -4678,6 +4874,7 @@ export async function executeSummaryShowCommand(
       const section = await application.expandSummarySectionView({
         sourceIdentifier: options.sourceIdentifier,
         chunkIdentifier: options.chunkIdentifier,
+        ...(options.sourceKind === undefined ? {} : { sourceKind: options.sourceKind }),
       });
       if (options.isJsonOutput) {
         printJson({ status: "ok", section });
@@ -4700,6 +4897,7 @@ export async function executeSummaryShowCommand(
       sourceIdentifier: options.sourceIdentifier,
       detailLevel: options.detailLevel,
       pageSize: options.pageSize,
+      ...(options.sourceKind === undefined ? {} : { sourceKind: options.sourceKind }),
       ...(options.maximumReturnUnitCount !== undefined
         ? { maximumReturnUnitCount: options.maximumReturnUnitCount }
         : {}),
@@ -5255,3 +5453,4 @@ export async function executeToolPackageFeedbackCommand(
 }
 export { executeParameterAuthorizationSettingsCommand } from "./parameter-authorization-settings-command.js";
 export type { ParameterAuthorizationSettingsCommandOptions } from "./parameter-authorization-settings-command.js";
+
