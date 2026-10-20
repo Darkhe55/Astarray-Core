@@ -937,6 +937,18 @@ export {
   type LessonWriteDecision,
 } from "./orchestration/lesson-record-contract.js";
 /**
+ * LESSON-01-02 跨任务选择：同配置命中不带任务细节、不同模型不误套、原文不可越域读、去重与版本失效。
+ */
+export {
+  computeLessonContentFingerprint,
+  evaluateLessonRawTextAccess,
+  selectLessonsForTask,
+  type LessonSelectionCandidate,
+  type LessonSelectionEntry,
+  type LessonSelectionRequest,
+  type LessonSelectionResult,
+} from "./orchestration/lesson-selection.js";
+/**
  * WORKWINDOW-01-01（2026-10-18）：工作/休息时段的规则、时区、暂停原因与恢复契约。
  *
  * 纯判定：不调度、不取消工具、不写盘、不唤醒系统服务。

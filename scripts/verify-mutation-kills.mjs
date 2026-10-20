@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "lesson-cross-task-keeps-details",
+    targetFile: "packages/core/src/orchestration/lesson-selection.ts",
+    find: '    const isCrossTask =\n      candidate.scopeKind !== "task" && candidate.sourceTaskIdentifier !== request.taskIdentifier;',
+    replace: "    const isCrossTask = false;",
+    testFiles: ["tests/core/unit/lesson01-selection.test.ts"],
+    expectedFailingTestNames: ["① 跨任务命中"],
+    rationale:
+      "跨任务复用仍带旧任务细节/证据引用 ⇒ 把旧任务上下文污染进新任务（卡内点名）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-model-mismatch-applies",
+    targetFile: "packages/core/src/orchestration/lesson-selection.ts",
+    find: "      if (!isSameModel) {",
+    replace: "      if (false) {",
+    testFiles: ["tests/core/unit/lesson01-selection.test.ts"],
+    expectedFailingTestNames: ["③ 不同模型"],
+    rationale:
+      "不同模型/参数也套用 role-model-config 教训 ⇒ 建议在错误模型上生效（卡内点名）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-allows-cross-agent-raw-text",
+    targetFile: "packages/core/src/orchestration/lesson-selection.ts",
+    find: "  if (input.requestingAgentInstanceId !== input.ownerAgentInstanceId) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/lesson01-selection.test.ts"],
+    expectedFailingTestNames: ["⑩ 原文不可跨个体读"],
+    rationale:
+      "跨个体可读原文 ⇒ 个体隔离的教训原文泄漏（卡内\"原文不可越域读\"）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "workwindow-resume-repeats-after-wake",
     targetFile: "packages/core/src/orchestration/work-window-resume.ts",
     find: "  if (request.hasResumedSinceWake) {",
