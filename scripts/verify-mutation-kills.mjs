@@ -365,6 +365,26 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "lesson-dispatch-port-never-called",
+    targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
+    find: "    if (this.options.lessonDispatchPort !== undefined) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/integration/lesson01-dispatch-wiring.test.ts"],
+    expectedFailingTestNames: ["① 端口被调用"],
+    rationale:
+      "分派节点从不调用投递端口 ⇒ 教训永远到不了任务（接线形同虚设）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "lesson-dispatch-failure-blocks-dispatch",
+    targetFile: "packages/core/src/orchestration/mission-orchestrator.ts",
+    find: "      } catch {\n        // 建议性投递失败：不影响派发（也不静默改变行为）\n      }",
+    replace: "      } catch (error) {\n        throw error;\n      }",
+    testFiles: ["tests/core/integration/lesson01-dispatch-wiring.test.ts"],
+    expectedFailingTestNames: ["③ 端口抛错"],
+    rationale:
+      "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "workwindow-model-gate-ignored",
     targetFile: "packages/core/src/runtime/tool-loop.ts",
     find: '      if (modelGateDecision.kind === "deny") {',

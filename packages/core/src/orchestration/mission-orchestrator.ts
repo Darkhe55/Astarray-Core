@@ -243,6 +243,18 @@ export interface MissionOrchestratorOptions {
    * 为什么放在编排器：派发是"产生新工作"的唯一入口；门禁放这里，
    * 休息时段/暂停原因就不会被某个绕过路径漏掉。
    */
+  /**
+   * LESSON-01-03（2026-10-20）：**分派节点**的教训投递端口（可选；缺省 ⇒ 不投递）。
+   *
+   * 教训是**建议性**的：投递失败/被拒绝**不得阻塞派发**（与门禁相反）。
+   */
+  lessonDispatchPort?: (input: {
+    missionId: string;
+    taskIdentifier: string;
+  }) => Promise<
+    | { readonly kind: "deliver"; readonly deliveryKeys: ReadonlyArray<string> }
+    | { readonly kind: "rejected"; readonly reason: string }
+  >;
   workWindowGate?: (input: {
     missionId: string;
     taskIdentifier: string;
@@ -677,6 +689,17 @@ export class MissionOrchestrator {
       .getNode(action.taskId);
     if (task === undefined) {
       return;
+    }
+    /**
+     * LESSON-01-03 分派节点投递（2026-10-20）：**只建议、不阻塞**。
+     * 抛错/拒绝都不改变派生流程（教训不能成为派发的单点故障）。
+     */
+    if (this.options.lessonDispatchPort !== undefined) {
+      try {
+        await this.options.lessonDispatchPort({ missionId, taskIdentifier: action.taskId });
+      } catch {
+        // 建议性投递失败：不影响派发（也不静默改变行为）
+      }
     }
     /**
      * WORKWINDOW 统一门禁（2026-10-20）：**先问门禁再派发**。
