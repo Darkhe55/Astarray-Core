@@ -87,8 +87,8 @@ export interface WorkerAgentOptions {
   availableToolDescriptors?: ToolDescriptor[];
   /** WORKWINDOW-01-02（2026-10-20）：工具执行前门禁（可选；缺省 ⇒ 不门禁）。 */
   workWindowGate?: (input: {
-    toolName: string;
-    gatePoint: "tool-execution";
+    toolName?: string;
+    gatePoint: "model" | "tool-execution";
   }) => Promise<
     | { readonly kind: "allow"; readonly reason: string }
     | {
@@ -508,7 +508,7 @@ export class WorkerAgent {
         ...(this.options.workWindowGate === undefined
           ? {}
           : {
-              workWindowGate: (gateInput: { toolName: string; gatePoint: "tool-execution" }) =>
+              workWindowGate: (gateInput: { toolName?: string; gatePoint: "model" | "tool-execution" }) =>
                 this.options.workWindowGate!(gateInput),
             }),
         cancellationSignal: this.cancellationController.signal,

@@ -246,7 +246,7 @@ export interface MissionOrchestratorOptions {
   workWindowGate?: (input: {
     missionId: string;
     taskIdentifier: string;
-    gatePoint: "dispatch" | "tool-execution";
+    gatePoint: "dispatch" | "model" | "tool-execution";
     toolName?: string;
   }) => Promise<
     | { readonly kind: "allow"; readonly reason: string }
@@ -853,7 +853,7 @@ export class MissionOrchestrator {
     ...(this.options.workWindowGate === undefined
       ? {}
       : {
-          workWindowGate: (gateInput: { toolName: string; gatePoint: "tool-execution" }) =>
+          workWindowGate: (gateInput: { toolName?: string; gatePoint: "model" | "tool-execution" }) =>
             this.options.workWindowGate!({
               missionId,
               taskIdentifier: task.id,
@@ -1316,3 +1316,4 @@ export function buildWorkerGuidanceSafePointPort(input: {
       }).applied,
   };
 }
+
