@@ -1316,3 +1316,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 已安装 tarball 实测：3 条授权按来源/目标/接收个体过滤**互不串**（sib-1=2、sib-2=1）；6 路并发导入 ⇒ **1 次写入 + 5 次复用**、
 > 副本回执 1 条；来源零写入（sha256 不变）；无授权 ⇒ ``authorization-not-found`` 且未写目标。
 > **未做**：TUI/GUI 克隆列表面板、A/B/C 真实业务链路（当前 mock runtime）。
+
+> **2026-10-20 ``WORKWINDOW-01-02`` 派发接线（公开库）**：`MissionOrchestratorOptions.workWindowGate` + `launchWorker` 派发前调用；
+> `deny` ⇒ 不建 Worker、不调模型/工具、升级全部暂停原因、使命收口 `cancelled`；缺省门禁 ⇒ 行为逐字不变。
+> **5 条接线反例 + 2 条变异体**（拒绝仍派发／门禁从不被调用）。**未做**：模型与工具执行前两处接线。

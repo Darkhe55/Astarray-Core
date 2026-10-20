@@ -238,6 +238,25 @@ export interface MissionOrchestratorOptions {
    */
   missionDiagnosticEventPort?: (event: MissionDiagnosticEvent) => Promise<void> | void;
   /**
+   * WORKWINDOW-01-02（2026-10-20）：**派发前统一门禁**（可选；缺省 ⇒ 行为逐字不变）。
+   *
+   * 为什么放在编排器：派发是"产生新工作"的唯一入口；门禁放这里，
+   * 休息时段/暂停原因就不会被某个绕过路径漏掉。
+   */
+  workWindowGate?: (input: {
+    missionId: string;
+    taskIdentifier: string;
+    gatePoint: "dispatch";
+  }) => Promise<
+    | { readonly kind: "allow"; readonly reason: string }
+    | {
+        readonly kind: "deny";
+        readonly reasonCode: string;
+        readonly reason: string;
+        readonly activePauseReasonKinds?: ReadonlyArray<string>;
+      }
+  >;
+  /**
    * GUI-02-01 片①（2026-10-11）：**权限询问**的升级回调，**额外携带发起方绝对身份**。
    *
    * 为什么需要它：`PermissionAskRequestStore` 按
@@ -648,7 +667,7 @@ export class MissionOrchestrator {
     }
   }
 
-  private async launchWorker(
+  protected async launchWorker(
     action: Extract<ScheduleAction, { action: "start-task" }>,
   ): Promise<void> {
     const { missionId } = this.options;
@@ -657,6 +676,27 @@ export class MissionOrchestrator {
       .getNode(action.taskId);
     if (task === undefined) {
       return;
+    }
+    /**
+     * WORKWINDOW 统一门禁（2026-10-20）：**先问门禁再派发**。
+     * 拒绝 ⇒ 不建 Worker、不消耗模型/工具，如实升级原因并收口为 cancelled（不静默排队）。
+     */
+    const workWindowGate = this.options.workWindowGate;
+    if (workWindowGate !== undefined) {
+      const gateDecision = await workWindowGate({
+        missionId,
+        taskIdentifier: action.taskId,
+        gatePoint: "dispatch",
+      });
+      if (gateDecision.kind === "deny") {
+        const pauseReasons = gateDecision.activePauseReasonKinds ?? [];
+        this.options.onUserEscalation(
+          `未派发任务 ${action.taskId}：${gateDecision.reason}` +
+            (pauseReasons.length === 0 ? "" : `（生效中的暂停原因：${pauseReasons.join(", ")}）`),
+        );
+        await this.options.onMissionFinished("cancelled");
+        return;
+      }
     }
     // 每次启动生成唯一且不可复用的 Worker 实例 ID（审计 S6：重分配不得复用同一 ID）
     const agentInstanceId = this.nextWorkerInstanceId(action.taskId);
