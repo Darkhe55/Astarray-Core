@@ -1311,3 +1311,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **2026-10-20 ``PERF-01-03`` 公开入口包级验收（公开库）**：``scripts/verify-perf-overview-package.mjs`` + ``verify:perf-overview-package``。
 > 已安装 tarball 实测：空库 ``sampleSize=0`` 且耗时 ``null``（不报零）；25 条样本 ⇒ ``sampleSize=25``、内存保留 25（有界）；
 > 追加坏行 ⇒ ``discardedLineCount=1``（不静默）；明细 ``pageSize=10`` ⇒ 页内 10 条。**未做**：TUI/GUI 概览面板、长会话真实采样观测。
+
+> **2026-10-20 ``PROJECT-01-04`` 公开入口 + 压力验收（公开库）**：``scripts/verify-project-pressure-package.mjs`` + ``verify:project-pressure-package``。
+> 已安装 tarball 实测：3 条授权按来源/目标/接收个体过滤**互不串**（sib-1=2、sib-2=1）；6 路并发导入 ⇒ **1 次写入 + 5 次复用**、
+> 副本回执 1 条；来源零写入（sha256 不变）；无授权 ⇒ ``authorization-not-found`` 且未写目标。
+> **未做**：TUI/GUI 克隆列表面板、A/B/C 真实业务链路（当前 mock runtime）。
