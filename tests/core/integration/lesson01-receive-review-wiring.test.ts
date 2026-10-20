@@ -14,14 +14,13 @@ class OrderCapturingOrchestrator extends MissionOrchestrator {
 
   protected override buildWorkerAgent(): never {
     this.order.push("build");
-    const self = this;
     return {
       run: async () => {
-        self.order.push("run");
+        this.order.push("run");
         return {
-          outcome: self.workerOutcome,
+          outcome: this.workerOutcome,
           toolName: null,
-          failureReason: self.workerOutcome === "failure" ? "失败" : null,
+          failureReason: this.workerOutcome === "failure" ? "失败" : null,
           stateSummary: "测试收口",
         };
       },
@@ -155,3 +154,4 @@ describe("LESSON-01-03 接收/审查节点接线", () => {
     expect(orchestrator.order).toContain("run");
   });
 });
+

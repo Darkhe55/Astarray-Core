@@ -5437,6 +5437,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           throw new Error(
             "permission-profile-default 的值必须是 PermissionProfileReference JSON：" +
               (error instanceof Error ? error.message : String(error)),
+            { cause: error },
           );
         }
         await this.switchPermissionProfile(reference);
@@ -5712,5 +5713,6 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 export { ProjectRelocationController } from "./orchestration/project-relocation-controller.js";
 export { ProjectLocationRegistrationStore } from "./orchestration/project-location-registration-store.js";
 export { classifyProjectRelocation } from "./orchestration/project-relocation-classification.js";
+
 
 
