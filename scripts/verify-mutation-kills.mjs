@@ -365,6 +365,36 @@ export const MUTATIONS = [
       "转达丢失原来源却不标记 ⇒ 追溯链断了却看起来正常（无法回答\"这条指令从哪来\"）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "workwindow-resume-repeats-after-wake",
+    targetFile: "packages/core/src/orchestration/work-window-resume.ts",
+    find: "  if (request.hasResumedSinceWake) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/workwindow03-resume.test.ts"],
+    expectedFailingTestNames: ["② 同一唤醒内第二次调用"],
+    rationale:
+      "唤醒后重复恢复 ⇒ 同一任务被跑两遍（重复副作用，卡内点名\"只恢复一次\"）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-resume-revives-manual-cancel",
+    targetFile: "packages/core/src/orchestration/work-window-resume.ts",
+    find: "  if (request.isManuallyCancelled) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/workwindow03-resume.test.ts"],
+    expectedFailingTestNames: ["③ 手动取消"],
+    rationale:
+      "手动取消后被唤醒复活 ⇒ 用户失去停止能力（卡内\"手动取消不复活\"）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "workwindow-stop-claims-stopped-on-timeout",
+    targetFile: "packages/core/src/orchestration/work-window-resume.ts",
+    find: "  if (input.elapsedMilliseconds >= input.timeoutMilliseconds) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/workwindow03-resume.test.ts"],
+    expectedFailingTestNames: ["⑨ 停止超时未确认"],
+    rationale:
+      "停止超时后被当作\"进行中\"的普通分支 ⇒ 界面仍可能显示已停止（最危险的谎报）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "workwindow-gate-ignores-pause-reasons",
     targetFile: "packages/core/src/orchestration/work-window-gate.ts",
     find: "  if (activePauseReasonKinds.length > 0) {",
