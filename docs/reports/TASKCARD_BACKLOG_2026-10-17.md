@@ -1328,3 +1328,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **2026-10-20 ``WORKWINDOW-01-02`` 工具执行前门禁（公开库）**：``ToolLoopOptions.workWindowGate`` + Worker/编排器逐层透传；
 > ``deny`` ⇒ **不调 toolPort.execute**、结果 ``work-window-gate-denied``、列出全部暂停原因；缺省不变。
 > **5 条接线反例 + 2 条变异体**。**未做**：模型执行前（provider 调用）门禁。
+
+> **2026-10-20 ``WORKWINDOW-01-02`` 模型执行前门禁（公开库）**：`deny` ⇒ ``runtime.run`` **零调用**（不烧 token），
+> 收口为 ``runFinished(error)`` 并写明全部暂停原因；早退也返回同一 AsyncIterable。
+> **三处门禁（dispatch / model / tool-execution）均已接线**。**5 条接线反例 + 2 条变异体**。
