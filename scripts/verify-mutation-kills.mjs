@@ -405,6 +405,36 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "usage-budget-ignores-inflight-reservations",
+    targetFile: "packages/core/src/orchestration/usage-budget-reservation.ts",
+    find: "  if (view.settledInputTokenCount + view.reservedInputTokenCount + input.estimatedInputTokenCount > input.policy.inputTokenLimit) {",
+    replace: "  if (view.settledInputTokenCount + input.estimatedInputTokenCount > input.policy.inputTokenLimit) {",
+    testFiles: ["tests/core/unit/usage02-budget-reservation.test.ts"],
+    expectedFailingTestNames: ["⑤ 并发预算"],
+    rationale:
+      "并发预留不累计 ⇒ 多个在途调用一起超预算（卡内点名并发预算）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "usage-budget-releases-unknown-usage",
+    targetFile: "packages/core/src/orchestration/usage-budget-reservation.ts",
+    find: "  if (!input.isUsageKnown) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/usage02-budget-reservation.test.ts"],
+    expectedFailingTestNames: ["⑧ 取消且缺 usage"],
+    rationale:
+      "未知用量当 0 释放 ⇒ 取消后预算虚增剩余（虚报未超预算）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "usage-budget-switch-clears-old-model",
+    targetFile: "packages/core/src/orchestration/usage-budget-reservation.ts",
+    find: '      : input.state.reservations.filter(\n          (reservation) => reservation.modelIdentifier === input.modelIdentifier,\n        );',
+    replace: "      : input.state.reservations;",
+    testFiles: ["tests/core/unit/usage02-budget-reservation.test.ts"],
+    expectedFailingTestNames: ["⑩ 跨模型切换"],
+    rationale:
+      "按模型过滤失效 ⇒ 切换后旧模型预留被算进新模型（跨模型混账）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "workwindow-model-gate-ignored",
     targetFile: "packages/core/src/runtime/tool-loop.ts",
     find: '      if (modelGateDecision.kind === "deny") {',
