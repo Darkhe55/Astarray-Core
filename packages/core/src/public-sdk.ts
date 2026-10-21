@@ -34,6 +34,24 @@ import {
   type PermissionAskAuthorityPort,
 } from "./orchestration/permission-ask-decision-entry.js";
 import { UsageLedgerStore } from "./orchestration/usage-ledger-store.js";
+/**
+ * USAGE-01-02 预算预留/结算：并发 revision、未知用量保守占用、跨模型分账。
+ * 口径（默认，待用户确认）：只限 token 与请求数；金额估价一律"未估算"。
+ */
+export {
+  computeUsageReservationFingerprint,
+  createUsageBudgetState,
+  describeUsageBudgetAfterModelSwitch,
+  evaluateUsageBudgetView,
+  reserveUsageBudget,
+  settleUsageBudget,
+  type UsageBudgetPolicy,
+  type UsageBudgetReserveOutcome,
+  type UsageBudgetSettleOutcome,
+  type UsageBudgetState,
+  type UsageBudgetView,
+  type UsageReservation,
+} from "./orchestration/usage-budget-reservation.js";
 // SMART-01-04：指令窗口与三分钟期限必须由**产品入口**真实驱动（此前只有 re-export 的独立组件）。
 import { InstructionWindowStore } from "./orchestration/instruction-window-store.js";
 import type { InstructionWindowSnapshot } from "./orchestration/instruction-window-store.js";
