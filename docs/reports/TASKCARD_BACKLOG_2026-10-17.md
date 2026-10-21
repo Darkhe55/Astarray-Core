@@ -1359,3 +1359,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **默认口径（待用户确认）**：只读来源沿用卡内清单；主动探测/联网/复现默认关闭，需分别授权。
 
 > **2026-10-21 推送失败记录**：``DIAG-01-03`` 验收提交在 5 次重试后仍失败（GitHub SSH reset），已本地提交、门禁通过；下次推送时一并补推。
+
+> **2026-10-21 ``GUIDE-01-04`` 公开入口包级验收（公开库）**：``verify:guidance-package``。
+> 实测：受理可查、空文本报错、过期 ``expired-guidance``、档位越权 ``behavior-tier-not-permitted``、
+> ``record-only`` 立即 applied（延迟 0）、非法来源构造期拒绝。**订正**：观察来源实际注册到 ``safe-point-guidance``（非 record-only），
+> 越权档为 ``gate-and-request-pause``；我第一版断言写错，已按真实契约改正。
