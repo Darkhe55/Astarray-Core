@@ -268,7 +268,7 @@ export const MUTATIONS = [
     mutationIdentifier: "relocate-reconciler-malformed-observation-passes",
     targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
     find: "  if (malformedPendingOperations.length > 0) {",
-    replace: "  if (false) {",
+    replace: "  if (true) {",
     testFiles: ["tests/core/unit/relocate01-reconciler.test.ts"],
     expectedFailingTestNames: ["⑨ 未决操作观测残缺"],
     rationale:
@@ -403,6 +403,36 @@ export const MUTATIONS = [
     expectedFailingTestNames: ["③ 端口抛错"],
     rationale:
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-startup-blocks-project-chat",
+    targetFile: "packages/core/src/orchestration/secretary-policy.ts",
+    find: "  if (!input.isProjectConversationBusy) {",
+    replace: "  if (true) {",
+    testFiles: ["tests/core/unit/secretary01-policy.test.ts"],
+    expectedFailingTestNames: ["① 项目对话忙碌"],
+    rationale:
+      "忙碌时也启动整理 ⇒ 秘书阻塞项目对话（卡内点名\"秘书启动不阻塞项目对话\"）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-report-without-evidence",
+    targetFile: "packages/core/src/orchestration/secretary-policy.ts",
+    find: '  if (evidence.length === 0) {',
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/secretary01-policy.test.ts"],
+    expectedFailingTestNames: ["⑦ 报告条目必须有证据引用"],
+    rationale:
+      "无证据也出具条目 ⇒ 秘书结论不可追溯（自述替代证据）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "onboarding-entry-implies-authorization",
+    targetFile: "packages/core/src/orchestration/secretary-policy.ts",
+    find: '  return { kind: "show", surface: input.surface, doesStealFocus: false, impliesAuthorization: false };',
+    replace: '  return { kind: "show", surface: input.surface, doesStealFocus: true as unknown as false, impliesAuthorization: false };',
+    testFiles: ["tests/core/unit/secretary01-policy.test.ts"],
+    expectedFailingTestNames: ["⑪ 两个界面都能展示入口"],
+    rationale:
+      "入口抢焦点 ⇒ 打断用户当前输入/授权裁决（卡内点名\"不抢焦点\"）⇒ 该反例必须变红",
   },
   {
     mutationIdentifier: "accuracy-forged-hash-crashes",
