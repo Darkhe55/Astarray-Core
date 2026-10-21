@@ -268,7 +268,7 @@ export const MUTATIONS = [
     mutationIdentifier: "relocate-reconciler-malformed-observation-passes",
     targetFile: "packages/core/src/orchestration/project-relocation-reconciler.ts",
     find: "  if (malformedPendingOperations.length > 0) {",
-    replace: "  if (true) {",
+    replace: "  if (false) {",
     testFiles: ["tests/core/unit/relocate01-reconciler.test.ts"],
     expectedFailingTestNames: ["⑨ 未决操作观测残缺"],
     rationale:
