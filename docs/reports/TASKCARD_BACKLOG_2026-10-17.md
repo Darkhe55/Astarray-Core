@@ -1374,3 +1374,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 实测：去重 ``duplicate-idempotent``、同键异参 ``conflict-rejected``、过期 revision ``stale-revision-rejected``；
 > 聚合可复算（400=400）、未知 usage ⇒ ``consumedTokenCount:null``（不宣称超预算）、估算分列（``excludedEstimatedCount=1``）、
 > 无价目 ⇒ ``amountMinorUnits:null``。**未做**：GUI 用量面板与导出格式（需产品确认）。
+
+> **2026-10-21 ``ACCURACY-01/02`` 对账（公开库）**：``verify:accuracy-package`` 逐条实测既有验收器。
+> 覆盖：漏报必需节点、空证据、错收件人、旧/未来 revision、伪造证据、陈旧产物、幂等签收、fast 档 ``quality-check-skipped``、strict 需理解确认。
+> **发现并修复真实缺口**：漏传 ``contentHash`` ⇒ TypeError 崩溃（应为 rejected）；反例先红后修，加 2 条变异体守住。
+> **未做（ACCURACY-03）**：设置/产品入口、增量 E2E；默认口径（待确认）：严格模式追加 ≤1 轮、关闭即无新增模型审查。

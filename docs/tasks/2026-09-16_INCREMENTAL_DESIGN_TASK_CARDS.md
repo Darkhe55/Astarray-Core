@@ -63,7 +63,7 @@
 
 | 检查点 | 实施范围 | 必需验收 |
 |---|---|---|
-| ACCURACY-01 | 审计现有签收/完成链路，冻结档位、预算和跳过状态 | 核查未来 revision、漏报必需节点、空证据及部分完成；先证明缺口，不重复实现已有能力 |
+| ACCURACY-01 | 审计现有签收/完成链路，冻结档位、预算和跳过状态 | 核查未来 revision、漏报必需节点、空证据及部分完成；先证明缺口，不重复实现已有能力 | **对账 done（2026-10-21）**：`TaskAccuracyVerifier` 已覆盖 漏报必需节点／空证据／错收件人／旧 revision／**未来 revision**／伪造证据／陈旧产物／幂等签收／档位诚实（fast ⇒ `quality-check-skipped`）／strict 需理解确认 —— 逐条由 `verify:accuracy-package` 实测。**发现并修复一个真实缺口**：证据漏传 `contentHash`（undefined）时验收器 **TypeError 崩溃**，现改为按空证据 `rejected` 并列入 forged（反例先红：`accuracy01-verifier-hardening.test.ts` ②）。**4+2 条反例 + 2 条变异体**。
 | ACCURACY-02 | 幂等签收、可选理解确认、条目到证据覆盖，复用原完成验收器 | 错收件人、重复派发、旧/未来版本、伪造证据、陈旧产物、崩溃重启等反例 |
 | ACCURACY-03 | 设置与产品入口、增量 E2E | 关闭后无新增模型审查或人工阻塞；状态诚实；标准/严格工作量有上限；不影响权限路由 |
 
