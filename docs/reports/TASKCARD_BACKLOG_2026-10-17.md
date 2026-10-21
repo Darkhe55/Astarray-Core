@@ -1369,3 +1369,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 并发 revision 乐观锁、在途预留累计、取消缺 usage **保留占用**（不虚报剩余）、跨模型分账不清旧预留、结算释放差额。
 > **15 条反例 + 3 条变异体**。**默认口径（待确认）**：只限 token/请求数，金额估价一律「未估算」。
 > **未做**：接线到真实 provider 调用点（需产品确认预算语义）、金额估价与硬金额预算（缺价目，阻塞）。
+
+> **2026-10-21 ``USAGE-01-03`` 公开入口包级验收（公开库）**：``verify:usage-package``。
+> 实测：去重 ``duplicate-idempotent``、同键异参 ``conflict-rejected``、过期 revision ``stale-revision-rejected``；
+> 聚合可复算（400=400）、未知 usage ⇒ ``consumedTokenCount:null``（不宣称超预算）、估算分列（``excludedEstimatedCount=1``）、
+> 无价目 ⇒ ``amountMinorUnits:null``。**未做**：GUI 用量面板与导出格式（需产品确认）。
