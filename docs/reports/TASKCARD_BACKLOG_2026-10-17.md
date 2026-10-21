@@ -1364,3 +1364,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 实测：受理可查、空文本报错、过期 ``expired-guidance``、档位越权 ``behavior-tier-not-permitted``、
 > ``record-only`` 立即 applied（延迟 0）、非法来源构造期拒绝。**订正**：观察来源实际注册到 ``safe-point-guidance``（非 record-only），
 > 越权档为 ``gate-and-request-pause``；我第一版断言写错，已按真实契约改正。
+
+> **2026-10-21 ``USAGE-01-02`` 预算预留/结算（公开库）**：``usage-budget-reservation.ts``。
+> 并发 revision 乐观锁、在途预留累计、取消缺 usage **保留占用**（不虚报剩余）、跨模型分账不清旧预留、结算释放差额。
+> **15 条反例 + 3 条变异体**。**默认口径（待确认）**：只限 token/请求数，金额估价一律「未估算」。
+> **未做**：接线到真实 provider 调用点（需产品确认预算语义）、金额估价与硬金额预算（缺价目，阻塞）。
