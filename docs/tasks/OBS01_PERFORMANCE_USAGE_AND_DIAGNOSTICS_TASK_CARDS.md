@@ -62,7 +62,7 @@
 |---|---|
 | USAGE-01-01 | 请求级账目/来源/修订契约及现有捕获审计；同键异参拒绝，明确总量/子量、估算与账单边界 **2026-10-19 R67：USAGE-01-01 请求级账目契约**。新增 `usage-ledger-contract.ts`：①**来源必须显式**（`provider` / `local-estimate` / `missing`）；②**unknown 不记作零**（`missing` ⇒ 计数必须 null 且给原因，写数字即拒绝）；③**估算不得声明可结算**（`local-estimate` + `isBillable` ⇒ 拒绝）；④**总量/子量自洽**（子量之和 > 总量 ⇒ 拒绝）；⑤**同键同内容 ⇒ 幂等复用**、**同键异参 ⇒ 拒绝**（同一次调用不得被记两次或改数）；⑥缺请求标识/修订非法 ⇒ 拒绝。**7 条反例 + 2 条变异体**（估算声明可结算／缺失写 0，均被拦下）。门禁：全量（低并发）exit 0；`--check-anchors` **171/171**。**未做**：真实捕获接线与持久化去重/分页/预算（属 USAGE-01-02）、公开查询与导出（属 03）。 |
 | USAGE-01-02 | 持久化去重、分页聚合、预算及估价；重复事件、乱序终值、重启、跨模型切换、取消缺usage、并发预算反例 | **预算预留/结算 done（2026-10-21）**：`usage-budget-reservation.ts`。①**并发预算**：预留按 `revision` 乐观并发（不符 ⇒ `stale-revision`），在途预留累计计入限额（第二笔超限被拒）；②**取消缺 usage ⇒ 保留占用**（`consumed-unknown`，`isDeterminable:false`），**不虚增剩余额度**；③**跨模型切换**：预留绑定模型、视图按模型过滤，**不清除**旧模型预留；④结算已知用量 ⇒ 释放多余预留；重复预留 ID ⇒ 拒绝；⑤**重启**：预算判定只依赖持久化 state（revision 连续）。**15 条反例 + 3 条变异体**。**默认口径（待用户确认）**：只限 **token 与请求数**；**金额估价一律「未估算」**（无价目）；未知 usage 按最保守占用。
-| USAGE-01-03 | 公开查询/界面/导出和包验证；账目可复算，不虚报余额，价格缺失和估算来源清楚，不泄漏其他个体明细 |
+| USAGE-01-03 | 公开查询/界面/导出和包验证；账目可复算，不虚报余额，价格缺失和估算来源清楚，不泄漏其他个体明细 | **公开入口包级验收 done（2026-10-21）**：`scripts/verify-usage-package.mjs`（`npm run verify:usage-package`）。对已安装 tarball 实测：**去重** 同键同 revision 同哈希 ⇒ `duplicate-idempotent`（条目数不增）；**同键异参** ⇒ `conflict-rejected`；**过期 revision**（保持同哈希）⇒ `stale-revision-rejected`；**可复算** 聚合输入 token 400 == 手工求和 400；**未知 usage 不补零** ⇒ `consumedTokenCount:null` 且不宣称超预算；**估算与账单分开** ⇒ `billable.excludedEstimatedCount=1`；**无价目** ⇒ `costEstimate.amountMinorUnits=null`（不伪造金额）；每条带 `sourceAgentInstanceId`，按个体过滤不串。**默认口径（待用户确认）**：金额一律「未估算」，只报 token/请求数。**未做**：GUI 用量面板（私有库）与导出文件格式（需产品确认）。 |
 
 ## 5. DIAG-01：错误汇总与只读诊断
 
