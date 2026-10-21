@@ -193,7 +193,8 @@ export class TaskAccuracyVerifier {
       }
       if (
         evidence.evidenceKind !== "model-claim" &&
-        (evidence.contentHash === null || evidence.contentHash.trim() === "")
+        // 加固（2026-10-21）：漏传 contentHash（undefined）时必须按**空证据**拒绝，不得 TypeError 崩溃
+        (typeof evidence.contentHash !== "string" || evidence.contentHash.trim() === "")
       ) {
         forgedEvidenceIdentifiers.push(evidence.evidenceIdentifier);
         continue;
@@ -284,3 +285,4 @@ export class InMemoryAccuracyAttemptJournal {
     return this.resultsByAttemptId.size;
   }
 }
+
