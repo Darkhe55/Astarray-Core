@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "accuracy-forged-hash-crashes",
+    targetFile: "packages/core/src/orchestration/task-accuracy-verifier.ts",
+    find: "        (typeof evidence.contentHash !== \"string\" || evidence.contentHash.trim() === \"\")",
+    replace: "        (evidence.contentHash === null || evidence.contentHash.trim() === \"\")",
+    testFiles: ["tests/core/unit/accuracy01-verifier-hardening.test.ts"],
+    expectedFailingTestNames: ["② 漏传 contentHash"],
+    rationale:
+      "漏传 contentHash 直接 TypeError 崩溃 ⇒ 畸形声明把验收器打断（而不是如实拒绝）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "accuracy-idempotent-replay-disabled",
+    targetFile: "packages/core/src/orchestration/task-accuracy-verifier.ts",
+    find: "    const processed =\n      (await this.ports.findProcessedAttempt?.(declaration.completionAttemptId)) ??\n      null;",
+    replace: "    const processed = null;",
+    testFiles: ["tests/core/unit/accuracy01-verifier-hardening.test.ts"],
+    expectedFailingTestNames: ["⑤ 幂等签收"],
+    rationale:
+      "关掉幂等复用 ⇒ 同一完成声明重复派发（重复副作用，卡内点名重复派发）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "usage-budget-ignores-inflight-reservations",
     targetFile: "packages/core/src/orchestration/usage-budget-reservation.ts",
     find: "  if (view.settledInputTokenCount + view.reservedInputTokenCount + input.estimatedInputTokenCount > input.policy.inputTokenLimit) {",
