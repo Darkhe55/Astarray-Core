@@ -58,7 +58,8 @@
     "verify:diagnostic-package": "node scripts/verify-diagnostic-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:guidance-package": "node scripts/verify-guidance-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:usage-package": "node scripts/verify-usage-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
-    "verify:accuracy-package": "node scripts/verify-accuracy-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
+    "verify:accuracy-package": "node scripts/verify-accuracy-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
+    "verify:accuracy-settings-package": "node scripts/verify-accuracy-settings-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
   },
   "dependencies": {
     "commander": "^15.0.0",
