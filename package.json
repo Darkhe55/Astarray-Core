@@ -55,7 +55,8 @@
     "verify:history-measurement": "npx tsx scripts/verify-history-measurement.mjs",
     "verify:perf-overview-package": "node scripts/verify-perf-overview-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:project-pressure-package": "node scripts/verify-project-pressure-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
-    "verify:diagnostic-package": "node scripts/verify-diagnostic-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
+    "verify:diagnostic-package": "node scripts/verify-diagnostic-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
+    "verify:guidance-package": "node scripts/verify-guidance-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
   },
   "dependencies": {
     "commander": "^15.0.0",

@@ -92,7 +92,7 @@
 | GUIDE-01-01 | 事件来源/资源/任务作用域、sequence/有效期、指导revision及工具取消能力契约 | 伪造、过期、乱序、重放、跨作用域反例；紧急等级不篡改task priorityTier |
 | GUIDE-01-02 | 独立反馈机制中的控制队列/IPC入口，在模型调用和工具前后安全点应用指导 | busy期间即可应用修正，不等整链结束；普通报告不唤醒主Agent；同指导幂等应用 |
 | GUIDE-01-03 | 长工具检查点和协作取消，保存回执、收敛旧请求、新请求承接指导 | 不假定Provider允许在途插入；未知停止结果blocked；旧完成声明失效；watchdog不误续跑旧指令 |
-| GUIDE-01-04 | 公共应用/CLI/现有TUI提交指导并查看接收/应用状态 | 安装包长任务中途修改目标后行为实际改变；普通指导可继续，主Agent仍只读；记录延迟 |
+| GUIDE-01-04 | 公共应用/CLI/现有TUI提交指导并查看接收/应用状态 | 安装包长任务中途修改目标后行为实际改变；普通指导可继续，主Agent仍只读；记录延迟 | **公开入口包级验收 done（2026-10-21）**：`scripts/verify-guidance-package.mjs`（`npm run verify:guidance-package`），对已安装 tarball 经 `AstarrayApplicationFacade` 实测：正常提交 `accepted`（safe-point 档）且 `queryGuidanceStatus` **可查到**；空文本 ⇒ 明确报错；过期 ⇒ `expired-guidance`；**档位越权** ⇒ `behavior-tier-not-permitted`；`record-only` ⇒ 立即 `applied` 且 `latencyMilliseconds=0`；非法 `sourceKind` ⇒ 构造阶段拒绝。**订正我的假设**：运行时把 `file-task-observation` 注册到 `safe-point-guidance`（不是 `record-only`），越权档是 `gate-and-request-pause`；我第一版按 `record-only` 断言导致误判，已按实际契约改正。**默认口径（待用户确认）**：控制通道可打断；普通报告不唤醒主 Agent。 |
 
 默认只影响指定任务/资源；依赖传播须显式关联。人类指导由本地控制面路由，次级负责重排，模型仅接收必要差异。旧请求未收敛不得让新的写者争用同一资源。
 
