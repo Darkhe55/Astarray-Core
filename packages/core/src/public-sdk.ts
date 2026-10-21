@@ -900,6 +900,31 @@ export {
   type SecretaryViewItem,
 } from "./orchestration/secretary-first-start.js";
 /**
+ * SECRETARY-01-04 / ONBOARD-01-02：默认预算/工作时段（**待用户确认**）、启动不阻塞对话、
+ * 证据可追溯、入口不抢焦点/不隐式授权。
+ */
+export {
+  DEFAULT_SECRETARY_BUDGET,
+  DEFAULT_SECRETARY_WORK_WINDOW,
+  ONBOARDING_SURFACES,
+  SECRETARY_HABITS,
+  buildSecretaryReportEntry,
+  describeSecretaryDefaultsForConfirmation,
+  evaluateExplicitExecution,
+  evaluateOnboardingEntry,
+  evaluateSecretaryBudget,
+  evaluateSecretaryStartup,
+  evaluateSecretaryWorkWindow,
+  type OnboardingEntryDecision,
+  type OnboardingSurface,
+  type SecretaryBudgetVerdict,
+  type SecretaryHabit,
+  type SecretaryReportEntry,
+  type SecretaryReportOutcome,
+  type SecretaryStartupDecision,
+  type SecretaryWindowVerdict,
+} from "./orchestration/secretary-policy.js";
+/**
  * EXP-01 / FOLD-01-01（2026-10-18）：等价折叠的复用契约与版本/权限模型。
  *
  * 纯判定：不执行工作流、不注册工具、不写盘、不调模型。
