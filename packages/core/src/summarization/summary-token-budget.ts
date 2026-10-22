@@ -53,8 +53,7 @@ export interface SummaryTokenizerPort {
 /**
  * 计量一段文本。
  *
- * 估算规则（**保守上界**）：以"字符数 / 2"作为上界（经验上多数 tokenizer 对中英文混合
- * 均不超过 1 token/2 字符；对 ASCII 亦偏保守），并**显式标注**为估算。
+ * 估算规则（**上界**）：用户 2026-10-22 决定 —— 直接以**字符数本身**作为上界，并显式标注为估算。
  * 这不是准确性声明，只是"宁可多留预算"的下限保护。
  */
 export function measureSummaryText(input: {
@@ -75,14 +74,15 @@ export function measureSummaryText(input: {
       source: input.source,
     };
   }
-  const conservativeUpperBound = Math.ceil(input.text.length / 2);
+  // 用户口径（2026-10-22）：**字符数本身作为上界**（不是字符数/2）。
+  const conservativeUpperBound = input.text.length;
   return {
     kind: "estimated",
     tokenCount: conservativeUpperBound,
     basis: "estimated",
     estimationRule:
       tokenizer === null
-        ? "无 tokenizer（或未注入）：按字符数/2 保守上界估算，不宣称准确 token。"
+        ? "无 tokenizer（或未注入）：按**字符数本身**作为上界估算，不宣称准确 token。"
         : "注入的 tokenizer 与来源 schema 不一致（" +
           tokenizer.tokenizerIdentifier +
           " vs " +
@@ -112,14 +112,18 @@ export type SummarySelectionPlan =
       readonly measurementBases: ReadonlyArray<"tokenizer" | "estimated">;
     }
   | {
-      readonly kind: "blocked";
-      readonly reasonCode: "budget-too-small-for-pinned-records" | "single-record-exceeds-budget";
+      readonly kind: "split-plan";
+      /** 首页可完整放下的记录（不放宽预算、不裁剪记录）。 */
+      readonly firstPageRecords: ReadonlyArray<SummaryArchiveRecord>;
+      readonly pageSizeHint: number;
+      readonly remainingRecordCount: number;
+      readonly usedInputTokenCount: number;
       readonly reason: string;
     }
   | {
-      readonly kind: "split-plan";
+      readonly kind: "blocked";
+      readonly reasonCode: "budget-too-small-for-pinned-records" | "single-record-exceeds-budget";
       readonly reason: string;
-      readonly pageSizeHint: number;
     };
 
 /**
@@ -130,11 +134,16 @@ export type SummarySelectionPlan =
  * - 预留输出预算（默认全局 4096 规则由调用方传入）；
  * - 放不下 ⇒ `blocked`（若单条或 pinned 记录超预算）或 `split-plan`（建议拆页）。
  */
+/**
+ * 规划"本轮选入"。
+ *
+ * 用户口径（2026-10-22）：**放不下就拆页**——返回首页可完整放下的记录 + 剩余条数，
+ * **不静默丢弃、不裁剪存档、不放宽预算**。
+ * 单条 pinned 记录超出可用预算 ⇒ `blocked`（不截断记录）。
+ */
 export function planSummarySelection(input: {
   readonly records: ReadonlyArray<SummaryArchiveRecord>;
-  /** 本轮可用输入预算（token；默认由全局 4096 规则给）。 */
   readonly inputTokenBudget: number;
-  /** 需要为输出预留的 token（默认 512）。 */
   readonly outputTokenReservation?: number;
   readonly source: SummaryMeteringSource;
   readonly tokenizer?: SummaryTokenizerPort | null;
@@ -150,7 +159,7 @@ export function planSummarySelection(input: {
         String(input.inputTokenBudget) +
         " ≤ 输出预留 " +
         String(outputReservation) +
-        "）：不静默裁剪，请提高预算或改拆页。",
+        "）：不静默裁剪，请提高预算或拆页。",
     };
   }
 
@@ -163,52 +172,72 @@ export function planSummarySelection(input: {
     }),
   }));
 
-  // 单条超出可用预算（且无法拆分记录内部）⇒ blocked
-  const oversized = measurements.find(
+  const oversizedPinned = measurements.find(
     (entry) => entry.measurement.tokenCount > availableInput && entry.record.isPinned === true,
   );
-  if (oversized !== undefined) {
+  if (oversizedPinned !== undefined) {
     return {
       kind: "blocked",
       reasonCode: "single-record-exceeds-budget",
       reason:
         "记录 " +
-        oversized.record.recordIdentifier +
+        oversizedPinned.record.recordIdentifier +
         " 需要 " +
-        String(oversized.measurement.tokenCount) +
+        String(oversizedPinned.measurement.tokenCount) +
         " tokens，超过可用输入预算 " +
         String(availableInput) +
         "：不截断记录，请拆页。",
     };
   }
 
-  const selectedRecords: SummaryArchiveRecord[] = [];
+  const firstPageRecords: SummaryArchiveRecord[] = [];
   let used = 0;
   for (const entry of measurements) {
     if (entry.measurement.tokenCount > availableInput) continue;
-    if (used + entry.measurement.tokenCount > availableInput) continue;
-    selectedRecords.push(entry.record);
+    if (used + entry.measurement.tokenCount > availableInput) break;
+    firstPageRecords.push(entry.record);
     used += entry.measurement.tokenCount;
   }
 
-  if (selectedRecords.length === 0) {
+  const measurementBases = [...new Set(measurements.map((entry) => entry.measurement.basis))];
+
+  if (firstPageRecords.length === input.records.length) {
+    return {
+      kind: "selected",
+      selectedRecords: firstPageRecords,
+      reservedOutputTokenCount: outputReservation,
+      usedInputTokenCount: used,
+      totalTokenCount: used + outputReservation,
+      measurementBases,
+    };
+  }
+
+  if (firstPageRecords.length === 0) {
     return {
       kind: "split-plan",
+      firstPageRecords: [],
+      pageSizeHint: 1,
+      remainingRecordCount: input.records.length,
+      usedInputTokenCount: 0,
       reason:
         "没有能完整放入本轮预算的记录（" +
         String(input.records.length) +
-        " 条）：建议按页码拆分，不要截断记录。",
-      pageSizeHint: 1,
+        " 条）：必须拆页，不要截断记录。",
     };
   }
 
   return {
-    kind: "selected",
-    selectedRecords,
-    reservedOutputTokenCount: outputReservation,
+    kind: "split-plan",
+    firstPageRecords,
+    pageSizeHint: firstPageRecords.length,
+    remainingRecordCount: input.records.length - firstPageRecords.length,
     usedInputTokenCount: used,
-    totalTokenCount: used + outputReservation,
-    measurementBases: [...new Set(measurements.map((entry) => entry.measurement.basis))],
+    reason:
+      "本轮预算只能完整放入 " +
+      String(firstPageRecords.length) +
+      " 条，其余 " +
+      String(input.records.length - firstPageRecords.length) +
+      " 条**拆页**继续（不裁剪存档、不静默丢弃）。",
   };
 }
 
