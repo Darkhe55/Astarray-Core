@@ -405,6 +405,36 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "sum02-estimate-claims-precision",
+    targetFile: "packages/core/src/summarization/summary-token-budget.ts",
+    find: "    isConservativeUpperBound: true,",
+    replace: "    isConservativeUpperBound: false as unknown as true,",
+    testFiles: ["tests/core/unit/sum02-token-budget.test.ts"],
+    expectedFailingTestNames: ["② 无 tokenizer"],
+    rationale:
+      "把估算说成非保守/精确 ⇒ 用户按它算预算（虚报精度，卡内明令「无统一 token 准确性声明」）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "sum02-selection-trims-records",
+    targetFile: "packages/core/src/summarization/summary-token-budget.ts",
+    find: "    if (used + entry.measurement.tokenCount > availableInput) continue;",
+    replace: "    if (used + entry.measurement.tokenCount > availableInput) {\n      selectedRecords.push({ ...entry.record, text: entry.record.text.slice(0, Math.max(1, availableInput * 2)) });\n      continue;\n    }",
+    testFiles: ["tests/core/unit/sum02-token-budget.test.ts"],
+    expectedFailingTestNames: ["⑦ 放不下"],
+    rationale:
+      "把放不下的记录截断后塞进去 ⇒ 存档摘要被裁剪（卡内：只分页/调整选入，不裁剪存档）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "sum02-switch-rewrites-history",
+    targetFile: "packages/core/src/summarization/summary-token-budget.ts",
+    find: "    previous.source.modelIdentifier !== next.source.modelIdentifier ||\n    previous.tokenCount !== next.tokenCount;",
+    replace: "    true;",
+    testFiles: ["tests/core/unit/sum02-token-budget.test.ts"],
+    expectedFailingTestNames: ["⑭ 同一模型重复计量"],
+    rationale:
+      "同一模型也报「已重新计量」⇒ 每次都重写历史/重算（卡内：换模型不重写历史，只重算本轮）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "secretary-startup-blocks-project-chat",
     targetFile: "packages/core/src/orchestration/secretary-policy.ts",
     find: "  if (!input.isProjectConversationBusy) {",
@@ -3754,6 +3784,7 @@ function main() {
 }
 
 main();
+
 
 
 
