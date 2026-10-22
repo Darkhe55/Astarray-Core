@@ -1465,3 +1465,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **2026-10-23 私有库 GUI 接线（08e1074）**：`/status/secretary`、`/status/onboarding`、`/agents/instruction-window`；
 > 右栏「运行状态」面板 + Agent 右键菜单（contextmenu/Shift+F10/Escape）。
 > 反例 7 + 变异体 2；私有库 325 用例 / 变异 25-25 / 包验收 7-7。**未做**：GUI 用量与诊断面板、人工体验。
+
+> **2026-10-23 私有库 GUI 用量/诊断面板（ce81894）**：`/observability/usage`、`/observability/diagnostics`。
+> 空账目提示「空≠无消耗」、金额恒 null、分页有界；诊断脱敏且空库不编造。反例 6 + 变异体 2。
+> 私有库门禁：331 用例 / 变异 27-27 / 包验收 7-7。
