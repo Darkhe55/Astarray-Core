@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "onboarding-ignores-never-show-again",
+    targetFile: "packages/core/src/orchestration/onboarding-hint-contract.ts",
+    find: "  if (input.state.isNeverShowAgain) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/tui/unit/onboarding-status-command.test.ts"],
+    expectedFailingTestNames: ["③「不再提示」持久化生效"],
+    rationale:
+      "「不再提示」被忽略 ⇒ 用户已拒绝仍反复弹（卡内硬要求持久化生效）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "onboarding-ignores-typing",
+    targetFile: "packages/core/src/orchestration/onboarding-hint-contract.ts",
+    find: "  if (input.context.isUserTyping) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/tui/unit/onboarding-status-command.test.ts"],
+    expectedFailingTestNames: ["② 用户输入中"],
+    rationale:
+      "用户输入中也提示 ⇒ 抢焦点、打断输入 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "secretary-status-accepts-invalid-habit",
     targetFile: "packages/tui/src/cli/secretary-command.ts",
     find: "  if (!(SECRETARY_HABITS as ReadonlyArray<string>).includes(habit)) {",
