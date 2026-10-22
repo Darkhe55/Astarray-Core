@@ -35,6 +35,22 @@ function priorityRank(priority: FeedbackMessage["priority"]): number {
 }
 
 export class MailboxJournal {
+  /**
+   * 读改写串行化（2026-10-22）：`enqueue / markDelivered / ack` 都是「读文档 → 改 → 原子写回」，
+   * 并发时后者会用旧快照覆盖前者（实测：并发入池 3 条只落盘 1 条、ack 后消息复活）。
+   * 这里按实例串行化，保证同一进程内的并发调用不丢更新。
+   */
+  private operationQueue: Promise<void> = Promise.resolve();
+
+  private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.operationQueue.then(operation, operation);
+    this.operationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   private readonly journalDirectoryPath: string;
 
   constructor(baseDirectory: string) {
@@ -73,6 +89,10 @@ export class MailboxJournal {
   }
 
   async enqueue(message: FeedbackMessage): Promise<number> {
+    return this.runExclusive(() => this.enqueueExclusive(message));
+  }
+
+  private async enqueueExclusive(message: FeedbackMessage): Promise<number> {
     const recipientId = message.recipientId;
     const document = (await this.loadDocument(recipientId)) ?? {
       schemaVersion: MAILBOX_JOURNAL_SCHEMA_VERSION,
@@ -117,6 +137,16 @@ export class MailboxJournal {
     messageId: string,
     deliveredAtIso: string,
   ): Promise<void> {
+    return this.runExclusive(() =>
+      this.markDeliveredExclusive(recipientId, messageId, deliveredAtIso),
+    );
+  }
+
+  private async markDeliveredExclusive(
+    recipientId: string,
+    messageId: string,
+    deliveredAtIso: string,
+  ): Promise<void> {
     await this.mutateRecipient(recipientId, (message) => {
       message.delivered = true;
       message.deliveredAtIso = deliveredAtIso;
@@ -124,6 +154,10 @@ export class MailboxJournal {
   }
 
   async ack(recipientId: string, messageId: string): Promise<void> {
+    return this.runExclusive(() => this.ackExclusive(recipientId, messageId));
+  }
+
+  private async ackExclusive(recipientId: string, messageId: string): Promise<void> {
     const document = (await this.loadDocument(recipientId)) ?? null;
     if (document === null) {
       return;
