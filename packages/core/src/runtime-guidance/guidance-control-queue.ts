@@ -152,6 +152,9 @@ export class GuidanceControlQueue {
         if (supersededStatus !== undefined) {
           supersededStatus.status = "superseded";
         }
+        // 修复（2026-10-22）：被取代的旧修订**必须移出待应用队列**，
+        // 否则安全点会把 r1 和 r2 一起套用（互相矛盾的两条指导同时生效）。
+        this.pending.delete(supersededKey);
       }
     }
     this.statusByIdentifier.set(statusKey, {
@@ -360,3 +363,4 @@ export function createGuidanceFeedbackLanePublisher(input: {
     },
   };
 }
+
