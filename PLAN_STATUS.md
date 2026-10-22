@@ -2311,3 +2311,16 @@ LESSON-01-03（dispatch/receive/review 三节点接线）✅；PERF-01-02 ✅；
 | 验收 | 契约 26/26、relocation 11/11、docview/perf/project/usage/diag/guidance/accuracy×3/comm 全部通过 |
 
 **已知抖动**：`g2-progress-guard` 的对照用例在高并发下偶发失败（单文件 2/2 通过），属时间敏感断言。
+
+## 2026-10-23 GUI 接线（私有库 08e1074）
+
+| 端点 | 内容 |
+|---|---|
+| `GET /status/secretary` | 默认**不限预算 + 全天**（用户口径）；非法 `minuteOfDay` ⇒ 400 |
+| `GET /status/onboarding` | 状态缺失按首次；`typing=1` ⇒ `user-busy`；状态文件损坏 ⇒ **502（fail-closed）** |
+| `GET /agents/instruction-window` | 缺参 400；状态未接入 ⇒ `isAvailable:false` + 如实原因；提供状态 ⇒ 菜单区块（积压时批量提交禁用） |
+
+- 页面壳：右栏新增 **Agent 右键菜单**（contextmenu / Shift+F10 / Escape）与「运行状态」面板；
+- 反例 7 条 + 变异体 2 条；私有库门禁：**325 用例 / 变异 25-25 / 包验收 7-7**。
+
+**未做**：GUI 的用量与诊断面板（下一步）；人工体验（需你操作）。
