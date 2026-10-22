@@ -62,7 +62,8 @@
     "verify:accuracy-settings-package": "node scripts/verify-accuracy-settings-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:accuracy-e2e-package": "node scripts/verify-accuracy-e2e-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:comm-package": "node scripts/verify-comm-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
-    "verify:secretary-package": "node scripts/verify-secretary-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
+    "verify:secretary-package": "node scripts/verify-secretary-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
+    "verify:onboarding-package": "node scripts/verify-onboarding-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray"
   },
   "dependencies": {
     "commander": "^15.0.0",

@@ -118,6 +118,7 @@ import {
 } from "./cli/commands.js";
 
 import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
+import { executeOnboardingStatusCommand } from "./cli/onboarding-command.js";
 const program = new Command();
 
 program
@@ -2140,6 +2141,53 @@ secretaryCommand
         endMinuteOfDay: options.endMinute,
         isProjectConversationBusy: options.projectBusy === true,
         habit: options.habit,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+const onboardingCommand = program
+  .command("onboarding")
+  .description("首次/适时引导（只读判定：冷却、不再提示、入口位置）");
+onboardingCommand
+  .command("status")
+  .description("打印引导判定与项目/秘书入口可用性（只读）")
+  .option("--now <iso>", "当前时间（ISO；缺省取系统时间）")
+  .option("--typing", "用户正在输入")
+  .option("--auth-pending", "授权裁决进行中")
+  .option("--error-recovery", "错误恢复中")
+  .option("--emergency", "紧急状态")
+  .option("--high-load", "高负载")
+  .option("--milestone", "已完成里程碑（本地可解释信号）")
+  .option("--asked-efficiency", "用户主动问过效率（本地可解释信号）")
+  .option("--duplicate-work", "发现重复工作（本地可解释信号）")
+  .option("--migration-state-unknown", "迁移后本地状态缺失（不得重复弹首次）")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      now?: string;
+      typing?: boolean;
+      authPending?: boolean;
+      errorRecovery?: boolean;
+      emergency?: boolean;
+      highLoad?: boolean;
+      milestone?: boolean;
+      askedEfficiency?: boolean;
+      duplicateWork?: boolean;
+      migrationStateUnknown?: boolean;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeOnboardingStatusCommand({
+        stateDirectory: defaultStateDirectory(),
+        nowIso: options.now,
+        isUserTyping: options.typing === true,
+        isAuthorizationPending: options.authPending === true,
+        isErrorRecovery: options.errorRecovery === true,
+        isEmergencyActive: options.emergency === true,
+        isHighLoad: options.highLoad === true,
+        hasCompletedMilestone: options.milestone === true,
+        hasAskedAboutEfficiency: options.askedEfficiency === true,
+        hasDuplicateWorkDetected: options.duplicateWork === true,
+        isStateUnknownAfterMigration: options.migrationStateUnknown === true,
         isJsonOutput: options.json === true,
       });
     },
