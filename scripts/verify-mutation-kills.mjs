@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm-journal-no-serialization",
+    targetFile: "packages/core/src/feedback-process/mailbox-journal.ts",
+    find: "    const result = this.operationQueue.then(operation, operation);",
+    replace: "    const result = operation();",
+    testFiles: ["tests/core/unit/comm03-journal-concurrency.test.ts"],
+    expectedFailingTestNames: ["① 并发入池 3 条"],
+    rationale:
+      "读改写不串行化 ⇒ 并发入池只落盘 1 条（丢消息；COMM-01-03 多实例验收实测复现）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm-journal-ack-keeps-message",
+    targetFile: "packages/core/src/feedback-process/mailbox-journal.ts",
+    find: "    document.messages = remainingMessages;",
+    replace: "    document.messages = document.messages;",
+    testFiles: ["tests/core/unit/comm03-journal-concurrency.test.ts"],
+    expectedFailingTestNames: ["③ ack 与投递标记并发"],
+    rationale:
+      "ack 不真正移除消息 ⇒ 已确认消息会被重放（重复投递）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "guide02-superseded-still-applies",
     targetFile: "packages/core/src/runtime-guidance/guidance-control-queue.ts",
     find: "        this.pending.delete(supersededKey);",
