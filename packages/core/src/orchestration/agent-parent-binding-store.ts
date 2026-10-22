@@ -54,7 +54,26 @@ export class AgentCreationRegistry {
   private readonly stateDirectory: string;
   private readonly nowIso: () => string;
   private readonly recordsByAgentInstanceId = new Map<string, AgentCreationRecord>();
-  private isLoaded = false;
+  /**
+   * 加载中的共享 promise（2026-10-23）：先前用 `isLoaded` 先置位、再 await 读盘，
+   * 并发的其它读者看到 `isLoaded=true` 直接返回，于是**读到空登记表**（实测并发读回 9/10 为 null）。
+   */
+  private loadPromise: Promise<void> | null = null;
+
+  /**
+   * 写操作串行化（2026-10-23）：登记/回收都是「改内存 → 整文件写回」，
+   * 并发时后者用旧快照覆盖前者（实测：并发登记 10 个个体重启后只剩 1 个）。
+   */
+  private operationQueue: Promise<void> = Promise.resolve();
+
+  private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.operationQueue.then(operation, operation);
+    this.operationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
 
   constructor(options: AgentCreationRegistryOptions) {
     this.stateDirectory = options.stateDirectory;
@@ -66,10 +85,13 @@ export class AgentCreationRegistry {
   }
 
   async ensureLoaded(): Promise<void> {
-    if (this.isLoaded) {
-      return;
+    if (this.loadPromise === null) {
+      this.loadPromise = this.loadFromDisk();
     }
-    this.isLoaded = true;
+    await this.loadPromise;
+  }
+
+  private async loadFromDisk(): Promise<void> {
     let rawText: string;
     try {
       rawText = await fs.readFile(this.stateFilePath, "utf8");
@@ -96,6 +118,13 @@ export class AgentCreationRegistry {
 
   /** 登记新建主体（由**创建工具**调用）。同一主体重复登记 ⇒ 幂等（保留首次来源）。 */
   async registerCreatedAgent(input: {
+    agentInstanceId: string;
+    createdByAgentInstanceId: string | null;
+  }): Promise<AgentCreationRecord> {
+    return this.runExclusive(() => this.registerCreatedAgentExclusive(input));
+  }
+
+  private async registerCreatedAgentExclusive(input: {
     agentInstanceId: string;
     createdByAgentInstanceId: string | null;
   }): Promise<AgentCreationRecord> {
@@ -127,6 +156,10 @@ export class AgentCreationRegistry {
 
   /** 标记回收：历史记录保留（可追溯"谁建的"），但不再是活跃地址。 */
   async markRecycled(agentInstanceId: string): Promise<void> {
+    return this.runExclusive(() => this.markRecycledExclusive(agentInstanceId));
+  }
+
+  private async markRecycledExclusive(agentInstanceId: string): Promise<void> {
     await this.ensureLoaded();
     const record = this.recordsByAgentInstanceId.get(agentInstanceId);
     if (record === undefined || record.recycledAtIso !== null) {

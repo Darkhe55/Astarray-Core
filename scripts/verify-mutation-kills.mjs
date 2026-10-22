@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-binding-load-race",
+    targetFile: "packages/core/src/orchestration/agent-parent-binding-store.ts",
+    find: "    await this.loadPromise;",
+    replace: "    void this.loadPromise;",
+    testFiles: ["tests/core/unit/comm02-concurrent-binding.test.ts"],
+    expectedFailingTestNames: ["① 并发登记 10 个个体"],
+    rationale:
+      "加载未完成就放行读者 ⇒ 并发读回空登记表（实测 9/10 为 null）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-binding-recycle-noop",
+    targetFile: "packages/core/src/orchestration/agent-parent-binding-store.ts",
+    find: "    record.recycledAtIso = this.nowIso();",
+    replace: "    record.recycledAtIso = null;",
+    testFiles: ["tests/core/unit/comm02-concurrent-binding.test.ts"],
+    expectedFailingTestNames: ["④ 回收后重启"],
+    rationale:
+      "回收标记不落盘 ⇒ 已回收个体重启后又变成可投递地址（复活）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "onboarding-ignores-never-show-again",
     targetFile: "packages/core/src/orchestration/onboarding-hint-contract.ts",
     find: "  if (input.state.isNeverShowAgain) {",
