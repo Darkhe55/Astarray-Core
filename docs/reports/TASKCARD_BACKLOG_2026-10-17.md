@@ -1461,3 +1461,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **修掉真实缺陷**：``ensureLoaded`` 先置位再读盘导致并发读空表；写回未串行化。**2 条变异体**。
 
 > **2026-10-23 已知抖动（第 2 例）**：``history01-run-history-e2e.test.ts`` 的"工具调用后 run-history 出现"在高并发全量下偶发失败（单文件 1/1 通过；``check:low-parallel`` 3868 全绿）；属时间敏感断言。
+
+> **2026-10-23 私有库 GUI 接线（08e1074）**：`/status/secretary`、`/status/onboarding`、`/agents/instruction-window`；
+> 右栏「运行状态」面板 + Agent 右键菜单（contextmenu/Shift+F10/Escape）。
+> 反例 7 + 变异体 2；私有库 325 用例 / 变异 25-25 / 包验收 7-7。**未做**：GUI 用量与诊断面板、人工体验。
