@@ -514,6 +514,7 @@ export class AccuracyCompletionGate {
         input.declaration.taskIdentifier,
       );
     }
+
     const budget = budgetTracker.tryConsumeModelCall({
       taskIdentifier: input.declaration.taskIdentifier,
       nowIso: observedAtIso,
@@ -595,3 +596,4 @@ export class AccuracyCompletionGate {
     return auditLog.readAll();
   }
 }
+
