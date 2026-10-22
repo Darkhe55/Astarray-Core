@@ -2225,3 +2225,11 @@ LESSON-01-03（dispatch/receive/review 三节点接线）✅；PERF-01-02 ✅；
 
 **未回填**：`SUM-01-01~03`（`PLAN_STATUS` 记为 re-verifying，未通过验收）、`EVENT-01`（无验收口径）、
 `COMM-01-02/03`（主体未做），避免虚报 done。
+
+## 2026-10-22 SUM-02-03 对账结论
+
+`SUM-02-03`（权威字段本地提取、叙述引用证据、依据原始分块重建）**实现已存在**，本次复核：
+`tests/core/integration/summary-fact-verification.test.ts` **7/7 通过**，覆盖
+「引用存在≠语义正确」「无出处数值」「关键遗漏 ⇒ partially-supported」「哈希/revision 校验」「拒绝摘要再摘要」「依据原始分块重建」。
+
+**本次未新增实现**（按要求不重复造已有能力）；`SUM-02-04`（人工标注质量评估）仍待人工样本，未回填 done。
