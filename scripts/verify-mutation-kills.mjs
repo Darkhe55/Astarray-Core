@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "secretary-status-accepts-invalid-habit",
+    targetFile: "packages/tui/src/cli/secretary-command.ts",
+    find: "  if (!(SECRETARY_HABITS as ReadonlyArray<string>).includes(habit)) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/tui/unit/secretary-status-command.test.ts"],
+    expectedFailingTestNames: ["③ 非法 habit"],
+    rationale:
+      "非法 habit 被接受 ⇒ 命令按错误习惯静默执行（fail-open）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "secretary-status-accepts-out-of-range-minute",
+    targetFile: "packages/tui/src/cli/secretary-command.ts",
+    find: "  if (!Number.isFinite(options.minuteOfDay) || options.minuteOfDay < 0 || options.minuteOfDay > 1440) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/tui/unit/secretary-status-command.test.ts"],
+    expectedFailingTestNames: ["⑤ 非法 minute-of-day"],
+    rationale:
+      "越界分钟数被接受 ⇒ 时段判定输入错误却静默执行（fail-open）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-transport-writes-before-check",
     targetFile: "packages/core/src/orchestration/cross-project-transport.ts",
     find: "  if (decision.kind === \"rejected\") {",

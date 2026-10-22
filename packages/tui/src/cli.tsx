@@ -117,6 +117,7 @@ import {
   executeUsageOverviewCommand,
 } from "./cli/commands.js";
 
+import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
 const program = new Command();
 
 program
@@ -2105,6 +2106,44 @@ accuracyCommand
     },
   );
 
+const secretaryCommand = program
+  .command("secretary")
+  .description("秘书（只读状态：默认不限预算、默认全天；启动不阻塞项目对话）");
+secretaryCommand
+  .command("status")
+  .description("打印秘书默认值与当前判定（只读）")
+  .option("--tokens-used <count>", "本会话已用 token 数", (value: string) => Number.parseInt(value, 10))
+  .option("--session-token-limit <count>", "显式会话 token 上限（缺省不限）", (value: string) => Number.parseInt(value, 10))
+  .option("--minute-of-day <minute>", "当前本地分钟数（0–1440）", (value: string) => Number.parseInt(value, 10))
+  .option("--start-minute <minute>", "工作时段起点（本地分钟；缺省全天）", (value: string) => Number.parseInt(value, 10))
+  .option("--end-minute <minute>", "工作时段终点（本地分钟；缺省全天）", (value: string) => Number.parseInt(value, 10))
+  .option("--project-busy", "项目对话正在进行（秘书应推迟）")
+  .option("--habit <habit>", "使用习惯：project-first | secretary-first")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      tokensUsed?: number;
+      sessionTokenLimit?: number;
+      minuteOfDay?: number;
+      startMinute?: number;
+      endMinute?: number;
+      projectBusy?: boolean;
+      habit?: string;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeSecretaryStatusCommand({
+        stateDirectory: defaultStateDirectory(),
+        tokensUsed: options.tokensUsed ?? 0,
+        sessionTokenLimit: options.sessionTokenLimit,
+        minuteOfDay: options.minuteOfDay ?? new Date().getHours() * 60 + new Date().getMinutes(),
+        startMinuteOfDay: options.startMinute,
+        endMinuteOfDay: options.endMinute,
+        isProjectConversationBusy: options.projectBusy === true,
+        habit: options.habit,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
 const preserveCommand = program
   .command("preserve")
   .description("本地保全（GIT-PRESERVE：远端同步失败后的独立可恢复快照）");
