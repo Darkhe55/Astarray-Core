@@ -1414,3 +1414,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > standard 真发起校验；关闭 ⇒ ``quality-check-skipped`` + 审计 ``isVerificationLayerInvoked:false`` 且不阻塞；
 > fast 档 ``tier-fast`` 诚实；预算耗尽 ⇒ ``quality-check-budget-exhausted`` 不重试；重启后审计可读回。
 > **我的失误**：把 store 的 ``configurePolicy`` 当门面扁平参数用，预算没生效，误判产品缺陷；已改为 ``budget:{maximumModelCallCount}``。
+
+> **2026-10-22 ``SUM-02-03`` 对账（公开库）**：实现已存在，``tests/core/integration/summary-fact-verification.test.ts`` **7/7**。
+> 覆盖引用存在≠语义正确、无出处数值、关键遗漏、哈希/revision 校验、拒绝摘要再摘要、依据原始分块重建。**未新增实现**。
+> ``SUM-02-04``（人工标注）仍待人工样本。
