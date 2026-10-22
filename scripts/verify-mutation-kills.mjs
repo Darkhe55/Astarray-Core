@@ -405,6 +405,46 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "guide02-superseded-still-applies",
+    targetFile: "packages/core/src/runtime-guidance/guidance-control-queue.ts",
+    find: "        this.pending.delete(supersededKey);",
+    replace: "        void supersededKey;",
+    testFiles: ["tests/core/unit/guide02-safe-point.test.ts"],
+    expectedFailingTestNames: ["⑥ 更高 revision 取代旧条"],
+    rationale:
+      "被取代的旧修订仍留在待应用队列 ⇒ 安全点同时套用 r1 与 r2（互相矛盾的指导）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "guide02-report-wakes-main-agent",
+    targetFile: "packages/core/src/runtime-guidance/guidance-control-queue.ts",
+    find: "      shouldWakeMainAgent: false,",
+    replace: "      shouldWakeMainAgent: true as unknown as false,",
+    testFiles: ["tests/core/unit/guide02-safe-point.test.ts"],
+    expectedFailingTestNames: ["④ 普通报告"],
+    rationale:
+      "普通报告唤醒主 Agent ⇒ 打断主对话（卡内：普通报告不唤醒主 Agent）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "diag02-page-ignores-pagesize",
+    targetFile: "packages/core/src/orchestration/diagnostic-event-store.ts",
+    find: "  const pageSize = Math.max(1, Math.floor(query.pageSize ?? 20));",
+    replace: "  const pageSize = 1_000;",
+    testFiles: ["tests/core/unit/diag02-summary-paging.test.ts"],
+    expectedFailingTestNames: ["① pageSize 生效"],
+    rationale:
+      "分页忽略 pageSize ⇒ 一次返回全部分组（大库直接把响应撑爆，卡内点名分页）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "diag02-matched-ignores-agent-scope",
+    targetFile: "packages/core/src/orchestration/diagnostic-event-store.ts",
+    find: "    event.sourceAgentInstanceId !== query.sourceAgentInstanceId",
+    replace: "    false",
+    testFiles: ["tests/core/unit/diag02-summary-paging.test.ts"],
+    expectedFailingTestNames: ["④ 个体过滤"],
+    rationale:
+      "忽略个体可见范围 ⇒ 子 Agent 能借诊断读到同级原始记录（卡内明令不得）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "sum02-estimate-claims-precision",
     targetFile: "packages/core/src/summarization/summary-token-budget.ts",
     find: "    isConservativeUpperBound: true,",
@@ -3784,6 +3824,8 @@ function main() {
 }
 
 main();
+
+
 
 
 
