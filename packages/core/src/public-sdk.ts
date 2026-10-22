@@ -116,6 +116,23 @@ export {
   type SuggestionAdoptionPlan,
 } from "./orchestration/cross-project-collaboration.js";
 /**
+ * COMM-01-02：跨项目只读消息的**本机传输**（落到目标 mailbox，先判定后落盘，幂等由本机账本保证）。
+ */
+export {
+  sendCrossProjectMessage,
+  type CrossProjectSendOutcome,
+} from "./orchestration/cross-project-transport.js";
+/**
+ * COMM-01-02/03：本地 mailbox journal 公开入口（多实例离线闭环与跨项目只读传输共用）。
+ * 只暴露入池/窥视/投递/确认/计数，不含网络监听。
+ */
+export {
+  MAILBOX_JOURNAL_SCHEMA_VERSION,
+  MailboxJournal,
+  type JournaledMessage,
+  type MailboxJournalDocument,
+} from "./feedback-process/mailbox-journal.js";
+/**
  * SMART-01：指令窗口在**右键 Agent 菜单**中的入口（用户 2026-10-22 决定的位置）。
  */
 export {

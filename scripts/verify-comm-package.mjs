@@ -46,6 +46,9 @@ try {
   process.exit(2);
 }
 
+// 父进程也直接使用 SDK（跨项目只读传输段）：注意这里要 public-sdk，不是反馈进程入口
+const sdkEntryPath = path.join(packageRoot, "dist", "public-sdk.js");
+const sdk = await import(new URL(`file://${sdkEntryPath.replaceAll("\\", "/")}`).href);
 const PROTOCOL_VERSION = 1;
 let currentStage = "init";
 function stage(name) {
@@ -256,6 +259,73 @@ try {
     failures.push("未确认的 msg-2/msg-3 必须仍在 journal（重启不丢）");
   }
 
+  // ⑦ 跨项目只读传输（COMM-01-02）：授权 → 发送 → 幂等抑制
+  stage("cross-project");
+  const crossProjectStateDirectory = path.join(stateDirectory, "cross-project-state");
+  const crossProjectJournal = new sdk.MailboxJournal(crossProjectStateDirectory);
+  const grantOutcome = sdk.issueCrossProjectAuthorization({
+    authorizationIdentifier: "auth-e2e",
+    sourceProjectIdentifier: "project-a",
+    targetProjectIdentifier: "project-b",
+    requestingAgentInstanceId: "agent-a1",
+    grantor: { kind: "authenticated-user", userId: "user-1" },
+    scope: { kind: "specific-agent", agentInstanceId: "agent-b1" },
+    allowedMessageKinds: ["status-query", "correlated-reply"],
+    purpose: "只读状态查询",
+    issuedAtIso: "2026-10-22T10:00:00.000Z",
+    expiresAtIso: "2026-10-23T10:00:00.000Z",
+    revision: 1,
+  });
+  if (grantOutcome.kind !== "granted") failures.push("跨项目授权签发失败");
+  const crossProjectEnvelope = {
+    messageIdentifier: randomUUID(),
+    idempotencyKey: "idem-e2e-1",
+    senderAgentInstanceId: "agent-a1",
+    recipientAgentInstanceId: "agent-b1",
+    sourceProjectIdentifier: "project-a",
+    targetProjectIdentifier: "project-b",
+    sourceSessionIdentifier: "session-a",
+    targetSessionIdentifier: null,
+    missionIdentifier: "mission-1",
+    taskIdentifier: "task-1",
+    authorizationRevision: 1,
+    messageKind: "status-query",
+    correlationIdentifier: null,
+    replyToMessageIdentifier: null,
+    intendedAction: "read",
+  };
+  const crossProjectSend = await sdk.sendCrossProjectMessage({
+    baseDirectory: crossProjectStateDirectory,
+    journal: crossProjectJournal,
+    envelope: crossProjectEnvelope,
+    authorization: grantOutcome.kind === "granted" ? grantOutcome.authorization : null,
+    nowIso: "2026-10-22T12:00:00.000Z",
+  });
+  observations.crossProjectSend = crossProjectSend.kind;
+  if (crossProjectSend.kind !== "queued") failures.push("跨项目只读消息应入池");
+  const crossProjectDuplicate = await sdk.sendCrossProjectMessage({
+    baseDirectory: crossProjectStateDirectory,
+    journal: crossProjectJournal,
+    envelope: { ...crossProjectEnvelope, messageIdentifier: randomUUID() },
+    authorization: grantOutcome.kind === "granted" ? grantOutcome.authorization : null,
+    nowIso: "2026-10-22T12:00:00.000Z",
+  });
+  observations.crossProjectDuplicate = crossProjectDuplicate.kind;
+  if (crossProjectDuplicate.kind !== "duplicate-suppressed") {
+    failures.push("同幂等键的跨项目消息应被抑制");
+  }
+  if ((await crossProjectJournal.countPending("agent-b1")) !== 1) {
+    failures.push("跨项目消息只应入池一次");
+  }
+  const crossProjectWriteAttempt = await sdk.sendCrossProjectMessage({
+    baseDirectory: crossProjectStateDirectory,
+    journal: crossProjectJournal,
+    envelope: { ...crossProjectEnvelope, idempotencyKey: "idem-e2e-2", intendedAction: "write-file" },
+    authorization: grantOutcome.kind === "granted" ? grantOutcome.authorization : null,
+    nowIso: "2026-10-22T12:00:00.000Z",
+  });
+  observations.crossProjectWriteAttempt = crossProjectWriteAttempt.kind;
+  if (crossProjectWriteAttempt.kind !== "rejected") failures.push("跨项目写动作必须被拒");
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -277,6 +347,8 @@ if (failures.length > 0) {
   process.exit(1);
 }
 process.stdout.write("COMM 多实例离线闭环通过：独立进程 fork/IPC、崩溃后 replay 不丢、ack 后不重复、接收者隔离、优雅关闭\n");
+
+
 
 
 
