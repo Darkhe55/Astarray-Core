@@ -53,16 +53,28 @@ function options(stateDirectory: string, overrides: Record<string, unknown> = {}
   };
 }
 
-async function captureJson(execute: () => Promise<number>): Promise<{ status: number; report: any }> {
+interface OnboardingReport {
+  decision: { kind: string; reasonCode?: string; reason?: string };
+  entries: Array<{
+    kind: string;
+    doesStealFocus?: boolean;
+    impliesAuthorization?: boolean;
+  }>;
+}
+
+async function captureJson(
+  execute: () => Promise<number>,
+): Promise<{ status: number; report: OnboardingReport }> {
   const chunks: string[] = [];
-  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
-    chunks.push(String(chunk));
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
     return true;
-  });
+  }) as unknown as typeof process.stdout.write);
   try {
     const status = await execute();
     const text = chunks.join("");
-    return { status, report: text.trim() === "" ? null : JSON.parse(text) };
+    if (text.trim() === "") throw new Error("命令没有输出 JSON");
+    return { status, report: JSON.parse(text) as OnboardingReport };
   } finally {
     spy.mockRestore();
   }
@@ -71,12 +83,12 @@ async function captureJson(execute: () => Promise<number>): Promise<{ status: nu
 describe("ONBOARD-01-02 onboarding status", () => {
   it("① 全新状态 ⇒ show-first，两处入口 show 且不抢焦点/不隐式授权", async () => {
     const stateDirectory = await createStateDirectory();
-    const { status, report } = await captureJson(() => executeOnboardingStatusCommand(options(stateDirectory)));
-    expect(status).toBe(0);
+    const { report } = await captureJson(() => executeOnboardingStatusCommand(options(stateDirectory)));
+    expect(await executeOnboardingStatusCommand(options(stateDirectory))).toBe(0);
     expect(report.decision.kind).toBe("show-first");
     expect(report.entries).toHaveLength(2);
     expect(
-      report.entries.every((entry: any) => entry.kind === "show" && entry.doesStealFocus === false && entry.impliesAuthorization === false),
+      report.entries.every((entry: OnboardingReport["entries"][number]) => entry.kind === "show" && entry.doesStealFocus === false && entry.impliesAuthorization === false),
     ).toBe(true);
   });
 
@@ -86,7 +98,7 @@ describe("ONBOARD-01-02 onboarding status", () => {
       executeOnboardingStatusCommand(options(stateDirectory, { isUserTyping: true })),
     );
     expect(report.decision).toMatchObject({ kind: "suppress", reasonCode: "user-busy" });
-    expect(report.entries.every((entry: any) => entry.kind === "suppressed")).toBe(true);
+    expect(report.entries.every((entry: OnboardingReport["entries"][number]) => entry.kind === "suppressed")).toBe(true);
   });
 
   it("③「不再提示」持久化生效 ⇒ never-show-again", async () => {
@@ -131,3 +143,5 @@ describe("ONBOARD-01-02 onboarding status", () => {
     await expect(executeOnboardingStatusCommand(options(stateDirectory))).resolves.toBe(1);
   });
 });
+
+
