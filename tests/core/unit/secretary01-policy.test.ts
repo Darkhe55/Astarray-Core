@@ -7,7 +7,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_SECRETARY_BUDGET,
   DEFAULT_SECRETARY_WORK_WINDOW,
   SECRETARY_HABITS,
   ONBOARDING_SURFACES,
@@ -33,24 +32,27 @@ describe("SECRETARY-01-04 默认值/启动/预算/工作时段", () => {
     expect(evaluateSecretaryStartup({ habit: "project-first", isProjectConversationBusy: false }).kind).toBe("start");
   });
 
-  it("③ 预算耗尽 ⇒ exhausted 且剩余为 0（不无限重试）", () => {
-    const verdict = evaluateSecretaryBudget({ tokensUsed: DEFAULT_SECRETARY_BUDGET.sessionTokenLimit });
-    expect(verdict).toMatchObject({ kind: "exhausted", remainingTokenCount: 0 });
-    expect(verdict.kind === "exhausted" ? verdict.reason : "").toContain("不无限重试");
+  it("③ 默认不限预算 ⇒ 始终 within（用户 2026-10-22 决定）", () => {
+    const verdict = evaluateSecretaryBudget({ tokensUsed: 10_000_000 });
+    expect(verdict.kind).toBe("within");
   });
 
-  it("④ 预算内 ⇒ within，剩余可算", () => {
-    expect(evaluateSecretaryBudget({ tokensUsed: 5_000 })).toEqual({
+  it("④ 显式配置预算时才按上限判定", () => {
+    expect(evaluateSecretaryBudget({ tokensUsed: 5_000, sessionTokenLimit: 20_000 })).toEqual({
       kind: "within",
-      remainingTokenCount: DEFAULT_SECRETARY_BUDGET.sessionTokenLimit - 5_000,
+      remainingTokenCount: 15_000,
     });
+    const exhausted = evaluateSecretaryBudget({ tokensUsed: 20_000, sessionTokenLimit: 20_000 });
+    expect(exhausted).toMatchObject({ kind: "exhausted", remainingTokenCount: 0 });
+    expect(exhausted.kind === "exhausted" ? exhausted.reason : "").toContain("不无限重试");
   });
 
-  it("⑤ 工作时段内/外判定（默认 09:00–18:00）", () => {
+  it("⑤ 默认工作时段为**全天**（用户 2026-10-22 决定）", () => {
     expect(evaluateSecretaryWorkWindow({ minuteOfDay: 10 * 60 }).kind).toBe("inside");
-    expect(evaluateSecretaryWorkWindow({ minuteOfDay: 8 * 60 }).kind).toBe("outside");
-    expect(evaluateSecretaryWorkWindow({ minuteOfDay: 18 * 60 }).kind).toBe("outside");
-    expect(DEFAULT_SECRETARY_WORK_WINDOW.isDefaultPendingUserConfirmation).toBe(true);
+    expect(evaluateSecretaryWorkWindow({ minuteOfDay: 3 * 60 }).kind).toBe("inside");
+    expect(evaluateSecretaryWorkWindow({ minuteOfDay: 23 * 60 + 59 }).kind).toBe("inside");
+    expect(DEFAULT_SECRETARY_WORK_WINDOW.startMinuteOfDay).toBe(0);
+    expect(DEFAULT_SECRETARY_WORK_WINDOW.endMinuteOfDay).toBe(24 * 60);
   });
 
   it("⑥ 非法时间 ⇒ 按不工作处理（不猜）", () => {
@@ -91,10 +93,10 @@ describe("SECRETARY-01-04 默认值/启动/预算/工作时段", () => {
     expect(outcome.entry.evidenceReferences).toEqual(["mission#1"]);
   });
 
-  it("⑩ 默认值展示里**三条都标注待确认**", () => {
+  it("⑩ 默认值展示写明用户决定（预算不限、全天）", () => {
     const lines = describeSecretaryDefaultsForConfirmation();
-    expect(lines.length).toBeGreaterThanOrEqual(3);
-    expect(lines.every((line) => line.includes("待确认"))).toBe(true);
+    expect(lines.some((line) => line.includes("默认不限"))).toBe(true);
+    expect(lines.some((line) => line.includes("默认全天"))).toBe(true);
   });
 });
 

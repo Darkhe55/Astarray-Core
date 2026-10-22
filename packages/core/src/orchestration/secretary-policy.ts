@@ -17,16 +17,18 @@
 
 /** 默认预算（待用户确认）。 */
 export const DEFAULT_SECRETARY_BUDGET = {
-  sessionTokenLimit: 20_000,
-  isDefaultPendingUserConfirmation: true,
+  /** 用户 2026-10-22 决定：**默认不限预算**（null 表示不设会话级上限）。 */
+  sessionTokenLimit: null,
+  isDefaultPendingUserConfirmation: false,
 } as const;
 
 /** 默认工作时段（本地时区，分钟偏移；右开）。 */
 export const DEFAULT_SECRETARY_WORK_WINDOW = {
-  startMinuteOfDay: 9 * 60,
-  endMinuteOfDay: 18 * 60,
+  /** 用户 2026-10-22 决定：**默认全天**（00:00–24:00）。 */
+  startMinuteOfDay: 0,
+  endMinuteOfDay: 24 * 60,
   timeZone: "local",
-  isDefaultPendingUserConfirmation: true,
+  isDefaultPendingUserConfirmation: false,
 } as const;
 
 /** 两种使用习惯。 */
@@ -71,9 +73,18 @@ export type SecretaryBudgetVerdict =
 /** 预算：耗尽后**停止**而不是无限重试（卡内：耗时与模型调用次数有界）。 */
 export function evaluateSecretaryBudget(input: {
   readonly tokensUsed: number;
-  readonly sessionTokenLimit?: number;
+  /** null / 省略 ⇒ 不限预算（用户默认）。 */
+  readonly sessionTokenLimit?: number | null;
 }): SecretaryBudgetVerdict {
-  const limit = input.sessionTokenLimit ?? DEFAULT_SECRETARY_BUDGET.sessionTokenLimit;
+  const configuredLimit =
+    input.sessionTokenLimit === undefined ? DEFAULT_SECRETARY_BUDGET.sessionTokenLimit : input.sessionTokenLimit;
+  if (configuredLimit === null) {
+    return {
+      kind: "within",
+      remainingTokenCount: Number.POSITIVE_INFINITY,
+    };
+  }
+  const limit = configuredLimit;
   const remaining = limit - input.tokensUsed;
   if (remaining <= 0) {
     return {
@@ -217,8 +228,8 @@ export function evaluateExplicitExecution(input: {
 /** 默认值展示（供 UI/文档提示"这些是默认值，待确认"）。 */
 export function describeSecretaryDefaultsForConfirmation(): ReadonlyArray<string> {
   return [
-    "秘书预算：会话级 " + String(DEFAULT_SECRETARY_BUDGET.sessionTokenLimit) + " tokens（默认值，待确认）",
-    "工作时段：本地时区 09:00–18:00（默认值，待确认）",
+    "秘书预算：默认不限（用户 2026-10-22 决定）",
+    "工作时段：默认全天（用户 2026-10-22 决定）",
     "使用习惯：project-first / secretary-first（默认 project-first，待确认）",
     "入口位置：项目界面 + 秘书界面各一处（默认，待确认）",
   ];

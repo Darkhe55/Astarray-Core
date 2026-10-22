@@ -116,6 +116,15 @@ export {
   type SuggestionAdoptionPlan,
 } from "./orchestration/cross-project-collaboration.js";
 /**
+ * SMART-01：指令窗口在**右键 Agent 菜单**中的入口（用户 2026-10-22 决定的位置）。
+ */
+export {
+  buildInstructionWindowMenuSection,
+  type InstructionWindowMenuSection,
+  type InstructionWindowMenuState,
+  type InstructionWindowMenuItem,
+} from "./orchestration/instruction-window-menu.js";
+/**
  * COMM-01-03 只读拓扑与投递状态（2026-10-20 R111）：无上级不猜、环比不投递、只读无正文。
  */
 export {

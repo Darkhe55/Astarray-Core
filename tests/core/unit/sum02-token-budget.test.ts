@@ -50,7 +50,7 @@ describe("SUM-02-01 计量适配端口", () => {
     if (measurement.kind !== "estimated") throw new Error("unreachable");
     expect(measurement.isConservativeUpperBound).toBe(true);
     expect(measurement.estimationRule).toContain("不宣称准确");
-    expect(measurement.tokenCount).toBe(5); // ceil(10/2)
+    expect(measurement.tokenCount).toBe(10); // 字符数本身作为上界（用户 2026-10-22 决定）
   });
 
   it("③ tokenizer 与来源 schema 不一致 ⇒ 降级为估算（不混用）", () => {
@@ -66,7 +66,7 @@ describe("SUM-02-01 计量适配端口", () => {
     for (const text of samples) {
       const measurement = measureSummaryText({ text, source, tokenizer: null });
       expect(measurement.kind).toBe("estimated");
-      expect(measurement.tokenCount).toBe(Math.ceil(text.length / 2));
+      expect(measurement.tokenCount).toBe(text.length);
     }
   });
 
@@ -93,12 +93,12 @@ describe("SUM-02-02 选入规划（不裁剪存档）", () => {
     expect(plan.kind).toBe("selected");
     expect(JSON.stringify(records)).toBe(snapshot);
     if (plan.kind !== "selected") throw new Error("unreachable");
-    // 每条估算 50 tokens，3584 可用 ⇒ 全选
+    // 每条估算 100 tokens（字符数），3584 可用 ⇒ 全选
     expect(plan.selectedRecords.map((entry) => entry.recordIdentifier)).toEqual(["a", "b", "c"]);
-    expect(plan.usedInputTokenCount).toBe(150);
+    expect(plan.usedInputTokenCount).toBe(300);
   });
 
-  it("⑦ 放不下 ⇒ 只选能完整放下的（不切半条）", () => {
+  it("⑦ 放不下 ⇒ 拆页（首页完整记录 + 剩余条数，不静默丢弃）", () => {
     const records = Array.from({ length: 5 }, (_value, index) =>
       record({ recordIdentifier: `r-${String(index)}`, text: "x".repeat(1_000) }),
     );
@@ -109,13 +109,14 @@ describe("SUM-02-02 选入规划（不裁剪存档）", () => {
       source,
       tokenizer: null,
     });
-    expect(plan.kind).toBe("selected");
-    if (plan.kind !== "selected") throw new Error("unreachable");
-    // 可用 1000，每条估算 500 ⇒ 只能放 2 条
-    expect(plan.selectedRecords).toHaveLength(2);
-    expect(plan.usedInputTokenCount).toBe(1_000);
-    // 关键：选入的记录必须是**完整原文**（不得截断后塞入）
-    expect(plan.selectedRecords.every((entry) => entry.text.length === 1_000)).toBe(true);
+    expect(plan.kind).toBe("split-plan");
+    if (plan.kind !== "split-plan") throw new Error("unreachable");
+    // 可用 1000，每条估算 1000 ⇒ 首页只能放 1 条，其余拆页
+    expect(plan.firstPageRecords).toHaveLength(1);
+    expect(plan.remainingRecordCount).toBe(4);
+    expect(plan.pageSizeHint).toBe(1);
+    // 关键：首页记录必须是**完整原文**（不得截断后塞入）
+    expect(plan.firstPageRecords.every((entry) => entry.text.length === 1_000)).toBe(true);
   });
 
   it("⑧ 预算小于输出预留 ⇒ blocked（不静默裁剪）", () => {
@@ -178,9 +179,12 @@ describe("SUM-02-02 选入规划（不裁剪存档）", () => {
       source,
       tokenizer: null,
     });
-    expect(plan.kind).toBe("selected");
-    if (plan.kind !== "selected") throw new Error("unreachable");
-    expect(plan.totalTokenCount).toBeLessThanOrEqual(4_096);
+    expect(plan.kind).toBe("split-plan");
+    if (plan.kind !== "split-plan") throw new Error("unreachable");
+    // 20 条 × 1000 字符 ⇒ 首页只放 3 条（3000 + 512 预留 ≤ 4096），其余拆页
+    expect(plan.firstPageRecords).toHaveLength(3);
+    expect(plan.remainingRecordCount).toBe(17);
+    expect(plan.usedInputTokenCount).toBeLessThanOrEqual(4_096 - 512);
   });
 
   it("⑬ 模型切换 ⇒ **重新计量**，且只重算本轮（历史不重写）", () => {

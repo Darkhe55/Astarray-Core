@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "smart01-menu-hides-timeout",
+    targetFile: "packages/core/src/orchestration/instruction-window-menu.ts",
+    find: "  if (input.state.timedOutInstructionCount > 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/smart01-instruction-menu.test.ts"],
+    expectedFailingTestNames: ["④ 有超时"],
+    rationale:
+      "悄悄隐藏超时条数 ⇒ 用户以为全部达标（卡内要求逐条超时状态如实揭示）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "smart01-batch-submit-ignores-backlog",
+    targetFile: "packages/core/src/orchestration/instruction-window-menu.ts",
+    find: "      isEnabled: input.state.pendingInstructionCount > 0 && !input.state.isQueueBacklogged,",
+    replace: "      isEnabled: input.state.pendingInstructionCount > 0,",
+    testFiles: ["tests/core/unit/smart01-instruction-menu.test.ts"],
+    expectedFailingTestNames: ["⑤ 积压"],
+    rationale:
+      "窗口已满还允许批量提交 ⇒ 越窗提交、背压失效（卡内：满且不能合法释放时不越窗）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-self-approval-allowed",
     targetFile: "packages/core/src/orchestration/cross-project-collaboration.ts",
     find: "    input.grantor.agentInstanceId === input.requestingAgentInstanceId",
@@ -507,7 +527,7 @@ export const MUTATIONS = [
   {
     mutationIdentifier: "sum02-selection-trims-records",
     targetFile: "packages/core/src/summarization/summary-token-budget.ts",
-    find: "    if (used + entry.measurement.tokenCount > availableInput) continue;",
+    find: "    if (used + entry.measurement.tokenCount > availableInput) break;",
     replace: "    if (used + entry.measurement.tokenCount > availableInput) {\n      selectedRecords.push({ ...entry.record, text: entry.record.text.slice(0, Math.max(1, availableInput * 2)) });\n      continue;\n    }",
     testFiles: ["tests/core/unit/sum02-token-budget.test.ts"],
     expectedFailingTestNames: ["⑦ 放不下"],
