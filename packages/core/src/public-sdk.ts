@@ -95,6 +95,27 @@ export {
   type RelayedCollaborationRequest,
 } from "./orchestration/collaboration-relay-via-parent.js";
 /**
+ * COMM-01-02：跨项目**只读**协作的授权与信封校验（写入一律拒绝、不可再转授权、
+ * 建议采纳不等于执行批准）。
+ */
+export {
+  CROSS_PROJECT_MESSAGE_KINDS,
+  CROSS_PROJECT_WRITE_ACTIONS,
+  evaluateCrossProjectDelivery,
+  issueCrossProjectAuthorization,
+  planSuggestionAdoption,
+  revokeCrossProjectAuthorization,
+  type CrossProjectAuthorization,
+  type CrossProjectAuthorizationOutcome,
+  type CrossProjectDeliveryOutcome,
+  type CrossProjectEnvelope,
+  type CrossProjectGrantor,
+  type CrossProjectMessageKind,
+  type CrossProjectScope,
+  type CrossProjectWriteAction,
+  type SuggestionAdoptionPlan,
+} from "./orchestration/cross-project-collaboration.js";
+/**
  * COMM-01-03 只读拓扑与投递状态（2026-10-20 R111）：无上级不猜、环比不投递、只读无正文。
  */
 export {

@@ -405,6 +405,36 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-self-approval-allowed",
+    targetFile: "packages/core/src/orchestration/cross-project-collaboration.ts",
+    find: "    input.grantor.agentInstanceId === input.requestingAgentInstanceId",
+    replace: "    false",
+    testFiles: ["tests/core/unit/comm02-cross-project.test.ts"],
+    expectedFailingTestNames: ["② **请求方不能自批**"],
+    rationale:
+      "允许请求方自批目标项目授权 ⇒ 越权（跨项目连接必须由目标项目或用户批准）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-write-action-allowed",
+    targetFile: "packages/core/src/orchestration/cross-project-collaboration.ts",
+    find: "  if (envelope.intendedAction !== \"read\") {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/comm02-cross-project.test.ts"],
+    expectedFailingTestNames: ["⑯ 跨项目写动作"],
+    rationale:
+      "跨项目允许写动作 ⇒ 外来 Agent 可直接改目标项目（卡内明令只读）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-stale-revision-allowed",
+    targetFile: "packages/core/src/orchestration/cross-project-collaboration.ts",
+    find: "  if (envelope.authorizationRevision !== authorization.revision) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/comm02-cross-project.test.ts"],
+    expectedFailingTestNames: ["⑪ 旧/新 revision 不匹配"],
+    rationale:
+      "旧 revision 消息照常投递 ⇒ 撤销/变更后的在途消息落进新任务 ⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm-journal-no-serialization",
     targetFile: "packages/core/src/feedback-process/mailbox-journal.ts",
     find: "    const result = this.operationQueue.then(operation, operation);",
