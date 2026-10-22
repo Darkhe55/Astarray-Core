@@ -1409,3 +1409,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **修复真实缺陷**：被取代的旧修订原先仍在 ``pending`` 中，安全点会同时套用 r1 与 r2；现已在取代时移出。**2 条变异体**。
 
 > **2026-10-22 推送失败记录**：DIAG-01-02 / GUIDE-01-02 提交在 5 次重试后仍失败（GitHub 连接 reset），已本地提交且门禁通过（3811 用例 / 260 变异）；下次推送时合并补推。
+
+> **2026-10-22 ``ACCURACY-03`` 增量 E2E（公开库）**：``verify:accuracy-e2e-package``。
+> standard 真发起校验；关闭 ⇒ ``quality-check-skipped`` + 审计 ``isVerificationLayerInvoked:false`` 且不阻塞；
+> fast 档 ``tier-fast`` 诚实；预算耗尽 ⇒ ``quality-check-budget-exhausted`` 不重试；重启后审计可读回。
+> **我的失误**：把 store 的 ``configurePolicy`` 当门面扁平参数用，预算没生效，误判产品缺陷；已改为 ``budget:{maximumModelCallCount}``。
