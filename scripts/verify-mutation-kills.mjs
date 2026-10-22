@@ -405,6 +405,26 @@ export const MUTATIONS = [
       "投递失败阻塞派发 ⇒ 教训存储问题导致任务跑不起来（建议性数据变成单点故障）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-transport-writes-before-check",
+    targetFile: "packages/core/src/orchestration/cross-project-transport.ts",
+    find: "  if (decision.kind === \"rejected\") {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/comm02-transport.test.ts"],
+    expectedFailingTestNames: ["② 无授权"],
+    rationale:
+      "判定被拒也照样落盘 ⇒ 未授权/写动作消息进入目标 mailbox（越权 + 脏数据）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-transport-no-dedupe",
+    targetFile: "packages/core/src/orchestration/cross-project-transport.ts",
+    find: "  if (existing !== undefined) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/comm02-transport.test.ts"],
+    expectedFailingTestNames: ["④ 同 idempotencyKey"],
+    rationale:
+      "同幂等键重复入池 ⇒ 目标重复收到同一请求（重复投递）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "smart01-menu-hides-timeout",
     targetFile: "packages/core/src/orchestration/instruction-window-menu.ts",
     find: "  if (input.state.timedOutInstructionCount > 0) {",
