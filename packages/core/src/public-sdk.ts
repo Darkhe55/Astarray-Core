@@ -599,6 +599,19 @@ import {
   type DeferredFileSummaryRecord,
   type ReportSummaryRecord,
 } from "./summarization/summary-source-adapters.js";
+/**
+ * SUM-02-01/02 计量适配与选入规划：未知来源保守估算、只选完整记录、不裁剪存档、放不下 blocked/拆分。
+ */
+export {
+  measureSummaryText,
+  planSummarySelection,
+  remeasureAfterModelSwitch,
+  type SummaryArchiveRecord,
+  type SummaryMeteringSource,
+  type SummarySelectionPlan,
+  type SummaryTokenMeasurement,
+  type SummaryTokenizerPort,
+} from "./summarization/summary-token-budget.js";
 
 // ─── SUM-01-04：四类摘要来源适配器公开入口 ───
 // 卡内要求摘要覆盖"会话历史、工作存档、报告和延后文件"；四类适配器均为**纯函数**，
