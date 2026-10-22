@@ -2299,3 +2299,15 @@ LESSON-01-03（dispatch/receive/review 三节点接线）✅；PERF-01-02 ✅；
 | 包级验收 | `verify:comm-package` 增加跨项目段：`queued` → `duplicate-suppressed` → 写动作 `rejected` |
 
 **用户口径**：协作通信采用**本机状态**（同一本地状态目录，不引入网络/远程通道）。
+
+## 2026-10-22 门禁复跑（含 COMM-01-02 + 口径裁决）
+
+| 项 | 实测 |
+|---|---|
+| 全量测试（`--maxWorkers=2`） | **3,847 通过** |
+| 覆盖率 | 行 92.23 / **分支 85.55** / 函数 93.48 / 语句 92.35 |
+| 变异体 | **269/269 被拦下**，锚点 269/269 |
+| `npm pack` | **269 文件** sha256 `20963F17855A975269BA…` |
+| 验收 | 契约 26/26、relocation 11/11、docview/perf/project/usage/diag/guidance/accuracy×3/comm 全部通过 |
+
+**已知抖动**：`g2-progress-guard` 的对照用例在高并发下偶发失败（单文件 2/2 通过），属时间敏感断言。
