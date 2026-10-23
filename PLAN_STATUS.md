@@ -2436,3 +2436,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 门禁（我复跑）：私有库 **396 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；路由文件未改。
 风险：以上为**源码级静态断言**，分隔条拖拽手感、浮层对比度、弹窗焦点行为需浏览器实测。
+
+## 2026-10-23 GUI 修正第二轮（私有库 79bbbcb，MiniMax-M3 实现）
+
+用户实测问题与修复：
+1. **工作区位置**：改为在**项目区与会话区之间**以列展开（不覆盖）；`body.chatWorkspaceOpen #chatRightRegion { grid-template-columns: minmax(0,5fr) minmax(0,3fr) }`，工作区第 1 列、会话第 2 列，默认 **5:3**，关闭时单列。
+2. **Agent 状态点不开（bug）**：根因是模板 DOM 嵌套错误——`chatAgentSettingsDialog` 内部少两个 `</div>`，导致 `agentStatusDialog`/`relocationDialog` 被嵌进设置弹窗（原生 `<dialog>` 嵌套下 showModal 失效）。已补齐闭合、四个 dialog 改为顶层兄弟，末尾多余闭合已删。
+3. **状态/用量/诊断脱离 agent**：删除标题栏「状态/用量/诊断」按钮与三个独立弹窗；并入 **Agent 状态弹窗**四区块（指令窗口 / 运行状态 / 用量 / 诊断），打开即刷新，任一失败只影响本区块。
+  - 原 `agentMenuPanel`（Agent 列表）与 `obsOverview`（观测）迁到项目区（id 与文案保留）——**是否保留待用户确认**。
+
+门禁（我复跑）：私有库 **425 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；路由未改。
+风险：仍为静态+运行时 HTML 断言，5:3 像素观感、分隔条手感、弹窗真实焦点行为需浏览器实测。
