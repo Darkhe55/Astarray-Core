@@ -2388,3 +2388,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 `GUI02_AUTHORIZATION_AND_HISTORY_VIEW_TASK_CARD.md`、`WB00_MICRO_EDIT_WORKBENCH_PROTOTYPE_TASK_CARD.md`、
 `BATCH6_REPAIR_TASK_CARDS.md`、`B6R10_FINAL_ACCEPTANCE.md`（保留平台阻塞结论）。
+
+## 2026-10-23 补充核对：B6R-04b（TUI 权限组控制面）
+
+- 代码已在私有库：`packages/tui/src/ui/components/panels.tsx`（`PermissionProfilePanel`）、`app.tsx`（头栏显示 + 刷新/切换）、`state/app-state.ts`（分页/搜索/当前组）；
+- 私有库测试：`tests/tui/component/tui.test.tsx` 覆盖权限组面板；
+- 结论：**B6R-04b 不再是 pending**，本地可证部分 done（tarball 安装后的 TUI 人工体验仍属人工项）。
+## 2026-10-23 发现的下一处未阻塞缺口（GUI-02 产品接线）
+
+- 公共侧已齐：`permission-ask` 事件、`PermissionAskDecisionEntryService`、安全预览、指纹与服务一致性均有测试；
+- **私有 GUI 无 `/permission-ask` 路由与面板**（`project-chat-routes.ts` 只有项目/会话/观测/工作区）⇒「待授权列表 + 详情卡 + 批准入口」尚未接线；
+- 属**纯本地可做**（复用现有决策服务，不新建授权逻辑）。
