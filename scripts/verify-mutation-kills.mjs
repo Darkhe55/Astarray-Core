@@ -625,6 +625,36 @@ export const MUTATIONS = [
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "event01-single-owner-allows-second",
+    targetFile: "packages/core/src/orchestration/event-incident-arbitration.ts",
+    find: "    if (incident.ownerAgentInstanceId !== null) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/event01-incident-arbitration.test.ts"],
+    expectedFailingTestNames: ["① single-owner"],
+    rationale:
+      "允许第二个所有者 ⇒ 同一资源被并行处理（卡内要求单一所有者）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-stale-epoch-accepted",
+    targetFile: "packages/core/src/orchestration/event-incident-arbitration.ts",
+    find: "    if (!Number.isSafeInteger(epoch) || epoch < incident.epoch) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/event01-incident-arbitration.test.ts"],
+    expectedFailingTestNames: ["② old-epoch-rejected"],
+    rationale:
+      "旧 epoch 也被接受 ⇒ 过期执行者仍能提交（fencing 失效）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-storm-always-preempts",
+    targetFile: "packages/core/src/orchestration/event-incident-arbitration.ts",
+    find: "      if (rank(severity) > rank(existing.severity)) {",
+    replace: "      if (true) {",
+    testFiles: ["tests/core/unit/event01-incident-arbitration.test.ts"],
+    expectedFailingTestNames: ["③ storm-no-ping-pong"],
+    rationale:
+      "同级重复也抢占 ⇒ 风暴期间来回切换所有者（乒乓）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "event01-criteria-accepts-empty-sources",
     targetFile: "packages/core/src/orchestration/event-acceptance-criteria.ts",
     find: "  if (eventSources === null || eventSources.filter((source) => source.trim() !== \"\").length === 0) {",

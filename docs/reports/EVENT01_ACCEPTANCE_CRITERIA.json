@@ -1,0 +1,12 @@
+{
+  "eventSources": ["process-exit", "provider-failure", "queue-storm", "tool-crash"],
+  "responseDeadlineSeconds": 60,
+  "recoveryPolicy": "require-user-confirmation",
+  "requiredEvidence": [
+    "single-owner",
+    "old-epoch-rejected",
+    "storm-no-ping-pong",
+    "quota-exhausted-still-receives",
+    "recovery-requires-confirmation"
+  ]
+}
