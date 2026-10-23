@@ -2399,3 +2399,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 公共侧已齐：`permission-ask` 事件、`PermissionAskDecisionEntryService`、安全预览、指纹与服务一致性均有测试；
 - **私有 GUI 无 `/permission-ask` 路由与面板**（`project-chat-routes.ts` 只有项目/会话/观测/工作区）⇒「待授权列表 + 详情卡 + 批准入口」尚未接线；
 - 属**纯本地可做**（复用现有决策服务，不新建授权逻辑）。
+
+## 2026-10-23 布局修复（私有库 40df419）
+
+- 用户实测：“agent 菜单位置不对，应在右侧展开；现在跑到界面右上角，并把除标题外内容挤到底部”。
+- **根因**：`#chatStatusPane` 只设了 `grid-column: -1`、没设 `grid-row`，CSS Grid 自动放置把它塞进**表头行**（row 1），该行被状态面板撑高，会话（row 2）被推到页面底部。
+- **修复**：`grid-row: 2`，与左栏/会话同处内容行；`grid-column: -1` 保持最右列。
+- 护栏新增断言 `grid-row: 2`，并加 1 条变异体（改回 row 1 ⇒ 必须变红）；私有库门禁 **338 用例 / 变异 32-32 / 包验收 7-7**。
