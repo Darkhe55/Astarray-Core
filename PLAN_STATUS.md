@@ -2468,3 +2468,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 - 用户口径：**macOS 相关证据（RELIABILITY-01-03 / AR-07 / B6R-10 / SMART-01 / BRIDGE-01）统一推迟到"所有任务卡完成后的统一测试"**，不作为当前单项阻塞。
 - 因此这些卡当前记为「**平台证据延后（用户决定）**」，而不是「阻塞待平台」；统一测试时一次性在 macOS（或 macos-latest CI）跑门禁并归档。
+
+## 2026-10-24 EVENT-01 仲裁内核（用户确认口径后开工）
+
+- 口径落地：`docs/reports/EVENT01_ACCEPTANCE_CRITERIA.json`（事件源 process-exit / provider-failure / queue-storm / tool-crash；期限 60s；恢复 require-user-confirmation；5 条证据）。
+- 实现：`event-incident-arbitration.ts` + 10 条反例：单一所有者、旧 epoch 拒绝、风暴合并（不乒乓）、额度满仍接收、超期降级、恢复需确认、状态只进不退、未知事件源拒绝。
+- **仍 pending**：控制通道 IPC、工具取消/分阶段确认、崩溃重放、安装包状态入口 ⇒ 整卡不判通过。
