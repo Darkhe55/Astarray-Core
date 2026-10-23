@@ -2343,3 +2343,10 @@ LESSON-01-03（dispatch/receive/review 三节点接线）✅；PERF-01-02 ✅；
 - 头像右键 ⇒ Agent 菜单（指令窗口区块 + 修改 agent 设置）；左键 ⇒ 修改设置；**用户气泡不弹**。
 - 指令窗口未接入时菜单仍保留设置入口；选中 agent 缺省 `primary`。
 - 反例 6 条 + 变异体 2 条；私有库门禁 **337 用例 / 变异 29-29 / 包验收 7-7**。
+
+## 2026-10-23 布局订正（私有库 7180dab）
+
+- 用户实测：“弹出菜单像底栏，不是窗口” ⇒ `.agent-context-menu` 改为 `position: fixed` 浮层（`z-index:1000`、阴影、圆角），并在 `agentMenuPlace` 里按视口收边。
+- 用户实测：“右栏列表实际在左栏” ⇒ 新增独立右侧栏 `#chatStatusPane`（`grid-column: -1`，默认列 `var(--chat-rail) minmax(0,1fr) var(--chat-status)`；打开工作区时四列），把 Agent 列表、运行状态、用量、诊断移到右侧；窄屏（≤1180px）隐藏。
+- 布局护栏测试随之更新：仍禁止**布局面板**用 `fixed`，同时断言弹出菜单**必须** `fixed` 且状态栏在 `</main>` 之后、`grid-column: -1`。
+- 私有库门禁：**338 用例 / 变异 31-31 / 包验收 7-7**。
