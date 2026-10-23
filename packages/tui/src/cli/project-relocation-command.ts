@@ -12,6 +12,7 @@ import {
   ProjectRelocationController,
 } from "../../../core/src/public-sdk.js";
 import { EXIT_CODES, failWith, printJson } from "./json-output.js";
+import { buildProjectEntryRelocationPrompt } from "../../../core/src/orchestration/project-relocation-entry-prompt.js";
 
 /** 命令输入。 */
 export interface ProjectStatusCommandInput {
@@ -241,4 +242,59 @@ export async function executeProjectReconcileCommand(
 
   // 只有"可以继续"才返回 0；blocked 与"需人工确认"都返回非 0（不谎报已恢复）
   return reconciliation.isExecutionAllowed ? EXIT_CODES.SUCCESS : EXIT_CODES.FAILURE;
+}
+
+/** `project entry` 输入：**进入项目时**调用（不在启动时调用）。 */
+export interface ProjectEntryCommandInput {
+  readonly stateDirectory: string;
+  readonly projectIdentifier: string;
+  readonly currentRootPath: string;
+  readonly observedProjectIdentifier: string | null;
+  readonly isJsonOutput: boolean;
+}
+
+/**
+ * 执行 `project entry`：进入项目时才检查重定位并给出提示。
+ *
+ * 退出码：0 = 无阻断（身份一致，可进入只读对账）；3 = **阻断**（需要用户先处理重定位）。
+ */
+export async function executeProjectEntryCommand(
+  input: ProjectEntryCommandInput,
+): Promise<number> {
+  const controller = new ProjectRelocationController({
+    store: new ProjectLocationRegistrationStore({ baseDirectory: input.stateDirectory }),
+  });
+
+  let description;
+  try {
+    description = await controller.describeProjectRelocation({
+      projectIdentifier: input.projectIdentifier,
+      currentRootPath: input.currentRootPath,
+      isRegisteredRootAccessible: existsSync(input.currentRootPath),
+      observedProjectIdentifierAtCurrentRoot: input.observedProjectIdentifier,
+      candidateIdentifiersWithSameIdentity: [],
+    });
+  } catch (error) {
+    failWith(new Error("读取项目登记失败：" + (error instanceof Error ? error.message : String(error))));
+  }
+
+  const prompt = buildProjectEntryRelocationPrompt(description);
+  if (input.isJsonOutput) {
+    printJson({
+      status: "ok",
+      prompt,
+      registrationReadKind: description.registrationReadKind,
+      outcome: description.outcome,
+    });
+  } else {
+    process.stdout.write(
+      [
+        prompt.titleText,
+        prompt.messageText,
+        "需要你执行：" + prompt.requiredUserAction,
+        prompt.isBlocking ? "（已阻断：处理后可继续）" : "（可进入只读恢复对账）",
+      ].join("\n") + "\n",
+    );
+  }
+  return prompt.isBlocking ? 3 : EXIT_CODES.SUCCESS;
 }

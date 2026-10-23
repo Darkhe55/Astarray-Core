@@ -615,6 +615,16 @@ export const MUTATIONS = [
       "忽略个体可见范围 ⇒ 子 Agent 能借诊断读到同级原始记录（卡内明令不得）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "relocate-entry-confirmed-is-blocking",
+    targetFile: "packages/core/src/orchestration/project-relocation-entry-prompt.ts",
+    find: "  if (outcome.classification === \"identity-confirmed\") {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/relocate01-entry-prompt.test.ts"],
+    expectedFailingTestNames: ["① 身份一致"],
+    rationale:
+      "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "event01-criteria-accepts-empty-sources",
     targetFile: "packages/core/src/orchestration/event-acceptance-criteria.ts",
     find: "  if (eventSources === null || eventSources.filter((source) => source.trim() !== \"\").length === 0) {",

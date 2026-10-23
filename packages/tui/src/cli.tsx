@@ -8,6 +8,7 @@ import { executeRunCommand } from "./cli/run-command.js";
 import {
   executeProjectReconcileCommand,
   executeProjectStatusCommand,
+  executeProjectEntryCommand,
 } from "./cli/project-relocation-command.js";
 // OBS-01（2026-10-19 R38）：性能/诊断的只读查询入口。
 import {
@@ -688,6 +689,30 @@ settingsCommand
 const projectCommand = program
   .command("project")
   .description("项目（只读；冷启动与重定位状态）");
+projectCommand
+  .command("entry")
+  .description("进入项目时检查重定位并给出提示（阻断时退出码 3）")
+  .requiredOption("--project <project-id>", "项目标识")
+  .requiredOption("--root <path>", "当前选择的项目根路径")
+  .option("--observed-identifier <id>", "当前根观测到的项目标识")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      project: string;
+      root: string;
+      observedIdentifier?: string;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeProjectEntryCommand({
+        stateDirectory: defaultStateDirectory(),
+        projectIdentifier: options.project,
+        currentRootPath: options.root,
+        observedProjectIdentifier: options.observedIdentifier ?? null,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
 projectCommand
   .command("status")
   .description("查询项目的冷启动状态：能否加载旧历史、能否执行任务、需要用户做什么")
