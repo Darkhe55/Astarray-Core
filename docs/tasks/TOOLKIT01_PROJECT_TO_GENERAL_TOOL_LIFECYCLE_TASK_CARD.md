@@ -123,7 +123,7 @@
 | TOOLKIT-01-03 | **done（2026-10-10）** | 已完成：两个结构不同的 fixture 项目（`fixture-alpha`：`src/`+`tests/`+`.ts`；`fixture-beta`：`lib/`+`lib/vendor/`+`docs/`+`.py`）、来源项目**零修改**、目标项目**显式启用并固定内容哈希**、推广**只提案**（`enabledProjectIdentifiers` 恒为空）、来源项目零修改有反例。**内容哈希已改为真实 sha256**（原为自造多项式哈希）。 |
 | TOOLKIT-01-04 | **本地可证部分 done（2026-10-13）**；整卡仍不主张通过 | 已完成：设置入口、版本升级差异、停用/回滚、**取消/崩溃恢复管理入口**与**独立反馈**（`tool-package-operation-control.ts`），CLI `list/describe/status/enable/disable/upgrade/rollback/cancel/recover/feedback`，GUI/TUI 面板；**修掉"在途调用未持久化"缺陷**（取消后跨进程仍可见在途调用）。反例含**真实 `dist/cli.js` 子进程**。<br>**2026-10-13 追加交付**：① 查实"新增副作用须重新授权"门禁此前只依赖**调用方自述的裸布尔**（CLI `--reauthorized`）⇒ 任何调用方传 true 即可绕过，且同一控制器在 `enableForProject` 处已把该形态判为"旁路"并移除了参数（**自相矛盾**）。已改为**本地签发 + 操作绑定 + 一次性消费**的可核验记录（`d7afd1c`），并补 CLI 签发入口 `authorize-upgrade`（`af8ba8c`）；② 补齐卡内点名的**与 MERGE-01 完整联测**（`4e167a0`：互不干扰 / 两处都不落地 / 门禁只认记录 / 重启后两边状态可读回）。<br>⚠️ **本行原写的「仍未完成：签发来源仍是独立机制 —— 尚未把 MERGE-01 的参数授权规则表接成签发者」已于 2026-10-23 **作废**（`cee06f1`）**：用户 2026-10-22 明确澄清「签发者**不应该根据规则表设置**，应该由**拥有权限的角色**确定，**默认升级工具权限只有用户拥有**，并兼容向下级逐层分发」⇒「把 MERGE-01 规则表当签发者」这一方向**是错的**；已按澄清交付 `packages/core/src/toolkit/tool-upgrade-authorization-grant.ts`。<br>**仍未完成（不主张整卡通过）**：06 的真实 token／维护成本／跨平台可比性（须真实额度与平台证据）。 |
 | TOOLKIT-01-05 | **done（2026-10-10）** | 已完成：受控确定性程序工具（`DETERMINISTIC_CSV_TO_JSON_CONVERTER`）+ 隔离门禁（沙箱与 broker **两者都必需**、未支持能力**先于**沙箱检查拒绝、`fallbackPath: "recipe-only"`、**不允许任意脚本兜底**）。 |
-| TOOLKIT-01-06 | **大部分完成（2026-10-10：真实 token 用量已实测）**；**不判通过** | 已交付：tarball 隔离安装闭环（`verify:toolkit-package` **48/48**）、SDK 与 CLI/TUI/GUI 最小管理入口、受益评估（**保守取区间下限**、无机械重复门槛、自动发现只提案）、**如实记录 `measuredSavingMinutes: 0` 与 `notMeasuredItems`**、**更大样本的多轮复用实测**（`measureRecipeReuseAcrossRounds()`：**实测**轮数与**预测**次数分列；`buildCost` 一次性 vs `recurringCost` 按轮分开；**结构性守恒**可核对（6 轮 × 3 次 = 18）；**失败轮不得算成节省**；`isPerRoundCostStable` 判定"复用是否真的成立"）。**仍未完成**：真实 token/模型请求消耗（**须真实额度**）、真实维护成本与跨平台可比性 ⇒ 不主张整卡通过。 |
+| TOOLKIT-01-06 | **大部分完成（2026-10-10：真实 token 用量已实测）**；**不判通过** | 已交付：tarball 隔离安装闭环（`verify:toolkit-package` **48/48**）、SDK 与 CLI/TUI/GUI 最小管理入口、受益评估（**保守取区间下限**、无机械重复门槛、自动发现只提案）、**如实记录 `measuredSavingMinutes: 0` 与 `notMeasuredItems`**、**更大样本的多轮复用实测**（`measureRecipeReuseAcrossRounds()`：**实测**轮数与**预测**次数分列；`buildCost` 一次性 vs `recurringCost` 按轮分开；**结构性守恒**可核对（6 轮 × 3 次 = 18）；**失败轮不得算成节省**；`isPerRoundCostStable` 判定"复用是否真的成立"）。**真实 token/模型请求消耗已实测（2026-10-24，云知声 u2-flash，2 轮 4 请求，见文末实测段）**；真实维护成本与跨平台可比性仍未完成 ⇒ 不主张整卡通过。 |
 
 推荐先交付 01/02/03 的项目复用纵向切片，证明收益后做 04/05/06；第一阶段完成不把整卡标 done。01 可提前审计；实际启用受 MERGE 权限门禁及 RELIABILITY 关键缺口限制。NODECTX 未落地时不引入新的压缩方案，沿用原文按需读取。
 
@@ -865,3 +865,15 @@ packages/tui/src/cli.tsx:416 / 436
 
 **⇒ TOOLKIT-01-04 的本地可证部分至此全部交付**（含用户本次澄清的两条）；
 **整卡仍不主张通过**：06 的真实 token／维护成本／跨平台可比性须真实额度与平台证据。
+### TOOLKIT-01-06 真实 token 实测（2026-10-24）
+
+- **脚本**：`node scripts/verify-u2-flash-token-usage.mjs --rounds 2 --state-dir .tmp/live-u2-flash-usage-20261024`
+- **环境**：云知声 `u2-flash`（`prov-unisound-1`，anthropic-messages 协议）；凭据 sha256 运行前后一致（未写盘）。
+- **结果（真实账目口径，非估算）**：
+  - 轮次：2/2 达到 `done`；账目条目（模型请求）**4** 条，缺 usage **0** 条，估算 **0** 条；
+  - token：input **7207**、output **292**、cached **1987**；
+  - 延迟：mean **4317ms**（min 4069 / max 4564）；
+  - **工具调用数：未测**（公开门面不暴露该计数，`perfSampleSink` 未接线 ⇒ 不猜测）；
+  - **费用/节省：未测**（未配置价格表，不以本地估算冒充账单）。
+- **验收脚本自检**：6/6 项通过；判据落盘 `.tmp/live-u2-flash-usage-20261024/acceptance-verdict.json`。
+- **仍不判整卡通过**：真实维护成本、跨平台可比性未取得；工具调用数无取证入口。

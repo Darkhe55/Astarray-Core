@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人工判定总清单（2026-10-24）</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --ink: #1c2530;
+    --ink-soft: #55606e;
+    --line: #dfe3e9;
+    --line-soft: #eceff3;
+    --pass: #1a7f4b;
+    --pass-bg: #e7f6ee;
+    --fail: #b3261e;
+    --fail-bg: #fdecea;
+    --todo: #6b7280;
+    --todo-bg: #eef0f3;
+    --accent: #22508f;
+    --accent-soft: #eaf0f8;
+    --focus: #1a73e8;
+    --radius: 8px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    padding: 0 0 4rem;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  a { color: var(--accent); }
+
+  /* ---------- 顶部 ---------- */
+  header.top {
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    padding: 1.25rem 1.5rem 1rem;
+  }
+
+  .top-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    margin: 0 0 .35rem;
+    font-size: 1.35rem;
+    letter-spacing: .01em;
+  }
+
+  .meta {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: .86rem;
+  }
+
+  .meta code {
+    background: var(--line-soft);
+    border-radius: 4px;
+    padding: .1rem .35rem;
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: .92em;
+  }
+
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+    flex-wrap: wrap;
+    margin-top: .9rem;
+  }
+
+  .bar {
+    position: relative;
+    flex: 1 1 320px;
+    min-width: 220px;
+    height: 14px;
+    background: var(--line-soft);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--pass);
+    transition: width .18s ease;
+  }
+
+  .bar-text {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .counters {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .7rem;
+    font-size: .84rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border-radius: 999px;
+    padding: .15rem .65rem;
+    border: 1px solid var(--line);
+    background: var(--todo-bg);
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chip b { font-weight: 700; }
+  .chip.is-pass { background: var(--pass-bg); color: var(--pass); border-color: #bfe3d0; }
+  .chip.is-fail { background: var(--fail-bg); color: var(--fail); border-color: #f2c4c0; }
+  .chip.is-incomplete { background: #fff5e6; color: #8a5a00; border-color: #f0d9a8; }
+
+  .actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .85rem;
+  }
+
+  button {
+    font: inherit;
+    font-size: .87rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    padding: .42rem .85rem;
+    cursor: pointer;
+  }
+
+  button:hover { background: var(--line-soft); }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  button.primary:hover { background: #1c4478; }
+
+  button.danger {
+    color: var(--fail);
+    border-color: #e6b4b0;
+    background: #fff;
+  }
+  button.danger:hover { background: var(--fail-bg); }
+
+  /* ---------- 说明块 ---------- */
+  .notice {
+    max-width: 1180px;
+    margin: 1rem auto 0;
+    padding: .8rem 1rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    color: var(--ink-soft);
+    font-size: .86rem;
+  }
+
+  .notice ol { margin: .4rem 0 0; padding-left: 1.2rem; }
+  .notice li { margin: .15rem 0; }
+
+  /* ---------- 分组卡片 ---------- */
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  .group {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-top: 1.1rem;
+    overflow: hidden;
+  }
+
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    flex-wrap: wrap;
+    padding: .7rem .95rem;
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .group-title { margin: 0; font-size: 1rem; }
+
+  .group-stat {
+    margin-left: auto;
+    font-size: .8rem;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .items { margin: 0; padding: 0; list-style: none; }
+
+  .item {
+    padding: .75rem .95rem;
+    border-top: 1px solid var(--line-soft);
+  }
+  .item:first-child { border-top: none; }
+
+  .item-row {
+    display: flex;
+    gap: .6rem;
+    align-items: flex-start;
+  }
+
+  .id {
+    flex: 0 0 auto;
+    min-width: 2.2rem;
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: .15rem;
+  }
+
+  .body { flex: 1 1 auto; min-width: 0; }
+
+  .field {
+    display: flex;
+    gap: .5rem;
+    align-items: baseline;
+    margin: .12rem 0;
+  }
+
+  .field-label {
+    flex: 0 0 4.6rem;
+    color: var(--ink-soft);
+    font-size: .82rem;
+    white-space: nowrap;
+  }
+
+  .field-value { flex: 1 1 auto; min-width: 0; }
+
+  .hint {
+    font-size: .8rem;
+    color: var(--ink-soft);
+    background: var(--line-soft);
+    border-radius: 4px;
+    padding: 0 .3rem;
+  }
+
+  /* ---------- 状态选择 ---------- */
+  .choices {
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: .55rem;
+  }
+
+  .choices-label {
+    color: var(--ink-soft);
+    font-size: .82rem;
+    margin-right: .1rem;
+  }
+
+  .choice {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .choice input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .choice span {
+    display: inline-block;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: .25rem .8rem;
+    font-size: .85rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .choice input:hover + span { background: var(--line-soft); }
+
+  .choice input:checked + span {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .choice input[value="pass"]:checked + span {
+    background: var(--pass-bg);
+    border-color: var(--pass);
+    color: var(--pass);
+  }
+
+  .choice input[value="fail"]:checked + span {
+    background: var(--fail-bg);
+    border-color: var(--fail);
+    color: var(--fail);
+  }
+
+  .choice input[value="todo"]:checked + span {
+    background: var(--todo-bg);
+    border-color: var(--todo);
+    color: var(--todo);
+  }
+
+  /* ---------- 备注 ---------- */
+  .note {
+    margin-top: .55rem;
+    padding: .6rem .7rem;
+    background: #fffaf2;
+    border: 1px solid #f0d9a8;
+    border-radius: var(--radius);
+  }
+
+  .note[hidden] { display: none; }
+
+  .note-label {
+    font-size: .84rem;
+    font-weight: 600;
+    color: #8a5a00;
+    margin-bottom: .35rem;
+  }
+
+  .note textarea {
+    width: 100%;
+    min-height: 5.5rem;
+    resize: vertical;
+    font: inherit;
+    font-size: .87rem;
+    padding: .45rem .55rem;
+    border: 1px solid #e0c88f;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+
+  .note-guidance {
+    margin: .35rem 0 0;
+    font-size: .8rem;
+    color: var(--ink-soft);
+  }
+
+  .note-warn {
+    display: none;
+    margin: .4rem 0 0;
+    font-size: .82rem;
+    color: var(--fail);
+    font-weight: 600;
+  }
+
+  .item.is-incomplete .note-warn { display: block; }
+
+  .item.is-incomplete { background: #fffdf7; }
+
+  .badge {
+    display: inline-block;
+    margin-left: .45rem;
+    font-size: .76rem;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: .05rem .5rem;
+    border: 1px solid var(--line);
+    background: var(--todo-bg);
+    color: var(--ink-soft);
+    vertical-align: middle;
+  }
+
+  .badge.is-pass { background: var(--pass-bg); color: var(--pass); border-color: #bfe3d0; }
+  .badge.is-fail { background: var(--fail-bg); color: var(--fail); border-color: #f2c4c0; }
+  .badge.is-incomplete { background: #fff5e6; color: #8a5a00; border-color: #f0d9a8; }
+  .badge.is-todo { background: var(--todo-bg); color: var(--todo); border-color: var(--line); }
+
+  /* ---------- 焦点可见 ---------- */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .choice input:focus-visible + span {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ---------- 记录区 ---------- */
+  .record {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-top: 1.1rem;
+    padding: .9rem 1rem;
+  }
+
+  .record h2 { margin: 0 0 .5rem; font-size: 1rem; }
+
+  .record-list { margin: 0; padding-left: 1.2rem; color: var(--ink-soft); font-size: .88rem; }
+  .record-list li { margin: .1rem 0; }
+  .record-list .empty { list-style: none; margin-left: -1.2rem; color: var(--ink-soft); }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%) translateY(8px);
+    background: var(--ink);
+    color: #fff;
+    padding: .5rem 1rem;
+    border-radius: 999px;
+    font-size: .86rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 50;
+  }
+
+  .toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 640px) {
+    .field { flex-direction: column; gap: 0; }
+    .field-label { flex: 0 0 auto; }
+    header.top { padding: 1rem 1rem .8rem; }
+    main { padding: 0 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <h1>人工判定总清单（2026-10-24 更新）</h1>
+    <p class="meta">
+      来源：<code>docs/reports/GUI_MANUAL_ACCEPTANCE_2026-10-23.md</code> ·
+      环境：Firefox，窗口 2560 宽 ·
+      服务：<code>cd astarray-ui &amp;&amp; npx tsx scripts/seed-gui-demo.mjs --port 7420</code> → <code>http://127.0.0.1:7420/</code> ·
+      注意：GUI 页面在服务启动时生成，<strong>改完必须重启服务</strong>再看。
+    </p>
+
+    <div class="progress-row">
+      <div class="bar" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar-fill" id="bar-fill"></div>
+      </div>
+      <div class="bar-text" id="progress-label">已通过 0 / 49</div>
+    </div>
+
+    <div class="counters" id="counters">
+      <span class="chip is-pass">通过 <b id="c-pass">0</b></span>
+      <span class="chip is-fail">不通过 <b id="c-fail">0</b></span>
+      <span class="chip is-todo">未测 <b id="c-todo">49</b></span>
+      <span class="chip is-incomplete">不完整 <b id="c-incomplete">0</b></span>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="primary" id="btn-export">导出 Markdown</button>
+      <button type="button" class="danger" id="btn-clear">清空全部</button>
+      <button type="button" id="btn-reset-progress">仅重置结果（保留备注）</button>
+    </div>
+  </div>
+</header>
+
+<div class="notice">
+  <strong>判定规则</strong>
+  <ol>
+    <li>每项只有 <strong>通过 / 不通过</strong> 两态可选；不测请保持「未测」。</li>
+    <li>选择「不通过」时必须写 <strong>看到什么 / 期望什么 / 复现步骤</strong>；未填写该项标为 <strong>不完整</strong>。</li>
+    <li>状态与备注自动保存在本浏览器 localStorage（键：<code>manual-acceptance-2026-10-24</code>），刷新不丢。</li>
+  </ol>
+</div>
+
+<main id="groups"></main>
+
+<section class="record">
+  <h2>记录</h2>
+  <ul class="record-list">
+    <li>通过项：<span id="rec-pass">（无）</span></li>
+    <li>不通过项（每条写：看到什么 / 期望什么 / 复现步骤）：<span id="rec-fail">（无）</span></li>
+    <li>结论：☐ 全部通过　☐ 有不通过（需修）</li>
+  </ul>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script id="acceptance-data" type="application/json">
+{
+  "title": "人工判定总清单（2026-10-24 更新）",
+  "source": "docs/reports/GUI_MANUAL_ACCEPTANCE_2026-10-23.md",
+  "groups": [
+    {
+      "key": "A",
+      "title": "A. 布局与拖拽（GUI 重做后）",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "A1", "step": "打开首页", "expect": "标题栏**独占整行、全宽**；下方左项目区、右会话区", "fail": "标题栏被分栏切、或内容挤在左半边" },
+        { "id": "A2", "step": "拖动项目区与会话区之间的分隔条", "expect": "两侧宽度连续变化，松开后保持", "fail": "拖不动、跳动、或拖到 0 宽" },
+        { "id": "A3", "step": "键盘聚焦分隔条后按 ←/→", "expect": "宽度按步长变化", "fail": "无反应或焦点丢失" },
+        { "id": "A4", "step": "点项目区右上角「收起项目」", "expect": "项目区缩成**只有按钮宽**的窄条，按钮变「展开项目」，会话区占满", "fail": "整列消失、或找不到展开入口" },
+        { "id": "A5", "step": "点窄条上的「展开项目」", "expect": "恢复原宽度与项目列表", "fail": "展不开、或宽度错乱" },
+        { "id": "A6", "step": "点「工作区」", "expect": "工作区出现在**项目区与会话区之间**，会话区被挤到右侧", "fail": "工作区覆盖会话、或出现在最右侧" },
+        { "id": "A7", "step": "拖动工作区与会话区之间的分隔条", "expect": "比例连续变化（默认 5:3）", "fail": "拖不动、或两者互相遮挡" },
+        { "id": "A8", "step": "确认旧“隐藏左栏 / 显示左栏”按钮已不存在", "expect": "只有 A4 的收起/展开", "fail": "仍能看到旧按钮" }
+      ]
+    },
+    {
+      "key": "B",
+      "title": "B. Agent 菜单与弹窗（用户最关心）",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "B1", "step": "右键会话中某个 Agent 的头像", "expect": "光标附近弹出菜单，只有「Agent 设置」「Agent 状态」两项", "fail": "菜单不出现、出现在页面底部、或含其它项" },
+        { "id": "B2", "step": "点「Agent 状态」", "expect": "**弹出弹窗**，含四区块：指令窗口 / 运行状态 / 用量 / 诊断", "fail": "无弹窗、只有部分区块、或整页报错" },
+        { "id": "B3", "step": "在 B2 弹窗按 Escape / 点关闭", "expect": "弹窗关闭，焦点回到头像", "fail": "关不掉、或焦点丢失" },
+        { "id": "B4", "step": "点「Agent 设置」", "expect": "弹出设置弹窗（名称/角色/思考强度）", "fail": "无弹窗" },
+        { "id": "B5", "step": "右键自己的头像", "expect": "**不**弹 Agent 菜单", "fail": "弹出菜单" },
+        { "id": "B6", "step": "看左侧项目区", "expect": "**没有**独立「Agent 列表」（Agent 随项目创建）", "fail": "仍有全局 Agent 列表" },
+        { "id": "B7", "step": "用键盘 Shift+F10 / 菜单键打开菜单，↑↓/Home/End/Enter 操作", "expect": "菜单可用键盘完整操作", "fail": "某键无反应" }
+      ]
+    },
+    {
+      "key": "C",
+      "title": "C. 项目与文件夹授权",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "C1", "step": "展开一个项目", "expect": "会话区显示该项目的「文件夹授权」面板，标注当前项目", "fail": "授权面板仍在左侧，或未标注项目" },
+        { "id": "C2", "step": "切换另一个项目", "expect": "授权面板跟随切换（各项目独立）", "fail": "显示上一个项目的授权" },
+        { "id": "C3", "step": "生成授权卡后点「批准」", "expect": "必须**显式确认**，不默认批准", "fail": "一键批准、或默认勾选" },
+        { "id": "C4", "step": "路径在项目根之外", "expect": "明确提示超出范围/需授权", "fail": "静默允许" }
+      ]
+    },
+    {
+      "key": "D",
+      "title": "D. 运行状态 / 用量 / 诊断",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "D1", "step": "打开 Agent 状态弹窗看「运行状态」", "expect": "秘书：**预算不限、时段 0–1440**；引导：显示或明确抑制原因", "fail": "显示 20000 tokens / 09:00–18:00" },
+        { "id": "D2", "step": "看「用量」", "expect": "空账目写「本地账目为空…（**不等于没有消耗**）」；金额显示**未估算**", "fail": "显示金额数字、或写「0 消耗」" },
+        { "id": "D3", "step": "看「诊断」", "expect": "明确不含完整会话/源码/日志", "fail": "展示完整会话正文或源码" },
+        { "id": "D4", "step": "确认标题栏不再有独立的「状态/用量/诊断」按钮", "expect": "只有 Agent 弹窗入口", "fail": "仍有三个独立按钮" }
+      ]
+    },
+    {
+      "key": "E",
+      "title": "E. GUI-02：待授权与历史",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "E1", "step": "触发一次受限操作", "expect": "待授权卡显示：项目/Agent/任务、工具、目标、参数、理由与影响、批准范围与有效期", "fail": "缺字段" },
+        { "id": "E2", "step": "不点批准，直接点拒绝", "expect": "明确 denied，任务不执行", "fail": "拒绝后仍执行" },
+        { "id": "E3", "step": "点「批准本次」两次", "expect": "只生效一次；不重复执行", "fail": "重复执行" },
+        { "id": "E4", "step": "历史三视图（列表/详情/原始）", "expect": "内容一致；重启前「运行中」显示为已中断待对账", "fail": "视图矛盾、或把历史当运行" },
+        { "id": "E5", "step": "查看历史不点恢复", "expect": "不恢复、不调模型、不注入上下文", "fail": "自动恢复" }
+      ]
+    },
+    {
+      "key": "F",
+      "title": "F. 重启与恢复",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "F1", "step": "关服务再启动，刷新", "expect": "明确「会话视图为空 ≠ 数据丢失」；历史仍可查", "fail": "声称数据丢失" },
+        { "id": "F2", "step": "点恢复", "expect": "先对账、再鉴权、显式确认后才恢复", "fail": "直接续跑旧任务" },
+        { "id": "F3", "step": "重启前有一次「一次性批准」", "expect": "重启后**不自动恢复**该批准", "fail": "自动视为已批准" }
+      ]
+    },
+    {
+      "key": "G",
+      "title": "G. 重定位 RELOCATE",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "G1", "step": "`astarray project entry --project p --root <正确路径>`", "expect": "提示「位置已确认、不会自动重跑」，退出码 0", "fail": "报错或直接执行任务" },
+        { "id": "G2", "step": "`--root` 指向不存在/不匹配路径", "expect": "列出三选项；不给 `--choice` 时退出码 3", "fail": "静默通过" },
+        { "id": "G3", "step": "加 `--choice exit`", "expect": "退出码 0，明确「未做任何恢复」", "fail": "有副作用" },
+        { "id": "G4", "step": "加 `--choice view-history-only`（历史不可加载时）", "expect": "退出码 4，提示先重定位", "fail": "仍加载历史" },
+        { "id": "G5", "step": "加 `--choice relocate`", "expect": "退出码 5，只给指引，不改写登记", "fail": "自动改写登记" },
+        { "id": "G6", "step": "GUI 打开被移动的项目", "expect": "弹出三选项弹窗（仅查看历史/重定位/直接退出），仅查看历史在不可用时禁用", "fail": "无弹窗、或三选项缺失" }
+      ]
+    },
+    {
+      "key": "H",
+      "title": "H. 秘书 / 引导",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "H1", "step": "看秘书所在项目", "expect": "秘书**单独处于自己的项目**，不与业务项目混在一起", "fail": "秘书出现在业务项目中" },
+        { "id": "H2", "step": "首次使用引导", "expect": "只出现一次；忙碌（输入框有内容）时被抑制", "fail": "重复弹、或打断输入" },
+        { "id": "H3", "step": "选「不再提示」后重启", "expect": "不再弹首次引导", "fail": "重启又弹" }
+      ]
+    },
+    {
+      "key": "I",
+      "title": "I. E2E 并发",
+      "columns": ["#", "步骤", "预期", "失败判定", "结果"],
+      "items": [
+        { "id": "I1", "step": "同时提交 3 个任务", "expect": "状态如实（排队/运行/完成），互不覆盖", "fail": "状态串台或静默丢失" },
+        { "id": "I2", "step": "其中一个任务失败", "expect": "失败可见，其它任务继续", "fail": "一起卡死或静默失败" }
+      ]
+    },
+    {
+      "key": "J",
+      "title": "J. 只能平台/数据侧完成（非界面人工项，列出以免遗漏）",
+      "columns": ["#", "项", "需要什么", "通过标准", "结果"],
+      "items": [
+        { "id": "J1", "step": "macOS 证据（RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01）", "expect": "一台 macOS（或 macos-latest CI）", "fail": "macOS 上跑完全部门禁并归档日志" },
+        { "id": "J2", "step": "SUM-02-04 摘要质量", "expect": "你提供 ≥30 条**人工标注**样本", "fail": "`verify:summary-annotation` 结论 `evaluated` 且指标带分母" },
+        { "id": "J3", "step": "EVENT-01 紧急仲裁", "expect": "你填四项口径（事件源/响应期限/恢复策略/完成证据）", "fail": "`verify:event01-criteria` 退出码 0" },
+        { "id": "J4", "step": "EXP-01 工作流收益", "expect": "真实工作流样本", "fail": "折叠/探索/整理有可复现收益（保守下限）" },
+        { "id": "J5", "step": "TOOLKIT-01-06 工具收益", "expect": "真实 token 额度", "fail": "记录工具化前后差值" },
+        { "id": "J6", "step": "RELOCATE 运行时 apply", "expect": "你拍板触发方式与执行者", "fail": "tarball 双进程证据 + 重启后 ID/revision 保持" },
+        { "id": "J7", "step": "COMM-01-02 收件箱范围", "expect": "你决定是否扩展", "fail": "按卡 §2.4 验收四态/背压/重试" }
+      ]
+    }
+  ]
+}
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "manual-acceptance-2026-10-24";
+  var EXPORT_FILENAME = "manual-acceptance-result.md";
+
+  var data = JSON.parse(document.getElementById("acceptance-data").textContent);
+  var groups = data.groups;
+
+  var ITEMS = [];
+  groups.forEach(function (group) {
+    group.items.forEach(function (item) {
+      ITEMS.push({
+        id: item.id,
+        groupKey: group.key,
+        groupTitle: group.title,
+        columns: group.columns,
+        step: item.step,
+        expect: item.expect,
+        fail: item.fail
+      });
+    });
+  });
+
+  var TOTAL = ITEMS.length;
+
+  // ---------- 状态模型 ----------
+  // status: "todo" | "pass" | "fail"
+  // note:  字符串；fail 时必须包含"看到什么/期望什么/复现步骤"三段才算完整
+  var state = {};
+  ITEMS.forEach(function (item) {
+    state[item.id] = { status: "todo", note: "" };
+  });
+
+  function isNoteComplete(note) {
+    var text = String(note || "").trim();
+    if (!text) { return false; }
+    return text.length >= 8;
+  }
+
+  function isIncomplete(id) {
+    var entry = state[id];
+    return entry.status === "fail" && !isNoteComplete(entry.note);
+  }
+
+  // ---------- localStorage ----------
+  function loadState() {
+    var raw = null;
+    try {
+      raw = window.localStorage.getItem(STORAGE_KEY);
+    } catch (error) {
+      raw = null;
+    }
+    if (!raw) { return; }
+    var parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      return;
+    }
+    if (!parsed || typeof parsed !== "object") { return; }
+    ITEMS.forEach(function (item) {
+      var saved = parsed[item.id];
+      if (!saved || typeof saved !== "object") { return; }
+      if (saved.status === "pass" || saved.status === "fail" || saved.status === "todo") {
+        state[item.id].status = saved.status;
+      }
+      if (typeof saved.note === "string") {
+        state[item.id].note = saved.note;
+      }
+    });
+  }
+
+  function saveState() {
+    var payload = {};
+    ITEMS.forEach(function (item) {
+      payload[item.id] = { status: state[item.id].status, note: state[item.id].note };
+    });
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // ---------- 渲染 ----------
+  var groupsContainer = document.getElementById("groups");
+  var elBarFill = document.getElementById("bar-fill");
+  var elProgressLabel = document.getElementById("progress-label");
+  var elBar = document.querySelector(".bar");
+  var elPass = document.getElementById("c-pass");
+  var elFail = document.getElementById("c-fail");
+  var elTodo = document.getElementById("c-todo");
+  var elIncomplete = document.getElementById("c-incomplete");
+  var elRecPass = document.getElementById("rec-pass");
+  var elRecFail = document.getElementById("rec-fail");
+
+  var itemNodes = {};
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // 将源文档中的 **粗体** 与 `代码` 渲染为 HTML
+  function renderRich(text) {
+    var html = escapeHtml(text);
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+    return html;
+  }
+
+  function buildItem(item) {
+    var li = document.createElement("li");
+    li.className = "item";
+    li.id = "item-" + item.id;
+    li.setAttribute("data-id", item.id);
+
+    var isJ = item.groupKey === "J";
+    var labelStep = isJ ? "项" : "步骤";
+    var labelExpect = isJ ? "需要什么" : "预期";
+    var labelFail = isJ ? "通过标准" : "失败判定";
+
+    var html = "";
+    html += '<div class="item-row">';
+    html += '<div class="id">' + escapeHtml(item.id) + '<span class="badge" data-role="badge">未测</span></div>';
+    html += '<div class="body">';
+    html += '<div class="field"><span class="field-label">' + labelStep + '</span><span class="field-value">' + renderRich(item.step) + '</span></div>';
+    html += '<div class="field"><span class="field-label">' + labelExpect + '</span><span class="field-value">' + renderRich(item.expect) + '</span></div>';
+    html += '<div class="field"><span class="field-label">' + labelFail + '</span><span class="field-value">' + renderRich(item.fail) + '</span></div>';
+    html += '<div class="choices">';
+    html += '<span class="choices-label" id="label-' + item.id + '">结果</span>';
+    html += '<label class="choice"><input type="radio" name="status-' + item.id + '" value="pass" data-id="' + item.id + '" aria-label="' + escapeHtml(item.id) + ' 通过"><span>通过</span></label>';
+    html += '<label class="choice"><input type="radio" name="status-' + item.id + '" value="fail" data-id="' + item.id + '" aria-label="' + escapeHtml(item.id) + ' 不通过"><span>不通过</span></label>';
+    html += '<label class="choice"><input type="radio" name="status-' + item.id + '" value="todo" data-id="' + item.id + '" aria-label="' + escapeHtml(item.id) + ' 未测"><span>未测</span></label>';
+    html += '</div>';
+    html += '<div class="note" data-role="note" hidden>';
+    html += '<div class="note-label">不通过备注（必填）</div>';
+    html += '<label class="visually-hidden" for="note-' + item.id + '">' + escapeHtml(item.id) + ' 不通过备注</label>';
+    html += '<textarea id="note-' + item.id + '" data-role="note-input" data-id="' + item.id + '" placeholder="看到什么：&#10;期望什么：&#10;复现步骤："></textarea>';
+    html += '<p class="note-guidance">请分三行写：<strong>看到什么</strong> / <strong>期望什么</strong> / <strong>复现步骤</strong>。</p>';
+    html += '<p class="note-warn">未填写备注 —— 该项为「不完整」。</p>';
+    html += '</div>';
+    html += '</div></div>';
+
+    li.innerHTML = html;
+
+    itemNodes[item.id] = {
+      li: li,
+      badge: li.querySelector('[data-role="badge"]'),
+      note: li.querySelector('[data-role="note"]'),
+      noteInput: li.querySelector('[data-role="note-input"]'),
+      radios: Array.prototype.slice.call(li.querySelectorAll('input[type="radio"]'))
+    };
+
+    return li;
+  }
+
+  function buildGroups() {
+    groups.forEach(function (group) {
+      var section = document.createElement("section");
+      section.className = "group";
+      section.id = "group-" + group.key;
+      section.setAttribute("aria-labelledby", "group-title-" + group.key);
+
+      var head = document.createElement("div");
+      head.className = "group-head";
+      head.innerHTML = '<h2 class="group-title" id="group-title-' + group.key + '">' + escapeHtml(group.title) + '</h2>' +
+        '<span class="group-stat" data-role="group-stat"></span>';
+      section.appendChild(head);
+
+      var ul = document.createElement("ul");
+      ul.className = "items";
+      group.items.forEach(function (item) {
+        ul.appendChild(buildItem(item));
+      });
+      section.appendChild(ul);
+
+      groupsContainer.appendChild(section);
+    });
+  }
+
+  var STATUS_TEXT = { pass: "通过", fail: "不通过", todo: "未测" };
+
+  function refreshItem(id) {
+    var entry = state[id];
+    var node = itemNodes[id];
+    if (!node) { return; }
+
+    node.radios.forEach(function (radio) {
+      radio.checked = (radio.value === entry.status);
+    });
+
+    var incomplete = isIncomplete(id);
+    var showNote = (entry.status === "fail");
+
+    node.note.hidden = !showNote;
+    node.li.classList.toggle("is-incomplete", incomplete);
+
+    var badgeText = STATUS_TEXT[entry.status];
+    var badgeClass = "is-todo";
+    if (incomplete) {
+      badgeText = "不完整";
+      badgeClass = "is-incomplete";
+    } else if (entry.status === "pass") {
+      badgeClass = "is-pass";
+    } else if (entry.status === "fail") {
+      badgeClass = "is-fail";
+    }
+    node.badge.textContent = badgeText;
+    node.badge.className = "badge " + badgeClass;
+  }
+
+  function refreshSummary() {
+    var pass = 0, fail = 0, todo = 0, incomplete = 0;
+    var passIds = [];
+    var failIds = [];
+
+    ITEMS.forEach(function (item) {
+      var entry = state[item.id];
+      if (entry.status === "pass") {
+        pass += 1;
+        passIds.push(item.id);
+      } else if (entry.status === "fail") {
+        fail += 1;
+        failIds.push(item.id);
+      } else {
+        todo += 1;
+      }
+      if (isIncomplete(item.id)) { incomplete += 1; }
+    });
+
+    var percent = TOTAL === 0 ? 0 : Math.round((pass / TOTAL) * 100);
+    elBarFill.style.width = percent + "%";
+    elBar.setAttribute("aria-valuenow", String(percent));
+    elProgressLabel.textContent = "已通过 " + pass + " / " + TOTAL;
+    elPass.textContent = String(pass);
+    elFail.textContent = String(fail);
+    elTodo.textContent = String(todo);
+    elIncomplete.textContent = String(incomplete);
+
+    elRecPass.textContent = passIds.length ? passIds.join("、") : "（无）";
+    elRecFail.textContent = failIds.length ? failIds.join("、") : "（无）";
+
+    // 每组小统计
+    groups.forEach(function (group) {
+      var statEl = document.querySelector('#group-' + group.key + ' [data-role="group-stat"]');
+      if (!statEl) { return; }
+      var gPass = 0, gTodo = 0, gFail = 0, gInc = 0;
+      group.items.forEach(function (item) {
+        if (state[item.id].status === "pass") { gPass += 1; }
+        else if (state[item.id].status === "fail") { gFail += 1; }
+        else { gTodo += 1; }
+        if (isIncomplete(item.id)) { gInc += 1; }
+      });
+      var parts = ["通过 " + gPass, "不通过 " + gFail, "未测 " + gTodo];
+      if (gInc > 0) { parts.push("不完整 " + gInc); }
+      statEl.textContent = parts.join(" · ");
+    });
+  }
+
+  function refreshAll() {
+    ITEMS.forEach(function (item) { refreshItem(item.id); });
+    refreshSummary();
+  }
+
+  // ---------- 交互 ----------
+  function onRadioChange(event) {
+    var input = event.target;
+    if (!input || input.type !== "radio") { return; }
+    var id = input.getAttribute("data-id");
+    if (!id) { return; }
+    state[id].status = input.value;
+    refreshItem(id);
+    refreshSummary();
+    saveState();
+  }
+
+  function onNoteInput(event) {
+    var input = event.target;
+    if (!input || input.getAttribute("data-role") !== "note-input") { return; }
+    var id = input.getAttribute("data-id");
+    if (!id) { return; }
+    state[id].note = input.value;
+    refreshItem(id);
+    refreshSummary();
+    saveState();
+  }
+
+  // ---------- Toast ----------
+  var toastEl = document.getElementById("toast");
+  var toastTimer = null;
+  function showToast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add("is-visible");
+    if (toastTimer) { window.clearTimeout(toastTimer); }
+    toastTimer = window.setTimeout(function () {
+      toastEl.classList.remove("is-visible");
+    }, 2200);
+  }
+
+  // ---------- 导出 Markdown ----------
+  function mdCell(text) {
+    return String(text == null ? "" : text)
+      .replace(/\|/g, "\\|")
+      .replace(/\r?\n/g, "<br>");
+  }
+
+  function buildMarkdown() {
+    var lines = [];
+    var pass = 0, fail = 0, todo = 0, incomplete = 0;
+
+    ITEMS.forEach(function (item) {
+      if (state[item.id].status === "pass") { pass += 1; }
+      else if (state[item.id].status === "fail") { fail += 1; }
+      else { todo += 1; }
+      if (isIncomplete(item.id)) { incomplete += 1; }
+    });
+
+    lines.push("# " + data.title + "（人工判定结果）");
+    lines.push("");
+    lines.push("> 来源：`" + data.source + "`");
+    lines.push("> 规则：每项只有 **通过 / 不通过**；不通过必须写 **看到什么 / 期望什么 / 复现步骤**。");
+    lines.push("> 统计：已通过 " + pass + " / " + TOTAL + "；不通过 " + fail + "；未测 " + todo + "；不完整 " + incomplete + "。");
+    lines.push("");
+
+    groups.forEach(function (group) {
+      lines.push("## " + group.title);
+      lines.push("");
+      // 表头：与原文档同列，并在末尾追加「备注」列（承载不通过的三段记录）
+      var headerCells = group.columns.slice();
+      headerCells[headerCells.length - 1] = "结果";
+      headerCells.push("备注");
+      lines.push("| " + headerCells.join(" | ") + " |");
+      lines.push("|" + headerCells.map(function () { return "---"; }).join("|") + "|");
+
+      group.items.forEach(function (item) {
+        var entry = state[item.id];
+        var result;
+        if (isIncomplete(item.id)) {
+          result = "☒ 不通过（**不完整**：备注未填写）";
+        } else if (entry.status === "pass") {
+          result = "☑ 通过";
+        } else if (entry.status === "fail") {
+          result = "☒ 不通过";
+        } else {
+          result = "☐ 未测";
+        }
+
+        var cells = [];
+        cells.push(mdCell(item.id));
+        cells.push(mdCell(item.step));
+        cells.push(mdCell(item.expect));
+        cells.push(mdCell(item.fail));
+
+        // 第五列固定为「结果」；若组内列数不足（未用），忽略
+        var resultIndex = group.columns.length - 1;
+        while (cells.length < resultIndex) { cells.push(""); }
+        cells[resultIndex] = result;
+
+        // 追加「备注」列
+        var note = String(entry.note || "").trim();
+        cells.push(note ? mdCell(note) : "—");
+
+        lines.push("| " + cells.join(" | ") + " |");
+      });
+
+      lines.push("");
+    });
+
+    lines.push("## 记录");
+    lines.push("");
+    lines.push("- 通过项：" + collectIds("pass"));
+    lines.push("- 不通过项（每条写：看到什么 / 期望什么 / 复现步骤）：" + collectIds("fail"));
+    lines.push("- 结论：" + (fail > 0 ? "☐ 全部通过　☒ 有不通过（需修）" : (todo === 0 ? "☒ 全部通过　☐ 有不通过（需修）" : "☐ 全部通过　☐ 有不通过（需修）")));
+    lines.push("");
+
+    return lines.join("\n");
+  }
+
+  function collectIds(status) {
+    var ids = ITEMS.filter(function (item) { return state[item.id].status === status; })
+      .map(function (item) { return item.id; });
+    return ids.length ? ids.join("、") : "______";
+  }
+
+  function exportMarkdown() {
+    var markdown = buildMarkdown();
+    var blob = new Blob(["﻿" + markdown], { type: "text/markdown;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = EXPORT_FILENAME;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    showToast("已导出 " + EXPORT_FILENAME);
+  }
+
+  // ---------- 清空 ----------
+  function clearAll() {
+    var confirmed = window.confirm(
+      "确认清空全部判定结果与备注？\n\n" +
+      "此操作会删除本浏览器中保存的所有「通过 / 不通过 / 未测」状态和备注，且不可撤销。\n" +
+      "（localStorage 键：" + STORAGE_KEY + "）"
+    );
+    if (!confirmed) { return; }
+
+    var second = window.confirm("再次确认：真的要清空全部结果吗？");
+    if (!second) { return; }
+
+    ITEMS.forEach(function (item) {
+      state[item.id] = { status: "todo", note: "" };
+    });
+    ITEMS.forEach(function (item) {
+      if (itemNodes[item.id]) { itemNodes[item.id].noteInput.value = ""; }
+    });
+    saveState();
+    refreshAll();
+    showToast("已清空全部结果");
+  }
+
+  function resetStatusKeepNotes() {
+    var confirmed = window.confirm("仅重置结果为「未测」，保留所有备注？");
+    if (!confirmed) { return; }
+    ITEMS.forEach(function (item) {
+      state[item.id].status = "todo";
+    });
+    saveState();
+    refreshAll();
+    showToast("已重置结果（备注保留）");
+  }
+
+  // ---------- 初始化 ----------
+  buildGroups();
+  loadState();
+
+  ITEMS.forEach(function (item) {
+    var node = itemNodes[item.id];
+    if (node && state[item.id].note) {
+      node.noteInput.value = state[item.id].note;
+    }
+  });
+
+  groupsContainer.addEventListener("change", onRadioChange);
+  groupsContainer.addEventListener("input", onNoteInput);
+
+  document.getElementById("btn-export").addEventListener("click", exportMarkdown);
+  document.getElementById("btn-clear").addEventListener("click", clearAll);
+  document.getElementById("btn-reset-progress").addEventListener("click", resetStatusKeepNotes);
+
+  refreshAll();
+})();
+</script>
+</body>
+</html>
