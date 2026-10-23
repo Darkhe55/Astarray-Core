@@ -5840,3 +5840,25 @@ export { classifyProjectRelocation } from "./orchestration/project-relocation-cl
 
 
 
+
+// EVENT-01（2026-10-24）：紧急事件仲裁内核（单所有者 / epoch fencing / 风暴合并 / 背压不丢 / 期限降级 / 恢复确认）。
+export {
+  EVENT_INCIDENT_KINDS,
+  EVENT_INCIDENT_STATES,
+  EVENT_SEVERITIES,
+  EventIncidentArbitrator,
+  type EventIncident,
+  type EventIncidentKind,
+  type EventIncidentState,
+  type EventReceiveOutcome,
+  type EventRecoveryPolicy,
+  type EventSeverity,
+} from "./orchestration/event-incident-arbitration.js";
+
+// EVENT-01：验收口径校验（缺项时不开工）。
+export {
+  EVENT_RECOVERY_POLICIES,
+  evaluateEventAcceptanceCriteria,
+  type EventAcceptanceCriteria,
+  type EventRecoveryPolicy as EventAcceptanceRecoveryPolicy,
+} from "./orchestration/event-acceptance-criteria.js";
