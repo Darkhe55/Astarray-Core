@@ -95,6 +95,15 @@ export {
   type RelayedCollaborationRequest,
 } from "./orchestration/collaboration-relay-via-parent.js";
 /**
+ * COMM-01-02 §2.4：协作转达的**跳数上限**与**关联链循环检测**（复用同级转达的升级语义）。
+ */
+export {
+  DEFAULT_COLLABORATION_MAXIMUM_HOPS,
+  evaluateCollaborationRelayChain,
+  type CollaborationRelayChain,
+  type CollaborationRelayChainVerdict,
+} from "./orchestration/collaboration-relay-chain.js";
+/**
  * COMM-01-02：跨项目**只读**协作的授权与信封校验（写入一律拒绝、不可再转授权、
  * 建议采纳不等于执行批准）。
  */

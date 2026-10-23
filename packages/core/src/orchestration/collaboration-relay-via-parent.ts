@@ -53,6 +53,8 @@ export type RelayedCollaborationOutcome =
  *    （`isPausedForRecovery: true`），**不得**由执行者另找上级；
  * 5. 否则 ⇒ 收件人 = 该目标的**唯一直属上级**，并带上来源/转达者/任务关联。
  */
+import { evaluateCollaborationRelayChain, type CollaborationRelayChain } from "./collaboration-relay-chain.js";
+
 export async function routeCollaborationViaUniqueParent(input: {
   registry: AgentCreationRegistry;
   /** 发起协作的执行者（原始来源）。 */
@@ -60,7 +62,21 @@ export async function routeCollaborationViaUniqueParent(input: {
   /** 想协作的目标执行者。 */
   targetAgentInstanceId: string;
   taskIdentifier: string;
+  /** 转达链（跳数/已访问主体）：不传按首跳处理。 */
+  relayChain?: CollaborationRelayChain;
 }): Promise<RelayedCollaborationOutcome> {
+  const relayChainVerdict = evaluateCollaborationRelayChain({
+    originalSourceAgentInstanceId: input.originalSourceAgentInstanceId,
+    targetAgentInstanceId: input.targetAgentInstanceId,
+    ...(input.relayChain === undefined ? {} : { relayChain: input.relayChain }),
+  });
+  if (!relayChainVerdict.isAllowed) {
+    return {
+      isRoutable: false,
+      reason: relayChainVerdict.reason,
+      isPausedForRecovery: false,
+    };
+  }
   const targetRecord = await input.registry.getRecord(input.targetAgentInstanceId);
   if (targetRecord === null) {
     return {
@@ -117,3 +133,4 @@ export async function routeCollaborationViaUniqueParent(input: {
     },
   };
 }
+

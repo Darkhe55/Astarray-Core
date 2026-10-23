@@ -1489,3 +1489,6 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 | 未核对 | 4 | GUI02 卡、WB00、BATCH6_REPAIR、B6R10（平台阻塞结论保留） |
 
 > 旧统计（11.B/11.C/11.E）来自 2026-10-18/19，已过期；以本表与 `PLAN_STATUS.md` 末尾权威段为准。
+
+> **2026-10-23 ``COMM-01-02`` 转达跳数与环检测（公开库）**：``collaboration-relay-chain.ts``，已接入 ``routeCollaborationViaUniqueParent``。
+> 默认 1 跳、超限升级用户；环检测优先；自我转达拒绝。**6 条反例 + 2 条变异体**。
