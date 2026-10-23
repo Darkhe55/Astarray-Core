@@ -668,6 +668,18 @@ export {
   type SummaryTokenMeasurement,
   type SummaryTokenizerPort,
 } from "./summarization/summary-token-budget.js";
+/**
+ * SUM-02-04：人工标注质量评估口径（拒绝模型自评、样本不足如实标注、指标带分母）。
+ */
+export {
+  DEFAULT_MINIMUM_ANNOTATION_SAMPLE_COUNT,
+  SUMMARY_ANNOTATION_LABELS,
+  evaluateSummaryAnnotations,
+  type SummaryAnnotationAnnotatorKind,
+  type SummaryAnnotationEvaluation,
+  type SummaryAnnotationLabel,
+  type SummaryAnnotationSample,
+} from "./summarization/summary-annotation-evaluation.js";
 
 // ─── SUM-01-04：四类摘要来源适配器公开入口 ───
 // 卡内要求摘要覆盖"会话历史、工作存档、报告和延后文件"；四类适配器均为**纯函数**，
