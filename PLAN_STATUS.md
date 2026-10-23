@@ -2411,3 +2411,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 护栏新增断言 `grid-row: 2`，并加 1 条变异体（改回 row 1 ⇒ 必须变红）；私有库门禁 **338 用例 / 变异 32-32 / 包验收 7-7**。
 
 
+
+## 2026-10-23 UI 工作方式变更（用户要求）：委托 MiniMax 子 agent
+
+- **协议**：UI 改动我不亲自动手；我写"可执行提示词"（目标 / 交互契约 / 硬约束 / 自检命令 / 交付格式），由 **MiniMax-M3** 子 agent 实现，我只做**评审 + 跑门禁 + 提交**。
+- **通道**：DSH profile 已配置 `minimax-cn`（模型 `MiniMax-M3` / `MiniMax-M2.7` / `MiniMax-M2.7-highspeed`，anthropic-messages 协议）；探测调用返回正常。
+- **方法参考**（按方法论文档名引用，本次未联网拉取）：`anthropics/skills` 的 frontend-design 技能、`superdesigndev/superdesign` 的 agent 设计工作法、GitHub Primer 可访问性规范。
+- **第一次委托（私有库 0982ae5）**：Agent 菜单与两个弹窗的可访问性/键盘交互（role=menu、方向键/Home/End/Enter/Space、Escape 归还焦点、aria-modal、aria-disabled、focus-visible、prefers-reduced-motion）。
+  - 新增 23 条用例（`tests/gui/integration/gui-agent-menu-a11y.test.ts`）；
+  - 我的复跑：**371 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；
+  - 子 agent 自述两点保留：①点菜单项关闭不归还焦点（有意）；②用例是源码级静态断言 + `vm.Script` 解析，**焦点行为仍需人工在浏览器核一次**。
