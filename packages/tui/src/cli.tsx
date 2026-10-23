@@ -695,12 +695,14 @@ projectCommand
   .requiredOption("--project <project-id>", "项目标识")
   .requiredOption("--root <path>", "当前选择的项目根路径")
   .option("--observed-identifier <id>", "当前根观测到的项目标识")
+  .option("--choice <option>", "三选项之一：view-history-only | relocate | exit")
   .option("--json", "JSON 输出")
   .action(
     async (options: {
       project: string;
       root: string;
       observedIdentifier?: string;
+      choice?: string;
       json?: boolean;
     }) => {
       process.exitCode = await executeProjectEntryCommand({
@@ -708,6 +710,7 @@ projectCommand
         projectIdentifier: options.project,
         currentRootPath: options.root,
         observedProjectIdentifier: options.observedIdentifier ?? null,
+        ...(options.choice === undefined ? {} : { choice: options.choice }),
         isJsonOutput: options.json === true,
       });
     },
