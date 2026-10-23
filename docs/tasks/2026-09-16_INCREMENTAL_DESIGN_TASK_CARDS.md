@@ -42,7 +42,7 @@
 
 | 检查点 | 实施范围 | 必需验收 |
 |---|---|---|
-| AUTH-SCOPE-01 | 核对当前实现；登记未占用 ADR；冻结范围分类、裁决者矩阵与旧规则迁移清单 | 项目内外、未知、安装、外部软件及专用流程有明确结果；没有歧义则不增加设置层级 |
+| AUTH-SCOPE-01 | 核对当前实现；登记未占用 ADR；冻结范围分类、裁决者矩阵与旧规则迁移清单 | 项目内外、未知、安装、外部软件及专用流程有明确结果；没有歧义则不增加设置层级 | **本地可证部分 done（2026-10-23 对账）**：证据 `tests/core/integration/auth-scope-gate.test.ts`、`auth-scope-resolution.test.ts`、`auth-scope-install-routing.test.ts`、`permission-refusal-side-effect.test.ts`。
 | AUTH-SCOPE-02 | 接入本地范围判定、上级批准回执、逐级升级及执行前复检 | 链接逃逸、路径前缀碰撞、跨根写入、全局安装、子进程外写、失效上级和 revision 变化均有反例 |
 | AUTH-SCOPE-03 | 设置及公开入口接线、恢复与打包回归 | 放权默认无人工等待；deny 生效；协同项目内批准后执行、项目外等待人工；拒绝/重放零副作用 |
 
@@ -64,7 +64,7 @@
 | 检查点 | 实施范围 | 必需验收 |
 |---|---|---|
 | ACCURACY-01 | 审计现有签收/完成链路，冻结档位、预算和跳过状态 | 核查未来 revision、漏报必需节点、空证据及部分完成；先证明缺口，不重复实现已有能力 | **对账 done（2026-10-21）**：`TaskAccuracyVerifier` 已覆盖 漏报必需节点／空证据／错收件人／旧 revision／**未来 revision**／伪造证据／陈旧产物／幂等签收／档位诚实（fast ⇒ `quality-check-skipped`）／strict 需理解确认 —— 逐条由 `verify:accuracy-package` 实测。**发现并修复一个真实缺口**：证据漏传 `contentHash`（undefined）时验收器 **TypeError 崩溃**，现改为按空证据 `rejected` 并列入 forged（反例先红：`accuracy01-verifier-hardening.test.ts` ②）。**4+2 条反例 + 2 条变异体**。
-| ACCURACY-02 | 幂等签收、可选理解确认、条目到证据覆盖，复用原完成验收器 | 错收件人、重复派发、旧/未来版本、伪造证据、陈旧产物、崩溃重启等反例 |
+| ACCURACY-02 | 幂等签收、可选理解确认、条目到证据覆盖，复用原完成验收器 | 错收件人、重复派发、旧/未来版本、伪造证据、陈旧产物、崩溃重启等反例 | **对账 done（2026-10-23）**：幂等签收、可选理解确认、条目→证据覆盖已由 `TaskAccuracyVerifier` 覆盖；错收件人/重复派发/旧与未来 revision/伪造证据/陈旧产物/崩溃重启均有反例（`tests/core/integration/task-accuracy-verifier.test.ts`、`tests/core/unit/accuracy01-verifier-hardening.test.ts`、`verify:accuracy-package`）。
 | ACCURACY-03 | 设置与产品入口、增量 E2E | 关闭后无新增模型审查或人工阻塞；状态诚实；标准/严格工作量有上限；不影响权限路由 | **设置/产品入口包级验收 done（2026-10-21）**：`scripts/verify-accuracy-settings-package.mjs`（`npm run verify:accuracy-settings-package`）对已安装 tarball 经门面实测：①默认 `standard` + 启用 + 预算 **模型调用 4 次 / 墙钟 120s**；②**Agent 不得降级或关闭**（带 `requestingAgentInstanceId` ⇒ 拒绝）；③**revision 冲突** ⇒ 拒绝（不覆盖并发改动）；④**非法预算**（负数）⇒ `accuracy-policy-invalid`；⑤用户可设 `strict` + 收紧预算并**读回**；⑥**关闭后读回 `isEnabled:false`**，且**权限组 reference 不变**（不影响权限路由）；⑦**重启后关闭状态仍保持**（设置落盘）。CLI 侧已有 `accuracy status` / `accuracy configure` 入口。**默认口径（待用户确认）**：严格模式追加 ≤1 轮；关闭即无新增模型审查/人工阻塞。**增量 E2E done（2026-10-22）**：`verify:accuracy-e2e-package` 实测 —— standard 真发起校验（审计 `isVerificationLayerInvoked:true`）；**关闭 ⇒ `quality-check-skipped` 且不阻塞**（`verification:null`、审计 `false`）；fast 档 `tier-fast` 诚实；**预算耗尽 ⇒ `quality-check-budget-exhausted` 不重试**；重启后审计可读回。**未做**：真实任务链上的人工体验。 **用户 2026-10-22 决定：严格模式工作量采用推荐口径**（追加 ≤1 轮）。
 
 ## 4. READ-FORMAT：内置多格式读取视图
@@ -91,7 +91,7 @@ readFile 增加 shouldIncludeComments 和 shouldIncludeImports，可选且默认
 
 | 检查点 | 实施范围 | 必需验收 |
 |---|---|---|
-| READ-FORMAT-01 | 核对已有解析依赖；策略接口、格式能力矩阵和公共回执 | 冻结四种参数组合、unsupported/parse-error 语义；新增依赖先遵守当时有效安装规则 |
+| READ-FORMAT-01 | 核对已有解析依赖；策略接口、格式能力矩阵和公共回执 | 冻结四种参数组合、unsupported/parse-error 语义；新增依赖先遵守当时有效安装规则 | **本地可证部分 done（2026-10-23 对账）**：C 系/前端/LaTeX/配置/缓存与入口均有测试（`read-format-*.test.ts`、`read-file-view.test.ts`、`merge01-read-*`）。
 | READ-FORMAT-02 | C 系、Python、Rust 策略 | 每种承诺语言有真实夹具：字符串伪注释、多行导入、嵌套/逐字字符串、不完整源码、同行代码 |
 | READ-FORMAT-03 | 前端及混合格式策略 | 模板/脚本/样式区段、JSX、URL、嵌入代码及副作用导入不误删 |
 | READ-FORMAT-04 | LaTeX、配置文档和其他语言 | 转义百分号、verbatim、Markdown 围栏、Shell heredoc、方言不支持等边界 |
@@ -115,7 +115,7 @@ readFile 增加 shouldIncludeComments 和 shouldIncludeImports，可选且默认
 
 | 检查点 | 实施范围 | 必需验收 |
 |---|---|---|
-| GIT-PRESERVE-01 | 审计并复用恢复点服务；冻结保全清单、范围和状态 | 分离 remote-sync 与 local-preservation 状态；列出 LFS/子模块等支持或受限策略 |
+| GIT-PRESERVE-01 | 审计并复用恢复点服务；冻结保全清单、范围和状态 | 分离 remote-sync 与 local-preservation 状态；列出 LFS/子模块等支持或受限策略 | **本地可证部分 done（2026-10-23 对账）**：`local-preservation*.test.ts`、`preserve-cli.test.ts`、`destructive-file-api-guard.test.ts`。
 | GIT-PRESERVE-02 | 同步失败接线、独立对象归档、脏工作树/index 快照、原子清单 | 网络故障/缺远端触发；二进制、未跟踪、已暂存与未暂存并存、删除/重命名、无提交仓库 |
 | GIT-PRESERVE-03 | 崩溃恢复与独立恢复演练、产品状态入口 | 原仓库不可用仍可恢复已声明范围；并发改写、缺对象、磁盘不足不能虚报；重试不重复快照 |
 
