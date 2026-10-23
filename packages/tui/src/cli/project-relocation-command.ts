@@ -12,7 +12,10 @@ import {
   ProjectRelocationController,
 } from "../../../core/src/public-sdk.js";
 import { EXIT_CODES, failWith, printJson } from "./json-output.js";
-import { buildProjectEntryRelocationPrompt } from "../../../core/src/orchestration/project-relocation-entry-prompt.js";
+import {
+  applyProjectEntryRelocationChoice,
+  buildProjectEntryRelocationPrompt,
+} from "../../../core/src/orchestration/project-relocation-entry-prompt.js";
 
 /** 命令输入。 */
 export interface ProjectStatusCommandInput {
@@ -27,6 +30,8 @@ export interface ProjectStatusCommandInput {
    * 无法提供时保持缺省 ⇒ 判定为 `identity-missing`（fail-closed），而不是"乐观放行"。
    */
   readonly observedProjectIdentifier: string | null;
+  /** 三选项之一；缺省只展示选项（阻断时退出码 3）。 */
+  readonly choice?: string;
   readonly isJsonOutput: boolean;
 }
 
@@ -250,6 +255,8 @@ export interface ProjectEntryCommandInput {
   readonly projectIdentifier: string;
   readonly currentRootPath: string;
   readonly observedProjectIdentifier: string | null;
+  /** 三选项之一；缺省只展示选项（阻断时退出码 3）。 */
+  readonly choice?: string;
   readonly isJsonOutput: boolean;
 }
 
@@ -279,22 +286,37 @@ export async function executeProjectEntryCommand(
   }
 
   const prompt = buildProjectEntryRelocationPrompt(description);
-  if (input.isJsonOutput) {
-    printJson({
-      status: "ok",
-      prompt,
-      registrationReadKind: description.registrationReadKind,
-      outcome: description.outcome,
-    });
-  } else {
-    process.stdout.write(
-      [
-        prompt.titleText,
-        prompt.messageText,
-        "需要你执行：" + prompt.requiredUserAction,
-        prompt.isBlocking ? "（已阻断：处理后可继续）" : "（可进入只读恢复对账）",
-      ].join("\n") + "\n",
-    );
+  const optionLines = prompt.options.map(
+    (option) =>
+      "- " + option.label + "（--choice " + option.identifier + "）" +
+      (option.isEnabled ? "" : "：不可用——" + (option.reasonIfDisabled ?? "")),
+  );
+
+  if (input.choice === undefined) {
+    if (input.isJsonOutput) {
+      printJson({
+        status: prompt.isBlocking ? "needs-choice" : "ok",
+        prompt,
+        registrationReadKind: description.registrationReadKind,
+        outcome: description.outcome,
+      });
+    } else {
+      process.stdout.write(
+        [prompt.titleText, prompt.messageText, ...optionLines].join("\n") + "\n",
+      );
+    }
+    return prompt.isBlocking ? 3 : EXIT_CODES.SUCCESS;
   }
-  return prompt.isBlocking ? 3 : EXIT_CODES.SUCCESS;
+
+  const choiceOutcome = applyProjectEntryRelocationChoice({ description, choice: input.choice });
+  if (input.isJsonOutput) {
+    printJson({ status: "ok", prompt, choice: choiceOutcome });
+  } else {
+    process.stdout.write(choiceOutcome.message + "\n");
+  }
+  if (choiceOutcome.kind === "exit" || choiceOutcome.kind === "allowed") return EXIT_CODES.SUCCESS;
+  if (choiceOutcome.reasonCode === "relocation-not-applied") return 5;
+  if (choiceOutcome.reasonCode === "history-not-loadable") return 4;
+  return 2;
 }
+

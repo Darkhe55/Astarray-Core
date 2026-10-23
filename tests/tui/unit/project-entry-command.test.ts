@@ -61,4 +61,30 @@ describe("RELOCATE-01 project entry", () => {
     });
     expect(exitCode).toBe(0);
   });
+  it("③ 未登记且不给选择 ⇒ 退出码 3（只展示三个选项）", async () => {
+    const stateDirectory = await createStateDirectory();
+    const exitCode = await executeProjectEntryCommand({
+      stateDirectory,
+      projectIdentifier: "project-1",
+      currentRootPath: stateDirectory,
+      observedProjectIdentifier: null,
+      isJsonOutput: true,
+    });
+    expect(exitCode).toBe(3);
+  });
+
+  it("④ 三选项退出码：exit=0 / view-history-only=4 / relocate=5 / unknown=2", async () => {
+    const stateDirectory = await createStateDirectory();
+    const base = {
+      stateDirectory,
+      projectIdentifier: "project-1",
+      currentRootPath: stateDirectory,
+      observedProjectIdentifier: null,
+      isJsonOutput: true,
+    };
+    expect(await executeProjectEntryCommand({ ...base, choice: "exit" })).toBe(0);
+    expect(await executeProjectEntryCommand({ ...base, choice: "view-history-only" })).toBe(4);
+    expect(await executeProjectEntryCommand({ ...base, choice: "relocate" })).toBe(5);
+    expect(await executeProjectEntryCommand({ ...base, choice: "unknown" })).toBe(2);
+  });
 });
