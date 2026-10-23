@@ -2447,3 +2447,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 门禁（我复跑）：私有库 **425 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；路由未改。
 风险：仍为静态+运行时 HTML 断言，5:3 像素观感、分隔条手感、弹窗真实焦点行为需浏览器实测。
+
+## 2026-10-24 GUI 第三轮（私有库 a7b7a47）
+
+- **Agent 状态弹窗打不开的真因（已修）**：`chatDialogOpen(dialog, triggerSlot)` 形参名与函数体引用的 `trigger` 不一致 ⇒ 点击时抛 `ReferenceError`，`showModal()` 永远执行不到。修正形参为 `(dialog, trigger, triggerSlotName)`，两个调用点补槽位名；新增回归用例 5 条 + 1 条变异（`gui-dialog-open-uses-undefined-trigger`）。
+- **工作区/会话可拖动**：新增 `#chatWorkspaceSplitter`（separator 语义 + 方向键 ±2%/Shift ±8%），`--chat-workspace-col` 默认 62.5%（5:3），钳制 20%–80%。
+- **删除脱离项目的 Agent 列表**：`#agentMenuPanel` 及其渲染删除；Agent 设置/状态唯一入口是右键会话中的具体 Agent 头像（秘书有独立项目）。
+- **文件夹授权移入会话区**：`#folderGrantPanel` 移到 `main` 内、按当前项目显示（`#folderGrantProjectLabel`）。
+- **工作区按钮改为「关闭会话区 / 打开会话区」**：关闭后工作区占满右侧，按钮可恢复。
+
+门禁：私有库 **448 用例 / 变异 41-41 / 包验收 7-7 / build 成功**。
