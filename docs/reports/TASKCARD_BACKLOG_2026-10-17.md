@@ -1492,3 +1492,13 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **2026-10-23 ``COMM-01-02`` 转达跳数与环检测（公开库）**：``collaboration-relay-chain.ts``，已接入 ``routeCollaborationViaUniqueParent``。
 > 默认 1 跳、超限升级用户；环检测优先；自我转达拒绝。**6 条反例 + 2 条变异体**。
+
+> **2026-10-23 ``SUM-02-04`` 标注评估口径（公开库）**：``summary-annotation-evaluation.ts`` + ``verify:summary-annotation`` + 模板 JSONL。
+> 模型自评整体拒绝（退出码 1）、样本不足如实标注、指标带分母、误归因不计 recall、无样本为 null。**8 条反例 + 2 条变异体**。
+> **仍需用户提供人工标注样本**才能真正评估。
+
+> **2026-10-23 三件准备件**：①`SUM-02-04` 标注评估口径 + 模板 + `verify:summary-annotation`（8 反例 + 2 变异体）；
+> ②`EVENT-01` 口径校验 + 模板 + 方案文档（6 反例 + 2 变异体，缺口径时退出码 2、不开工）；
+> ③`GUI_MANUAL_ACCEPTANCE_2026-10-23.md` 人工体验勾选表（A–F 六组，含失败判定）。
+
+> **2026-10-23 已知抖动（第 3 例）**：``e2e01-vertical-rework.test.ts`` 在低并发全量下偶发失败（单文件 1/1 通过、重跑全量 3888 全绿）；属时间敏感断言。

@@ -1,0 +1,2 @@
+{"sampleIdentifier":"example-001","claimText":"构建耗时 12 秒","evidenceText":"构建日志：耗时 12 秒","label":"supported","annotatorKind":"human","annotatorIdentifier":"reviewer-1"}
+{"sampleIdentifier":"example-002","claimText":"测试全部通过","evidenceText":"测试日志：跳过 2 个用例","label":"partially-supported","annotatorKind":"human","annotatorIdentifier":"reviewer-1"}

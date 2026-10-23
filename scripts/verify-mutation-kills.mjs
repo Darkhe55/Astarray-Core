@@ -615,6 +615,46 @@ export const MUTATIONS = [
       "忽略个体可见范围 ⇒ 子 Agent 能借诊断读到同级原始记录（卡内明令不得）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "event01-criteria-accepts-empty-sources",
+    targetFile: "packages/core/src/orchestration/event-acceptance-criteria.ts",
+    find: "  if (eventSources === null || eventSources.filter((source) => source.trim() !== \"\").length === 0) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/event01-acceptance-criteria.test.ts"],
+    expectedFailingTestNames: ["③ 空事件源清单"],
+    rationale:
+      "空事件源也算完整 ⇒ 没有事件源也能“验收通过”（口径形同虚设）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-criteria-accepts-bad-deadline",
+    targetFile: "packages/core/src/orchestration/event-acceptance-criteria.ts",
+    find: "  } else if (!Number.isFinite(deadline) || deadline <= 0) {",
+    replace: "  } else if (false) {",
+    testFiles: ["tests/core/unit/event01-acceptance-criteria.test.ts"],
+    expectedFailingTestNames: ["④ 响应期限非正数"],
+    rationale:
+      "0/负数期限也算完整 ⇒ 响应期限失去意义（永远“未超时”）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "sum02-annotation-accepts-model",
+    targetFile: "packages/core/src/summarization/summary-annotation-evaluation.ts",
+    find: "    if (sample.annotatorKind !== \"human\") {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/sum02-annotation-evaluation.test.ts"],
+    expectedFailingTestNames: ["② 出现模型标注"],
+    rationale:
+      "把模型自评当人工标注计入 ⇒ 摘要质量可被自评“通过”（卡内明令禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "sum02-annotation-recall-counts-misattributed",
+    targetFile: "packages/core/src/summarization/summary-annotation-evaluation.ts",
+    find: "  const recallNumerator = labelCounts.supported + labelCounts[\"partially-supported\"];",
+    replace: "  const recallNumerator =\n    labelCounts.supported + labelCounts[\"partially-supported\"] + labelCounts.misattributed;",
+    testFiles: ["tests/core/unit/sum02-annotation-evaluation.test.ts"],
+    expectedFailingTestNames: ["⑧ 误归因不计入 recall"],
+    rationale:
+      "错误归因也算“部分支持” ⇒ 质量被虚报（引用存在≠语义正确）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "sum02-estimate-claims-precision",
     targetFile: "packages/core/src/summarization/summary-token-budget.ts",
     find: "    isConservativeUpperBound: true,",
