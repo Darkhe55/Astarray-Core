@@ -2399,9 +2399,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **我先前写"私有 GUI 无 `/permission-ask` 路由"是错的**：`gui-server.ts` 已有 `/permission-asks`、`/commands/permission-ask-decision`、
   `/installation-inquiries` 与 `/commands/installation-inquiry-decision`，并按 GUI-02 的安全要求校验 CSRF/主体/项目会话可见性/裁决权/指纹/revision；
 - 因此 **GUI-02-01 与 GUI-02-02 属本地可证部分已交付**（卡内 2026-10-11/12 记录一致）；
-- **GUI-02 仍缺的是**：
-  1. **GUI-02-03 任务级历史详情与三视图**（当前 `/mission-history` 只到 mission 级；任务级数据在 `<state>/missions/<id>/task-chain.json`）；
-  2. **GUI-02-04 重启与隔离 tarball 包级复验**（重启后"会话视图为空 ≠ 数据丢失"的界面证明）。
+- **再次订正（同日）**：GUI-02-03（三视图历史）与 GUI-02-04（重启/恢复按钮/包入口）**也已在私有库实现并有测试**
+  （`gui02-03-*`、`gui02-04-*` 共 8 个测试文件）⇒ **GUI-02 本地可证部分全部 done**，只剩人工体验。
+- 卡内行已按证据回填（`GUI-02-03` / `GUI-02-04` 标 ✅ 本地可证 done）。
 
 ## 2026-10-23 布局修复（私有库 40df419）
 
@@ -2409,4 +2409,5 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **根因**：`#chatStatusPane` 只设了 `grid-column: -1`、没设 `grid-row`，CSS Grid 自动放置把它塞进**表头行**（row 1），该行被状态面板撑高，会话（row 2）被推到页面底部。
 - **修复**：`grid-row: 2`，与左栏/会话同处内容行；`grid-column: -1` 保持最右列。
 - 护栏新增断言 `grid-row: 2`，并加 1 条变异体（改回 row 1 ⇒ 必须变红）；私有库门禁 **338 用例 / 变异 32-32 / 包验收 7-7**。
+
 
