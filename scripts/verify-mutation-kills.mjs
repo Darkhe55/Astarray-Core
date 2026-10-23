@@ -505,6 +505,26 @@ export const MUTATIONS = [
       "窗口已满还允许批量提交 ⇒ 越窗提交、背压失效（卡内：满且不能合法释放时不越窗）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-relay-hop-unbounded",
+    targetFile: "packages/core/src/orchestration/collaboration-relay-chain.ts",
+    find: "    hopCount: input.relayChain?.hopCount ?? 0,",
+    replace: "    hopCount: 0,",
+    testFiles: ["tests/core/unit/comm02-relay-chain.test.ts"],
+    expectedFailingTestNames: ["② 已达上限"],
+    rationale:
+      "忽略已用跳数 ⇒ 转达可以无限继续（卡内要求有限跳数）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-relay-cycle-ignored",
+    targetFile: "packages/core/src/orchestration/collaboration-relay-chain.ts",
+    find: "  if (visited.includes(input.targetAgentInstanceId)) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/comm02-relay-chain.test.ts"],
+    expectedFailingTestNames: ["③ 环"],
+    rationale:
+      "不做环检测 ⇒ A→B→A 无限互转（卡内点名关联链循环检测）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-self-approval-allowed",
     targetFile: "packages/core/src/orchestration/cross-project-collaboration.ts",
     find: "    input.grantor.agentInstanceId === input.requestingAgentInstanceId",
