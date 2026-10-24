@@ -13,7 +13,7 @@
  * 6. **优雅关闭**：`shutdown → shutdownComplete`；
  * 7. 全程**离线**：只读写本地 journal，不启动网络监听。
  */
-import { fork } from "node:child_process";
+import { fork, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -23,7 +23,7 @@ function parseArguments(argv) {
   const options = { packageDirectory: null };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--package-dir") {
-      options.packageDirectory = argv[index + 1] ?? null;
+      options.packageDirectory = argv[index + 1] === undefined ? null : path.resolve(argv[index + 1]);
       index += 1;
     }
   }
@@ -338,15 +338,94 @@ try {
       2,
     )}\n`,
   );
+  // ── COMM-01-03 新增只读入口的包级验收（2026-10-24）────────────────────
+  // 1) `collaboration status --json`：只读、空状态写「空 ≠ 不存在」；
+  // 2) `inbox list --json`：未保存过写「空 ≠ 无消息」；
+  // 3) `inbox deliver --json`：无收件箱 ⇒ 退出码 2（不伪造投递）；
+  // 4) 以上命令前后，状态目录里的文件清单不变（只读）。
+  const cliPath = path.join(options.packageDirectory, "dist", "cli.js");
+  const cliCwd = stateDirectory;
+  const listStateFiles = async () => {
+    const collected = [];
+    const walk = async (directoryPath) => {
+      const entries = await fs.readdir(directoryPath, { withFileTypes: true }).catch(() => []);
+      for (const entry of entries) {
+        const absolutePath = path.join(directoryPath, entry.name);
+        if (entry.isDirectory()) {
+          await walk(absolutePath);
+        } else {
+          collected.push(absolutePath);
+        }
+      }
+    };
+    await walk(stateDirectory);
+    return collected.sort();
+  };
+  const runCli = (argumentsList) =>
+    spawnSync(process.execPath, [cliPath, ...argumentsList], {
+      cwd: cliCwd,
+      encoding: "utf8",
+    });
+
+  const filesBefore = await listStateFiles();
+  const statusRun = runCli(["collaboration", "status", "--json"]);
+  observations.collaborationStatusExitCode = statusRun.status;
+  if (statusRun.status !== 0) {
+    failures.push("collaboration status 退出码应为 0，实际 " + String(statusRun.status));
+  } else {
+    try {
+      const parsed = JSON.parse(statusRun.stdout);
+      if (parsed.status !== "ok") failures.push("collaboration status 未返回 status:ok");
+      if (parsed.view?.isWritable !== false) failures.push("collaboration status 必须是只读（isWritable:false）");
+      if (typeof parsed.notice !== "string" || !parsed.notice.includes("空 ≠")) {
+        failures.push("空状态必须写「空 ≠ 不存在」，实际 notice=" + String(parsed.notice));
+      }
+    } catch (error) {
+      failures.push("collaboration status 输出不是合法 JSON：" + String(error));
+    }
+  }
+
+  const listRun = runCli(["inbox", "list", "--recipient", "agent-package-check", "--json"]);
+  if (listRun.status !== 0) {
+    failures.push("inbox list 退出码应为 0，实际 " + String(listRun.status));
+  } else {
+    try {
+      const parsed = JSON.parse(listRun.stdout);
+      if (parsed.isPresent !== false) failures.push("未保存过时 inbox list 必须 isPresent:false");
+      if (typeof parsed.notice !== "string" || !parsed.notice.includes("空 ≠ 无消息")) {
+        failures.push("inbox list 空状态必须写「空 ≠ 无消息」");
+      }
+    } catch (error) {
+      failures.push("inbox list 输出不是合法 JSON：" + String(error));
+    }
+  }
+
+  const deliverRun = runCli(["inbox", "deliver", "--recipient", "agent-package-check", "--json"]);
+  if (deliverRun.status !== 2) {
+    failures.push("inbox deliver 在无收件箱时退出码必须为 2，实际 " + String(deliverRun.status));
+  }
+
+  const filesAfter = await listStateFiles();
+  if (JSON.stringify(filesBefore) !== JSON.stringify(filesAfter)) {
+    failures.push("只读入口不得改动状态目录文件清单");
+  }
+
 } finally {
   await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 }
 
 if (failures.length > 0) {
   process.stderr.write(`COMM 多实例离线闭环验收失败：${String(failures.length)} 项\n`);
+  for (const failure of failures) {
+    process.stderr.write(`- ${failure}\n`);
+  }
   process.exit(1);
 }
 process.stdout.write("COMM 多实例离线闭环通过：独立进程 fork/IPC、崩溃后 replay 不丢、ack 后不重复、接收者隔离、优雅关闭\n");
+
+
+
+
 
 
 
