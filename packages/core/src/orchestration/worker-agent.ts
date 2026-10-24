@@ -739,6 +739,32 @@ export class WorkerAgent {
           break;
       }
     }
+    /**
+     * 把**最终文本回复**写进运行历史（model-note）：
+     * 此前 worker 只记录工具调用，纯文本回复不会出现在任何历史里 ⇒ GUI 聊天区
+     * 只有提示词、没有 Agent 回应（用户实测）。
+     */
+    const finalOutputText = this.outputTextChunks.join("");
+    if (
+      finalOutputText.trim() !== "" &&
+      this.options.runHistoryStore !== undefined &&
+      this.options.runHistoryStore !== null
+    ) {
+      void this.options.runHistoryStore
+        .appendEvent({
+          missionIdentifier: this.options.missionId,
+          event: {
+            eventIdentifier:
+              "model-note:" + this.options.missionId + ":" + this.options.task.id + ":" + String(Date.now()),
+            kind: "model-note",
+            recordedAtIso: new Date().toISOString(),
+            payloadJson: JSON.stringify({ text: finalOutputText }),
+          },
+        })
+        .catch(() => {
+          // 历史观测失败不得阻塞业务
+        });
+    }
     await this.appendArchiveEntryForOutcome(finalReason);
     if (
       finalReason.outcome === "success" &&
