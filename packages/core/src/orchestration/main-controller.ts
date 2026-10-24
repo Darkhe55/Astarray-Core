@@ -361,7 +361,10 @@ export class MainController {
    * 处理用户消息。Ponder 直接问答；Assist/Devolve 创建/接管 mission
    * 后立即返回（不阻塞输入循环）。
    */
-  async handleUserMessage(message: string): Promise<string> {
+  async handleUserMessage(
+    message: string,
+    options?: { readonly projectIdentifier?: string },
+  ): Promise<string> {
     const mode = this.options.modeMachine.getCurrentMode();
     if (mode === "ponder") {
       await this.respondInPonderMode(message);
@@ -374,8 +377,11 @@ export class MainController {
      * 使历史视图能呈现卡内点名的"项目"字段。
      * 取值与范围判定同源（`registeredProjectRoots[0]`），**不臆造**新概念。
      */
+    const requestedProjectIdentifier = options?.projectIdentifier?.trim();
     const projectIdentifier =
-      this.options.registeredProjectRoots?.[0]?.projectIdentifier;
+      requestedProjectIdentifier !== undefined && requestedProjectIdentifier !== ""
+        ? requestedProjectIdentifier
+        : this.options.registeredProjectRoots?.[0]?.projectIdentifier;
     await this.options.missionManager.createMission({
       missionId,
       mode,
@@ -1270,3 +1276,4 @@ export class MainController {
     ];
   }
 }
+
