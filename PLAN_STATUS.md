@@ -2763,3 +2763,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   3. Agent 拓扑/投递目标只落 GUI 元数据，**未驱动编排**（`submitTask` 不接受 targetAgent）；
   4. 权限/审批弹窗与文件夹授权尚未接到实际工具调用。
 - 门禁：私有库 **568 用例 / 变异 41-41**。
+
+## 2026-10-24 GUI 完整任务执行四项缺口（公开 b183141d / b97608da / 94b7629e；私有 d91da4e / 07dd450 / 2bd311d / ec901c3 / 后续）
+
+- ① 执行根按项目：submitTask 可带 workspaceRootPath（绝对且存在，fail-closed），mission 级映射到 worker 工具边界；GUI 只发项目自己的文件夹，服务端复核归属。
+- ② 实时事件：SSE 每条事件转交聊天外壳，mission 事件 400ms 合并刷新聊天、项目列表 1.5s 刷新。
+- ③ targetAgent：submitTask 接受并校验目标 Agent（登记存在且未回收），作为该 mission 工具主体；GUI 校验属于项目且未移出。
+- ④ 审批：rich onPermissionAsk 透传到 facade；live 登记 pending 请求；GUI list/decide 端口接 facade；裁决 allowed-once 后授予会话/作用域授权并下发 unblock。
+- 仍未闭合：文件夹授权面板 → ScopeAuthorizationGate（跨项目路径授权）。
+- 门禁：公开 3,974 用例 / 变异 313-313；私有 568 用例 / 变异 41-41。
