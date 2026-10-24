@@ -59,6 +59,8 @@ const settledStatuses = new Set(["done", "failed", "cancelled", "blocked"]);
 /** 费用口径：价格表未配置时不得以本地估算冒充账单（与 usage-ledger-store 一致）。 */
 const costNotMeasuredReason =
   "价格表未配置：无法给出费用/节省估算（不得以本地估算冒充官方账单）";
+const isPerformanceCollectionEnabled = process.argv.includes("--enable-perf");
+
 const toolCallCountNotMeasuredReason =
   "公开门面（PublicTaskResult / MissionStatus）不暴露工具调用计数；perfSampleSink 仅在 runtime/tool-loop.ts 声明、未接线到应用装配 ⇒ 无持久化取证，标为未测，不猜测";
 
@@ -424,6 +426,7 @@ async function main() {
         requestTimeoutMilliseconds: 120_000,
       },
       useFeedbackProcess: false,
+      isPerformanceCollectionEnabled,
       statusPollIntervalMilliseconds,
       maximumLoopIterations: 4,
     });
@@ -561,6 +564,25 @@ async function main() {
       !missionIdentifiersThisRun.has(entry.missionIdentifier),
   ).length;
 
+  // ── 工具调用数真实取证（--enable-perf）──
+  const perfSamplesFilePath = path.join(stateDirectory, "perf", "samples.jsonl");
+  let toolCallCount = null;
+  const toolCallCountByMission = new Map();
+  if (isPerformanceCollectionEnabled) {
+    try {
+      const perfRaw = await fs.readFile(perfSamplesFilePath, "utf8");
+      const perfSamples = perfRaw.split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line));
+      const toolSamples = perfSamples.filter((sample) => typeof sample.operationKind === "string" && sample.operationKind.startsWith("tool-call:"));
+      toolCallCount = toolSamples.length;
+      for (const sample of toolSamples) {
+        const missionKey = typeof sample.missionIdentifier === "string" ? sample.missionIdentifier : "";
+        toolCallCountByMission.set(missionKey, (toolCallCountByMission.get(missionKey) ?? 0) + 1);
+      }
+    } catch {
+      toolCallCount = null;
+    }
+  }
+
   const perRound = roundRecords.map((roundRecord) => {
     const roundEntries =
       roundRecord.missionIdentifier === null
@@ -580,7 +602,9 @@ async function main() {
       queryErrorMessage: roundRecord.queryErrorMessage,
       ...usage,
       modelRequestCount: usage.entryCount,
-      toolCallCount: null,
+      toolCallCount: isPerformanceCollectionEnabled
+        ? (toolCallCountByMission.get(roundRecord.missionIdentifier ?? "") ?? 0)
+        : null,
       toolCallCountNotMeasuredReason,
     };
   });
@@ -609,8 +633,8 @@ async function main() {
     measuredOutputTokenCount: runUsage.measuredOutputTokenCount,
     measuredCachedTokenCount: runUsage.measuredCachedTokenCount,
     latencyMilliseconds: latency,
-    toolCallCount: null,
-    toolCallCountNotMeasuredReason,
+    toolCallCount,
+    toolCallCountNotMeasuredReason: toolCallCount === null ? toolCallCountNotMeasuredReason : null,
     costEstimateAmountMinorUnits: null,
     costNotMeasuredReason,
   };
@@ -743,11 +767,13 @@ async function main() {
       reason: "没有成功提交的轮次 ⇒ 无延迟样本（未测得，不得记为 0）",
     });
   }
-  notMeasured.push({
-    scope: "run",
-    metric: "toolCallCount",
-    reason: toolCallCountNotMeasuredReason,
-  });
+  if (toolCallCount === null) {
+    notMeasured.push({
+      scope: "run",
+      metric: "toolCallCount",
+      reason: toolCallCountNotMeasuredReason,
+    });
+  }
   notMeasured.push({
     scope: "run",
     metric: "costEstimateAmountMinorUnits",
@@ -798,7 +824,17 @@ async function main() {
       String(latency.roundCount) +
       " 轮）",
   );
-  console.log("工具调用数: 未测 — " + toolCallCountNotMeasuredReason);
+  console.log(
+    "工具调用数: " +
+      (toolCallCount === null
+        ? "未测 — " + toolCallCountNotMeasuredReason
+        : String(toolCallCount) +
+          "（含子 mission；来自 " +
+          path.relative(repositoryRoot, perfSamplesFilePath) +
+          "；主 mission 合计 " +
+          String([...toolCallCountByMission.values()].reduce((sum, count) => sum + count, 0)) +
+          "）"),
+  );
   console.log("费用/节省估算: 未测 — " + costNotMeasuredReason);
   console.log("账目文件: " + path.relative(repositoryRoot, ledgerFilePath) + "（" + ledger.status + "）");
   for (const roundRecord of perRound) {
@@ -821,7 +857,17 @@ async function main() {
         String(roundRecord.estimatedEntryCount) +
         " missingUsage=" +
         String(roundRecord.missingUsageEntryCount) +
-        " toolCalls=未测",
+        " toolCalls=" + (roundRecord.toolCallCount === null ? "未测" : String(roundRecord.toolCallCount) + "（主 mission）"),
+    );
+  }
+
+  if (isPerformanceCollectionEnabled) {
+    record(
+      "⑦ 启用 perf 采集时工具调用数有真实取证",
+      typeof toolCallCount === "number" && toolCallCount > 0,
+      toolCallCount === null
+        ? "perf 样本不可读"
+        : "tool-call 样本数=" + String(toolCallCount),
     );
   }
 
@@ -844,6 +890,13 @@ async function main() {
     perRound,
     totals,
     notMeasured,
+    toolCallMeasurement: {
+      isEnabled: isPerformanceCollectionEnabled,
+      toolCallCount,
+      perfSamplesFilePathRelative: path.relative(repositoryRoot, perfSamplesFilePath),
+      note:
+        "toolCallCount 为全部 tool-call 样本（含子 mission）；perRound.toolCallCount 只按该轮主 mission 归属，可能低于实际。",
+    },
     checks,
     failedCheckNames,
     isPassed: failedCheckNames.length === 0,
