@@ -2717,3 +2717,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 待命列表保留在拓扑图下方（带「恢复」）。
 - 测试：页面含 `<svg id="projectAgentsGraph">`、`createElementNS`、拓扑 aria 文案；私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
 - 说明：当前是**树形分层布局**（同层不交叉、单父）；若需要真正力导向/多父 DAG，需要额外布局算法，可后续加。
+
+## 2026-10-24 投递 Agent 选择（私有库 900a6a0 + 测试修正）
+
+- 会话组合器新增「**选择投递 Agent**」按钮 + 目标标签（默认「默认投递」）。
+- 点击按钮打开 **Agent 拓扑图的选择模式**（标题「选择投递 Agent（点击节点）」），点任一节点即选定并关闭；关闭弹窗取消选择。
+- 选择按**项目**记忆（`targetProjectAgents[projectId]`），切换项目时标签刷新。
+- 离线队列：`/commands/send-message` 的 `targetAgentIdentifier` 优先用所选 Agent。
+- 真实模型路径：当前 `/commands/submit`（核心 `submitTask`）**不接受目标 Agent**，所以选择后会明确提示「按会话默认路由执行（指定 agent 尚未接线）」，不假装已投递。
+- 反例：页面含选择按钮/标签/选择入口；离线 send 断言更新为目标优先；私有库 **568 用例 / 变异 41-41**。
+- 下一步若要真正“投递给指定 agent”，需要在核心 `submitTask` 增加 targetAgent 输入并让编排器按该 agent 建任务（跨仓库改动）。
