@@ -2597,3 +2597,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 门禁：私有库 **527 用例 / 变异 41-41 / 包验收 7-7**。
 - **离线发送路由已确认存在**（在私有 `project-chat-routes.ts`，不是缺失）——子 agent 的疑点已核清。
 - 下一步：用 live 模式做 B/C/D/F 组人工验收（每次发送都是真实计费调用）。
+
+## 2026-10-24 GUI 设置入口（私有库 9e53d06，MiniMax-M3 实现）
+
+- 项目区**左下角**新增「设置」按钮 `#chatOpenSettingsButton`（`margin-top:auto` 贴底；折叠态用更高特异性规则放行，仍可点）。
+- 点击打开**顶层设置弹窗** `#chatSettingsDialog`：原有设置区块（上下文预算 + 权限组 + 结果行）整体移入，既有 8 个 id 一字未改；新增关闭按钮与焦点归还。
+- 复用既有接口：`GET /settings`（打开时刷新）、`POST /commands/set-context-budget`、`POST /commands/switch-permission-profile`（路径与请求体未改）。
+- 实测（live 模式，未发模型调用）：页面含按钮与弹窗、`margin-top:auto` 存在、`/settings` 返回 `sessionId/mode/context/permissionProfiles`。
+- 门禁：私有库 **545 用例 / 变异 41-41 / 包验收 7-7**。
+- 注意：`gui-workspace-and-agent-status-dialog` 的「顶层弹窗总数」断言由 4 改为 5（合法新增）；该计数不再充当上限守卫。
