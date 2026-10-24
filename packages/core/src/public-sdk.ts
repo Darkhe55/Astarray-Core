@@ -5862,3 +5862,13 @@ export {
   type EventAcceptanceCriteria,
   type EventRecoveryPolicy as EventAcceptanceRecoveryPolicy,
 } from "./orchestration/event-acceptance-criteria.js";
+
+// COMM-01-02 §2.4（2026-10-24）：协作收件箱（四态分离 / 重复复用回执 / 每收件人背压 / 有限重试 / 撤销后不落新任务）。
+export {
+  COLLABORATION_INBOX_STATES,
+  CollaborationInbox,
+  type CollaborationInboxEnqueueOutcome,
+  type CollaborationInboxMessage,
+  type CollaborationInboxReceipt,
+  type CollaborationInboxState,
+} from "./orchestration/collaboration-inbox.js";
