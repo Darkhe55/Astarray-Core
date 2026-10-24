@@ -1526,3 +1526,5 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **COMM-01-02 真实反馈进程接线（2026-10-24）**：集成测试真实 fork 子进程，覆盖「可用 ⇒ delivered 落盘」「已停止 ⇒ 不标 delivered、保持 received 可重试」；变异「投递后不落盘」被拦下。3939 用例 / 299 锚点。
 
 > **COMM-01-03 只读状态（2026-10-24）**：`collaboration status` CLI + `collaboration-status.ts`（归属拓扑 + 投递状态，failed→dropped，空≠不存在）。3941 用例 / 301 锚点 / 2 新变异被拦下。TUI/GUI 入口与 tarball 闭环未做。
+
+> **COMM-01-03 收尾（2026-10-24）**：TUI 只读协作面板（聚焦自动刷新 / r 刷新 / 失败只读错误视图，无写路径）+ tarball 包级闭环（`collaboration status` / `inbox list` / `inbox deliver` 退出码与只读性）。私有库 495 用例 / 41 变异 / 7-7。

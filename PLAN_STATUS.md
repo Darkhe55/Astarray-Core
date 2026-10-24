@@ -2522,3 +2522,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - Agent 状态弹窗新增「协作（只读）」区块：Agent 数 / 投递记录 / 可投递节点 / 暂停 / 丢弃 / 是否存在环，并写明「只读：不投递、不改归属」；失败只影响本区块。
 - 门禁：私有库 **466 用例 / 变异 41-41 / 包验收 7-7**。
 - **事故记录**：子 agent 写回时把 `gui-server.ts` / `project-chat-routes.ts` 整体改成 CRLF，导致 4 条按 LF 切片/锚点的既有测试变红（不是既有失败）。我按仓库既有 LF 约定归一化后全绿；尚未加 `.gitattributes` 固定行尾，后续仍可能复发。
+
+## 2026-10-24 COMM-01-03 收尾（TUI 入口 + tarball 闭环）
+
+- **TUI 只读入口**（私有库 8fa9457，MiniMax-M3 实现）：`CollaborationStatusPanel` + `collaboration-status-ports.ts`。面板聚焦时自动刷新一次、按 `r` 再刷新；展示 Agent/投递/可投递/暂停/丢弃/环；失败显示只读错误视图（计数 0、`isWritable:false`、写明「不可用：原因」）；**无任何投递/写盘路径**（源码级守卫测试）。
+- **tarball 隔离闭环**：扩展 `verify-comm-package.mjs`，在安装包上跑 `collaboration status --json`（`isWritable:false`、空状态写「空 ≠ 不存在」）、`inbox list --json`（空 ≠ 无消息）、`inbox deliver`（无收件箱 ⇒ 退出码 2），并断言这些只读命令**不改动状态目录文件清单**。
+  - 实测：`.tmp/comm-pkg/astarray-0.1.0.tgz` → 临时安装 → 脚本退出码 0（原有 fork/IPC 崩溃重放等判据同时通过）。
+- 门禁：私有库 **495 用例 / 变异 41-41 / 包验收 7-7**；公开库新增包级判据通过。
