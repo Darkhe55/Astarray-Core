@@ -805,6 +805,16 @@ export const MUTATIONS = [
       "无记录却报存在 ⇒ 「空 ≠ 无事件」被破坏（用户会被误导）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "event01-control-low-severity-blocks",
+    targetFile: "packages/core/src/orchestration/event-control-channel.ts",
+    find: "          (incident.severity === \"high\" || incident.severity === \"critical\"),",
+    replace: "          true,",
+    testFiles: ["tests/core/integration/event01-control-loop-gate.test.ts"],
+    expectedFailingTestNames: ["③ 低严重度事故只记录"],
+    rationale:
+      "低严重度也阻断 ⇒ 普通工具错误把整轮停死（过度拦截）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "event01-control-model-gate-ignores-incident",
     targetFile: "packages/core/src/orchestration/event-control-channel.ts",
     find: "    if (blocking.length === 0) {",

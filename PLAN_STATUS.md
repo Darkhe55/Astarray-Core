@@ -2548,3 +2548,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 实测（云知声 u2-flash，2 轮）：**工具调用 4 次**（含子 mission；每轮主 mission 计 1）；input **7274** / output **262** / cached **1986**；延迟 mean **56993ms**（min 44202 / max 69784）；脚本 **7/7** 通过。
 - 口径说明：`toolCallCount` 含子 mission；`perRound.toolCallCount` 只按主 mission 归属，可能低于实际——已写进 verdict 的 `note`，不四舍五入。
 - **仍不判整卡通过**：真实维护成本的人工估算、跨平台可比性未取得；价格表未配置 ⇒ 费用仍标未测。
+
+## 2026-10-24 EVENT-01 门禁接缝接入（工具循环）
+
+- 新增集成测试 `event01-control-loop-gate.test.ts`：把 `EventControlChannel` 接到工具循环**既有** `workWindowGate` 接缝：
+  - 无事故 ⇒ 模型请求照常（modelRunCount=1）；
+  - **critical 事故 ⇒ 模型请求 0 次**（不烧 token）；
+  - **低严重度事故只记录不阻断**（避免普通工具错误把整轮停死）。
+- `event-control-channel.ts` 相应收紧：只拦截 `high`/`critical` 的未解除事故。
+- 变异 `event01-control-low-severity-blocks`（低严重度也阻断）被拦下。
+- 门禁：公开库 **3,957 用例通过**，锚点 **308/308**。
+- **生产默认仍不注入**事件源（何时把工具失败升级为事故属产品策略）；接缝与证据已就绪。

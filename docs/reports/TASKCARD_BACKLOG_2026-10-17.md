@@ -1532,3 +1532,5 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **EVENT-01 安装包状态入口（2026-10-24）**：`event-incident-journal.ts` + `event status` CLI + `verify:event01-package`（空≠无事件、只读、损坏退出码 2）。5 反例 + 2 变异。本地可证部分完成。
 
 > **TOOLKIT-01-06 工具调用数实测（2026-10-24）**：`--enable-perf` 走生产 perf 采集，2 轮实测工具调用 4 次、input 7274 / output 262 / cached 1986、延迟 mean 56993ms，7/7 通过。费用与维护成本仍标未测（无价格表/无人工估算）。
+
+> **EVENT-01 门禁接缝（2026-10-24）**：控制通道接到工具循环 `workWindowGate`，critical 事故时模型调用 0 次、低严重度不阻断（3 条集成反例 + 1 变异）。生产事件源仍按产品策略默认不注入。
