@@ -2529,3 +2529,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **tarball 隔离闭环**：扩展 `verify-comm-package.mjs`，在安装包上跑 `collaboration status --json`（`isWritable:false`、空状态写「空 ≠ 不存在」）、`inbox list --json`（空 ≠ 无消息）、`inbox deliver`（无收件箱 ⇒ 退出码 2），并断言这些只读命令**不改动状态目录文件清单**。
   - 实测：`.tmp/comm-pkg/astarray-0.1.0.tgz` → 临时安装 → 脚本退出码 0（原有 fork/IPC 崩溃重放等判据同时通过）。
 - 门禁：私有库 **495 用例 / 变异 41-41 / 包验收 7-7**；公开库新增包级判据通过。
+
+## 2026-10-24 EVENT-01 控制通道 / 取消 / 分阶段确认 / 崩溃重放
+
+- `event-control-channel.ts`：模型与工具调用前门禁（事故期间拒绝）；工具取消按能力回报（unknown/not-supported/cancel-requested，请求≠停止）；在途副作用需用户确认+对账；`toSnapshot`/`fromSnapshot` 崩溃重放保留状态与所有者。
+- 反例 8 条 + 变异 4 条。**安装包状态入口**仍未做（下一步）。

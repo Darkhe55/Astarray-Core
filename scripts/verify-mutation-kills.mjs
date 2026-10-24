@@ -785,6 +785,46 @@ export const MUTATIONS = [
       "授权撤销后仍在途投递 ⇒ 旧消息落入新任务（卡内明确禁止）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "event01-control-model-gate-ignores-incident",
+    targetFile: "packages/core/src/orchestration/event-control-channel.ts",
+    find: "    if (blocking.length === 0) {",
+    replace: "    if (true) {",
+    testFiles: ["tests/core/unit/event01-control-channel.test.ts"],
+    expectedFailingTestNames: ["② 收到事件 ≠ 已停止"],
+    rationale:
+      "有事故仍放行模型调用 ⇒ 控制通道形同虚设（收到事件必须立即隔离）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-control-cancel-claims-stopped",
+    targetFile: "packages/core/src/orchestration/event-control-channel.ts",
+    find: "      reason: \"已发出取消请求；**取消请求 ≠ 已停止**，须确认在途副作用。\",",
+    replace: "      reason: \"已停止。\",",
+    testFiles: ["tests/core/unit/event01-control-channel.test.ts"],
+    expectedFailingTestNames: ["④ 取消结果按能力如实回报"],
+    rationale:
+      "把取消请求说成已停止 ⇒ 用户误以为副作用已收敛（卡内明确禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-control-confirm-skips-user",
+    targetFile: "packages/core/src/orchestration/event-control-channel.ts",
+    find: "    if (!input.userConfirmed) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/event01-control-channel.test.ts"],
+    expectedFailingTestNames: ["⑤ 在途副作用必须用户确认"],
+    rationale:
+      "跳过用户确认 ⇒ 在途副作用被自动继续（不代替专用授权）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-control-replay-drops-incidents",
+    targetFile: "packages/core/src/orchestration/event-control-channel.ts",
+    find: "    channel.arbitrator.restoreIncidents(input.snapshot.incidents);",
+    replace: "    void input.snapshot.incidents;",
+    testFiles: ["tests/core/unit/event01-control-channel.test.ts"],
+    expectedFailingTestNames: ["⑥ 崩溃重放"],
+    rationale:
+      "崩溃后不恢复事故 ⇒ 重启即放行（暂停被当成解除）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "event01-single-owner-allows-second",
     targetFile: "packages/core/src/orchestration/event-incident-arbitration.ts",
     find: "    if (incident.ownerAgentInstanceId !== null) {",
