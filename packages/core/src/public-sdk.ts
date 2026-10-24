@@ -4775,6 +4775,11 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     taskIdentifier: string;
     prompt: string;
     idempotencyKey?: string;
+    /**
+     * 可选：把本次任务归属到指定项目（GUI 多项目场景）。
+     * 缺省时沿用运行时登记的 `registeredProjectRoots[0]`（行为不变）。
+     */
+    projectIdentifier?: string;
   }): Promise<PublicTaskResult> {
     this.assertOpen();
     this.requireSession(input.sessionId);
@@ -4788,6 +4793,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         : input.sessionId + "|" + input.idempotencyKey;
     const submissionInputHash = this.computeTaskSubmissionInputHash({
       prompt: input.prompt,
+      ...(input.projectIdentifier === undefined
+        ? {}
+        : { projectIdentifier: input.projectIdentifier }),
     });
     if (ledgerKey !== null && input.idempotencyKey !== undefined) {
       const existingEntry = this.taskIdempotencyLedger.get(ledgerKey);
@@ -4848,7 +4856,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
     let missionIdentifier: string;
     try {
-      missionIdentifier = await this.runtime.controller.handleUserMessage(input.prompt);
+      missionIdentifier = await this.runtime.controller.handleUserMessage(
+        input.prompt,
+        input.projectIdentifier === undefined
+          ? undefined
+          : { projectIdentifier: input.projectIdentifier },
+      );
     } catch (error) {
       throw new PublicApplicationError(
         "submit-failed",
@@ -5947,3 +5960,4 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
