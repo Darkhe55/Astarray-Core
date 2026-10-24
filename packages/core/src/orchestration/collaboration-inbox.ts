@@ -30,6 +30,10 @@ export interface CollaborationInboxMessage {
   readonly correlationIdentifier: string;
   readonly recipientAgentInstanceId: string;
   readonly senderAgentInstanceId: string;
+  /** 转达链的**原始来源**（首跳时为 sender）；视图据此判断追溯是否断链。 */
+  readonly originalSourceAgentInstanceId: string;
+  /** 是否经上级转达（不是直属上级原创指令）。 */
+  readonly isRelayedRequest: boolean;
   readonly taskIdentifier: string;
   readonly summary: string;
   readonly receivedAtIso: string;
@@ -110,6 +114,8 @@ export class CollaborationInbox {
     readonly taskIdentifier: string;
     readonly summary: string;
     readonly receivedAtIso: string;
+    readonly originalSourceAgentInstanceId?: string;
+    readonly isRelayedRequest?: boolean;
     readonly authorizationEpoch?: number;
     readonly relayChain?: CollaborationRelayChain;
   }): CollaborationInboxEnqueueResult {
@@ -189,6 +195,8 @@ export class CollaborationInbox {
       correlationIdentifier: input.correlationIdentifier,
       recipientAgentInstanceId: input.recipientAgentInstanceId,
       senderAgentInstanceId: input.senderAgentInstanceId,
+      originalSourceAgentInstanceId: input.originalSourceAgentInstanceId ?? input.senderAgentInstanceId,
+      isRelayedRequest: input.isRelayedRequest ?? false,
       taskIdentifier: input.taskIdentifier,
       summary: input.summary,
       receivedAtIso: input.receivedAtIso,
@@ -374,6 +382,7 @@ export class CollaborationInbox {
     );
   }
 }
+
 
 
 
