@@ -873,7 +873,8 @@ packages/tui/src/cli.tsx:416 / 436
   - 轮次：2/2 达到 `done`；账目条目（模型请求）**4** 条，缺 usage **0** 条，估算 **0** 条；
   - token：input **7207**、output **292**、cached **1987**；
   - 延迟：mean **4317ms**（min 4069 / max 4564）；
-  - **工具调用数：未测**（公开门面不暴露该计数，`perfSampleSink` 未接线 ⇒ 不猜测）；
+  - **工具调用数：已实测（2026-10-24）**（`--enable-perf` 启用生产 perf 采集，2 轮共 4 次 tool-call 样本；含子 mission）；
   - **费用/节省：未测**（未配置价格表，不以本地估算冒充账单）。
 - **验收脚本自检**：6/6 项通过；判据落盘 `.tmp/live-u2-flash-usage-20261024/acceptance-verdict.json`。
 - **仍不判整卡通过**：真实维护成本、跨平台可比性未取得；工具调用数无取证入口。
+

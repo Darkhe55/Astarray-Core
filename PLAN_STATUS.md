@@ -2541,3 +2541,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - `astarray event status [--json]`：只读；无记录写「空 ≠ 无事件」，损坏退出码 2。
 - `verify:event01-package`：tarball 隔离安装后验证上述三条（实测通过）。
 - 5 反例 + 2 变异。**EVENT-01 本地可证部分至此完成**；真实设备故障注入（进程 kill/断电）属人工/平台证据，未做。
+
+## 2026-10-24 TOOLKIT-01-06 工具调用数真实取证（--enable-perf）
+
+- 测量脚本新增 `--enable-perf`：启用生产 perf 采集（`isPerformanceCollectionEnabled`），从 `<state>/perf/samples.jsonl` 读取 `tool-call:*` 样本，得到**真实工具调用数**；未启用时仍如实标"未测"。
+- 实测（云知声 u2-flash，2 轮）：**工具调用 4 次**（含子 mission；每轮主 mission 计 1）；input **7274** / output **262** / cached **1986**；延迟 mean **56993ms**（min 44202 / max 69784）；脚本 **7/7** 通过。
+- 口径说明：`toolCallCount` 含子 mission；`perRound.toolCallCount` 只按主 mission 归属，可能低于实际——已写进 verdict 的 `note`，不四舍五入。
+- **仍不判整卡通过**：真实维护成本的人工估算、跨平台可比性未取得；价格表未配置 ⇒ 费用仍标未测。
