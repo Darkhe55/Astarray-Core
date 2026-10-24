@@ -280,6 +280,17 @@ export interface ApplicationRuntimeOptions {
     taskId: string;
     message: string;
   }) => void;
+  /**
+   * 权限询问（Assist）：携带工具名与**精确参数**，供宿主登记
+   * `PermissionAskRequestStore` 请求实体（GUI 待授权面板的数据来源）。
+   */
+  onPermissionAsk?: (ask: {
+    missionId: string;
+    taskId: string;
+    toolName: string;
+    argumentsJson: string;
+    explanation: string;
+  }) => void;
   /** 备份删除交互端口（界面层注入；null 表示无交互通道，fail-closed）。 */
   backupDeletionControlPort?: BackupDeletionAuthorizationControlPort | null;
   /** 安装门禁交互端口（界面层注入；null 表示无交互通道，fail-closed）。 */
@@ -1372,6 +1383,9 @@ export async function createApplicationRuntime(
     ...(options.onPermissionAskWithIdentity === undefined
       ? {}
       : { onPermissionAskWithIdentity: options.onPermissionAskWithIdentity }),
+    ...(options.onPermissionAsk === undefined
+      ? {}
+      : { onPermissionAsk: options.onPermissionAsk }),
   });
 
   const shutdown = async (): Promise<void> => {
