@@ -2571,3 +2571,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - `project-relocation-service.ts`：未登记/不可达/身份不符/相同根/陈旧 revision/非用户确认一律拒绝；成功时 `previousRootPath` 保留旧根、`locationRevision + 1`、`confirmedBy: user`。
 - CLI：`project entry --choice relocate --confirm-new-root <path> --expected-location-revision <n>`（0=已重定位，4=拒绝）。
 - 反例：服务 5 条 + CLI 2 条；变异 2 条。**GUI 仍走同一服务的接线待做**。
+
+## 2026-10-24 RELOCATE GUI apply（私有库 42fb578，MiniMax-M3 实现）
+
+- `POST /commands/project-relocation-apply`：无状态目录 501；缺字段或 `confirm !== true` 400；revision 过期/身份不符/不可达 409；成功 200 并**由同一控制面服务**写入登记（revision+1、保留 previousRootPath）。
+- GUI 重定位弹窗新增「新项目根 / 观测标识 / 确认重定位」：点「重定位项目位置」只展开、不提交；点「确认重定位」才 POST；成功/失败文案分开，不自动确认。
+- `/projects/relocation` 现在返回 `expectedLocationRevision`，避免 GUI 总按 1 处理。
+- 反例：路由 11 条 + 页面 14 条；私有库 **520 用例 / 变异 41-41 / 包验收 7-7**。
+- 风险（子 agent 已如实说明）：观测标识仍由用户/调用方提供（核心只校验与登记一致），未接入真实目录标识探测；浏览器点击未实测。
