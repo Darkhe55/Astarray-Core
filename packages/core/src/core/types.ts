@@ -382,6 +382,19 @@ export type FeedbackMessagePayload =
       compatibleCandidateTypes: string[];
     }
   | {
+      /**
+       * COMM-01-02（2026-10-24，用户批准协议扩展 a）：
+       * **协作请求**——经唯一上级转达、进入收件人协作收件箱。
+       * 与 `success`/`failure` 文本通道区分：查询时可判定为协作消息。
+       */
+      kind: "collaboration-request";
+      messageIdentifier: string;
+      correlationIdentifier: string;
+      taskIdentifier: string;
+      summary: string;
+      authorizationEpoch: number;
+      hopCount: number;
+    }  | {
       kind: "assist-installation-request";
       authorizationRequestId: string;
       nonce: string;
@@ -748,3 +761,4 @@ export interface GitIntegrationReport {
   unresolvedRisks: string[];
   createdAtIso: string;
 }
+

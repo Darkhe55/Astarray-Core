@@ -119,7 +119,7 @@ import {
 } from "./cli/commands.js";
 
 import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
-import { executeInboxListCommand } from "./cli/inbox-command.js";
+import { executeInboxDeliverCommand, executeInboxListCommand } from "./cli/inbox-command.js";
 import { executeOnboardingStatusCommand } from "./cli/onboarding-command.js";
 const program = new Command();
 
@@ -2151,6 +2151,23 @@ inboxCommand
         stateDirectory: defaultStateDirectory(),
         recipientAgentInstanceId: options.recipient,
         stateFilter: options.state ?? null,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+inboxCommand
+  .command("deliver")
+  .description("把某收件人的待投递消息写入本地 outbox（入队 ≠ 已处理）")
+  .requiredOption("--recipient <agent-instance-id>", "收件人 Agent 实例标识")
+  .option("--transport <name>", "传输实现（目前只支持 file-outbox）", "file-outbox")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: { recipient: string; transport: string; json?: boolean }) => {
+      process.exitCode = await executeInboxDeliverCommand({
+        stateDirectory: defaultStateDirectory(),
+        recipientAgentInstanceId: options.recipient,
+        transportName: options.transport,
         isJsonOutput: options.json === true,
       });
     },
