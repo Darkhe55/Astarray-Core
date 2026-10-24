@@ -2665,3 +2665,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **修复**：受管项目改用**它自己的第一个文件夹**作为“当前目录”参与比较；只有非受管（mission 派生）项目才回退到 `workspaceRootPath`。
 - 证据：新增用例 ⑭（项目文件夹 ≠ GUI 工作区时 `prompt.isBlocking === false`）；私有库 **559 用例 / 变异 41-41**。
 - 说明：若某个项目之前被错误地“重定位”到 GUI 工作区，其登记根与项目文件夹会不一致——此时提示是**真实的**，用「重定位」选回项目文件夹即可。
+
+## 2026-10-24 修复：右键菜单关不掉 + 左上角黑色空框（私有库 93a036d）
+
+- **同一根因**：`.agent-context-menu { display: flex; }` 覆盖了 HTML `hidden` 属性 ⇒ 隐藏时仍按 `position: fixed` 渲染在左上角（空黑框），且点击外部虽把 `hidden=true`，视觉上仍显示 ⇒ “菜单收不掉”。
+- **修复**：新增 `.agent-context-menu[hidden] { display: none; }`（对项目菜单与 Agent 菜单同时生效）；关闭逻辑（外部点击 / Escape / 选中菜单项）保持不变。
+- 回归测试：断言该 CSS 规则存在、关闭函数与外部点击/Escape 监听存在；私有库 **560 用例 / 变异 41-41**。
