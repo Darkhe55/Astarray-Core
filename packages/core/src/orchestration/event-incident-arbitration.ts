@@ -354,6 +354,20 @@ export class EventIncidentArbitrator {
     };
   }
 
+  /**
+   * 崩溃重放：用快照恢复事故（保留状态、所有者、epoch、合并计数）。
+   *
+   * 只用于**同一控制面**的重启恢复；不重置所有者、不假装已恢复执行。
+   */
+  restoreIncidents(incidents: ReadonlyArray<EventIncident>): void {
+    for (const incident of incidents) {
+      this.incidents.set(incident.incidentIdentifier, { ...incident });
+      const numericSuffix = Number.parseInt(incident.incidentIdentifier.replace(/^incident-/, ""), 10);
+      if (Number.isSafeInteger(numericSuffix) && numericSuffix >= this.nextIncidentNumber) {
+        this.nextIncidentNumber = numericSuffix + 1;
+      }
+    }
+  }
   /** 只读查询（测试与上层汇报用）。 */
   getIncident(incidentIdentifier: string): EventIncident | null {
     return this.incidents.get(incidentIdentifier) ?? null;
@@ -402,4 +416,5 @@ export class EventIncidentArbitrator {
     };
   }
 }
+
 
