@@ -2606,3 +2606,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 实测（live 模式，未发模型调用）：页面含按钮与弹窗、`margin-top:auto` 存在、`/settings` 返回 `sessionId/mode/context/permissionProfiles`。
 - 门禁：私有库 **545 用例 / 变异 41-41 / 包验收 7-7**。
 - 注意：`gui-workspace-and-agent-status-dialog` 的「顶层弹窗总数」断言由 4 改为 5（合法新增）；该计数不再充当上限守卫。
+
+## 2026-10-24 GUI 新建项目 / 多文件夹 / 项目内会话 / 系统文件夹选择器（私有库 e3236e8）
+
+- **新建项目**：项目区顶部「＋ 新建项目」按钮 → 弹窗（名称 + 文件夹列表）→ `POST /commands/create-project`；项目存储 `<state>/gui/projects.json`（原子写、revision 复核、**损坏拒绝覆盖**）。
+- **多文件夹**：一个项目可管理多个文件夹（`add-project-folder` / `remove-project-folder`；至少保留一个）；项目列表显示「N 个文件夹 · M 个会话」。
+- **项目内新建会话**：受管项目提供「＋ 新建会话」→ `POST /commands/create-project-session`（记录 session 并调用 facade `createSession`）。
+- **系统资源管理器选择**：`POST /commands/pick-folder` 调 `scripts/pick-folder.ps1`（Windows `FolderBrowserDialog`）；重定位弹窗的「新项目根路径」旁也有「浏览…」。
+  - **多选结论**：`FolderBrowserDialog` **不支持一次多选**；实现为「重复添加」+「粘贴多路径（换行/分号分隔）」。若必须原生多选，需要改用 COM `IFileOpenDialog`（可后续加）。
+- `/projects` 已合并受管项目（即使 0 个 mission 也展示）。
+- 门禁：私有库 **551 用例 / 变异 41-41 / 包验收 7-7**；新增 6 条反例（存储 2 + 路由 3 + 页面 1）。
