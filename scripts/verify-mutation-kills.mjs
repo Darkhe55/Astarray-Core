@@ -625,6 +625,36 @@ export const MUTATIONS = [
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-delivery-ignores-transport-result",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox-delivery.ts",
+    find: "      if (result.isDelivered) {",
+    replace: "      if (true) {",
+    testFiles: ["tests/core/unit/comm02-inbox-delivery.test.ts"],
+    expectedFailingTestNames: ["② 失败"],
+    rationale:
+      "传输失败也当成功 ⇒ 消息丢失且不重试（卡内要求有限重试）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-delivery-sends-stale-epoch",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox-delivery.ts",
+    find: "        input.currentAuthorizationEpoch !== undefined &&",
+    replace: "        false &&",
+    testFiles: ["tests/core/unit/comm02-inbox-delivery.test.ts"],
+    expectedFailingTestNames: ["④ 授权代已变"],
+    rationale:
+      "授权变更后仍投递 ⇒ 旧消息落入新任务（卡内明确禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-delivery-swallows-conflict",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox-delivery.ts",
+    find: "      if (error instanceof CollaborationInboxRevisionConflictError) {",
+    replace: "      if (false) {",
+    testFiles: ["tests/core/unit/comm02-inbox-delivery.test.ts"],
+    expectedFailingTestNames: ["⑤ 落盘 revision 冲突"],
+    rationale:
+      "冲突被当普通错误抛出 ⇒ 上层看不清是并发写冲突（可能误重试）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-inbox-store-ignores-revision",
     targetFile: "packages/core/src/orchestration/collaboration-inbox-store.ts",
     find: "    if (input.expectedRevision !== currentRevision) {",
