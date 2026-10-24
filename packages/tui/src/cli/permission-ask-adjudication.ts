@@ -124,6 +124,7 @@ export async function runPermissionAskAdjudication(options: {
     return "requires-human-resubmission";
   }
   if (!isAutoReused) {
+    writePrompt("──── 待处理（1）：权限授权（处理完此前不会继续任务输入）────");
     writePrompt(
       `[权限裁决] 任务 ${ask.taskIdentifier} 请求调用受限工具 ${ask.toolName}\n` +
         `  说明: ${ask.explanation}\n` +
@@ -131,6 +132,7 @@ export async function runPermissionAskAdjudication(options: {
         "  allow-once = 仅本次按上述精确参数授权；参数变化将失效需要重新裁决。\n" +
         "  输入 allow-once 授权 / 其他任意输入拒绝：",
     );
+    writePrompt("──── 待处理结束 ────");
     const decision = await options.readDecision(ask);
     if (decision === null) {
       // 有界等待耗尽（管道已无输入）→ fail-closed，任务保持 blocked 待人工处理。
@@ -301,3 +303,4 @@ export class InteractivePermissionAskDecisionPort implements PermissionAskDecisi
     return answer.trim().toLowerCase() === "allow-once" ? "allow-once" : "deny";
   }
 }
+

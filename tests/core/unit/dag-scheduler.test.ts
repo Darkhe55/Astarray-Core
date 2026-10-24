@@ -255,4 +255,23 @@ describe("ToolFailureCounter", () => {
   it("阈值 < 1 抛错", () => {
     expect(() => new ToolFailureCounter(0)).toThrowError(/≥ 1/);
   });
+
+  it("阻塞只影响该任务线：并行任务继续，unblock 后恢复", async () => {
+    const scheduler = await createScheduler([makeNode("t1"), makeNode("t2")], 2);
+    await scheduler.blockTaskForHumanDecision("t1");
+    const firstRound = await scheduler.scheduleRound();
+    const started = firstRound
+      .filter((action) => action.action === "start-task")
+      .map((action) => (action as { taskId: string }).taskId);
+    expect(started).toContain("t2");
+    expect(started).not.toContain("t1");
+    // 完成 t2（并行线不受阻塞影响）
+    await scheduler.finishTask("t2", "done", null);
+    await scheduler.unblockTask("t1");
+    const secondRound = await scheduler.scheduleRound();
+    const resumed = secondRound
+      .filter((action) => action.action === "start-task")
+      .map((action) => (action as { taskId: string }).taskId);
+    expect(resumed).toContain("t1");
+  });
 });
