@@ -62,6 +62,8 @@ export interface RunCommandOptions {
    * 未开启 ⇒ 不创建采集器（不建目录、不排定时器）。
    */
   isPerfCollectionEnabled?: boolean;
+  /** 对话模式：无工具/产物时不要求完成控制事件（缺省 false，保持严格）。 */
+  isConversationMode?: boolean;
   /** T07D-R2-03：等待上限秒数；缺省不设固定上限（等待任务终态）。 */
   timeoutSeconds?: number;
   /** openai-compatible 运行时的本地/远端协议端点（必填；不静默回退 mock）。 */
@@ -176,6 +178,7 @@ const application = await AstarrayApplicationFacade.create({
     // T04：产品入口使用独立反馈进程（AGENTS.md：反馈工具不得退化为进程内定时器/协程）。
     // mock 离线路径保持进程内，避免测试期无谓 fork 抖动。
     useFeedbackProcess: runConfig.runtime !== "mock",
+    ...(options.isConversationMode === true ? { isConversationMode: true } : {}),
     streamOutput: (_missionIdentifier, text) => {
       streamedAnswerChunks.push(text);
       // ADR-0011：权限询问随升级文本到达，需结构化留档供用户裁决。
