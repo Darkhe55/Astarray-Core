@@ -66,6 +66,26 @@ describe("AstarrayApplicationFacade（Public SDK）", () => {
     );
   });
 
+  it("submitTask 可把任务归属到指定项目（GUI 多项目）", async () => {
+    const facade = await AstarrayApplicationFacade.create({
+      stateDirectory,
+      mode: "assist",
+    });
+    facade.createSession({ sessionId: "session-1", mode: "assist" });
+    const accepted = await facade.submitTask({
+      sessionId: "session-1",
+      taskIdentifier: "task-project",
+      prompt: "归属到项目 A",
+      projectIdentifier: "project-alpha",
+    });
+    expect(accepted.status).toBe("accepted");
+    const history = await facade.queryMissionHistory();
+    const mission = history.entries.find(
+      (entry) => entry.missionIdentifier === accepted.missionIdentifier,
+    );
+    expect(mission?.projectIdentifier).toBe("project-alpha");
+    await facade.shutdown();
+  });
   it("SDK 版本与公共 DTO 不携带凭据/内部字段", async () => {
     expect(ASTARRAY_SDK_VERSION).toBe("0.1.0");
     const facade = await AstarrayApplicationFacade.create({
@@ -166,3 +186,5 @@ describe("依赖方向", () => {
     }
   });
 });
+
+
