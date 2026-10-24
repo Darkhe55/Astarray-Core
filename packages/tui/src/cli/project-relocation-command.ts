@@ -16,6 +16,7 @@ import {
   applyProjectEntryRelocationChoice,
   buildProjectEntryRelocationPrompt,
 } from "../../../core/src/orchestration/project-relocation-entry-prompt.js";
+import { relocateProjectRegistration } from "../../../core/src/orchestration/project-relocation-service.js";
 
 /** 命令输入。 */
 export interface ProjectStatusCommandInput {
@@ -257,6 +258,10 @@ export interface ProjectEntryCommandInput {
   readonly observedProjectIdentifier: string | null;
   /** 三选项之一；缺省只展示选项（阻断时退出码 3）。 */
   readonly choice?: string;
+  /** 选择「重定位项目位置」时，用户确认的新根（缺省 ⇒ 只给指引）。 */
+  readonly confirmNewRoot?: string;
+  /** 用户看到的当前登记 revision（确认时必须显式提供）。 */
+  readonly expectedLocationRevision?: number;
   readonly isJsonOutput: boolean;
 }
 
@@ -306,6 +311,36 @@ export async function executeProjectEntryCommand(
       );
     }
     return prompt.isBlocking ? 3 : EXIT_CODES.SUCCESS;
+  }
+
+  if (input.choice === "relocate" && input.confirmNewRoot !== undefined) {
+    if (input.expectedLocationRevision === undefined) {
+      process.stderr.write(
+        "重定位需要显式 --expected-location-revision（用户确认时看到的 revision），不猜。\n",
+      );
+      return 2;
+    }
+    const store = new ProjectLocationRegistrationStore({ baseDirectory: input.stateDirectory });
+    const relocation = await relocateProjectRegistration({
+      store,
+      projectIdentifier: input.projectIdentifier,
+      newRootPath: input.confirmNewRoot,
+      observedProjectIdentifierAtNewRoot: input.observedProjectIdentifier,
+      isNewRootAccessible: existsSync(input.confirmNewRoot),
+      expectedLocationRevision: input.expectedLocationRevision,
+      isHumanConfirmed: true,
+      confirmedAtIso: new Date().toISOString(),
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "ok", relocation });
+    } else {
+      process.stdout.write(
+        (relocation.kind === "applied"
+          ? "已重定位到 " + relocation.registration.rootPath + "（revision " + String(relocation.registration.locationRevision) + "；旧根保留为 previousRootPath）"
+          : "拒绝重定位：" + relocation.reason) + "\n",
+      );
+    }
+    return relocation.kind === "applied" ? EXIT_CODES.SUCCESS : 4;
   }
 
   const choiceOutcome = applyProjectEntryRelocationChoice({ description, choice: input.choice });

@@ -2565,3 +2565,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 口径：工具崩溃类=critical、连续 3 次 provider 失败=high、同键 60 秒去重、默认开启、超期降级、恢复需确认。
 - 实现：`event-source-policy.ts` + `event-source-bridge.ts`（落盘失败不阻塞）；装配层默认构造并接到 `workWindowGate` 与 worker 的 `eventSourceHooks`（provider 失败仅匹配 provider/网络/限流特征）。
 - 反例 7 条 + 变异 3 条。
+
+## 2026-10-24 RELOCATE-01-03 运行时 apply（用户按建议确认）
+
+- `project-relocation-service.ts`：未登记/不可达/身份不符/相同根/陈旧 revision/非用户确认一律拒绝；成功时 `previousRootPath` 保留旧根、`locationRevision + 1`、`confirmedBy: user`。
+- CLI：`project entry --choice relocate --confirm-new-root <path> --expected-location-revision <n>`（0=已重定位，4=拒绝）。
+- 反例：服务 5 条 + CLI 2 条；变异 2 条。**GUI 仍走同一服务的接线待做**。

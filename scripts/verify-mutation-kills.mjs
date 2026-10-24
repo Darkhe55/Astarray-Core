@@ -615,6 +615,26 @@ export const MUTATIONS = [
       "忽略个体可见范围 ⇒ 子 Agent 能借诊断读到同级原始记录（卡内明令不得）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "relocate-service-skips-revision-check",
+    targetFile: "packages/core/src/orchestration/project-relocation-service.ts",
+    find: "  if (registration.locationRevision !== input.expectedLocationRevision) {",
+    replace: "  if (false) {",
+    testFiles: ["tests/core/unit/relocate01-apply-service.test.ts"],
+    expectedFailingTestNames: ["④ 陈旧 revision"],
+    rationale:
+      "忽略 revision ⇒ 并发确认互相覆盖（用户看到的不是当前登记）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "relocate-service-allows-non-human",
+    targetFile: "packages/core/src/orchestration/project-relocation-service.ts",
+    find: "    isHumanConfirmed: input.isHumanConfirmed,",
+    replace: "    isHumanConfirmed: true,",
+    testFiles: ["tests/core/unit/relocate01-apply-service.test.ts"],
+    expectedFailingTestNames: ["② 非用户确认"],
+    rationale:
+      "模型/自动流程也能写登记 ⇒ 违反「用户本人确认」⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "relocate-entry-confirmed-is-blocking",
     targetFile: "packages/core/src/orchestration/project-relocation-entry-prompt.ts",
     find: "  if (outcome.classification === \"identity-confirmed\") {",
