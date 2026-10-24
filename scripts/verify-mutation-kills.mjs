@@ -785,6 +785,26 @@ export const MUTATIONS = [
       "授权撤销后仍在途投递 ⇒ 旧消息落入新任务（卡内明确禁止）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "event01-journal-ignores-revision",
+    targetFile: "packages/core/src/orchestration/event-incident-journal.ts",
+    find: "    if (input.expectedRevision !== currentRevision) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/tui/unit/event-status-command.test.ts"],
+    expectedFailingTestNames: ["② 陈旧 revision 被拒"],
+    rationale:
+      "忽略 revision ⇒ 并发写覆盖事故状态（崩溃重放失真）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-status-absent-claims-present",
+    targetFile: "packages/tui/src/cli/event-command.ts",
+    find: "isPresent: false",
+    replace: "isPresent: true",
+    testFiles: ["tests/tui/unit/event-status-command.test.ts"],
+    expectedFailingTestNames: ["④ 无记录"],
+    rationale:
+      "无记录却报存在 ⇒ 「空 ≠ 无事件」被破坏（用户会被误导）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "event01-control-model-gate-ignores-incident",
     targetFile: "packages/core/src/orchestration/event-control-channel.ts",
     find: "    if (blocking.length === 0) {",

@@ -5911,3 +5911,12 @@ export {
   type EventGateDecision,
   type EventToolCancellationCapability,
 } from "./orchestration/event-control-channel.js";
+
+// EVENT-01（2026-10-24）：事故日志持久化（安装包状态入口 + 崩溃重放；损坏不覆盖）。
+export {
+  EVENT_INCIDENT_JOURNAL_SCHEMA_VERSION,
+  EventIncidentJournal,
+  EventIncidentJournalRevisionConflictError,
+  type EventIncidentJournalReadOutcome,
+  type EventIncidentJournalRecord,
+} from "./orchestration/event-incident-journal.js";

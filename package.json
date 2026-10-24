@@ -66,7 +66,8 @@
     "verify:onboarding-package": "node scripts/verify-onboarding-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:cli-json-package": "node scripts/verify-cli-json-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:summary-annotation": "npx tsx scripts/verify-summary-annotation.mjs --samples docs/reports/SUM02_04_ANNOTATION_TEMPLATE.jsonl",
-    "verify:event01-criteria": "npx tsx scripts/verify-event01-criteria.mjs --criteria docs/reports/EVENT01_ACCEPTANCE_CRITERIA_TEMPLATE.json --allow-incomplete"
+    "verify:event01-criteria": "npx tsx scripts/verify-event01-criteria.mjs --criteria docs/reports/EVENT01_ACCEPTANCE_CRITERIA_TEMPLATE.json --allow-incomplete",
+    "verify:event01-package": "node scripts/verify-event01-package.mjs --package-dir .tmp/comm-install/node_modules/astarray"
   },
   "dependencies": {
     "commander": "^15.0.0",
