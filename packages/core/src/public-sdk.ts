@@ -1999,6 +1999,14 @@ export interface PublicApplicationOptions {
     taskId: string;
     message: string;
   }) => void;
+  /** 权限询问（含工具名与精确参数；GUI 登记待授权请求用）。 */
+  onPermissionAsk?: (ask: {
+    missionId: string;
+    taskId: string;
+    toolName: string;
+    argumentsJson: string;
+    explanation: string;
+  }) => void;
   concurrency?: number;
   failureThreshold?: number;
   maximumLoopIterations?: number;
@@ -2456,6 +2464,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       ...(options.onPermissionAskWithIdentity === undefined
         ? {}
         : { onPermissionAskWithIdentity: options.onPermissionAskWithIdentity }),
+      ...(options.onPermissionAsk === undefined
+        ? {}
+        : { onPermissionAsk: options.onPermissionAsk }),
       backupDeletionControlPort: options.backupDeletionControlPort ?? null,
       installationUserPort: effectiveInstallationUserPort,
       authenticatedUserId: options.authenticatedUserId,
