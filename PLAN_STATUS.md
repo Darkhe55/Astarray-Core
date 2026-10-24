@@ -2534,3 +2534,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 - `event-control-channel.ts`：模型与工具调用前门禁（事故期间拒绝）；工具取消按能力回报（unknown/not-supported/cancel-requested，请求≠停止）；在途副作用需用户确认+对账；`toSnapshot`/`fromSnapshot` 崩溃重放保留状态与所有者。
 - 反例 8 条 + 变异 4 条。**安装包状态入口**仍未做（下一步）。
+
+## 2026-10-24 EVENT-01 安装包状态入口
+
+- `event-incident-journal.ts`：`<state>/events/incidents.json`，原子写 + revision 复核 + 损坏不覆盖。
+- `astarray event status [--json]`：只读；无记录写「空 ≠ 无事件」，损坏退出码 2。
+- `verify:event01-package`：tarball 隔离安装后验证上述三条（实测通过）。
+- 5 反例 + 2 变异。**EVENT-01 本地可证部分至此完成**；真实设备故障注入（进程 kill/断电）属人工/平台证据，未做。

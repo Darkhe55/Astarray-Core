@@ -122,6 +122,7 @@ import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
 import { executeCollaborationStatusCommand } from "./cli/collaboration-command.js";
 import { executeInboxDeliverCommand, executeInboxListCommand } from "./cli/inbox-command.js";
 import { executeOnboardingStatusCommand } from "./cli/onboarding-command.js";
+import { executeEventStatusCommand } from "./cli/event-command.js";
 const program = new Command();
 program
   .name("astarray")
@@ -2135,6 +2136,20 @@ accuracyCommand
       });
     },
   );
+
+const eventCommand = program
+  .command("event")
+  .description("紧急事件（只读状态；不恢复、不调模型）");
+eventCommand
+  .command("status")
+  .description("只读：事故日志与当前事故状态")
+  .option("--json", "JSON 输出")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await executeEventStatusCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+    });
+  });
 
 const collaborationCommand = program
   .command("collaboration")
