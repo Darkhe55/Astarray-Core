@@ -2671,3 +2671,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **同一根因**：`.agent-context-menu { display: flex; }` 覆盖了 HTML `hidden` 属性 ⇒ 隐藏时仍按 `position: fixed` 渲染在左上角（空黑框），且点击外部虽把 `hidden=true`，视觉上仍显示 ⇒ “菜单收不掉”。
 - **修复**：新增 `.agent-context-menu[hidden] { display: none; }`（对项目菜单与 Agent 菜单同时生效）；关闭逻辑（外部点击 / Escape / 选中菜单项）保持不变。
 - 回归测试：断言该 CSS 规则存在、关闭函数与外部点击/Escape 监听存在；私有库 **560 用例 / 变异 41-41**。
+
+## 2026-10-24 工作区按项目根展开（私有库 9eb0d35）
+
+- **用户口径**：每个项目的会话区点「工作区」应展开**该项目文件夹**下的内容，而不是 GUI 进程的全局工作区。
+- 服务端：新增 `resolveWorkspaceRootForRequest()` —— 优先**受管项目的第一个文件夹**，其次位置登记根，最后才回退 `workspaceRootPath`；`/workspace/tree`、`/workspace/file`、`/commands/workspace-write` 全部按该根解析并返回 `rootPath/projectIdentifier`；写入仍受 `outside-workspace-root` 限制（不能写出项目）。
+- 前端：工作区请求携带 `projectIdentifier`；工作区标题显示「根目录：…」；切换项目时若工作区打开则按新项目根重载；`/workspace/file` 与写接口同样带项目。
+- 证据：新增用例 ⑯（项目内文件可见、全局工作区文件不可见、`../` 写入被 400 拒绝）与 ⑰（页面携带项目与根目录显示）；私有库 **562 用例 / 变异 41-41 / 包验收 7-7**。
+- 提示：修复前的项目若无文件夹（极少），会回退到位置登记根。
