@@ -2480,3 +2480,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 卡内 §2.4 第 76/78 行落地：`collaboration-inbox.ts` + `tests/core/unit/comm02-inbox.test.ts`（8 条反例 + 3 变异）。
 - 覆盖：四态分离（received/delivered/processed/completed + failed）、重复投递复用回执不重复插入任务、每收件人背压（超限明确拒绝、忙碌隔离）、有限重试（指数退避、上限转 failed）、入箱前跳数/环检测、授权撤销后在途消息不落新任务。
 - **仍未做**：持久化与投递通道接线（内存状态机不落盘）、独立反馈进程接入 ⇒ 整卡不判通过。
+
+## 2026-10-24 收件箱持久化与只读 CLI
+
+- `collaboration-inbox-store.ts`：每收件人一文件（`collaboration/inbox/<id>.json`），原子替换 + `beforeCommit` revision 复核；损坏文件返回 invalid 且拒绝覆盖；`CollaborationInbox.fromSnapshot` 支持重启恢复。
+- `astarray inbox list --recipient <id> [--state …] [--json]`：只读；未保存过写「空 ≠ 无消息」，损坏退出码 2。
+- 反例：存储 5 条、CLI 4 条；变异 4 条。**投递通道仍未接线**（收件箱只保证状态与持久化）。

@@ -625,6 +625,46 @@ export const MUTATIONS = [
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-inbox-store-ignores-revision",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox-store.ts",
+    find: "    if (input.expectedRevision !== currentRevision) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/comm02-inbox-store.test.ts"],
+    expectedFailingTestNames: ["② 陈旧 revision"],
+    rationale:
+      "忽略 revision ⇒ 并发写入互相覆盖（丢消息）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-inbox-store-absent-fabricates-valid",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox-store.ts",
+    find: "    if (recovery === null) return { kind: \"absent\" };",
+    replace: "    if (recovery === null) return { kind: \"valid\", snapshot: { schemaVersion: 1, recipientAgentInstanceId, revision: 1, updatedAtIso: \"\", messages: [] }, recoveredFromBackup: false };",
+    testFiles: ["tests/core/unit/comm02-inbox-store.test.ts"],
+    expectedFailingTestNames: ["③ 未保存过的收件人"],
+    rationale:
+      "未保存过却伪造合法快照 ⇒ 「空 ≠ 无消息」被破坏，用户以为收件箱为空 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-inbox-cli-absent-fabricates-presence",
+    targetFile: "packages/tui/src/cli/inbox-command.ts",
+    find: "        isPresent: false,",
+    replace: "        isPresent: true,",
+    testFiles: ["tests/tui/unit/inbox-list-command.test.ts"],
+    expectedFailingTestNames: ["② 未保存过"],
+    rationale:
+      "未保存过却报告存在 ⇒ 用户误以为收件箱为空（空 ≠ 无消息）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-inbox-cli-corrupt-as-empty",
+    targetFile: "packages/tui/src/cli/inbox-command.ts",
+    find: "    return 2;",
+    replace: "    return 0;",
+    testFiles: ["tests/tui/unit/inbox-list-command.test.ts"],
+    expectedFailingTestNames: ["③ 损坏文件"],
+    rationale:
+      "损坏当空 ⇒ 用户以为没有消息（掩盖损坏）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-inbox-duplicate-reinserts",
     targetFile: "packages/core/src/orchestration/collaboration-inbox.ts",
     find: "    if (existing !== undefined) {",
@@ -4104,6 +4144,8 @@ function main() {
 }
 
 main();
+
+
 
 
 

@@ -5872,3 +5872,12 @@ export {
   type CollaborationInboxReceipt,
   type CollaborationInboxState,
 } from "./orchestration/collaboration-inbox.js";
+
+// COMM-01-02（2026-10-24）：收件箱持久化（原子写 + revision 乐观锁 + 损坏不覆盖）。
+export {
+  COLLABORATION_INBOX_SCHEMA_VERSION,
+  CollaborationInboxRevisionConflictError,
+  CollaborationInboxStore,
+  type CollaborationInboxReadOutcome,
+  type CollaborationInboxSnapshot,
+} from "./orchestration/collaboration-inbox-store.js";
