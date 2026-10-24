@@ -2688,3 +2688,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 存储：`<state>/gui/project-agents.json`（原子写 + revision + 损坏拒绝覆盖）；父子绑定以核心登记为准。
 - 反例：存储校验/重复移除、2 级缺上级 400、上级层级不合法、移除后核心回收；私有库 **566 用例 / 变异 41-41 / 包验收 7-7**。
 - 未做/限制：核心登记**不支持更改上级**（菜单只提供查看，不提供 reparent）；模型为自由文本，未与 provider 配置联动。
+
+## 2026-10-24 创建 Agent 的模型下拉与可用性校验（私有库）
+
+- 新接口 `GET /models/available`：只读 `<state>/providers/provider-catalog.json` + `provider-credentials.json`，返回模型、provider、协议、是否有凭据、不可用原因。
+- 页面：创建 Agent 的模型输入改为**下拉**；打开弹窗时拉取列表，缺凭据/未知 profile 的条目**显示但禁用**并带原因；无可用模型时提示先配置凭据。
+- 创建 Agent 时服务端**校验**：模型必须“已知 profile + 有凭据”，否则 400 `model-unavailable`（fail-closed）。
+- 反例：缺凭据条目不可用、未配置模型 400、可用模型 200；页面断言下拉与接口。私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
+- 限制：未知 provider profile **不猜模型名**（显示 profileId）；`live-provider-1` 的模型名在 catalog 里没有独立字段，故按 profileId 展示。
