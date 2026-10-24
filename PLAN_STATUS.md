@@ -2772,3 +2772,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - ④ 审批：rich onPermissionAsk 透传到 facade；live 登记 pending 请求；GUI list/decide 端口接 facade；裁决 allowed-once 后授予会话/作用域授权并下发 unblock。
 - 仍未闭合：文件夹授权面板 → ScopeAuthorizationGate（跨项目路径授权）。
 - 门禁：公开 3,974 用例 / 变异 313-313；私有 568 用例 / 变异 41-41。
+
+## 2026-10-24 文件夹授权扩展工具边界（用户口径 A，公开 core）
+
+- WorkspaceBoundary 新增 additionalRootsProvider；provider 抛错 ⇒ 只保留主根（fail-closed）。
+- runtime 按任务项目读取 FolderGrantStore：仅未撤销、未过期的授权根参与；授权变化下一次调用即生效。
+- controller 记录 mission→project 并传入端口工厂；相对路径仍相对主根解析。
+- 反例：授权根可解析 / 未授权根仍拒绝 / provider 抛错仍拒绝 / 相对路径语义不变；公开 3,977 用例、变异 313-313。
+- 余项：GUI 文件夹授权面板仍绑定启动时的固定项目标识，需按所选项目传 projectIdentifier 才能与任务项目匹配。
