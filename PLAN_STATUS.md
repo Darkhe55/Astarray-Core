@@ -2753,3 +2753,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **修复**：`#projectContextMenu[popover] { margin: 0; inset: auto; }`，并在打开时显式 `style.margin = "0"; style.right = "auto"; style.bottom = "auto"`，再设 `left/top`。
 - 说明：普通 `z-index` **无法**压过原生 `<dialog>` 的 top layer；正确做法就是 popover/另一层 top layer。此前遗漏的是清掉 UA 居中样式。
 - 测试：断言 popover 重置样式与 `margin = "0"`；私有库 **568 用例 / 变异 41-41**。
+
+## 2026-10-24 会话区未选项目留白 + Agent 任务执行现状评估（私有库 ba89c28）
+
+- **GUI**：`chatRenderChat()` 在 `selectedProjectIdentifier` 为空时给 `#chatPanel` 加 `chatPanelBlank`，CSS 隐藏会话标题栏、气泡区、输入框 ⇒ 会话区**完全空白**（不写提示、不留占位）；选择项目后恢复。
+- **执行能力评估（如实）**：live 模式能真实调用云知声 u2-flash、创建 mission 并运行工具循环，但**还不是“完整 agent 任务”**：
+  1. 工具作用域/工作目录仍是启动时的 `workspaceRootPath`，**不跟所选项目**；
+  2. 运行中的 mission 没有实时事件流进聊天区（聊天读运行历史，未完成时提示“没有运行历史文件”）；
+  3. Agent 拓扑/投递目标只落 GUI 元数据，**未驱动编排**（`submitTask` 不接受 targetAgent）；
+  4. 权限/审批弹窗与文件夹授权尚未接到实际工具调用。
+- 门禁：私有库 **568 用例 / 变异 41-41**。
