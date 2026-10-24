@@ -625,6 +625,26 @@ export const MUTATIONS = [
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-status-failed-as-delivered",
+    targetFile: "packages/core/src/orchestration/collaboration-status.ts",
+    find: "    case \"failed\":",
+    replace: "    case \"failed\": return \"delivered\";",
+    testFiles: ["tests/tui/unit/collaboration-status-command.test.ts"],
+    expectedFailingTestNames: ["① 输出 Agent 归属"],
+    rationale:
+      "失败消息显示成已投递 ⇒ 用户以为送达（卡内要求 dropped 如实计数）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-status-empty-claims-present",
+    targetFile: "packages/core/src/orchestration/collaboration-status.ts",
+    find: "        ? \"没有登记 Agent、也没有收件箱文件（空 ≠ 不存在，可能是尚未运行）。\"",
+    replace: "        ? \"没有数据。\"",
+    testFiles: ["tests/tui/unit/collaboration-status-command.test.ts"],
+    expectedFailingTestNames: ["② 空状态"],
+    rationale:
+      "空状态写成“没有数据” ⇒ 掩盖“空 ≠ 不存在”（用户口径）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-delivery-skips-persist",
     targetFile: "packages/core/src/orchestration/collaboration-inbox-delivery.ts",
     find: "      await this.store.save(input.recipientAgentInstanceId, {",

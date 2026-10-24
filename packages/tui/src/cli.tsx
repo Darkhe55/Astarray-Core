@@ -119,10 +119,10 @@ import {
 } from "./cli/commands.js";
 
 import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
+import { executeCollaborationStatusCommand } from "./cli/collaboration-command.js";
 import { executeInboxDeliverCommand, executeInboxListCommand } from "./cli/inbox-command.js";
 import { executeOnboardingStatusCommand } from "./cli/onboarding-command.js";
 const program = new Command();
-
 program
   .name("astarray")
   .description("TUI agent orchestration tool with Ponder / Assist / Devolve modes")
@@ -2136,6 +2136,20 @@ accuracyCommand
     },
   );
 
+const collaborationCommand = program
+  .command("collaboration")
+  .description("协作（只读拓扑与投递状态；不投递、不改归属）");
+collaborationCommand
+  .command("status")
+  .description("只读：Agent 归属拓扑 + 投递状态")
+  .option("--json", "JSON 输出")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await executeCollaborationStatusCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+    });
+  });
+
 const inboxCommand = program
   .command("inbox")
   .description("协作收件箱（只读；空 ≠ 无消息）");
@@ -2789,6 +2803,7 @@ process.stdout.write("", () => {
 setTimeout(() => {
   process.exit(convergenceExitCode);
 }, 1_000).unref();
+
 
 
 

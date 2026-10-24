@@ -8,8 +8,8 @@
  * 4. 未保存过 ⇒ `absent`（不伪造空收件箱）；
  * 5. 备份文件 `<file>.bak` 由原子写/恢复工具维护。
  */
+import { promises as fs } from "node:fs";
 import path from "node:path";
-
 import {
   readJsonWithBackupRecovery,
   writeAtomicJson,
@@ -105,6 +105,41 @@ export class CollaborationInboxStore {
    * `expectedRevision === 0` 只适用于"从未保存过"的收件人；
    * 已存在时必须与当前 revision 一致，否则抛冲突。
    */
+  /**
+   * 列出已有收件箱文件（只读；供状态查询枚举）。
+   *
+   * 文件名做过安全化，收件人标识以文件内容为准；内容不可读时回退到文件名（由调用方按 invalid 计数）。
+   */
+  async listInboxes(): Promise<{
+    readonly inboxes: ReadonlyArray<{ readonly recipientAgentInstanceId: string }>;
+  }> {
+    const directoryPath = path.join(this.baseDirectory, "collaboration", "inbox");
+    let fileNames: string[];
+    try {
+      fileNames = await fs.readdir(directoryPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { inboxes: [] };
+      throw error;
+    }
+    const inboxes: Array<{ recipientAgentInstanceId: string }> = [];
+    for (const fileName of fileNames) {
+      if (!fileName.endsWith(".json")) continue;
+      const filePath = path.join(directoryPath, fileName);
+      try {
+        const rawContent = await fs.readFile(filePath, "utf8");
+        const parsed = JSON.parse(rawContent) as Record<string, unknown>;
+        const recipientAgentInstanceId = parsed["recipientAgentInstanceId"];
+        if (typeof recipientAgentInstanceId === "string" && recipientAgentInstanceId !== "") {
+          inboxes.push({ recipientAgentInstanceId });
+          continue;
+        }
+      } catch {
+        // 落到下方回退分支（损坏文件仍会被枚举，方便上层如实计数）。
+      }
+      inboxes.push({ recipientAgentInstanceId: fileName.slice(0, -".json".length) });
+    }
+    return { inboxes };
+  }
   async save(
     recipientAgentInstanceId: string,
     input: {
@@ -211,6 +246,17 @@ function parseSnapshot(
       };
     }
   }
+  // 旧快照兼容：缺少 originalSource / isRelayedRequest 时按 sender / false 归一，
+  // 不因此丢弃历史消息（也不把缺失伪装成“已追溯”）。
+  const normalizedMessages = (messages as ReadonlyArray<Record<string, unknown>>).map((message) => ({
+    ...message,
+    originalSourceAgentInstanceId:
+      typeof message["originalSourceAgentInstanceId"] === "string" &&
+      message["originalSourceAgentInstanceId"] !== ""
+        ? message["originalSourceAgentInstanceId"]
+        : (message["senderAgentInstanceId"] as string),
+    isRelayedRequest: typeof message["isRelayedRequest"] === "boolean" ? message["isRelayedRequest"] : false,
+  })) as unknown as ReadonlyArray<CollaborationInboxMessage>;
   return {
     kind: "valid",
     snapshot: {
@@ -218,10 +264,15 @@ function parseSnapshot(
       recipientAgentInstanceId,
       revision: revision as number,
       updatedAtIso: typeof record["updatedAtIso"] === "string" ? record["updatedAtIso"] : "",
-      messages: messages as ReadonlyArray<CollaborationInboxMessage>,
+      messages: normalizedMessages,
     },
   };
 }
 
 export type { CollaborationInboxState };
 export { CollaborationInbox };
+
+
+
+
+

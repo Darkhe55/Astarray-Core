@@ -1524,3 +1524,5 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **COMM-01-02 协作→反馈映射（2026-10-24）**：协议扩展 `collaboration-request` + `agent:` 前缀 + `inbox deliver`（本地 outbox）。5 反例 + 3 变异。真实 fork 接线未做。
 
 > **COMM-01-02 真实反馈进程接线（2026-10-24）**：集成测试真实 fork 子进程，覆盖「可用 ⇒ delivered 落盘」「已停止 ⇒ 不标 delivered、保持 received 可重试」；变异「投递后不落盘」被拦下。3939 用例 / 299 锚点。
+
+> **COMM-01-03 只读状态（2026-10-24）**：`collaboration status` CLI + `collaboration-status.ts`（归属拓扑 + 投递状态，failed→dropped，空≠不存在）。3941 用例 / 301 锚点 / 2 新变异被拦下。TUI/GUI 入口与 tarball 闭环未做。

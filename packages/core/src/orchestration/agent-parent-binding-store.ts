@@ -150,6 +150,11 @@ export class AgentCreationRegistry {
   }
 
   /** 是否为一个**已登记**的地址主体（地址完整性的唯一依据）。 */
+  /** 列出全部登记记录（只读；供拓扑视图/状态查询使用）。 */
+  async listAllRecords(): Promise<ReadonlyArray<AgentCreationRecord>> {
+    await this.ensureLoaded();
+    return [...this.recordsByAgentInstanceId.values()].map((record) => ({ ...record }));
+  }
   async isRegisteredAgent(agentInstanceId: string): Promise<boolean> {
     return (await this.getRecord(agentInstanceId)) !== null;
   }
@@ -219,3 +224,4 @@ export class AgentAddressGuard {
     return record === null ? null : record.createdByAgentInstanceId;
   }
 }
+
