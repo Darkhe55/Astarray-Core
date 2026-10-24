@@ -2624,3 +2624,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **修复**：改用运行时构造分隔符正则（`new RegExp("[;" + String.fromCharCode(10) + "]")`），不再依赖模板转义。
 - **回归**：新增「页面脚本可被解析」测试（提取所有 `<script>` 用 `vm.Script` 解析，服务端插值先掩码）；私有库 **552 用例 / 变异 41-41 / 包验收 7-7**。
 - 提示：此类问题静态字符串断言抓不到，只有真解析（或浏览器）能抓到——该测试已补上。
+
+## 2026-10-24 修复：「浏览…」点击无效（私有库 da7a3c7）
+
+- **根因**：选择器脚本路径算错了一级——从 `packages/gui/src/server` 用 `../../../scripts/pick-folder.ps1` 实际指向 `packages/scripts/`，脚本不存在 ⇒ `powershell -File` 退出码 1、stdout 为空 ⇒ 路由把它当成**用户取消**（200 cancelled），前端没有任何提示，看起来就是“点击无效”。
+- **修复**：
+  1. 用 `fileURLToPath(import.meta.url)` + **四级**上溯定位 `astarray-ui/scripts/pick-folder.ps1`，并以 `process.cwd()/scripts` 兜底；支持 `ASTARRAY_PICK_FOLDER_SCRIPT` 覆盖（测试/排障）；
+  2. 脚本缺失 ⇒ **502 `folder-picker-script-missing`**；进程启动失败/非零退出 ⇒ **502 `folder-picker-failed`** 带真实错误，**不再伪装成取消**；
+  3. 两个弹窗（新建项目 / 重定位）都显示选择结果或错误文案，取消时写「已取消选择」。
+- 证据：新增 ⑧ 号用例用桩脚本走真实 `powershell -File` 路径，返回 `C:/chosen-folder`；私有库 **553 用例 / 变异 41-41 / 包验收 7-7**。
