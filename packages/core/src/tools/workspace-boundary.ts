@@ -2,6 +2,10 @@
  * 工作区边界（T06/T12）。
  * 拒绝路径穿越（../ 逃逸）与符号链接逃逸；路径解析后必须位于工作区内。
  * 目标不存在时对最近存在的祖先目录做 realpath 校验。
+ *
+ * 2026-10-24：新增 `additionalRootsProvider` —— 文件夹授权（FolderGrantStore）
+ * 在本任务内**扩展**工具边界（用户选择 A）。授权根仍逐次做 realpath 校验；
+ * 授权被撤销/过期后 provider 不再返回该根，下一次调用立即失效。
  */
 import path from "node:path";
 import { realpath } from "node:fs/promises";
@@ -9,19 +13,43 @@ import { realpath } from "node:fs/promises";
 import { DomainError } from "../core/errors.js";
 import { hasWindowsStyleAbsolutePathPrefix } from "./cross-platform-path-canonicalization.js";
 
+export interface WorkspaceBoundaryOptions {
+  /** 额外允许的根（异步读取；例如本项目的文件夹授权）。 */
+  readonly additionalRootsProvider?: () => Promise<ReadonlyArray<string>>;
+}
+
 export class WorkspaceBoundary {
   private readonly workspaceRootPath: string;
+  private readonly additionalRootsProvider: (() => Promise<ReadonlyArray<string>>) | null;
 
-  constructor(workspaceRoot: string) {
+  constructor(workspaceRoot: string, options?: WorkspaceBoundaryOptions) {
     this.workspaceRootPath = path.resolve(workspaceRoot);
+    this.additionalRootsProvider = options?.additionalRootsProvider ?? null;
   }
 
   getWorkspaceRoot(): string {
     return this.workspaceRootPath;
   }
 
+  private async resolveAllowedRoots(): Promise<ReadonlyArray<string>> {
+    const roots = [this.workspaceRootPath];
+    if (this.additionalRootsProvider !== null) {
+      try {
+        const additionalRoots = await this.additionalRootsProvider();
+        for (const root of additionalRoots) {
+          if (typeof root === "string" && path.isAbsolute(root)) {
+            roots.push(path.resolve(root));
+          }
+        }
+      } catch {
+        // 授权读取失败 ⇒ 只保留主根（fail-closed，不因读取错误放宽边界）。
+      }
+    }
+    return roots;
+  }
+
   /**
-   * 将请求路径解析为工作区内绝对路径；任何逃逸尝试抛
+   * 将请求路径解析为允许范围内绝对路径；任何逃逸尝试抛
    * DomainError（path-escape-attempt）。
    */
   async resolveWithinWorkspace(requestedPath: string): Promise<string> {
@@ -37,24 +65,31 @@ export class WorkspaceBoundary {
         `跨平台绝对路径被拒绝: ${requestedPath}`,
       );
     }
-    const resolvedPath = path.resolve(this.workspaceRootPath, requestedPath);
-    if (!isPathWithin(this.workspaceRootPath, resolvedPath)) {
+    const allowedRoots = await this.resolveAllowedRoots();
+    const resolvedPath = path.isAbsolute(requestedPath)
+      ? path.resolve(requestedPath)
+      : path.resolve(this.workspaceRootPath, requestedPath);
+    const matchedRoot = allowedRoots.find((root) => isPathWithin(root, resolvedPath));
+    if (matchedRoot === undefined) {
       throw new DomainError(
         "path-escape-attempt",
         `路径逃逸工作区被拒绝: ${requestedPath}`,
       );
     }
-    await this.assertNoSymlinkEscape(resolvedPath);
+    await this.assertNoSymlinkEscape(resolvedPath, matchedRoot);
     return resolvedPath;
   }
 
-  private async assertNoSymlinkEscape(resolvedPath: string): Promise<void> {
+  private async assertNoSymlinkEscape(
+    resolvedPath: string,
+    allowedRootPath: string,
+  ): Promise<void> {
     const anchorPath = await findNearestExistingAncestor(resolvedPath);
     if (anchorPath === null) {
       return;
     }
     const realAnchorPath = await realpath(anchorPath);
-    if (!isPathWithin(this.workspaceRootPath, realAnchorPath)) {
+    if (!isPathWithin(allowedRootPath, realAnchorPath)) {
       throw new DomainError(
         "path-escape-attempt",
         `符号链接逃逸工作区被拒绝: ${resolvedPath}`,
