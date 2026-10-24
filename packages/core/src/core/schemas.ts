@@ -209,6 +209,16 @@ const assistInstallationRequestPayloadSchema = z.object({
   canRememberForSession: z.literal(false),
 });
 
+/** COMM-01-02：协作请求（协议扩展，2026-10-24 用户批准）。 */
+export const collaborationRequestPayloadSchema = z.object({
+  kind: z.literal("collaboration-request"),
+  messageIdentifier: z.string().min(1),
+  correlationIdentifier: z.string().min(1),
+  taskIdentifier: z.string().min(1),
+  summary: z.string(),
+  authorizationEpoch: z.number().int().nonnegative(),
+  hopCount: z.number().int().nonnegative(),
+});
 export const feedbackMessagePayloadSchema = z.discriminatedUnion("kind", [
   successPayloadSchema,
   failurePayloadSchema,
@@ -218,6 +228,7 @@ export const feedbackMessagePayloadSchema = z.discriminatedUnion("kind", [
   instructionPayloadSchema,
   existingResourceInquiryPayloadSchema,
   assistInstallationRequestPayloadSchema,
+  collaborationRequestPayloadSchema,
 ]);
 
 export const feedbackMessageSourceSchema = z.discriminatedUnion(
@@ -528,3 +539,4 @@ export const gitIntegrationReportSchema = z.object({
   unresolvedRisks: z.array(z.string().min(1)),
   createdAtIso: z.iso.datetime(),
 });
+

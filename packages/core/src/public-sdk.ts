@@ -5889,3 +5889,17 @@ export {
   type CollaborationInboxDeliveryReport,
   type CollaborationInboxTransportPort,
 } from "./orchestration/collaboration-inbox-delivery.js";
+
+// COMM-01-02（2026-10-24）：协作消息 ↔ 反馈协议映射（recipientId = agent:<id>，payload = collaboration-request）。
+export {
+  COLLABORATION_RECIPIENT_PREFIX,
+  buildCollaborationFeedbackMessage,
+  fromCollaborationRecipientId,
+  toCollaborationRecipientId,
+} from "./orchestration/collaboration-feedback-mapping.js";
+
+// COMM-01-02：接到独立反馈进程的传输适配器（入队 ≠ 收件人已处理）。
+export { CollaborationFeedbackTransport } from "./orchestration/collaboration-feedback-transport.js";
+
+// COMM-01-02：本地文件队列传输适配器（开发/演示用，幂等写入）。
+export { CollaborationOutboxTransport } from "./orchestration/collaboration-outbox-transport.js";

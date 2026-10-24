@@ -625,6 +625,36 @@ export const MUTATIONS = [
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-mapping-drops-recipient-prefix",
+    targetFile: "packages/core/src/orchestration/collaboration-feedback-mapping.ts",
+    find: "  return COLLABORATION_RECIPIENT_PREFIX + agentInstanceId;",
+    replace: "  return agentInstanceId;",
+    testFiles: ["tests/core/unit/comm02-inbox-outbox-mapping.test.ts"],
+    expectedFailingTestNames: ["② 收件人前缀"],
+    rationale:
+      "去掉 agent: 前缀 ⇒ 与其它信箱命名冲突（用户决定 b）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-feedback-transport-marks-failure-delivered",
+    targetFile: "packages/core/src/orchestration/collaboration-feedback-transport.ts",
+    find: "        isDelivered: false,",
+    replace: "        isDelivered: true,",
+    testFiles: ["tests/core/unit/comm02-inbox-outbox-mapping.test.ts"],
+    expectedFailingTestNames: ["③ 反馈进程可用"],
+    rationale:
+      "反馈进程不可用也标投递 ⇒ 消息丢失且不重试 ⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-deliver-cli-no-inbox-exit-zero",
+    targetFile: "packages/tui/src/cli/inbox-command.ts",
+    find: "    report.outcome === \"no-inbox\" ||",
+    replace: "    false ||",
+    testFiles: ["tests/core/unit/comm02-inbox-outbox-mapping.test.ts"],
+    expectedFailingTestNames: ["⑤ 收件箱不存在"],
+    rationale:
+      "收件箱不存在也返回 0 ⇒ 调用方误以为已投递（空 ≠ 无消息）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-delivery-ignores-transport-result",
     targetFile: "packages/core/src/orchestration/collaboration-inbox-delivery.ts",
     find: "      if (result.isDelivered) {",

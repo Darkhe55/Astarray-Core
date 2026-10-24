@@ -2491,3 +2491,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 - `collaboration-inbox-delivery.ts`：可注入传输端口；成功落盘 delivered；失败有限重试（指数退避），耗尽转 failed 且不再发送；授权代变化跳过；revision 冲突不覆盖。
 - 反例 6 条 + 变异 3 条。**独立反馈进程接线仍未做**。
+
+## 2026-10-24 协作 → 反馈协议映射与 inbox deliver
+
+- **用户批准的协议扩展**：`FeedbackMessagePayload` 新增 `kind: "collaboration-request"`（schema 同步；worker 侧优先级映射为 instruction）。
+- **收件人前缀**：`agent:<agentInstanceId>`（用户决定 b）。
+- 新增：`collaboration-feedback-mapping.ts`、`collaboration-feedback-transport.ts`（enqueue ≠ 已处理；进程不可用不标投递）、`collaboration-outbox-transport.ts`（本地队列幂等）、`astarray inbox deliver`（无收件箱/损坏/冲突退出码 2）。
+- 反例 5 条 + 变异 3 条。**真实 fork/子进程接线仍未做**。

@@ -885,7 +885,9 @@ function payloadPriority(
   // 安装门禁类询问走 instruction 优先级（T06E）
   if (
     kind === "existing-resource-inquiry" ||
-    kind === "assist-installation-request"
+    kind === "assist-installation-request" ||
+    // COMM-01-02：协作请求按指令优先级投递（用户批准协议扩展）。
+    kind === "collaboration-request"
   ) {
     return "instruction";
   }
@@ -896,3 +898,4 @@ function summarize(outputTextChunks: string[]): string {
   const joined = outputTextChunks.join("").trim();
   return joined.length === 0 ? "（无文本输出）" : joined.slice(0, 300);
 }
+
