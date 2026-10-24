@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   ASTARRAY_SDK_VERSION,
   AstarrayApplicationFacade,
+  AgentCreationRegistry,
 } from "../../../packages/core/src/public-sdk.js";
 import {
   assertBridgeRequestValid,
@@ -102,6 +103,35 @@ describe("AstarrayApplicationFacade（Public SDK）", () => {
       await fs.rm(projectDirectory, { recursive: true, force: true, maxRetries: 5 });
       await facade.shutdown();
     }
+  });
+  it("submitTask 目标 Agent：未登记/已回收 ⇒ 拒绝；已登记 ⇒ 受理", async () => {
+    const facade = await AstarrayApplicationFacade.create({
+      stateDirectory,
+      mode: "assist",
+    });
+    facade.createSession({ sessionId: "session-1", mode: "assist" });
+    await expect(
+      facade.submitTask({
+        sessionId: "session-1",
+        taskIdentifier: "task-agent-missing",
+        prompt: "目标不存在",
+        targetAgentInstanceIdentifier: "agent-missing",
+      }),
+    ).rejects.toThrow(/目标 Agent 不存在或已回收/);
+
+    const registry = new AgentCreationRegistry({ stateDirectory });
+    await registry.registerCreatedAgent({
+      agentInstanceId: "agent-ok",
+      createdByAgentInstanceId: null,
+    });
+    const accepted = await facade.submitTask({
+      sessionId: "session-1",
+      taskIdentifier: "task-agent-ok",
+      prompt: "目标存在",
+      targetAgentInstanceIdentifier: "agent-ok",
+    });
+    expect(accepted.status).toBe("accepted");
+    await facade.shutdown();
   });
   it("submitTask 可把任务归属到指定项目（GUI 多项目）", async () => {
     const facade = await AstarrayApplicationFacade.create({
@@ -223,6 +253,7 @@ describe("依赖方向", () => {
     }
   });
 });
+
 
 
 

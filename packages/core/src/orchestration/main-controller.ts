@@ -342,6 +342,8 @@ export class MainController {
    * 只影响该 mission 的工具边界；未登记则用运行时默认工作区。
    */
   private readonly missionWorkspaceRootPaths = new Map<string, string>();
+  /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
+  private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
   constructor(private readonly options: MainControllerOptions) {}
 
@@ -375,6 +377,8 @@ export class MainController {
       readonly projectIdentifier?: string;
       /** 可选：本任务的执行根（GUI 多项目），只在该根内执行工具。 */
       readonly workspaceRootPath?: string;
+      /** 可选：指定执行该任务的 Agent 实例。 */
+      readonly targetAgentInstanceIdentifier?: string;
     },
   ): Promise<string> {
     const mode = this.options.modeMachine.getCurrentMode();
@@ -407,6 +411,17 @@ export class MainController {
       requestedWorkspaceRootPath !== ""
     ) {
       this.missionWorkspaceRootPaths.set(missionId, requestedWorkspaceRootPath);
+    }
+    const requestedTargetAgentInstanceIdentifier =
+      options?.targetAgentInstanceIdentifier?.trim();
+    if (
+      requestedTargetAgentInstanceIdentifier !== undefined &&
+      requestedTargetAgentInstanceIdentifier !== ""
+    ) {
+      this.missionTargetAgentIdentifiers.set(
+        missionId,
+        requestedTargetAgentInstanceIdentifier,
+      );
     }
     if (mode === "assist") {
       this.launchAssistMission(missionId, taskNodes);
@@ -1260,10 +1275,12 @@ export class MainController {
     task: TaskDependencyNode,
     agentInstanceId: string | undefined,
   ): ToolPort {
+    const targetAgentInstanceIdentifier =
+      this.missionTargetAgentIdentifiers.get(missionId);
     const innerToolPort = this.options.buildWorkerToolPort(
       task,
       new Set(task.toolNames),
-      agentInstanceId,
+      targetAgentInstanceIdentifier ?? agentInstanceId,
       this.missionWorkspaceRootPaths.get(missionId),
     );
     const buildCheckpointingPort = this.options.buildRecoveryCheckpointingToolPort;
