@@ -1990,6 +1990,8 @@ export interface PublicApplicationOptions {
   streamOutput?: (missionIdentifier: string | null, text: string) => void;
   /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
   isConversationMode?: boolean;
+  /** 权限询问默认有效期（秒）；null/缺省 = 无期限。 */
+  permissionAskDefaultLifetimeSeconds?: number | null;
   /**
    * GUI-02-01 片①（2026-10-11）：权限询问**携带绝对身份**的上报口（可选）。
    *
@@ -2529,6 +2531,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       crossProjectHumanEditGuard:
         options.crossProjectHumanEditGuard ?? createCrossProjectHumanEditGuard(),
       installationInquiryRegistry,
+      permissionAskDefaultLifetimeSeconds: options.permissionAskDefaultLifetimeSeconds ?? null,
     });
   }
 
@@ -2547,6 +2550,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       crossProjectHumanEditGuard?: CrossProjectTargetHumanEditGuardPort | null;
       /** GUI-02-02 专用流程：界面承载安装询问时的待决注册表（未开启则为 null）。 */
       installationInquiryRegistry?: InstallationInquiryRegistry | null;
+      /** 权限询问默认有效期（秒）；null/缺省 = 无期限（GUI 设置可调）。 */
+      permissionAskDefaultLifetimeSeconds?: number | null;
       /** G1（第 245 轮）：Git 集成配置。 */
       gitIntegration?: { repositoryPath: string; targetBranchName: string };
   /**
@@ -2575,6 +2580,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         ? createCrossProjectHumanEditGuard()
         : options.crossProjectHumanEditGuard;
     this.installationInquiryRegistry = options.installationInquiryRegistry ?? null;
+    this.permissionAskDefaultLifetimeSeconds =
+      options.permissionAskDefaultLifetimeSeconds ?? null;
     this.idempotencyLedgerFilePath =
       this.stateDirectory === null
         ? null
@@ -3465,6 +3472,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   };
   /** 权限询问裁决的 CSRF 期望值（由宿主注入；未注入时任何请求都不通过）。 */
   private permissionAskCsrfToken = "";
+  private permissionAskDefaultLifetimeSeconds: number | null = null;
   /** 项目根（用于安全预览中"目标路径相对化"）。 */
   private permissionAskProjectRootPath = process.cwd();
 
@@ -3533,7 +3541,10 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         "应用未绑定状态目录，无法登记权限询问请求",
       );
     }
-    return new PermissionAskRequestStore({ baseDirectory: this.stateDirectory });
+    return new PermissionAskRequestStore({
+      baseDirectory: this.stateDirectory,
+      defaultLifetimeSeconds: this.permissionAskDefaultLifetimeSeconds,
+    });
   }
 
   /** 本地存档中的 Agent 目录名（每 Agent 独立存档域；失败即空，不猜测）。 */
@@ -6039,6 +6050,8 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
 
 
 
