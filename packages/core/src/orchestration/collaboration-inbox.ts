@@ -336,6 +336,34 @@ export class CollaborationInbox {
     };
   }
 
+  /**
+   * 从持久化快照恢复（重启后状态不丢）。
+   *
+   * 只接受已校验的条目；调用方负责先通过 `CollaborationInboxStore.read` 的 schema 校验。
+   */
+  static fromSnapshot(input: {
+    readonly messages: ReadonlyArray<CollaborationInboxMessage>;
+    readonly maximumPendingPerRecipient: number;
+    readonly maximumDeliveryAttempts: number;
+    readonly baseRetryBackoffSeconds?: number;
+  }): CollaborationInbox {
+    const inbox = new CollaborationInbox({
+      maximumPendingPerRecipient: input.maximumPendingPerRecipient,
+      maximumDeliveryAttempts: input.maximumDeliveryAttempts,
+      ...(input.baseRetryBackoffSeconds === undefined
+        ? {}
+        : { baseRetryBackoffSeconds: input.baseRetryBackoffSeconds }),
+    });
+    for (const message of input.messages) {
+      inbox.messages.set(message.messageIdentifier, { ...message });
+    }
+    return inbox;
+  }
+
+  /** 导出快照（交给持久化层）。 */
+  toSnapshot(): ReadonlyArray<CollaborationInboxMessage> {
+    return [...this.messages.values()].map((message) => ({ ...message }));
+  }
   getMessage(messageIdentifier: string): CollaborationInboxMessage | null {
     return this.messages.get(messageIdentifier) ?? null;
   }
@@ -346,5 +374,6 @@ export class CollaborationInbox {
     );
   }
 }
+
 
 

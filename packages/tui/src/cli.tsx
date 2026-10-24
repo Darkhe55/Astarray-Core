@@ -119,6 +119,7 @@ import {
 } from "./cli/commands.js";
 
 import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
+import { executeInboxListCommand } from "./cli/inbox-command.js";
 import { executeOnboardingStatusCommand } from "./cli/onboarding-command.js";
 const program = new Command();
 
@@ -2130,6 +2131,26 @@ accuracyCommand
         maximumModelCallCount: options.maxModelCalls,
         maximumWallClockMilliseconds: options.maxWallClockMs,
         expectedRevision: options.expectedRevision,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+const inboxCommand = program
+  .command("inbox")
+  .description("协作收件箱（只读；空 ≠ 无消息）");
+inboxCommand
+  .command("list")
+  .description("列出某收件人的收件箱消息（只读）")
+  .requiredOption("--recipient <agent-instance-id>", "收件人 Agent 实例标识")
+  .option("--state <state>", "按状态过滤：received | delivered | processed | completed | failed")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: { recipient: string; state?: string; json?: boolean }) => {
+      process.exitCode = await executeInboxListCommand({
+        stateDirectory: defaultStateDirectory(),
+        recipientAgentInstanceId: options.recipient,
+        stateFilter: options.state ?? null,
         isJsonOutput: options.json === true,
       });
     },
