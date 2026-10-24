@@ -87,4 +87,66 @@ describe("RELOCATE-01 project entry", () => {
     expect(await executeProjectEntryCommand({ ...base, choice: "relocate" })).toBe(5);
     expect(await executeProjectEntryCommand({ ...base, choice: "unknown" })).toBe(2);
   });
+  it("⑤ 确认重定位 ⇒ 真正写登记（revision+1、保留旧根），退出码 0", async () => {
+    const stateDirectory = await createStateDirectory();
+    const newRoot = await createStateDirectory();
+    const store = new ProjectLocationRegistrationStore({ baseDirectory: stateDirectory });
+    await store.writeWithBackup({
+      schemaVersion: 1,
+      projectIdentifier: "project-1",
+      deviceIdentifier: "device-1",
+      rootPath: stateDirectory,
+      previousRootPath: null,
+      locationRevision: 1,
+      confirmedBy: "user",
+      confirmedAtIso: "2026-10-24T00:00:00.000Z",
+    });
+    const exitCode = await executeProjectEntryCommand({
+      stateDirectory,
+      projectIdentifier: "project-1",
+      currentRootPath: newRoot,
+      observedProjectIdentifier: "project-1",
+      choice: "relocate",
+      confirmNewRoot: newRoot,
+      expectedLocationRevision: 1,
+      isJsonOutput: true,
+    });
+    expect(exitCode).toBe(0);
+    const persisted = await store.read("project-1");
+    expect(persisted.kind).toBe("valid");
+    if (persisted.kind === "valid") {
+      expect(persisted.registration.rootPath).toBe(newRoot);
+      expect(persisted.registration.previousRootPath).toBe(stateDirectory);
+      expect(persisted.registration.locationRevision).toBe(2);
+    }
+  });
+
+  it("⑥ 陈旧 revision ⇒ 拒绝重定位（退出码 4，不覆盖）", async () => {
+    const stateDirectory = await createStateDirectory();
+    const newRoot = await createStateDirectory();
+    const store = new ProjectLocationRegistrationStore({ baseDirectory: stateDirectory });
+    await store.writeWithBackup({
+      schemaVersion: 1,
+      projectIdentifier: "project-1",
+      deviceIdentifier: "device-1",
+      rootPath: stateDirectory,
+      previousRootPath: null,
+      locationRevision: 1,
+      confirmedBy: "user",
+      confirmedAtIso: "2026-10-24T00:00:00.000Z",
+    });
+    const exitCode = await executeProjectEntryCommand({
+      stateDirectory,
+      projectIdentifier: "project-1",
+      currentRootPath: newRoot,
+      observedProjectIdentifier: "project-1",
+      choice: "relocate",
+      confirmNewRoot: newRoot,
+      expectedLocationRevision: 0,
+      isJsonOutput: true,
+    });
+    expect(exitCode).toBe(4);
+    const persisted = await store.read("project-1");
+    if (persisted.kind === "valid") expect(persisted.registration.locationRevision).toBe(1);
+  });
 });

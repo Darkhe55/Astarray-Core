@@ -5941,3 +5941,9 @@ export {
   type EventSourceSignal,
 } from "./orchestration/event-source-policy.js";
 
+
+// RELOCATE-01-03（2026-10-24）：控制面重定位（用户确认 + 备份/原子写 + 旧根保留）。
+export {
+  relocateProjectRegistration,
+  type RelocateProjectOutcome,
+} from "./orchestration/project-relocation-service.js";

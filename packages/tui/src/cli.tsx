@@ -698,6 +698,8 @@ projectCommand
   .requiredOption("--root <path>", "当前选择的项目根路径")
   .option("--observed-identifier <id>", "当前根观测到的项目标识")
   .option("--choice <option>", "三选项之一：view-history-only | relocate | exit")
+  .option("--confirm-new-root <path>", "重定位：用户确认的新项目根")
+  .option("--expected-location-revision <n>", "重定位：用户确认时看到的登记 revision", (value: string) => Number.parseInt(value, 10))
   .option("--json", "JSON 输出")
   .action(
     async (options: {
@@ -705,6 +707,8 @@ projectCommand
       root: string;
       observedIdentifier?: string;
       choice?: string;
+      confirmNewRoot?: string;
+      expectedLocationRevision?: number;
       json?: boolean;
     }) => {
       process.exitCode = await executeProjectEntryCommand({
@@ -713,6 +717,10 @@ projectCommand
         currentRootPath: options.root,
         observedProjectIdentifier: options.observedIdentifier ?? null,
         ...(options.choice === undefined ? {} : { choice: options.choice }),
+        ...(options.confirmNewRoot === undefined ? {} : { confirmNewRoot: options.confirmNewRoot }),
+        ...(options.expectedLocationRevision === undefined
+          ? {}
+          : { expectedLocationRevision: options.expectedLocationRevision }),
         isJsonOutput: options.json === true,
       });
     },
