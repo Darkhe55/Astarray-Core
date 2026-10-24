@@ -2586,3 +2586,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **EXP-01（真实工作流样本）**：现在不做；同样等内测实况。
 - **GUI 人工验收表**：其中多项**必须先真实接入模型 API** 才能做（当前 `seed-gui-demo` 明确 `isModelConnected: false`、发送只进 outbox）⇒ 下一步是接真实 provider，而不是继续拿离线 demo 点。
 - 结论：这两项不再列为"等我跑"的阻塞，改记为**内测阶段验收**。
+
+## 2026-10-24 GUI 真实模型模式（用户选择：云知声 + 显式启动）
+
+- 新增 `astarray-ui/scripts/start-gui-live.mjs`（npm `start:gui-live`）：显式启动才连真实模型；
+  - provider：云知声 `u2-flash`（Anthropic Messages 兼容端点），凭据按 `prov-unisound-1` 读取，**不打印、不落盘**；
+  - `--check` 只验证配置就绪，**不发起任何模型调用**（实测退出码 0）；
+  - 启动后 `/agents` 与 `/projects` 均返回 `isModelConnected: true`（实测，未发消息）。
+- GUI 聊天「发送」分流：真实模式 ⇒ `POST /commands/submit`（显示「已受理：mission …（受理不等于完成）」并刷新）；离线仍走 `/commands/send-message`（outbox）。
+- 门禁：私有库 **527 用例 / 变异 41-41 / 包验收 7-7**。
+- **离线发送路由已确认存在**（在私有 `project-chat-routes.ts`，不是缺失）——子 agent 的疑点已核清。
+- 下一步：用 live 模式做 B/C/D/F 组人工验收（每次发送都是真实计费调用）。
