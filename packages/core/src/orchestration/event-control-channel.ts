@@ -94,7 +94,12 @@ export class EventControlChannel {
     this.markOverdueIncidents(nowIso);
     const blocking = this.arbitrator
       .listIncidents()
-      .filter((incident) => BLOCKING_STATES.includes(incident.state));
+      .filter(
+        (incident) =>
+          BLOCKING_STATES.includes(incident.state) &&
+          // 低严重度事故只记录/合并，不阻断执行（避免普通工具错误把整轮停死）。
+          (incident.severity === "high" || incident.severity === "critical"),
+      );
     if (blocking.length === 0) {
       return { isAllowed: true, reason: "没有未解除事故，允许模型调用。" };
     }
@@ -236,3 +241,4 @@ export class EventControlChannel {
 
 /** 重新导出常用类型，方便调用方只依赖控制通道。 */
 export type { EventIncident, EventIncidentKind, EventRecoveryPolicy, EventSeverity };
+
