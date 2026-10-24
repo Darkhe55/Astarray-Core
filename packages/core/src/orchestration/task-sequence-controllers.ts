@@ -21,6 +21,7 @@ import type { AgentTaskSequenceStore } from "./agent-task-sequence-store.js";
 import { TaskBundlePlanner } from "./task-bundle-planner.js";
 import { TaskPriorityPolicy } from "./task-priority-policy.js";
 import { TaskSequencePartialOrder } from "./task-sequence-partial-order.js";
+import { assertContextPackValid, type ContextPack } from "./context-pack.js";
 
 export interface ActorIdentity {
   sourceKind: TaskSourceKind;
@@ -49,6 +50,8 @@ export interface InsertTaskInput {
     title: string;
     priorityTier: number | null;
     externalReference: string | null;
+    /** 可选：上游声明的上下文包（装配器据此保持整体性）。 */
+    contextPack?: ContextPack;
   };
   anchor: {
     predecessorTaskIds: string[];
@@ -155,6 +158,9 @@ export class TaskSequenceManageController {
 
   /** 插入新任务：可指定直接前驱/后继锚点；环与未知锚点被拒绝。 */
   async insertTask(input: InsertTaskInput): Promise<AgentTaskSequenceDocument> {
+    if (input.task.contextPack !== undefined) {
+      assertContextPackValid(input.task.contextPack);
+    }
     this.assertActorAllowedToManage(input.actor, input.ownerAgentInstanceId);
     const priorityTier = this.priorityPolicy.resolvePriorityTier({
       sourceKind: input.actor.sourceKind,
@@ -495,3 +501,4 @@ export class TaskSequenceStatusController {
     };
   }
 }
+

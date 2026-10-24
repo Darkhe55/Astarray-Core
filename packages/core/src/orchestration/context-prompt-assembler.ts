@@ -14,6 +14,8 @@ import { selectGlobalDecisionsForTask } from "./global-decision-selector.js";
 import { estimateRecallTokenCount } from "./context-recall-controller.js";
 import type { ContextAssemblyRuntimeEvent } from "./context-runtime-metrics.js";
 import type { LocalContextGraphStore } from "./local-context-graph-store.js";
+import type { ContextPack } from "./context-pack.js";
+import { renderContextPacks, validateContextPack } from "./context-pack.js";
 
 /** 系统规则文本（独立于可选全局记录，任何预算下都进入提示词）。 */
 export const APPLICATION_CONTEXT_SYSTEM_RULES = [
@@ -52,6 +54,8 @@ export interface AssembleContextPromptInput {
   necessaryConditions: NecessaryContextCondition[];
   globalDecisionRecords: ContextPromptGlobalDecision[];
   activeFrontier: ContextPromptActiveFrontier | null;
+  /** 上游插入任务时声明的上下文包（可选；缺省不注入该区块）。 */
+  contextPacks?: ReadonlyArray<ContextPack>;
 }
 
 export interface AssembledContextPrompt {
@@ -60,6 +64,8 @@ export interface AssembledContextPrompt {
   injectedFrontierNodeIdentifiers: string[];
   excludedClosedNodeCount: number;
   unsatisfiedNecessaryConditionIdentifiers: string[];
+  /** 实际注入的上下文包标识（原子包整包注入）。 */
+  injectedContextPackIdentifiers?: string[];
 }
 
 export function assembleContextPrompt(
@@ -120,12 +126,26 @@ export function assembleContextPrompt(
         " 个：只计数，不注入原文）",
     );
   }
+  lines.push("", "[上下文包]");
+  const contextPacks = input.contextPacks ?? [];
+  const invalidPackIdentifiers = contextPacks
+    .filter((pack) => validateContextPack(pack).length > 0)
+    .map((pack) => pack.packIdentifier);
+  const renderedPacks = renderContextPacks(contextPacks);
+  for (const line of renderedPacks.lines) lines.push(line);
+  if (invalidPackIdentifiers.length > 0) {
+    lines.push(
+      "- （拒绝注入的非法上下文包：" + invalidPackIdentifiers.join("、") + "）",
+    );
+  }
+
   return {
     promptText: lines.join("\n"),
     injectedGlobalDecisionIdentifiers,
     injectedFrontierNodeIdentifiers,
     excludedClosedNodeCount: input.activeFrontier?.excludedClosedNodeCount ?? 0,
     unsatisfiedNecessaryConditionIdentifiers,
+    injectedContextPackIdentifiers: renderedPacks.injectedPackIdentifiers.slice(),
   };
 }
 
@@ -306,3 +326,4 @@ export function createContextPromptProvider(
     return assembled;
   };
 }
+
