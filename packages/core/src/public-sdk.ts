@@ -2591,8 +2591,14 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    * 只纳入任务内容（prompt）：`taskIdentifier` 是本地受理标识，不同标识但同内容
    * 属同一逻辑请求；改内容则是不同参数 → 拒绝（RELIABILITY-01-02 · R4）。
    */
-  private computeTaskSubmissionInputHash(input: { prompt: string }): string {
-    return createHash("sha256").update(input.prompt).digest("hex");
+  private computeTaskSubmissionInputHash(input: {
+    prompt: string;
+    projectIdentifier?: string;
+    workspaceRootPath?: string;
+  }): string {
+    return createHash("sha256")
+      .update(input.prompt + "\u0000" + (input.projectIdentifier ?? "") + "\u0000" + (input.workspaceRootPath ?? ""))
+      .digest("hex");
   }
 
   /**
@@ -4780,6 +4786,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
      * 缺省时沿用运行时登记的 `registeredProjectRoots[0]`（行为不变）。
      */
     projectIdentifier?: string;
+    /**
+     * 可选：本任务的执行根（GUI 多项目）。
+     * 给出时工具只能在该目录内读写；缺省沿用运行时登记的工作区（旧行为不变）。
+     * 必须是**已存在的绝对目录**（fail-closed）。
+     */
+    workspaceRootPath?: string;
   }): Promise<PublicTaskResult> {
     this.assertOpen();
     this.requireSession(input.sessionId);
@@ -4793,9 +4805,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         : input.sessionId + "|" + input.idempotencyKey;
     const submissionInputHash = this.computeTaskSubmissionInputHash({
       prompt: input.prompt,
-      ...(input.projectIdentifier === undefined
-        ? {}
-        : { projectIdentifier: input.projectIdentifier }),
+    ...(input.projectIdentifier === undefined
+      ? {}
+      : { projectIdentifier: input.projectIdentifier }),
+    ...(input.workspaceRootPath === undefined
+      ? {}
+      : { workspaceRootPath: input.workspaceRootPath }),
     });
     if (ledgerKey !== null && input.idempotencyKey !== undefined) {
       const existingEntry = this.taskIdempotencyLedger.get(ledgerKey);
@@ -4854,13 +4869,35 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         "Ponder 模式为本地只读问答，不产生 mission；请使用 handleUserMessage 获取直接回答",
       );
     }
+    if (input.workspaceRootPath !== undefined) {
+      if (!path.isAbsolute(input.workspaceRootPath)) {
+        throw new PublicApplicationError(
+          "workspace-root-invalid",
+          "执行根必须是绝对路径: " + input.workspaceRootPath,
+        );
+      }
+      const workspaceStatistics = await fs.stat(input.workspaceRootPath).catch(() => null);
+      if (workspaceStatistics === null || !workspaceStatistics.isDirectory()) {
+        throw new PublicApplicationError(
+          "workspace-root-invalid",
+          "执行根不存在或不是目录: " + input.workspaceRootPath,
+        );
+      }
+    }
     let missionIdentifier: string;
     try {
       missionIdentifier = await this.runtime.controller.handleUserMessage(
         input.prompt,
-        input.projectIdentifier === undefined
+        input.projectIdentifier === undefined && input.workspaceRootPath === undefined
           ? undefined
-          : { projectIdentifier: input.projectIdentifier },
+          : {
+              ...(input.projectIdentifier === undefined
+                ? {}
+                : { projectIdentifier: input.projectIdentifier }),
+              ...(input.workspaceRootPath === undefined
+                ? {}
+                : { workspaceRootPath: input.workspaceRootPath }),
+            },
       );
     } catch (error) {
       throw new PublicApplicationError(

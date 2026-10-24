@@ -66,6 +66,43 @@ describe("AstarrayApplicationFacade（Public SDK）", () => {
     );
   });
 
+  it("submitTask 执行根：合法绝对目录可用；相对/不存在 ⇒ 拒绝", async () => {
+    const facade = await AstarrayApplicationFacade.create({
+      stateDirectory,
+      mode: "assist",
+    });
+    facade.createSession({ sessionId: "session-1", mode: "assist" });
+    const projectDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-root-"));
+    try {
+      const accepted = await facade.submitTask({
+        sessionId: "session-1",
+        taskIdentifier: "task-root",
+        prompt: "在项目根内执行",
+        projectIdentifier: "project-root",
+        workspaceRootPath: projectDirectory,
+      });
+      expect(accepted.status).toBe("accepted");
+      await expect(
+        facade.submitTask({
+          sessionId: "session-1",
+          taskIdentifier: "task-relative",
+          prompt: "相对路径",
+          workspaceRootPath: "relative/path",
+        }),
+      ).rejects.toThrow(/执行根必须是绝对路径/);
+      await expect(
+        facade.submitTask({
+          sessionId: "session-1",
+          taskIdentifier: "task-missing",
+          prompt: "不存在",
+          workspaceRootPath: path.join(projectDirectory, "missing-subdirectory"),
+        }),
+      ).rejects.toThrow(/执行根不存在或不是目录/);
+    } finally {
+      await fs.rm(projectDirectory, { recursive: true, force: true, maxRetries: 5 });
+      await facade.shutdown();
+    }
+  });
   it("submitTask 可把任务归属到指定项目（GUI 多项目）", async () => {
     const facade = await AstarrayApplicationFacade.create({
       stateDirectory,
@@ -186,5 +223,6 @@ describe("依赖方向", () => {
     }
   });
 });
+
 
 

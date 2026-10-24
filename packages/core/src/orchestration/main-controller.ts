@@ -155,6 +155,8 @@ export interface MainControllerOptions {
      * `resource-already-read`（u2-flash 真实实测缺陷）。
      */
     agentInstanceId?: string,
+    /** 可选：该任务的执行根（GUI 多项目）；缺省用运行时默认工作区。 */
+    workspaceRootPath?: string,
   ) => ToolPort;
   /**
    * E2E-01-03 S2b：把**恢复检查点装饰器**套在 worker 工具端口**最外层**。
@@ -335,6 +337,12 @@ export class MainController {
     { scheduler: AssistScheduler | DevolveScheduler; mode: AgentMode }
   >();
 
+  /**
+   * 任务级执行根（GUI 多项目）：missionId → workspaceRootPath。
+   * 只影响该 mission 的工具边界；未登记则用运行时默认工作区。
+   */
+  private readonly missionWorkspaceRootPaths = new Map<string, string>();
+
   constructor(private readonly options: MainControllerOptions) {}
 
   /** 模式切换（TUI 调用）：交由状态机校验，非法迁移抛 DomainError。 */
@@ -363,7 +371,11 @@ export class MainController {
    */
   async handleUserMessage(
     message: string,
-    options?: { readonly projectIdentifier?: string },
+    options?: {
+      readonly projectIdentifier?: string;
+      /** 可选：本任务的执行根（GUI 多项目），只在该根内执行工具。 */
+      readonly workspaceRootPath?: string;
+    },
   ): Promise<string> {
     const mode = this.options.modeMachine.getCurrentMode();
     if (mode === "ponder") {
@@ -389,6 +401,13 @@ export class MainController {
       taskNodes,
       ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
     });
+    const requestedWorkspaceRootPath = options?.workspaceRootPath?.trim();
+    if (
+      requestedWorkspaceRootPath !== undefined &&
+      requestedWorkspaceRootPath !== ""
+    ) {
+      this.missionWorkspaceRootPaths.set(missionId, requestedWorkspaceRootPath);
+    }
     if (mode === "assist") {
       this.launchAssistMission(missionId, taskNodes);
     } else {
@@ -1245,6 +1264,7 @@ export class MainController {
       task,
       new Set(task.toolNames),
       agentInstanceId,
+      this.missionWorkspaceRootPaths.get(missionId),
     );
     const buildCheckpointingPort = this.options.buildRecoveryCheckpointingToolPort;
     if (buildCheckpointingPort === undefined) {
