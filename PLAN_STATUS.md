@@ -2647,3 +2647,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **修复 1（5d6d167）**：`POST /commands/create-project` 创建后**立即写位置登记**（rootPath=第一个文件夹、revision 1、confirmedBy=user）；重定位弹窗**只有阻断级才打开**，非阻断最多显示一行 chip；登记写失败会在结果里如实提示 `registrationWarning`。
 - **修复 2（e514ee0）**：对**修复前已创建**的受管项目，进入时按受管存储里的第一个文件夹**补登记**（fail-closed：写失败仍按未登记处理，不伪造成功）。
 - 证据：新增用例 ⑩（新建即登记且 `prompt.isBlocking=false`）与 ⑪（旧项目进入自动补登记）；私有库 **556 用例 / 变异 41-41**。
+
+## 2026-10-24 GUI 项目右键菜单（私有库 08eec04、8854f47）
+
+- 项目条目**右键**弹出菜单：收起任务列表 / 展开任务列表（按当前状态切换）、归档项目 / 取消归档、项目设置、删除项目。
+- **归档**：默认列表隐藏；项目区「显示已归档」开关（`includeArchived=true`）可查看，归档项目带「［已归档］」标记。
+- **删除**：二次确认；只删**受管项目记录**，不删磁盘项目文件与任务历史（文案已写明）。
+- **项目设置**：改名（`/commands/update-project`）、增加文件夹（`/commands/add-project-folder` + 系统选择器）、移除文件夹（`/commands/remove-project-folder`，至少保留一个）。
+- **收起状态**：客户端内存态（重启后恢复展开）；如需持久化可后续加。
+- 接口：`archive-project` / `delete-project` / `update-project`；`/projects?includeArchived=true`。
+- 门禁：私有库 **558 用例 / 变异 41-41 / 包验收 7-7**。
