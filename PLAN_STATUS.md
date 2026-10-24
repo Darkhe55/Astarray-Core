@@ -2640,3 +2640,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **根因**：`pick-folder.ps1` 以 **UTF-8 无 BOM** 保存；Windows PowerShell 5.1 对 `.ps1` 默认按 ANSI 读取 ⇒ 中文注释/字符串被解析坏，引号丢失 ⇒ 语法错误。
 - **修复**：脚本改存 **UTF-8 with BOM**（已用 PowerShell 解析器验证 `parse-ok`）；Node 端对 PowerShell 的 stderr 先按 UTF-8 解、出现替换符再按 **GBK** 解，不再显示乱码；新增测试断言脚本**必须带 BOM**。
 - 门禁：私有库 **554 用例 / 变异 41-41 / 包验收 7-7**。
+
+## 2026-10-24 修复：新建项目后弹「重定位/项目尚未登记」（私有库 5d6d167、e514ee0）
+
+- **原因**：项目是新建的，但**没有位置登记**；进入项目时重定位检查判定 `unregistered` ⇒ 阻断式弹窗（且旧逻辑对非阻断提示也弹窗）。
+- **修复 1（5d6d167）**：`POST /commands/create-project` 创建后**立即写位置登记**（rootPath=第一个文件夹、revision 1、confirmedBy=user）；重定位弹窗**只有阻断级才打开**，非阻断最多显示一行 chip；登记写失败会在结果里如实提示 `registrationWarning`。
+- **修复 2（e514ee0）**：对**修复前已创建**的受管项目，进入时按受管存储里的第一个文件夹**补登记**（fail-closed：写失败仍按未登记处理，不伪造成功）。
+- 证据：新增用例 ⑩（新建即登记且 `prompt.isBlocking=false`）与 ⑪（旧项目进入自动补登记）；私有库 **556 用例 / 变异 41-41**。
