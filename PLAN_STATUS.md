@@ -2780,3 +2780,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - controller 记录 mission→project 并传入端口工厂；相对路径仍相对主根解析。
 - 反例：授权根可解析 / 未授权根仍拒绝 / provider 抛错仍拒绝 / 相对路径语义不变；公开 3,977 用例、变异 313-313。
 - 余项：GUI 文件夹授权面板仍绑定启动时的固定项目标识，需按所选项目传 projectIdentifier 才能与任务项目匹配。
+
+## 2026-10-24 完成：文件夹授权按项目扩展工具边界（本轮收尾）
+
+- 核心：WorkspaceBoundary additionalRootsProvider；runtime 按任务项目读取 FolderGrantStore（未撤销、未过期）；controller 记录 mission→project；相对路径仍相对主根。
+- GUI：文件夹授权路由接受 `projectIdentifier` query；页面所有授权调用（列表/出卡/批准/撤销/复检）都带当前项目 ⇒ 授权落在任务所属项目上，工具边界按该项目扩展。
+- 门禁：公开 3,977 用例 / 变异 313-313；私有 568 用例 / 变异 41-41 / 包验收 7-7。
+- 四项缺口全部完成：①项目执行根 ②实时事件 ③targetAgent ④审批 + 文件夹授权。
