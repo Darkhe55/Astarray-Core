@@ -896,11 +896,17 @@ export async function createApplicationRuntime(
     taskExecutionId: string | null;
     /** 可配置权限组仅适用于次级 Agent；思索模式白名单由执行层（本地策略引擎）覆盖。 */
     useConfigurablePermissionProfileEngine: boolean;
-  }): PolicyWrapper =>
-    new PolicyWrapper({
+    /** 可选：本任务的执行根（GUI 多项目）；缺省用启动工作区（旧行为不变）。 */
+    workspaceRootPath?: string;
+  }): PolicyWrapper => {
+    const taskWorkspaceBoundary =
+      input.workspaceRootPath === undefined
+        ? workspaceBoundary
+        : new WorkspaceBoundary(input.workspaceRootPath);
+    return new PolicyWrapper({
       permissionDecider,
       registry,
-      workspaceBoundary,
+      workspaceBoundary: taskWorkspaceBoundary,
       temporaryDirectoryPath,
       workerAllowedToolNames: input.allowedToolNames,
       nowUnixSeconds: () => Math.floor(Date.now() / 1000),
@@ -914,7 +920,7 @@ export async function createApplicationRuntime(
       sensitiveContentAccessPolicy,
       readSuppressionLedger,
       localToolPolicyEngine,
-      ponderGitRepositoryPath: workspaceBoundary.getWorkspaceRoot(),
+      ponderGitRepositoryPath: taskWorkspaceBoundary.getWorkspaceRoot(),
       evidenceBundleBuilder,
       factVerificationClaimIdentifier: input.factVerificationClaimIdentifier,
       installationGateGuard,
@@ -931,6 +937,7 @@ export async function createApplicationRuntime(
         ? currentPermissionProfileReference
         : null,
     });
+  };
 
   /**
    * OBS-01／PERF-01-02（2026-11-08，第 83 轮）：**把性能采集接进生产装配**。
@@ -1295,6 +1302,7 @@ export async function createApplicationRuntime(
       task: TaskDependencyNode,
       allowedToolNames: Set<string>,
       agentInstanceId?: string,
+      workspaceRootPath?: string,
     ) =>
       new ScopeGatedToolPort(
         createPolicyWrapperForAgent({
@@ -1303,6 +1311,7 @@ export async function createApplicationRuntime(
           factVerificationClaimIdentifier: `task-exec:${agentInstanceId ?? task.id}`,
           taskExecutionId: `task-exec:${agentInstanceId ?? task.id}`,
           useConfigurablePermissionProfileEngine: true,
+          ...(workspaceRootPath === undefined ? {} : { workspaceRootPath }),
         }),
         scopeAuthorizationGate,
       ),
