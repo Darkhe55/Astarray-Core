@@ -74,8 +74,8 @@ describe("GUI-02-01 请求实体：身份、指纹与持久化", () => {
     expect(record.requestRevision).toBe(1);
     // **本地权威原始参数**：不得改写、不得截断
     expect(record.argumentsJson).toBe(CAPSULE_ARGUMENTS);
-    // 有效期必须是可判定的时间点
-    expect(Number.isNaN(Date.parse(record.expiresAtIso))).toBe(false);
+    // 默认无期限（2026-10-24 用户口径）：不写到期时间
+    expect(record.expiresAtIso).toBeNull();
   });
 
   it("② 指纹绑定**完整规范化参数**：内容变化 ⇒ 指纹不同；键序变化 ⇒ 指纹相同", async () => {
@@ -261,3 +261,4 @@ describe("GUI-02-01 请求实体：状态机、revision 与期限", () => {
     expect(recordKeys.length).toBe(13);
   });
 });
+

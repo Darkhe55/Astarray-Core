@@ -63,27 +63,32 @@ export interface PermissionAskRequestRecord {
   /** 请求自身的 revision；**每次状态迁移递增**（多页面同步与拒绝陈旧裁决的锚点）。 */
   requestRevision: number;
   createdAtIso: string;
-  expiresAtIso: string;
+  /** null = 无期限（默认）；只有显式配置才写到期时间。 */
+  expiresAtIso: string | null;
   decidedAtIso: string | null;
   decidedByAgentInstanceId: string | null;
 }
 
-/** 默认有效期（秒）：给用户足够时间看清并裁决，但不会无限期悬挂。 */
-export const DEFAULT_PERMISSION_ASK_LIFETIME_SECONDS = 15 * 60;
+  /** 默认有效期（秒）：**null = 无期限**（2026-10-24 用户口径：默认不赋予时长限制）。 */
+  export const DEFAULT_PERMISSION_ASK_LIFETIME_SECONDS: number | null = null;
 
 export interface PermissionAskRequestStoreOptions {
   baseDirectory: string;
   /** 测试注入的时钟。 */
-  nowMilliseconds?: () => number;
+    nowMilliseconds?: () => number;
+    /** 默认有效期（秒）；null/缺省 = 无期限（可由设置调整）。 */
+    defaultLifetimeSeconds?: number | null;
 }
 
 export class PermissionAskRequestStore {
   private readonly baseDirectory: string;
   private readonly nowMilliseconds: () => number;
+  private readonly defaultLifetimeSeconds: number | null;
 
   constructor(options: PermissionAskRequestStoreOptions) {
     this.baseDirectory = options.baseDirectory;
     this.nowMilliseconds = options.nowMilliseconds ?? (() => Date.now());
+    this.defaultLifetimeSeconds = options.defaultLifetimeSeconds ?? null;
   }
 
   /** 登记一次权限询问，返回**权威记录**（含身份与指纹）。 */
@@ -94,13 +99,15 @@ export class PermissionAskRequestStore {
     /** 精确参数：**逐字保留**（不得改写、不得截断）。 */
     argumentsJson: string;
     explanation: string;
-    lifetimeSeconds?: number;
+    lifetimeSeconds?: number | null;
     askIdentifier?: string;
   }): Promise<PermissionAskRequestRecord> {
     const nowMilliseconds = this.nowMilliseconds();
     const lifetimeSeconds =
-      input.lifetimeSeconds ?? DEFAULT_PERMISSION_ASK_LIFETIME_SECONDS;
-    if (!(lifetimeSeconds >= 0)) {
+      input.lifetimeSeconds === undefined
+        ? this.defaultLifetimeSeconds
+        : input.lifetimeSeconds;
+    if (lifetimeSeconds !== null && !(lifetimeSeconds >= 0)) {
       throw new DomainError(
         "permission-ask-invalid",
         "有效期必须为非负数秒: " + String(lifetimeSeconds),
@@ -140,7 +147,10 @@ export class PermissionAskRequestStore {
       status: "pending",
       requestRevision: 1,
       createdAtIso: new Date(nowMilliseconds).toISOString(),
-      expiresAtIso: new Date(nowMilliseconds + lifetimeSeconds * 1_000).toISOString(),
+      expiresAtIso:
+        lifetimeSeconds === null
+          ? null
+          : new Date(nowMilliseconds + lifetimeSeconds * 1_000).toISOString(),
       decidedAtIso: null,
       decidedByAgentInstanceId: null,
     };
@@ -196,7 +206,10 @@ export class PermissionAskRequestStore {
         "裁决者无裁决权，拒绝裁决: " + input.deciderAgentInstanceId,
       );
     }
-    if (Date.parse(record.expiresAtIso) <= this.nowMilliseconds()) {
+    if (
+      record.expiresAtIso !== null &&
+      Date.parse(record.expiresAtIso) <= this.nowMilliseconds()
+    ) {
       if (record.status === "pending") {
         await writeAtomicJson(this.requestFilePath(record), {
           ...record,

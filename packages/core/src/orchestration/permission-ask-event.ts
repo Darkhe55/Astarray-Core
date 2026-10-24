@@ -59,7 +59,7 @@ export interface PermissionAskPublicEvent {
   status: PermissionAskRequestStatus;
   /** **请求自身的 revision**（与状态迁移同步递增）。 */
   requestRevision: number;
-  expiresAtIso: string;
+  expiresAtIso: string | null;
   /** 本地生成的结构化安全预览（已脱敏、已限长）。 */
   preview: PermissionAskSafePreview;
   /** 事件自身的权威 revision（沿用信封语义）。 */
@@ -117,3 +117,4 @@ export function buildPermissionAskEvent(input: {
         String(record.requestRevision),
   };
 }
+
