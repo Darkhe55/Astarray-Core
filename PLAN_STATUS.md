@@ -2507,3 +2507,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 变异 `comm02-delivery-skips-persist`（投递后不落盘）⇒ 集成反例变红，证明"落盘"不是摆设。
 - 公开库 **3,939 用例通过**；锚点 299/299。
 - 仍然不判整卡通过：CLI/TUI/GUI 共用入口（COMM-01-03）与跨项目写路径仍在后续检查点。
+
+## 2026-10-24 COMM-01-03 只读状态查询（CLI）
+
+- 新增 `collaboration-status.ts`：读 `AgentCreationRegistry` 归属 + 收件箱真实状态，产出 `buildCollaborationTopologyView` 视图（环/孤儿/可投递/暂停/丢弃）。
+- 新增 `astarray collaboration status [--json]`：**只读**（不投递、不改归属、不写盘）；`failed` 如实映射 `dropped`；空状态写「空 ≠ 不存在」。
+- 收件箱消息新增 `originalSourceAgentInstanceId` / `isRelayedRequest`（旧快照缺字段按 sender / false 归一，不丢历史）。
+- 反例 2 条 + 变异 2 条（失败显示成已投递、空状态写成“没有数据”）；公开库 **3,941 用例通过**，锚点 301/301。
+- 仍 pending：TUI/GUI 入口与 tarball 隔离闭环（COMM-01-03 剩余部分）。
