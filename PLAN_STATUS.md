@@ -2745,3 +2745,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 保留价值：旧处理器里“解析响应前检查 HTTP 状态、失败不得呈现成受理”的断言**没有丢**——移到 `chatSendMessageToModel`（断言 `if (!result.ok)` + 真实错误文案），测试意图不变。
 - 同步更新 a11y 断言（`submit-result` 不再存在；`prompt` 控件已删）。
 - 门禁：私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
+
+## 2026-10-24 右键菜单错位修复（私有库 d63fe6f）
+
+- **现象**：改为 top layer（`popover`）后，菜单不再被 Agent 拓扑弹窗遮挡，但位置相对落点偏移。
+- **根因**：popover 的 UA 默认样式是 `inset: 0; margin: auto`（默认居中）；只设 `left/top` 时，`right/bottom` 仍为 0 + `margin:auto`，浏览器把菜单位置重新居中。
+- **修复**：`#projectContextMenu[popover] { margin: 0; inset: auto; }`，并在打开时显式 `style.margin = "0"; style.right = "auto"; style.bottom = "auto"`，再设 `left/top`。
+- 说明：普通 `z-index` **无法**压过原生 `<dialog>` 的 top layer；正确做法就是 popover/另一层 top layer。此前遗漏的是清掉 UA 居中样式。
+- 测试：断言 popover 重置样式与 `margin = "0"`；私有库 **568 用例 / 变异 41-41**。
