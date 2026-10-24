@@ -188,6 +188,10 @@ program
     "Provider 单次请求超时秒数（缺省 30；长任务需放宽）",
   )
   .option("--perf-collect", "采集本进程性能样本（默认关闭；仅 run 命令，R73）")
+  .option(
+    "--conversation",
+    "对话模式：无工具调用、无产物时纯文本回复不要求完成控制事件",
+  )
   .action(
     async (
       prompt: string,
@@ -203,6 +207,7 @@ program
         providerProtocol?: string;
         providerRequestTimeoutSeconds?: string;
         perfCollect?: boolean;
+        conversation?: boolean;
       },
     ) => {
       /**
@@ -242,6 +247,7 @@ program
         isJsonOutput: options.json === true,
         stateDirectory: defaultStateDirectory(),
         isPerfCollectionEnabled: options.perfCollect === true,
+  isConversationMode: options.conversation === true,
         timeoutSeconds,
         ...(options.providerEndpoint !== undefined
           ? { providerEndpoint: options.providerEndpoint }
