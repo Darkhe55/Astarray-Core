@@ -2633,3 +2633,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   2. 脚本缺失 ⇒ **502 `folder-picker-script-missing`**；进程启动失败/非零退出 ⇒ **502 `folder-picker-failed`** 带真实错误，**不再伪装成取消**；
   3. 两个弹窗（新建项目 / 重定位）都显示选择结果或错误文案，取消时写「已取消选择」。
 - 证据：新增 ⑧ 号用例用桩脚本走真实 `powershell -File` 路径，返回 `C:/chosen-folder`；私有库 **553 用例 / 变异 41-41 / 包验收 7-7**。
+
+## 2026-10-24 修复：文件夹选择器 PowerShell 编码（私有库 2ab582b）
+
+- **报错原文**：`文件夹选择器异常退出（code=1）：… ParserError … 字符串缺少终止符`（乱码）。
+- **根因**：`pick-folder.ps1` 以 **UTF-8 无 BOM** 保存；Windows PowerShell 5.1 对 `.ps1` 默认按 ANSI 读取 ⇒ 中文注释/字符串被解析坏，引号丢失 ⇒ 语法错误。
+- **修复**：脚本改存 **UTF-8 with BOM**（已用 PowerShell 解析器验证 `parse-ok`）；Node 端对 PowerShell 的 stderr 先按 UTF-8 解、出现替换符再按 **GBK** 解，不再显示乱码；新增测试断言脚本**必须带 BOM**。
+- 门禁：私有库 **554 用例 / 变异 41-41 / 包验收 7-7**。
