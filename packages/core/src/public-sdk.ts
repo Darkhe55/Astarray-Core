@@ -21,6 +21,8 @@ import {
   PermissionAskRequestStore,
   type PermissionAskRequestRecord,
 } from "./orchestration/permission-ask-request-store.js";
+import { UserClarificationStore } from "./orchestration/user-clarification.js";
+import type { UserClarificationRequest } from "./orchestration/user-clarification.js";
 import type {
   InstallationInquiryAnswer,
   InstallationInquiryRecord,
@@ -3534,6 +3536,41 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   /** GUI-02-01 片②：权限询问请求实体存储（与 CLI/GUI 共用同一状态目录）。 */
+  /** 待回答的澄清请求（Agent 提问 + 候选）。只读、持久化、默认无期限。 */
+  async listPendingClarifications(
+    projectIdentifier: string,
+  ): Promise<ReadonlyArray<UserClarificationRequest>> {
+    this.assertOpen();
+    if (this.stateDirectory === null) {
+      throw new PublicApplicationError(
+        "clarifications-unavailable",
+        "应用未绑定状态目录，无法读取澄清请求",
+      );
+    }
+    return new UserClarificationStore({ baseDirectory: this.stateDirectory }).listPending(
+      projectIdentifier,
+    );
+  }
+
+  /** 回答一条澄清请求（候选或自由输入）。记录答案；是否重跑任务由上层决定。 */
+  async answerClarification(input: {
+    clarificationIdentifier: string;
+    answer: string;
+  }): Promise<UserClarificationRequest> {
+    this.assertOpen();
+    if (this.stateDirectory === null) {
+      throw new PublicApplicationError(
+        "clarifications-unavailable",
+        "应用未绑定状态目录，无法回答澄清请求",
+      );
+    }
+    return new UserClarificationStore({ baseDirectory: this.stateDirectory }).answer({
+      clarificationIdentifier: input.clarificationIdentifier,
+      answer: input.answer,
+      answeredAtIso: new Date().toISOString(),
+    });
+  }
+
   private createPermissionAskRequestStore(): PermissionAskRequestStore {
     if (this.stateDirectory === null) {
       throw new PublicApplicationError(
@@ -6050,6 +6087,8 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
 
 
 
