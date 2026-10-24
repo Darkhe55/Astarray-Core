@@ -19,6 +19,7 @@ import { ToolRegistry } from "../tools/registry.js";
 import { BUILTIN_TOOL_DESCRIPTORS } from "../tools/builtins.js";
 import { PolicyWrapper } from "../tools/policy-wrapper.js";
 import { WorkspaceBoundary } from "../tools/workspace-boundary.js";
+import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { MainController } from "../orchestration/main-controller.js";
@@ -909,11 +910,30 @@ export async function createApplicationRuntime(
     useConfigurablePermissionProfileEngine: boolean;
     /** 可选：本任务的执行根（GUI 多项目）；缺省用启动工作区（旧行为不变）。 */
     workspaceRootPath?: string;
+    /** 本任务所属项目（用于读取该项目的文件夹授权并扩展边界）。 */
+    projectIdentifier?: string;
   }): PolicyWrapper => {
+    const folderGrantStore = new FolderGrantStore({ baseDirectory: stateDirectory });
     const taskWorkspaceBoundary =
       input.workspaceRootPath === undefined
         ? workspaceBoundary
-        : new WorkspaceBoundary(input.workspaceRootPath);
+        : new WorkspaceBoundary(input.workspaceRootPath, {
+            // 用户口径 A：本项目已授权的文件夹**扩展**本任务的工具边界。
+            additionalRootsProvider: async () => {
+              if (input.projectIdentifier === undefined) return [];
+              const outcome = await folderGrantStore.read(input.projectIdentifier);
+              if (outcome.kind !== "valid") return [];
+              const nowIso = new Date().toISOString();
+              return outcome.collection.grants
+                .filter((grant) => !grant.isRevoked)
+                .filter(
+                  (grant) =>
+                    grant.expiresAtIso === null ||
+                    Date.parse(grant.expiresAtIso) > Date.parse(nowIso),
+                )
+                .map((grant) => grant.normalizedRootPath);
+            },
+          });
     return new PolicyWrapper({
       permissionDecider,
       registry,
@@ -1314,6 +1334,7 @@ export async function createApplicationRuntime(
       allowedToolNames: Set<string>,
       agentInstanceId?: string,
       workspaceRootPath?: string,
+      projectIdentifier?: string,
     ) =>
       new ScopeGatedToolPort(
         createPolicyWrapperForAgent({
@@ -1323,6 +1344,7 @@ export async function createApplicationRuntime(
           taskExecutionId: `task-exec:${agentInstanceId ?? task.id}`,
           useConfigurablePermissionProfileEngine: true,
           ...(workspaceRootPath === undefined ? {} : { workspaceRootPath }),
+          ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
         }),
         scopeAuthorizationGate,
       ),

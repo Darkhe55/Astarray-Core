@@ -157,6 +157,8 @@ export interface MainControllerOptions {
     agentInstanceId?: string,
     /** 可选：该任务的执行根（GUI 多项目）；缺省用运行时默认工作区。 */
     workspaceRootPath?: string,
+    /** 可选：该任务所属项目（读取文件夹授权扩展边界）。 */
+    projectIdentifier?: string,
   ) => ToolPort;
   /**
    * E2E-01-03 S2b：把**恢复检查点装饰器**套在 worker 工具端口**最外层**。
@@ -342,6 +344,8 @@ export class MainController {
    * 只影响该 mission 的工具边界；未登记则用运行时默认工作区。
    */
   private readonly missionWorkspaceRootPaths = new Map<string, string>();
+  /** mission → 所属项目（文件夹授权按项目查询）。 */
+  private readonly missionProjectIdentifiers = new Map<string, string>();
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -411,6 +415,9 @@ export class MainController {
       requestedWorkspaceRootPath !== ""
     ) {
       this.missionWorkspaceRootPaths.set(missionId, requestedWorkspaceRootPath);
+    }
+    if (projectIdentifier !== undefined) {
+      this.missionProjectIdentifiers.set(missionId, projectIdentifier);
     }
     const requestedTargetAgentInstanceIdentifier =
       options?.targetAgentInstanceIdentifier?.trim();
@@ -1282,6 +1289,7 @@ export class MainController {
       new Set(task.toolNames),
       targetAgentInstanceIdentifier ?? agentInstanceId,
       this.missionWorkspaceRootPaths.get(missionId),
+      this.missionProjectIdentifiers.get(missionId),
     );
     const buildCheckpointingPort = this.options.buildRecoveryCheckpointingToolPort;
     if (buildCheckpointingPort === undefined) {
