@@ -625,6 +625,16 @@ export const MUTATIONS = [
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-delivery-skips-persist",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox-delivery.ts",
+    find: "      await this.store.save(input.recipientAgentInstanceId, {",
+    replace: "      if (false) await this.store.save(input.recipientAgentInstanceId, {",
+    testFiles: ["tests/core/integration/comm02-inbox-feedback-process.test.ts"],
+    expectedFailingTestNames: ["① 真实进程可用"],
+    rationale:
+      "投递后不落盘 ⇒ 重启后状态回退成 received，消息被重复发送 ⇒ 该集成反例必须变红",
+  },
+  {
     mutationIdentifier: "comm02-mapping-drops-recipient-prefix",
     targetFile: "packages/core/src/orchestration/collaboration-feedback-mapping.ts",
     find: "  return COLLABORATION_RECIPIENT_PREFIX + agentInstanceId;",
