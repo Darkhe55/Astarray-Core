@@ -29,7 +29,7 @@
     "test:coverage": "vitest run --coverage",
     "check": "npm run typecheck && npm run lint && npm run build && npm run test",
     "check:low-parallel": "npm run typecheck && npm run lint && npm run build && vitest run --maxWorkers=2",
-    "prepack": "npm run check",
+    "prepack": "npm run typecheck && npm run lint && npm run build && npm run test:serial",
     "verify:sdk-consumer": "node scripts/verify-sdk-consumer.mjs",
     "verify:e2e01": "node scripts/e2e01-acceptance.mjs fixture",
     "verify:e2e01-03-harness": "node scripts/verify-e2e01-03-concurrency-harness.mjs --allow-live-request --permission-decision allow-once --mode devolve",
@@ -67,7 +67,8 @@
     "verify:cli-json-package": "node scripts/verify-cli-json-package.mjs --package-dir .tmp/perf-pkg/node_modules/astarray",
     "verify:summary-annotation": "npx tsx scripts/verify-summary-annotation.mjs --samples docs/reports/SUM02_04_ANNOTATION_TEMPLATE.jsonl",
     "verify:event01-criteria": "npx tsx scripts/verify-event01-criteria.mjs --criteria docs/reports/EVENT01_ACCEPTANCE_CRITERIA_TEMPLATE.json --allow-incomplete",
-    "verify:event01-package": "node scripts/verify-event01-package.mjs --package-dir .tmp/comm-install/node_modules/astarray"
+    "verify:event01-package": "node scripts/verify-event01-package.mjs --package-dir .tmp/comm-install/node_modules/astarray",
+    "test:serial": "vitest run --no-file-parallelism"
   },
   "dependencies": {
     "commander": "^15.0.0",
@@ -90,5 +91,20 @@
   },
   "allowScripts": {
     "esbuild@0.27.7": true
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Darkhe55/Astarray-Core.git"
+  },
+  "homepage": "https://github.com/Darkhe55/Astarray-Core#readme",
+  "bugs": {
+    "url": "https://github.com/Darkhe55/Astarray-Core/issues"
+  },
+  "keywords": [
+    "agent",
+    "orchestration",
+    "cli",
+    "automation",
+    "llm"
+  ]
 }
