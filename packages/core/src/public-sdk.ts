@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto";
 import type { ToolPublicDocumentationRegistryEntry } from "./tools/tool-public-documentation-registry.js";
 import { promises as fs } from "node:fs";
+import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
 import path from "node:path";
 
 // 装配层内部使用（不是再导出）：把真实用量观测接到账目存储上（2026-10-06 接线）。
@@ -2595,9 +2596,10 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     prompt: string;
     projectIdentifier?: string;
     workspaceRootPath?: string;
+    targetAgentInstanceIdentifier?: string;
   }): string {
     return createHash("sha256")
-      .update(input.prompt + "\u0000" + (input.projectIdentifier ?? "") + "\u0000" + (input.workspaceRootPath ?? ""))
+      .update(input.prompt + "\u0000" + (input.projectIdentifier ?? "") + "\u0000" + (input.workspaceRootPath ?? "") + "\u0000" + (input.targetAgentInstanceIdentifier ?? ""))
       .digest("hex");
   }
 
@@ -4792,6 +4794,11 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
      * 必须是**已存在的绝对目录**（fail-closed）。
      */
     workspaceRootPath?: string;
+    /**
+     * 可选：指定执行该任务的 Agent 实例（GUI 投递目标）。
+     * 必须是核心登记里**存在且未回收**的 Agent；否则 fail-closed。
+     */
+    targetAgentInstanceIdentifier?: string;
   }): Promise<PublicTaskResult> {
     this.assertOpen();
     this.requireSession(input.sessionId);
@@ -4869,6 +4876,24 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         "Ponder 模式为本地只读问答，不产生 mission；请使用 handleUserMessage 获取直接回答",
       );
     }
+    if (input.targetAgentInstanceIdentifier !== undefined) {
+      if (this.stateDirectory === null) {
+        throw new PublicApplicationError(
+          "missing-state-directory",
+          "未配置状态目录：无法校验目标 Agent",
+        );
+      }
+      const registry = new AgentCreationRegistry({
+        stateDirectory: this.stateDirectory,
+      });
+      const record = await registry.getRecord(input.targetAgentInstanceIdentifier);
+      if (record === null || record.recycledAtIso !== null) {
+        throw new PublicApplicationError(
+          "target-agent-invalid",
+          "目标 Agent 不存在或已回收: " + input.targetAgentInstanceIdentifier,
+        );
+      }
+    }
     if (input.workspaceRootPath !== undefined) {
       if (!path.isAbsolute(input.workspaceRootPath)) {
         throw new PublicApplicationError(
@@ -4897,6 +4922,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
               ...(input.workspaceRootPath === undefined
                 ? {}
                 : { workspaceRootPath: input.workspaceRootPath }),
+              ...(input.targetAgentInstanceIdentifier === undefined
+                ? {}
+                : { targetAgentInstanceIdentifier: input.targetAgentInstanceIdentifier }),
             },
       );
     } catch (error) {
@@ -5997,4 +6025,6 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
 
