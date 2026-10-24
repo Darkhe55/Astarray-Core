@@ -10,7 +10,7 @@ export type DevolveSchedulerOptions = Omit<
   MissionOrchestratorOptions,
   "onMissionFinished" | "onUserEscalation"
 > & {
-  onMissionFinished: (status: "done" | "cancelled") => void;
+  onMissionFinished: (status: "done" | "cancelled" | "blocked") => void;
   onUserEscalation: (message: string) => void;
 };
 
@@ -35,3 +35,4 @@ export class DevolveScheduler extends MissionOrchestrator {
     return this.cancelTask(taskId);
   }
 }
+

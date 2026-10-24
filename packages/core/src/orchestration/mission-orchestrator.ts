@@ -208,6 +208,10 @@ export interface MissionOrchestratorOptions {
   workerFactories: OrchestratorWorkerFactories;
   /** T07D-R2-03：Provider 运行时是否强制要求本地完成控制事件。 */
   requireCompletionControlEvent?: boolean;
+  /** 完成门禁失败时由宿主如实迁移 mission 状态（不结束 mission，保留续跑/重试）。 */
+  onMissionGateBlocked?: (failureReason: string) => void;
+  /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
+  isConversationMode?: boolean;
   /**
    * 产物对账的工作区根（2026-10-02）：必须与工具实际写入的工作区一致，
    * 缺省由装配方传入（通常 `options.workspaceRootPath ?? process.cwd()`）。
@@ -222,7 +226,7 @@ export interface MissionOrchestratorOptions {
   /** T09A-R1-03：当前模式（人工验收策略来源）。 */
   contextLifecycleModeKey?: string;
   feedbackTransportFactory: () => Promise<FeedbackTransportPort>;
-  onMissionFinished: (status: "done" | "cancelled") => void | Promise<void>;
+  onMissionFinished: (status: "done" | "cancelled" | "blocked") => void | Promise<void>;
   /** 无法由调度层裁决、需要用户输入时回调（ambiguity / 裁决指令无法解析）。 */
   onUserEscalation: (message: string) => void;
   /**
@@ -795,6 +799,14 @@ export class MissionOrchestrator {
       availableToolDescriptors:
         this.options.workerFactories.toolDescriptorFactory?.(task) ?? [],
       requireCompletionEvent: this.options.requireCompletionControlEvent ?? false,
+      ...(this.options.isConversationMode === true ? { isConversationMode: true } : {}),
+      onCompletionGateFailure: (failureReason: string) => {
+        try {
+          this.options.onMissionGateBlocked?.(failureReason);
+        } catch {
+          // 状态迁移失败不得阻塞任务收尾
+        }
+      },
       ...(this.options.artifactWorkspaceRootPath === undefined
         ? {}
         : { artifactWorkspaceRootPath: this.options.artifactWorkspaceRootPath }),
@@ -1319,7 +1331,7 @@ export class MissionOrchestrator {
     return result.status === 0;
   }
 
-  private async finishMission(status: "done" | "cancelled"): Promise<void> {
+  private async finishMission(status: "done" | "cancelled" | "blocked"): Promise<void> {
     // T05B：mission 完成且 Git 集成装配时，运行集成门禁并按门禁合入目标分支
     const gitIntegration = this.options.gitIntegration;
     if (
@@ -1381,4 +1393,5 @@ export function buildWorkerGuidanceSafePointPort(input: {
       }).applied,
   };
 }
+
 

@@ -133,7 +133,7 @@ interface BuildSchedulerOptions {
   scriptsByAttempt: Array<Array<unknown>>;
   toolPort?: ToolPort;
   escalationMessages?: string[];
-  finishedStatuses?: Array<"done" | "cancelled">;
+  finishedStatuses?: Array<"done" | "cancelled" | "blocked">;
   sessionManager?: SessionAuthorizationManager;
 }
 
@@ -551,7 +551,7 @@ describe("T08 编排：Devolve 与取消", () => {
     const tasks = [makeTask("T-001", [], ["writeFileTemporary"])];
     const missionId = "mission-devolve";
     await makeInitialChain(missionId, tasks);
-    const finishedStatuses: Array<"done" | "cancelled"> = [];
+    const finishedStatuses: Array<"done" | "cancelled" | "blocked"> = [];
     const escalationMessages: string[] = [];
     const scheduler = buildScheduler(missionId, tasks, {
       mode: "devolve",
@@ -912,3 +912,4 @@ describe("T05A：工作存档与选择性上下文", () => {
     await scheduler.cancel();
   }, 20_000);
 });
+
