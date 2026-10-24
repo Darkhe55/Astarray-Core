@@ -177,6 +177,9 @@ export class TaskSequenceManageController {
           priorityTier,
           externalReference: input.task.externalReference,
           actor: input.actor,
+          ...(input.task.contextPack === undefined
+            ? {}
+            : { contextPack: input.task.contextPack }),
         });
         partialOrder.insertNode(newNode, {
           predecessorTaskIds: input.anchor.predecessorTaskIds,
@@ -375,6 +378,7 @@ export class TaskSequenceManageController {
       priorityTier: number;
       externalReference: string | null;
       actor: ActorIdentity;
+      contextPack?: ContextPack;
     },
   ): AgentTaskNode {
     this.ordinalCounter += 1;
@@ -388,6 +392,7 @@ export class TaskSequenceManageController {
       status: "pending",
       blockReason: null,
       externalReference: options.externalReference,
+      ...(options.contextPack === undefined ? {} : { contextPack: options.contextPack }),
       sequenceOrdinal: Date.now() * 1000 + this.ordinalCounter,
       createdAtIso: new Date().toISOString(),
     };
@@ -501,4 +506,5 @@ export class TaskSequenceStatusController {
     };
   }
 }
+
 

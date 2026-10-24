@@ -361,6 +361,28 @@ export const agentTaskNodeSchema = z.object({
   status: agentTaskStatusSchema,
   blockReason: z.string().min(1).nullable(),
   externalReference: z.string().min(1).nullable(),
+  contextPack: z
+    .object({
+      packIdentifier: z.string().min(1),
+      mergePolicy: z.enum(["atomic", "summarize-allowed", "separate"]),
+      sourcePriority: z.enum(["user", "agent", "tool"]),
+      members: z.array(
+        z.object({
+          memberIdentifier: z.string().min(1),
+          sourceKind: z.enum([
+            "user",
+            "agent",
+            "tool",
+            "file",
+            "decision",
+            "evidence",
+          ]),
+          summary: z.string().min(1),
+          contentFingerprint: z.string().min(1).nullable().optional(),
+        }),
+      ),
+    })
+    .optional(),
   sequenceOrdinal: z.number().int().min(1),
   createdAtIso: z.iso.datetime(),
 });
