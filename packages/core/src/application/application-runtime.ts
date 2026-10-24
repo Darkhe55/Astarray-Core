@@ -6,6 +6,9 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 
 import { resolveHostUserIdentifier } from "../core/host-user-context.js";
+import { EventControlChannel } from "../orchestration/event-control-channel.js";
+import { EventIncidentJournal } from "../orchestration/event-incident-journal.js";
+import { EventSourceBridge } from "../orchestration/event-source-bridge.js";
 
 import { ModeMachine } from "../core/mode-machine.js";
 import { SessionAuthorizationManager } from "../core/permission-policy.js";
@@ -230,6 +233,11 @@ export interface ApplicationRuntimeOptions {
    * **缺省关**是因为本卡要求「观察开销预算**先测再定**」。
    */
   isPerformanceCollectionEnabled?: boolean;
+  /**
+   * EVENT-01（2026-10-24，用户"按建议做"）：生产事件源默认开启。
+   * 传 `false` 可关闭（只影响是否把崩溃/连续 provider 失败升级为事故）。
+   */
+  isEventControlEnabled?: boolean;
   /**
    * OBS-01／DIAG-01（2026-11-08，第 85 轮）：是否采集诊断事件（缺省 false）。
    *
@@ -1128,6 +1136,21 @@ export async function createApplicationRuntime(
         })()
       : undefined;
 
+  /**
+   * EVENT-01：事件源桥（默认开启）。门禁接到既有 `workWindowGate` 接缝；
+   * 崩溃类工具错误与连续 3 次 provider 失败才产生事故（低严重度不阻断）。
+   */
+  const eventControlBridge =
+    options.isEventControlEnabled === false
+      ? null
+      : new EventSourceBridge({
+          channel: new EventControlChannel({
+            maximumConcurrentIncidents: 4,
+            responseDeadlineSeconds: 60,
+          }),
+          journal: new EventIncidentJournal({ stateDirectory: options.stateDirectory }),
+        });
+
   const controller = new MainController({
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
@@ -1136,6 +1159,36 @@ export async function createApplicationRuntime(
        * 也不与其它特性耦合（此前误放进工具说明的三元里，已移出）。
        */
       runHistoryStore: new RunHistoryStore({ baseDirectory: options.stateDirectory }),
+    ...(eventControlBridge === null
+      ? {}
+      : {
+          workWindowGate: async (input: {
+            missionId: string;
+            taskIdentifier: string;
+            gatePoint: "dispatch" | "model" | "tool-execution";
+            toolName?: string;
+          }) => {
+            const decision = await eventControlBridge.gate({
+              gatePoint: input.gatePoint === "dispatch" ? "model" : input.gatePoint,
+              ...(input.toolName === undefined ? {} : { toolName: input.toolName }),
+            });
+            return decision.kind === "allow"
+              ? { kind: "allow" as const, reason: decision.reason }
+              : {
+                  kind: "deny" as const,
+                  reasonCode: decision.reasonCode,
+                  reason: decision.reason,
+                };
+          },
+          eventSourceHooks: {
+            onToolFailed: (toolName: string, failureReason: string) => {
+              void eventControlBridge.onToolFailed({ toolName, failureReason });
+            },
+            onProviderFailure: () => {
+              void eventControlBridge.onProviderFailure({ resourceKey: "runtime" });
+            },
+          },
+        }),
     /**
      * G4（第 281 轮）：构造**工具说明注入器**（回执存储落 stateDirectory）+ 透传登记表。
      * 未提供登记表 ⇒ 不构造、不注入（提示词逐字不变）。

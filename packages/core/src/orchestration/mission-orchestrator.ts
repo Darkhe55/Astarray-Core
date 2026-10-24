@@ -73,6 +73,11 @@ export interface OrchestratorWorkerFactories {
     task: TaskDependencyNode,
   ) => AgentRuntime;
   toolPortFactory: (task: TaskDependencyNode, agentInstanceId?: string) => ToolPort;
+  /** EVENT-01（2026-10-24）：事件源钩子透传（缺省 ⇒ 不产生事故）。 */
+  eventSourceHooks?: {
+    onToolFailed?(toolName: string, failureReason: string): void;
+    onProviderFailure?(detail: string): void;
+  };
   buildPermissionExplanation: (toolName: string) => string;
   /** T07D-R2-03：实际暴露给 Provider 的工具描述符（按任务工具子集）。 */
   toolDescriptorFactory?: (task: TaskDependencyNode) => ToolDescriptor[];
@@ -808,6 +813,9 @@ export class MissionOrchestrator {
       contextNodeLifecycle: this.options.contextNodeLifecycle ?? null,
       contextLifecycleModeKey: this.options.contextLifecycleModeKey,
       runtime: this.options.workerFactories.runtimeFactory(agentInstanceId, task),
+      ...(this.options.workerFactories.eventSourceHooks === undefined
+        ? {}
+        : { eventSourceHooks: this.options.workerFactories.eventSourceHooks }),
       toolPort: workerToolPort,
       failureCounter: this.getFailureCounter(agentInstanceId, task.id),
       feedbackTransport: await this.options.feedbackTransportFactory(),

@@ -76,6 +76,27 @@ import type { AcceptanceVerdictGate } from "./acceptance-verdict-gate.js";
 import type { QuaternaryLifecycleController } from "./quaternary-lifecycle-controller.js";
 
 export interface MainControllerOptions {
+  /**
+   * EVENT-01（2026-10-24）：控制通道门禁（缺省 ⇒ 不门禁）。
+   */
+  workWindowGate?: (input: {
+    missionId: string;
+    taskIdentifier: string;
+    gatePoint: "dispatch" | "model" | "tool-execution";
+    toolName?: string;
+  }) => Promise<
+    | { readonly kind: "allow"; readonly reason: string }
+    | {
+        readonly kind: "deny";
+        readonly reasonCode: string;
+        readonly reason: string;
+      }
+  >;
+  /** EVENT-01：事件源钩子（缺省 ⇒ 不产生事故）。 */
+  eventSourceHooks?: {
+    onToolFailed?(toolName: string, failureReason: string): void;
+    onProviderFailure?(detail: string): void;
+  };
   modeMachine: ModeMachine;
   sessionManager: SessionAuthorizationManager;
   taskStore: TaskStorePort;
@@ -963,6 +984,9 @@ export class MainController {
       ...(this.options.missionDiagnosticEventPort === undefined
         ? {}
         : { missionDiagnosticEventPort: this.options.missionDiagnosticEventPort }),
+      ...(this.options.workWindowGate === undefined
+        ? {}
+        : { workWindowGate: this.options.workWindowGate }),
       ...(this.options.artifactWorkspaceRootPath === undefined
         ? {}
         : { artifactWorkspaceRootPath: this.options.artifactWorkspaceRootPath }),
@@ -988,6 +1012,9 @@ export class MainController {
             agentInstanceId,
           ),
         buildPermissionExplanation: this.options.buildPermissionExplanation,
+        ...(this.options.eventSourceHooks === undefined
+          ? {}
+          : { eventSourceHooks: this.options.eventSourceHooks }),
         // PERF-01-02 采集（第 83 轮接线）：缺省 ⇒ 不采集
         ...(this.options.perfSamplePort === undefined
           ? {}
