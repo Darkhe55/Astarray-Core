@@ -2787,3 +2787,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - GUI：文件夹授权路由接受 `projectIdentifier` query；页面所有授权调用（列表/出卡/批准/撤销/复检）都带当前项目 ⇒ 授权落在任务所属项目上，工具边界按该项目扩展。
 - 门禁：公开 3,977 用例 / 变异 313-313；私有 568 用例 / 变异 41-41 / 包验收 7-7。
 - 四项缺口全部完成：①项目执行根 ②实时事件 ③targetAgent ④审批 + 文件夹授权。
+
+## 2026-10-24 上下文包（用户口径：上游插入任务时声明整体性）
+
+- 新增 `context-pack.ts`：`atomic`（整包注入、不拆分）/ `summarize-allowed`（允许摘要）/ `separate`（独立不合并）；校验空包、重复成员、未知来源、非法策略（fail-closed）。
+- `assembleContextPrompt` 新增可选 `contextPacks`：输出 `[上下文包]` 区块与 `injectedContextPackIdentifiers`；非法包拒绝注入并显式列出。
+- 任务插入契约 `InsertTaskInput.task.contextPack?` 走同一校验（`context-pack-invalid`）。
+- 尚未持久化：contextPack 目前只在校验/装配层生效，task-sequence 文档未存字段（后续迁移）。
+- 门禁：公开 3,980 用例 / 变异 313-313。
