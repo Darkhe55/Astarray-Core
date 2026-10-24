@@ -2498,3 +2498,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **收件人前缀**：`agent:<agentInstanceId>`（用户决定 b）。
 - 新增：`collaboration-feedback-mapping.ts`、`collaboration-feedback-transport.ts`（enqueue ≠ 已处理；进程不可用不标投递）、`collaboration-outbox-transport.ts`（本地队列幂等）、`astarray inbox deliver`（无收件箱/损坏/冲突退出码 2）。
 - 反例 5 条 + 变异 3 条。**真实 fork/子进程接线仍未做**。
+
+## 2026-10-24 收件箱 ↔ 真实独立反馈进程（接线与崩溃证据）
+
+- 集成测试 `tests/core/integration/comm02-inbox-feedback-process.test.ts`（真实 fork `dist/feedback-process-entry.js`）：
+  1. 进程可用 ⇒ 协作消息入队，收件箱标 `delivered` 并落盘；
+  2. 进程已停止 ⇒ 投递失败，**不标 delivered**，状态保持 `received`、`deliveryAttemptCount` 递增（可重试）。
+- 变异 `comm02-delivery-skips-persist`（投递后不落盘）⇒ 集成反例变红，证明"落盘"不是摆设。
+- 公开库 **3,939 用例通过**；锚点 299/299。
+- 仍然不判整卡通过：CLI/TUI/GUI 共用入口（COMM-01-03）与跨项目写路径仍在后续检查点。

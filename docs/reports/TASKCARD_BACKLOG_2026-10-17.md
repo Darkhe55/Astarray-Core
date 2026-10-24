@@ -1522,3 +1522,5 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **COMM-01-02 投递通道（2026-10-24）**：`collaboration-inbox-delivery.ts` 成功落盘、失败有限重试、耗尽转 failed、陈旧授权跳过、revision 冲突不覆盖（6 反例 + 3 变异）。独立反馈进程未接线。
 
 > **COMM-01-02 协作→反馈映射（2026-10-24）**：协议扩展 `collaboration-request` + `agent:` 前缀 + `inbox deliver`（本地 outbox）。5 反例 + 3 变异。真实 fork 接线未做。
+
+> **COMM-01-02 真实反馈进程接线（2026-10-24）**：集成测试真实 fork 子进程，覆盖「可用 ⇒ delivered 落盘」「已停止 ⇒ 不标 delivered、保持 received 可重试」；变异「投递后不落盘」被拦下。3939 用例 / 299 锚点。
