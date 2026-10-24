@@ -2727,3 +2727,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 真实模型路径：当前 `/commands/submit`（核心 `submitTask`）**不接受目标 Agent**，所以选择后会明确提示「按会话默认路由执行（指定 agent 尚未接线）」，不假装已投递。
 - 反例：页面含选择按钮/标签/选择入口；离线 send 断言更新为目标优先；私有库 **568 用例 / 变异 41-41**。
 - 下一步若要真正“投递给指定 agent”，需要在核心 `submitTask` 增加 targetAgent 输入并让编排器按该 agent 建任务（跨仓库改动）。
+
+## 2026-10-24 GUI 修复：消息归属项目 + 拓扑图遮挡右键菜单（公开库 07f741d9、私有库 a35619c）
+
+- **消息不见了（根因）**：`/commands/submit` 的 mission 项目来自运行时固定登记的 `registeredProjectRoots[0]`（默认 `workspace`）；GUI 多项目下，用户在“我的项目”里发消息，mission 却落到 `workspace` ⇒ 项目下看不到、只显示“没有运行历史文件”。
+  - 修复：公开核心 `submitTask` 新增可选 `projectIdentifier`，经 `handleUserMessage(message, { projectIdentifier })` 落到 mission；空/缺省回退运行时根（行为不变）；幂等 hash 纳入项目，避免同键跨项目复用。
+  - GUI：真实模型提交带 `projectIdentifier: chatState.selectedProjectIdentifier`；实测 `project=project-under-test missions=["项目归属验证"]`。
+- **右键菜单被 Agent 管理弹窗遮挡**：原生 `dialog[open]` 在 top layer，普通 `z-index` 菜单压不过。
+  - 修复：`#projectContextMenu` 加 `popover="manual"`，打开时 `showPopover()`、关闭时 `hidePopover()`（top layer 后开者在上），保留 hidden 兜底。
+- 测试：公开 SDK 反例（mission.projectIdentifier 等于指定项目）、GUI 页面断言（submit 带项目、popover）；公开 **3,972 用例 / 变异 313-313**，私有 **568 用例 / 变异 41-41**。
+- 另：修正一条**过期的变异点名**（`relocate-entry-confirmed-is-blocking` 期望用例名从「① 身份一致」改为「② 身份一致」），否则该变异永远假存活。
