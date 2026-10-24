@@ -1988,6 +1988,8 @@ export interface PublicApplicationOptions {
   providerRuntimeRegistry?: ProviderRuntimeRegistry;
   /** 可选流式输出钩子（headless 写 stderr；不暴露内部字段）。 */
   streamOutput?: (missionIdentifier: string | null, text: string) => void;
+  /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
+  isConversationMode?: boolean;
   /**
    * GUI-02-01 片①（2026-10-11）：权限询问**携带绝对身份**的上报口（可选）。
    *
@@ -2475,6 +2477,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       mainRuntimeFactory,
       workerRuntimeFactory,
       requireCompletionControlEvent: runtimeKind === "provider",
+      ...(options.isConversationMode === true ? { isConversationMode: true } : {}),
       // 产物对账使用与工具写入一致的工作区根（缺省仓库/进程 cwd）。
       ...(options.workspaceRootPath === undefined
         ? {}
@@ -6036,6 +6039,8 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
 
 
 

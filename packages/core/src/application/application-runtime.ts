@@ -313,6 +313,8 @@ export interface ApplicationRuntimeOptions {
   ) => AgentRuntime;
   /** T07D-R2-03：Provider 运行时强制要求本地完成控制事件（mock 默认关闭）。 */
   requireCompletionControlEvent?: boolean;
+  /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
+  isConversationMode?: boolean;
   /** T09A-R1-01：全局上下文预算（token，默认 4096）。 */
   globalContextBudgetTokens?: number;
   /** T09A-R1-01：任务必要条件；不满足时阻塞而非静默执行。 */
@@ -1395,6 +1397,7 @@ export async function createApplicationRuntime(
         .map((toolName) => registry.getDescriptor(toolName))
         .filter((descriptor): descriptor is ToolDescriptor => descriptor !== undefined),
     requireCompletionControlEvent: options.requireCompletionControlEvent ?? false,
+    isConversationMode: options.isConversationMode === true,
     // 产物对账必须使用与工具写入一致的工作区根（2026-10-02）。
     artifactWorkspaceRootPath: registeredProjectRoots[0]?.rootPath ?? process.cwd(),
     contextPromptProvider,
