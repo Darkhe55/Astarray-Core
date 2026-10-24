@@ -133,6 +133,31 @@ describe("AstarrayApplicationFacade（Public SDK）", () => {
     expect(accepted.status).toBe("accepted");
     await facade.shutdown();
   });
+  it("澄清请求：facade 可列出并回答（持久化）", async () => {
+    const facade = await AstarrayApplicationFacade.create({ stateDirectory, mode: "assist" });
+    const { UserClarificationStore } = await import(
+      "../../../packages/core/src/orchestration/user-clarification.js"
+    );
+    const store = new UserClarificationStore({ baseDirectory: stateDirectory });
+    const request = await store.register({
+      ownerAgentInstanceId: "agent-1",
+      taskIdentifier: "T-1",
+      projectIdentifier: "p1",
+      questionText: "选哪个？",
+      candidates: [
+        { candidateIdentifier: "a", label: "A", value: "a", isRecommended: true },
+      ],
+      createdAtIso: "2026-10-25T00:00:00.000Z",
+    });
+    expect(await facade.listPendingClarifications("p1")).toHaveLength(1);
+    const answered = await facade.answerClarification({
+      clarificationIdentifier: request.clarificationIdentifier,
+      answer: "a",
+    });
+    expect(answered.status).toBe("answered");
+    expect(await facade.listPendingClarifications("p1")).toHaveLength(0);
+    await facade.shutdown();
+  });
   it("submitTask 可把任务归属到指定项目（GUI 多项目）", async () => {
     const facade = await AstarrayApplicationFacade.create({
       stateDirectory,
@@ -253,6 +278,7 @@ describe("依赖方向", () => {
     }
   });
 });
+
 
 
 
