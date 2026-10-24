@@ -2696,3 +2696,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 创建 Agent 时服务端**校验**：模型必须“已知 profile + 有凭据”，否则 400 `model-unavailable`（fail-closed）。
 - 反例：缺凭据条目不可用、未配置模型 400、可用模型 200；页面断言下拉与接口。私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
 - 限制：未知 provider profile **不猜模型名**（显示 profileId）；`live-provider-1` 的模型名在 catalog 里没有独立字段，故按 profileId 展示。
+
+## 2026-10-24 Agent 暂时移出与恢复（私有库 765457d）
+
+- 右键菜单改为「**暂时移出工作流（可恢复）**」：二次确认文案说明“进入待命列表，可随时恢复”。
+- 暂时移出**不回收核心登记**（否则无法恢复）；仅标记 `removedFromWorkflowAtIso`。
+- Agent 管理弹窗新增「**待命列表（已暂时移出，可恢复）**」，每项带「恢复」按钮 → `POST /commands/restore-project-agent`。
+- 接口：`remove-project-agent`（语义改为暂时移出）、`restore-project-agent`；存储新增 `restoreToWorkflow` / `listStandby`。
+- 反例：移出后可恢复且登记 `recycledAtIso` 仍为 null、未移出时恢复被拒、页面含待命列表/恢复入口；私有库 **568 用例 / 变异 41-41**。
+- 说明：**永久移除**未提供（需要另行设计审计与二次确认）；如需要我再加。
