@@ -2474,3 +2474,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 口径落地：`docs/reports/EVENT01_ACCEPTANCE_CRITERIA.json`（事件源 process-exit / provider-failure / queue-storm / tool-crash；期限 60s；恢复 require-user-confirmation；5 条证据）。
 - 实现：`event-incident-arbitration.ts` + 10 条反例：单一所有者、旧 epoch 拒绝、风暴合并（不乒乓）、额度满仍接收、超期降级、恢复需确认、状态只进不退、未知事件源拒绝。
 - **仍 pending**：控制通道 IPC、工具取消/分阶段确认、崩溃重放、安装包状态入口 ⇒ 整卡不判通过。
+
+## 2026-10-24 COMM-01-02 协作收件箱
+
+- 卡内 §2.4 第 76/78 行落地：`collaboration-inbox.ts` + `tests/core/unit/comm02-inbox.test.ts`（8 条反例 + 3 变异）。
+- 覆盖：四态分离（received/delivered/processed/completed + failed）、重复投递复用回执不重复插入任务、每收件人背压（超限明确拒绝、忙碌隔离）、有限重试（指数退避、上限转 failed）、入箱前跳数/环检测、授权撤销后在途消息不落新任务。
+- **仍未做**：持久化与投递通道接线（内存状态机不落盘）、独立反馈进程接入 ⇒ 整卡不判通过。

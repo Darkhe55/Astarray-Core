@@ -625,6 +625,36 @@ export const MUTATIONS = [
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "comm02-inbox-duplicate-reinserts",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox.ts",
+    find: "    if (existing !== undefined) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/comm02-inbox.test.ts"],
+    expectedFailingTestNames: ["② 重复投递复用回执"],
+    rationale:
+      "重复投递再插一条 ⇒ 同一任务被重复执行（卡内明确禁止）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-inbox-backpressure-drops",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox.ts",
+    find: "    if (pendingCount >= this.maximumPendingPerRecipient) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/comm02-inbox.test.ts"],
+    expectedFailingTestNames: ["③ 每收件人背压"],
+    rationale:
+      "背压失效 ⇒ 忙碌收件人被无限堆积（卡内要求每收件人背压）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "comm02-inbox-stale-epoch-delivers",
+    targetFile: "packages/core/src/orchestration/collaboration-inbox.ts",
+    find: "    if (\n      options.currentAuthorizationEpoch !== undefined &&\n      options.currentAuthorizationEpoch !== message.authorizationEpoch\n    ) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/comm02-inbox.test.ts"],
+    expectedFailingTestNames: ["⑥ 授权撤销后"],
+    rationale:
+      "授权撤销后仍在途投递 ⇒ 旧消息落入新任务（卡内明确禁止）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "event01-single-owner-allows-second",
     targetFile: "packages/core/src/orchestration/event-incident-arbitration.ts",
     find: "    if (incident.ownerAgentInstanceId !== null) {",
