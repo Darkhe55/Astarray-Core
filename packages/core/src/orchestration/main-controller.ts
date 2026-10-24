@@ -118,6 +118,8 @@ export interface MainControllerOptions {
   resolveToolDescriptors?: (task: TaskDependencyNode) => ToolDescriptor[];
   /** T07D-R2-03：Provider 运行时强制要求本地完成控制事件。 */
   requireCompletionControlEvent?: boolean;
+  /** 显式对话模式（GUI 聊天）。 */
+  isConversationMode?: boolean;
   /**
    * 产物对账的工作区根（2026-10-02）：与工具实际写入的工作区保持一致；
    * 缺省由装配方传入（通常 `options.workspaceRootPath ?? process.cwd()`）。
@@ -248,7 +250,7 @@ export interface MainControllerOptions {
     argumentsJson: string;
     explanation: string;
   }) => void;
-  onMissionFinished?: (missionId: string, status: "done" | "cancelled") => void;
+  onMissionFinished?: (missionId: string, status: "done" | "cancelled" | "blocked") => void;
   /** T06A：自动备份库（可选；缺省时破坏性工具拒绝执行）。 */
   backupVault?: BackupVault | null;
   backupDeletionController?: BackupDeletionAuthorizationController | null;
@@ -1027,6 +1029,13 @@ export class MainController {
         `scheduler:${missionId}`,
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
+      onMissionGateBlocked: (failureReason) => {
+        this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
+        void this.options.missionManager
+          .updateMissionStatus(missionId, "blocked")
+          .catch(() => {});
+      },
+      ...(this.options.isConversationMode === true ? { isConversationMode: true } : {}),
       // DIAG-01 采集（第 113 轮接线）：使命级诊断端口，缺省 ⇒ 不采集
       ...(this.options.missionDiagnosticEventPort === undefined
         ? {}
@@ -1141,6 +1150,13 @@ export class MainController {
         `scheduler:${missionId}`,
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
+      onMissionGateBlocked: (failureReason) => {
+        this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
+        void this.options.missionManager
+          .updateMissionStatus(missionId, "blocked")
+          .catch(() => {});
+      },
+      ...(this.options.isConversationMode === true ? { isConversationMode: true } : {}),
       // DIAG-01 采集（第 113 轮接线）：使命级诊断端口，缺省 ⇒ 不采集
       ...(this.options.missionDiagnosticEventPort === undefined
         ? {}
@@ -1321,4 +1337,6 @@ export class MainController {
     ];
   }
 }
+
+
 

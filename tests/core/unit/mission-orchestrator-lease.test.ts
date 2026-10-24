@@ -92,7 +92,7 @@ interface BuildSchedulerOptions {
   missionId: string;
   tasks: TaskDependencyNode[];
   processInstanceId: string;
-  finishedStatuses?: Array<"done" | "cancelled">;
+  finishedStatuses?: Array<"done" | "cancelled" | "blocked">;
   escalationMessages?: string[];
 }
 
@@ -137,7 +137,7 @@ describe("MissionOrchestrator 会话租约（T12-02）", () => {
     const tasks = [makeTask("T-001")];
     await makeInitialChain(missionId, tasks);
 
-    const finishedStatuses: Array<"done" | "cancelled"> = [];
+    const finishedStatuses: Array<"done" | "cancelled" | "blocked"> = [];
     const scheduler = buildDevolveScheduler({
       missionId,
       tasks,
@@ -200,7 +200,7 @@ describe("MissionOrchestrator 会话租约（T12-02）", () => {
       ),
     ).toBe(true);
 
-    const finishedStatuses: Array<"done" | "cancelled"> = [];
+    const finishedStatuses: Array<"done" | "cancelled" | "blocked"> = [];
     const scheduler = buildDevolveScheduler({
       missionId,
       tasks,
@@ -213,3 +213,4 @@ describe("MissionOrchestrator 会话租约（T12-02）", () => {
     expect(summary.exists).toBe(false);
   });
 });
+

@@ -134,6 +134,10 @@ export interface WorkerAgentOptions {
    * 由装配层构造并经 `workerFactories` 透传；**缺省 ⇒ 不记录**（不改变既有行为）。
    */
   runHistoryStore?: RunHistoryStore | null;
+  /** 显式对话模式（仅当没有任何工具调用/产物时才豁免完成事件）。 */
+  isConversationMode?: boolean;
+  /** 完成门禁失败回调（orchestrator 据此把 mission 如实置 blocked）。 */
+  onCompletionGateFailure?: (failureReason: string) => void;
   /**
    * DIAG-01 采集（2026-11-08，第 85 轮）：诊断失败事件 sink。
    * 同样**由编排层构造**（身份/任务在闭包里补齐），本层只转交工具循环；缺省 ⇒ 不采集。
@@ -652,9 +656,20 @@ export class WorkerAgent {
             break;
           }
           if (event.reason === "success") {
-    const completionGateFailure = this.options.requireCompletionEvent
-              ? this.verifyCompletionControlEvent()
-              : null;
+            /**
+             * 对话式运行豁免（2026-10-24）：**没有任何工具调用、也没有产物**时，
+             * 文本回复就是结果，不要求完成控制事件；否则普通聊天必然被判失败。
+             * 一旦执行过工具（含失败尝试）或写过产物，仍走严格完成门禁。
+             */
+            const isConversationalRun =
+              this.options.isConversationMode === true &&
+              this.toolCallsByCallId.size === 0 &&
+              this.attemptedMutatingTools.size === 0 &&
+              this.persistedArtifactPaths.size === 0;
+            const completionGateFailure =
+              this.options.requireCompletionEvent && !isConversationalRun
+                ? this.verifyCompletionControlEvent()
+                : null;
             const unresolvedMutatingTools = [
               ...this.unresolvedMutatingToolFailures,
             ];
@@ -677,6 +692,11 @@ export class WorkerAgent {
               }
             }
             if (completionGateFailure !== null) {
+              try {
+                this.options.onCompletionGateFailure?.(completionGateFailure);
+              } catch {
+                // 状态迁移失败不得阻塞任务收尾
+              }
               finalReason = {
                 outcome: "failure",
                 toolName: null,
