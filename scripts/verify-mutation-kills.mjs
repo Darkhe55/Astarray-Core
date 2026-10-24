@@ -640,7 +640,7 @@ export const MUTATIONS = [
     find: "  if (outcome.classification === \"identity-confirmed\") {",
     replace: "  if (false) {",
     testFiles: ["tests/core/unit/relocate01-entry-prompt.test.ts"],
-    expectedFailingTestNames: ["① 身份一致"],
+    expectedFailingTestNames: ["② 身份一致"],
     rationale:
       "身份一致也按阻断处理 ⇒ 正常项目每次进入都被拦（提示失真）⇒ 该反例必须变红",
   },
@@ -4354,6 +4354,7 @@ function main() {
 }
 
 main();
+
 
 
 
