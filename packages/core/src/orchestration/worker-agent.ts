@@ -79,6 +79,14 @@ export interface ContextNodeLifecyclePort {
 }
 
 export interface WorkerAgentOptions {
+  /**
+   * EVENT-01（2026-10-24）：生产事件源钩子（可选；缺省 ⇒ 不产生事故）。
+   * 观测/落盘失败不得阻塞业务。
+   */
+  eventSourceHooks?: {
+    onToolFailed?(toolName: string, failureReason: string): void;
+    onProviderFailure?(detail: string): void;
+  };
   agentInstanceId: string;
   missionId: string;
   task: TaskDependencyNode;
@@ -547,6 +555,11 @@ export class WorkerAgent {
         },
         /** HISTORY-01-02（2026-10-18）：失败工具调用也进历史（此前失败分支无出口）。 */
         onToolFailed: (toolName: string, failureReason: string) => {
+          try {
+            this.options.eventSourceHooks?.onToolFailed?.(toolName, failureReason);
+          } catch {
+            // 事件源观测失败不得阻塞业务
+          }
           if (this.options.runHistoryStore !== undefined && this.options.runHistoryStore !== null) {
             void this.options.runHistoryStore
               .recordToolFailure({
@@ -705,6 +718,15 @@ export class WorkerAgent {
               stateSummary: summarize(this.outputTextChunks),
             };
           } else {
+            try {
+              if (
+                /provider|模型|API|ECONN|ETIMEDOUT|timeout|rate|quota|429|5\d\d/i.test(event.detail)
+              ) {
+                this.options.eventSourceHooks?.onProviderFailure?.(event.detail);
+              }
+            } catch {
+              // 事件源观测失败不得阻塞业务
+            }
             finalReason = {
               outcome: "failure",
               toolName: null,

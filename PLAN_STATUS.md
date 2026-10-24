@@ -2559,3 +2559,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 变异 `event01-control-low-severity-blocks`（低严重度也阻断）被拦下。
 - 门禁：公开库 **3,957 用例通过**，锚点 **308/308**。
 - **生产默认仍不注入**事件源（何时把工具失败升级为事故属产品策略）；接缝与证据已就绪。
+
+## 2026-10-24 EVENT-01 生产事件源（用户按建议确认）
+
+- 口径：工具崩溃类=critical、连续 3 次 provider 失败=high、同键 60 秒去重、默认开启、超期降级、恢复需确认。
+- 实现：`event-source-policy.ts` + `event-source-bridge.ts`（落盘失败不阻塞）；装配层默认构造并接到 `workWindowGate` 与 worker 的 `eventSourceHooks`（provider 失败仅匹配 provider/网络/限流特征）。
+- 反例 7 条 + 变异 3 条。

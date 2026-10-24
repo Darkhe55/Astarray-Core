@@ -2021,6 +2021,10 @@ export interface PublicApplicationOptions {
    */
   isPerformanceCollectionEnabled?: boolean;
   /**
+   * EVENT-01（2026-10-24）：生产事件源默认开启；传 `false` 关闭。
+   */
+  isEventControlEnabled?: boolean;
+  /**
    * OBS-01／DIAG-01（2026-11-08，第 85 轮）：**是否采集诊断事件**。
    *
    * **缺省 false（保持既有行为不变）** —— 新写入路径不擅自默认开启；
@@ -2437,6 +2441,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       useFeedbackProcess: options.useFeedbackProcess ?? runtimeKind === "provider",
       // OBS-01／PERF-01-02（第 83 轮）：性能采集**缺省关**（先测再定开销）
       isPerformanceCollectionEnabled: options.isPerformanceCollectionEnabled ?? false,
+      isEventControlEnabled: options.isEventControlEnabled ?? true,
       // OBS-01／DIAG-01（第 85 轮）：诊断采集**缺省关**（不擅自改变生产行为）
       isDiagnosticCollectionEnabled: options.isDiagnosticCollectionEnabled ?? false,
       isProgressGuardEnabled: options.isProgressGuardEnabled ?? false,
@@ -5920,3 +5925,19 @@ export {
   type EventIncidentJournalReadOutcome,
   type EventIncidentJournalRecord,
 } from "./orchestration/event-incident-journal.js";
+
+// EVENT-01（2026-10-24）：生产事件源（崩溃类工具错误 / 连续 3 次 provider 失败 / 60 秒去重）。
+export {
+  EventSourceBridge,
+  type EventSourceGateDecision,
+} from "./orchestration/event-source-bridge.js";
+export {
+  EVENT_SOURCE_MERGE_WINDOW_SECONDS,
+  PROVIDER_FAILURE_THRESHOLD,
+  EventSourceDeduplicator,
+  ProviderFailureCounter,
+  evaluateToolFailureSignal,
+  isCrashLikeToolFailure,
+  type EventSourceSignal,
+} from "./orchestration/event-source-policy.js";
+

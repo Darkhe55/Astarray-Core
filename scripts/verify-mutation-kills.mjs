@@ -805,6 +805,36 @@ export const MUTATIONS = [
       "无记录却报存在 ⇒ 「空 ≠ 无事件」被破坏（用户会被误导）⇒ 该反例必须变红",
   },
   {
+    mutationIdentifier: "event01-source-normal-error-triggers",
+    targetFile: "packages/core/src/orchestration/event-source-policy.ts",
+    find: "  if (!isCrashLikeToolFailure(input.failureReason)) return null;",
+    replace: "  if (false) return null;",
+    testFiles: ["tests/core/unit/event01-event-source.test.ts"],
+    expectedFailingTestNames: ["③ 工具崩溃"],
+    rationale:
+      "普通工具失败也升级为 critical 事故 ⇒ 一整轮被停死（过度拦截）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-source-provider-threshold-off-by-one",
+    targetFile: "packages/core/src/orchestration/event-source-policy.ts",
+    find: "    return { shouldSignal: next >= PROVIDER_FAILURE_THRESHOLD, consecutiveFailureCount: next };",
+    replace: "    return { shouldSignal: next > PROVIDER_FAILURE_THRESHOLD, consecutiveFailureCount: next };",
+    testFiles: ["tests/core/unit/event01-event-source.test.ts"],
+    expectedFailingTestNames: ["⑤ 连续 3 次 provider 失败"],
+    rationale:
+      "阈值差一 ⇒ 连续 3 次失败不触发（用户口径是 3 次）⇒ 该反例必须变红",
+  },
+  {
+    mutationIdentifier: "event01-source-dedupe-ignored",
+    targetFile: "packages/core/src/orchestration/event-source-policy.ts",
+    find: "    if (last !== undefined && nowMilliseconds - last < this.mergeWindowMilliseconds) {",
+    replace: "    if (false) {",
+    testFiles: ["tests/core/unit/event01-event-source.test.ts"],
+    expectedFailingTestNames: ["④ 同键 60 秒内去重"],
+    rationale:
+      "60 秒窗口去重失效 ⇒ 风暴期间重复发事件（卡内要求合并窗口）⇒ 该反例必须变红",
+  },
+  {
     mutationIdentifier: "event01-control-low-severity-blocks",
     targetFile: "packages/core/src/orchestration/event-control-channel.ts",
     find: "          (incident.severity === \"high\" || incident.severity === \"critical\"),",
