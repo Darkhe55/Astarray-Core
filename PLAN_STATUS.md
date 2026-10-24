@@ -2515,3 +2515,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 收件箱消息新增 `originalSourceAgentInstanceId` / `isRelayedRequest`（旧快照缺字段按 sender / false 归一，不丢历史）。
 - 反例 2 条 + 变异 2 条（失败显示成已投递、空状态写成“没有数据”）；公开库 **3,941 用例通过**，锚点 301/301。
 - 仍 pending：TUI/GUI 入口与 tarball 隔离闭环（COMM-01-03 剩余部分）。
+
+## 2026-10-24 GUI 只读协作状态（私有库 5185b43，MiniMax-M3 实现）
+
+- 新增 `GET /collaboration/status`：无状态目录 ⇒ 501；读失败 ⇒ 502；200 返回 agents / deliveries / view / inboxFileCount / invalidInboxCount / notice；**只读**（前后状态目录字节一致有测试守住）。
+- Agent 状态弹窗新增「协作（只读）」区块：Agent 数 / 投递记录 / 可投递节点 / 暂停 / 丢弃 / 是否存在环，并写明「只读：不投递、不改归属」；失败只影响本区块。
+- 门禁：私有库 **466 用例 / 变异 41-41 / 包验收 7-7**。
+- **事故记录**：子 agent 写回时把 `gui-server.ts` / `project-chat-routes.ts` 整体改成 CRLF，导致 4 条按 LF 切片/锚点的既有测试变红（不是既有失败）。我按仓库既有 LF 约定归一化后全绿；尚未加 `.gitattributes` 固定行尾，后续仍可能复发。
