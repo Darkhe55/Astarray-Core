@@ -3,6 +3,7 @@
  * 命名遵循 IMPLEMENTATION_PLAN.md §3：含义完整、布尔加前缀、时间量带单位。
  * 本文件只定义契约，不包含行为实现（状态机、权限策略、DAG 等见后续任务）。
  */
+import type { ContextPack } from "../orchestration/context-pack.js";
 import type { AgentEvent } from "./events.js";
 
 /** 三种运行模式，信任梯度：ponder < assist < devolve。 */
@@ -630,6 +631,8 @@ export interface AgentTaskNode {
   blockReason: string | null;
   /** 可选外部引用（如项目 mission/task id），不承载产出内容。 */
   externalReference: string | null;
+  /** 可选上下文包（上游声明整体性；装配器按 mergePolicy 处理）。 */
+  contextPack?: ContextPack;
   /** 创建序号（同层稳定排序，单调递增）。 */
   sequenceOrdinal: number;
   createdAtIso: string;
@@ -761,4 +764,5 @@ export interface GitIntegrationReport {
   unresolvedRisks: string[];
   createdAtIso: string;
 }
+
 
