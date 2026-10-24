@@ -1520,3 +1520,5 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **COMM-01-02 收件箱持久化（2026-10-24）**：store（原子写 + revision 乐观锁 + 损坏不覆盖 + 重启恢复）与 `inbox list` 只读 CLI（空 ≠ 无消息、损坏退出码 2）。5+4 反例、4 变异。投递通道未接线。
 
 > **COMM-01-02 投递通道（2026-10-24）**：`collaboration-inbox-delivery.ts` 成功落盘、失败有限重试、耗尽转 failed、陈旧授权跳过、revision 冲突不覆盖（6 反例 + 3 变异）。独立反馈进程未接线。
+
+> **COMM-01-02 协作→反馈映射（2026-10-24）**：协议扩展 `collaboration-request` + `agent:` 前缀 + `inbox deliver`（本地 outbox）。5 反例 + 3 变异。真实 fork 接线未做。
