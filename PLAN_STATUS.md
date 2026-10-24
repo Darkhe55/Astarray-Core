@@ -2737,3 +2737,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   - 修复：`#projectContextMenu` 加 `popover="manual"`，打开时 `showPopover()`、关闭时 `hidePopover()`（top layer 后开者在上），保留 hidden 兜底。
 - 测试：公开 SDK 反例（mission.projectIdentifier 等于指定项目）、GUI 页面断言（submit 带项目、popover）；公开 **3,972 用例 / 变异 313-313**，私有 **568 用例 / 变异 41-41**。
 - 另：修正一条**过期的变异点名**（`relocate-entry-confirmed-is-blocking` 期望用例名从「① 身份一致」改为「② 身份一致」），否则该变异永远假存活。
+
+## 2026-10-24 移除旧「提交用户指导」区块（私有库 fbea0c8）
+
+- **用户判断正确**：旧区块（`#prompt` / `#submit` / `#submit-result`，标题「提交用户指导」）与聊天组合器是**同一个功能**——都 POST `/commands/submit`；保留会造成两个入口、两套状态文案。
+- 移除：整个 `<section aria-labelledby="submit-heading">`、`resultElement` 声明、旧 click 处理器；聊天组合器（`#chatComposerText` / `#chatSendButton`）成为唯一发送入口。
+- 保留价值：旧处理器里“解析响应前检查 HTTP 状态、失败不得呈现成受理”的断言**没有丢**——移到 `chatSendMessageToModel`（断言 `if (!result.ok)` + 真实错误文案），测试意图不变。
+- 同步更新 a11y 断言（`submit-result` 不再存在；`prompt` 控件已删）。
+- 门禁：私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
