@@ -5881,3 +5881,11 @@ export {
   type CollaborationInboxReadOutcome,
   type CollaborationInboxSnapshot,
 } from "./orchestration/collaboration-inbox-store.js";
+
+// COMM-01-02（2026-10-24）：收件箱投递通道（成功落盘 / 有限重试 / 耗尽转 failed / 陈旧授权跳过 / revision 冲突不覆盖）。
+export {
+  CollaborationInboxDeliveryService,
+  type CollaborationInboxDeliveryOptions,
+  type CollaborationInboxDeliveryReport,
+  type CollaborationInboxTransportPort,
+} from "./orchestration/collaboration-inbox-delivery.js";

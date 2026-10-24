@@ -2486,3 +2486,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - `collaboration-inbox-store.ts`：每收件人一文件（`collaboration/inbox/<id>.json`），原子替换 + `beforeCommit` revision 复核；损坏文件返回 invalid 且拒绝覆盖；`CollaborationInbox.fromSnapshot` 支持重启恢复。
 - `astarray inbox list --recipient <id> [--state …] [--json]`：只读；未保存过写「空 ≠ 无消息」，损坏退出码 2。
 - 反例：存储 5 条、CLI 4 条；变异 4 条。**投递通道仍未接线**（收件箱只保证状态与持久化）。
+
+## 2026-10-24 收件箱投递通道
+
+- `collaboration-inbox-delivery.ts`：可注入传输端口；成功落盘 delivered；失败有限重试（指数退避），耗尽转 failed 且不再发送；授权代变化跳过；revision 冲突不覆盖。
+- 反例 6 条 + 变异 3 条。**独立反馈进程接线仍未做**。
