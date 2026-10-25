@@ -2863,3 +2863,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 路由：`GET /settings/model-accounts`、`GET /settings/vendor-presets`、`POST /commands/model-account-{save,activate,delete}`。
 - 实测（CDP）：DeepSeek 预设自动填充 `https://api.deepseek.com/v1` + 两个模型；保存后 `/models/available` 返回两条 `hasCredential=true`；重启启动器显示 `模型：deepseek-chat`。
 - 门禁：私有 587 用例 / 变异 41-41。
+
+## 2026-10-25 CLI/TUI “/” 命令面板（私有）
+
+- 新增 `slash-commands.ts` 注册表 + 解析/过滤/执行，TUI 输入框上方渲染命令面板：
+  - 输入 `/` 打开；继续输入过滤；`↑/↓` 选择、`Enter` 执行、`Tab` 补全、`Esc` 关闭；
+  - 命令只映射真实能力：`/help` `/clear` `/mode <assist|ponder|devolve>` `/status` `/stop` `/agents` `/dag` `/collab` `/folder` `/permissions`（查看当前权限组）`/model`（配置入口说明）`/exit`；
+  - 未知命令与非法参数给出明确错误；命令不会发送给模型。
+- 不冲突：普通文本不会打开面板；`/mode ` 等带参数输入不占用面板；权限弹窗优先（弹窗期间 `/` 不进入输入）。
+- 帮助/状态栏补充 `/:命令` 提示。
+- 测试：单元 6 条（解析/过滤/执行/未知/面板渲染）+ 组件 3 条（打开/过滤/↓+Tab 补全/Esc/权限优先），私有 596 用例、变异 41-41。
