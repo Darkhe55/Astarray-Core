@@ -2815,3 +2815,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 实测：exe 启动后 `desktop.log` 记录 `host started at http://127.0.0.1:2470/`，HTTP 200 且页面含 `chatSettingsWorkspace`；进程关闭后无 node 残留。
 - 依赖：Windows + .NET 8 Desktop Runtime（构建用 framework-dependent publish）+ Edge WebView2 Runtime。
 - 门禁：私有 580 用例 / 变异 41-41；新增 `tests/gui/unit/desktop-host.test.ts` 5 条契约。
+
+## 2026-10-25 桌面自驾（self-contained）
+
+- `npm run build:desktop:self-contained` → `desktop/dist/` **自包含目录版**（约 237MB，含 coreclr/hostfxr/运行时 DLL + node.exe + server.mjs），**不需要安装 .NET**；仍需 WebView2 Runtime。
+- 单文件 exe 试过：本机 `%TEMP%` 自解压失败（不设 `DOTNET_BUNDLE_EXTRACT_BASE_DIR` 时进程不起、无日志）；设该环境变量后可运行。为避免用户踩坑，交付采用**目录版**（双击 exe 即可，保留整个文件夹）。
+- 实测：`--smoke-test` → `DESKTOP_SMOKE_OK`；启动后 HTTP 200 且页面含 `chatSettingsWorkspace`；退出后无 node 残留。
+- 门禁：私有 581 用例 / 变异 41-41。
