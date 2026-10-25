@@ -2852,3 +2852,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 验证：脚本 `-CompileOnly`/`-Probe` 通过；直接启动脚本时 `MainWindowTitle=选择项目文件夹`（窗口真实创建）；桌面路径受沙箱桌面隔离限制无法截图确认前景，但进程在 Show 上等待而非立即退出。
 门禁：私有 582 用例 / 变异 41-41。
+
+## 2026-10-25 模型凭据管理器（仿 CC Switch，私有）
+
+- 新增 `model-accounts.ts`：多账户（账户名/厂商/协议/端点/自定义模型列表/凭据引用/超时），`providers/model-accounts.json` 持久化，`activeAccountIdentifier` 控制启用账户；旧 `gui-live-profile.json` 自动迁移为 `account-legacy`。
+- 新增 `vendor-presets.ts`：Anthropic / OpenAI / DeepSeek / Moonshot / 智谱 / 云知声 / OpenRouter / Ollama（本机 http 允许）/ 自定义；选择厂商自动填充端点、协议、默认模型（可改、可增删模型）。
+- 设置页「模型与凭据」改为多账户管理：账户列表（Key 是否已配置、模型数、当前启用）、编辑/启用/删除、保存账户；Key 只写不回显（留空不修改）。
+- 模型目录改为汇总全部账户模型（`providerDisplayName` 展示账户名），创建 Agent 下拉可见所有账户模型；旧单账户仍兜底。
+- 启动器改为优先读取启用账户（重启后真实调用使用该账户与第一个模型）。
+- 路由：`GET /settings/model-accounts`、`GET /settings/vendor-presets`、`POST /commands/model-account-{save,activate,delete}`。
+- 实测（CDP）：DeepSeek 预设自动填充 `https://api.deepseek.com/v1` + 两个模型；保存后 `/models/available` 返回两条 `hasCredential=true`；重启启动器显示 `模型：deepseek-chat`。
+- 门禁：私有 587 用例 / 变异 41-41。
