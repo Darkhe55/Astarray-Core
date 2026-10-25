@@ -2968,3 +2968,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 核心：Provider/运行时失败（鉴权、端点、超时）结束 mission 并置 blocked，释放租约，侧栏不再永远“运行中”；其他任务失败仍只迁移状态、保留恢复能力。
 - 实测假 Key：800ms 内出现用户气泡；随后 Agent 气泡显示 `[需要用户] ... Provider 请求失败...`；侧栏该 mission 显示已结束/中断而非运行中。
 - 门禁：公开 3990 用例 / 变异 313-313；私有 625 用例 / 变异 41-41；桌面版重新构建冒烟通过。
+
+## 2026-10-25 失败原因/投递入口/用户数据路径
+
+- Provider 失败分类：新增稳定错误码 `provider-auth-failed`、`provider-network-error`、`provider-endpoint-not-found`、`provider-rate-limited`、`provider-server-error`、`provider-http-error`；错误消息带错误码、HTTP 状态/底层网络码与可执行提示（401/403 明确“检查 API Key 是否有效/过期/有权限”）。Agent 失败气泡直接显示，例如：
+  `[provider-auth-failed] HTTP 401 Unauthorized：连接失败，请检查 API Key 是否有效、未过期且有权限。`
+- 投递入口简化为单个控件：`投递给 <agent 名>`，默认 agent 名为空；点击该控件打开项目拓扑选择，不再有独立“选择投递 Agent”按钮。
+- 数据路径：桌面版只在用户目录（`%LOCALAPPDATA%\Astarray` 优先，其次 APPDATA/UserProfile）保存 state；**移除 exe 旁 data 回退**，并忽略指向 dist 的旧 sticky 标记；构建后清理 dist 的冒烟 data/logs，重建不再删存档。
+- 备份：导出 zip **排除 `providers/`**（Key/账户/端点不进备份）；恢复时保留本机当前 providers，避免恢复把 Key 清掉。
+- 实测：直接服务保存账户+Key+项目到 `%LOCALAPPDATA%\Astarray\state` 成功；桌面正常启动 `data-path.txt` 指向该目录；本地 401 Provider 的 Agent 气泡显示上述错误码与 Key 检查提示。
+- 门禁：公开 3991 用例 / 变异 313-313；私有 627 用例 / 变异 41-41；桌面重新构建冒烟通过。
