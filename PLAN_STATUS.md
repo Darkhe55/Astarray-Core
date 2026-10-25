@@ -2900,3 +2900,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - Agent 管理：拓扑节点改浅色（`#ffffff`/`#f1f3f6`，文字 `#1f2430`/`#6b7280`）；右键菜单白底深字（`rgb(255,255,255)` / `rgb(31,36,48)`）。
 - “暂时移出工作流”去掉可能被 WebView2 拦截的 `window.confirm`，直接执行并带网络失败提示；CDP 实测返回「已从工作流移除：测试 Agent」。
 - 桌面版重新构建冒烟通过；门禁：私有 605 用例 / 变异 41-41。
+
+## 2026-10-25 Agent 右键菜单可点性与焦点框（私有 7b4fbaa）
+
+- 根因 1：Agent 管理是 `showModal()` 对话框，菜单原来挂在 body 上 ⇒ 对话框外的元素处于 **inert** 状态，菜单可见但鼠标点击不生效。
+  修复：在 `#projectAgentsDialog` 内新增 `#agentNodeMenu`，Agent 菜单改用该节点；打开后焦点落在第一项。
+- 根因 2：SVG 节点 `tabindex=0`，右键聚焦后浏览器画默认黑色 outline（与 rect 不对齐）。
+  修复：`.agent-topology-node:focus { outline: none; }`，焦点态改为 rect 描边加粗（`#3b6cf0`）。
+- 根因 3：菜单项透明无边框，像纯文本。
+  修复：浅底 `#f7f8fa` + 边框 + 圆角 + padding；hover 蓝底、active 更深。
+- 实测（CDP 真实鼠标事件）：右键节点 → 菜单 3 项；点击第一项 → “上级：无”；节点 outline=none；菜单项背景/边框/padding 生效。
+- 门禁：私有 607 用例 / 变异 41-41。
