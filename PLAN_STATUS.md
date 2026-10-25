@@ -2805,3 +2805,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - ⑤ 设置整区切换：左菜单/右详情，左栏复用 `--chat-rail` 与项目栏共享比例；接入模型凭据、授权有效期、预算/权限组、文件夹授权、显示开关、更多工作台区块。
 - 门禁：公开 3,982 用例（两例并行抖动，单跑通过）/ 变异 313-313；私有 573 用例 / 变异 41-41。
 - 残留：未实现「候选建议/补充信息输入框」（核心无候选生成接口，未伪造）；GUI 设置恢复中心等区块仍复用原节点。
+
+## 2026-10-25 GUI 桌面版（私有库）
+
+- `npm run build:desktop` → `desktop/dist/AstarrayGui.exe`：
+  - C# WinForms + **WebView2** 外壳（无浏览器地址栏），启动随包 `node.exe server.mjs`（esbuild 打包的 GUI 服务），找到回环端口后直接导航；关闭窗口 `Kill(entireProcessTree:true)` 结束 node。
+  - `--smoke-test` 冒烟：启动服务并请求 `/`，写 `smoke-result.txt`；构建脚本自动执行（实测 `DESKTOP_SMOKE_OK`）。
+  - 首次无凭据时 `start-gui-live` 以 **mock 离线模式**启动 GUI，可在设置页填写模型/凭据后重启接入。
+- 实测：exe 启动后 `desktop.log` 记录 `host started at http://127.0.0.1:2470/`，HTTP 200 且页面含 `chatSettingsWorkspace`；进程关闭后无 node 残留。
+- 依赖：Windows + .NET 8 Desktop Runtime（构建用 framework-dependent publish）+ Edge WebView2 Runtime。
+- 门禁：私有 580 用例 / 变异 41-41；新增 `tests/gui/unit/desktop-host.test.ts` 5 条契约。
