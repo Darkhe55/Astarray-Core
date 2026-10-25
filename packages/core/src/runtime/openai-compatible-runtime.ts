@@ -15,6 +15,10 @@ import {
   computeProviderRequestInputHash,
   type ProviderRequestUsageObserverPort,
 } from "../measurement/provider-request-usage-observation.js";
+import {
+  describeProviderHttpFailure,
+  describeProviderNetworkFailure,
+} from "./provider-failure.js";
 
 export interface OpenAiCompatibleRuntimeOptions {
   baseUrl: string;
@@ -157,7 +161,7 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
           body: JSON.stringify(requestBody),
           signal: abortController.signal,
         });
-      } catch {
+      } catch (error) {
         // 只有调用方取消才算 cancelled；本适配器超时（abortController）必须报超时失败。
         if (cancellationSignal.aborted) {
           yield {
@@ -168,16 +172,14 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
           };
           return;
         }
-        throw new DomainError(
-          "provider-timeout",
-          `Provider 请求失败或超时（${this.options.requestTimeoutMilliseconds}ms）`,
-        );
+        throw describeProviderNetworkFailure({
+          error,
+          isTimeout: abortController.signal.aborted,
+          timeoutMilliseconds: this.options.requestTimeoutMilliseconds,
+        });
       }
       if (!response.ok || !response.body) {
-        throw new DomainError(
-          "provider-timeout",
-          `Provider 返回非 2xx: ${response.status} ${response.statusText}`,
-        );
+        throw await describeProviderHttpFailure(response);
       }
       const chunks = readOpenAiStreamChunks(response.body);
       const accumulatedToolCalls = new Map<

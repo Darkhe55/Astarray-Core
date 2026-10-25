@@ -211,7 +211,7 @@ describe("OpenAiCompatibleRuntime", () => {
     expect(requestBody.messages[0]).toMatchObject({ role: "system" });
   });
 
-  it("fetch 拒绝（网络/超时）转为 provider-timeout DomainError", async () => {
+  it("fetch 拒绝（网络）转为 provider-network-error，并带底层错误码", async () => {
     const runtime = new OpenAiCompatibleRuntime({
       baseUrl: "https://provider.example/v1/chat/completions",
       apiKey: "sk-test-key-1234567890",
@@ -223,10 +223,13 @@ describe("OpenAiCompatibleRuntime", () => {
     });
     await expect(
       collectEvents(runtime.run(makeRunInput(), new AbortController().signal)),
-    ).rejects.toMatchObject({ errorCode: "provider-timeout" });
+    ).rejects.toMatchObject({
+      errorCode: "provider-network-error",
+      message: expect.stringContaining("ECONNREFUSED"),
+    });
   });
 
-  it("非 2xx 响应转为 provider-timeout", async () => {
+  it("非 2xx（429）转为 provider-rate-limited", async () => {
     const runtime = new OpenAiCompatibleRuntime({
       baseUrl: "https://provider.example/v1/chat/completions",
       apiKey: "sk-test-key-1234567890",
@@ -237,7 +240,29 @@ describe("OpenAiCompatibleRuntime", () => {
     });
     await expect(
       collectEvents(runtime.run(makeRunInput(), new AbortController().signal)),
-    ).rejects.toMatchObject({ errorCode: "provider-timeout" });
+    ).rejects.toMatchObject({
+      errorCode: "provider-rate-limited",
+      message: expect.stringContaining("[provider-rate-limited]"),
+    });
+  });
+
+  it("401 转为 provider-auth-failed，明确提示检查 API Key", async () => {
+    const runtime = new OpenAiCompatibleRuntime({
+      baseUrl: "https://provider.example/v1/chat/completions",
+      apiKey: "sk-fake-key-not-real",
+      model: "test-model",
+      requestTimeoutMilliseconds: 5_000,
+      fetchImpl: (() =>
+        new Response(JSON.stringify({ error: { message: "invalid api key" } }), {
+          status: 401,
+        })) as unknown as typeof fetch,
+    });
+    await expect(
+      collectEvents(runtime.run(makeRunInput(), new AbortController().signal)),
+    ).rejects.toMatchObject({
+      errorCode: "provider-auth-failed",
+      message: expect.stringContaining("检查 API Key 是否有效"),
+    });
   });
 
   it("finish_reason=stop 正常完成；异常 finish_reason 报 provider-timeout", async () => {
