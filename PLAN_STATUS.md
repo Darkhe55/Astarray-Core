@@ -2831,3 +2831,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 新建项目：客户端补 `.catch`/禁用按钮/“创建中…”，失败不再静默；CDP 实测桌面版创建项目成功（project-mvn93iy3-10c8d1）。
 - 文件夹选择器改为 IFileOpenDialog（FOS_PICKFOLDERS），即带地址栏/侧边栏的现代资源管理器窗口；保留 UTF-8 BOM 与编译自检（-CompileOnly 通过）。
 - 门禁：公开 3988 用例 / 变异 313-313；私有 582 用例 / 变异 41-41。
+
+## 2026-10-25 桌面版“未知发布者”处理
+
+- 原因：exe 无 Authenticode 签名（且下载文件带 Mark-of-the-Web），SmartScreen 无法确认发布者；与代码/打包无关。
+- 已内置签名构建：`node scripts/build-desktop.mjs --self-contained --sign`（`ASTARRAY_SIGN_PFX`/`ASTARRAY_SIGN_PFX_PASSWORD` 或 `ASTARRAY_SIGN_THUMBPRINT`），调用 Windows SDK `signtool`，时间戳默认 DigiCert，签名后 `signtool verify /pa` 失败即构建失败。
+- 已加 exe 元数据（Product/Company/FileVersion = Astarray / 0.1.0）。
+- 文档：`astarray-ui/desktop/README.md`（Azure Trusted Signing / OV / EV 对比；自签名仅本机有效；无证书时 Unblock-File 临时处理）。
+- 事实：本机无证书，当前 exe 仍是 **NotSigned**，警告会持续到配置证书并重新签名。
+- 门禁：私有 582 用例 / 变异 41-41。
