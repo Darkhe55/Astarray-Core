@@ -2115,6 +2115,8 @@ export interface PublicApplicationOptions {
    * 显式传 true 才会沿用可解析条目继续（调用方自担重复副作用风险）。
    */
   allowCorruptedIdempotencyLedger?: boolean;
+  /** 模型可用输入空间（token）；用于把全局上下文预算裁剪到模型窗口以内。 */
+  modelInputSpaceTokens?: number | null;
 }
 
 /** 公开 Provider 配置：只含受保护凭据引用与允许列表，不含秘密内容。 */
@@ -2126,6 +2128,8 @@ export interface PublicProviderConfiguration {
   baseUrl?: string | null;
   protectedCredentialReferenceId?: string | null;
   requestTimeoutMilliseconds?: number;
+  /** 单次输出上限（来自模型能力；不传则用运行时默认）。 */
+  maxOutputTokens?: number;
   /**
    * `baseUrl` 的来源：`true` = 取自受保护凭据条目，`false` = 取自调用方显式给出的端点。
    *
@@ -2395,6 +2399,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           protectedCredentialReferenceId:
             provider.protectedCredentialReferenceId ?? null,
           requestTimeoutMilliseconds: provider.requestTimeoutMilliseconds,
+          maxOutputTokens: provider.maxOutputTokens,
           providerRequestUsageObserver: providerUsageObserver,
         });
         mainRuntimeFactory = () => resolved.createRuntime();
@@ -2474,6 +2479,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         ? {}
         : { onPermissionAsk: options.onPermissionAsk }),
       backupDeletionControlPort: options.backupDeletionControlPort ?? null,
+      ...(options.modelInputSpaceTokens === undefined || options.modelInputSpaceTokens === null
+        ? {}
+        : { modelInputSpaceTokens: options.modelInputSpaceTokens }),
       installationUserPort: effectiveInstallationUserPort,
       authenticatedUserId: options.authenticatedUserId,
       mainAgentInstanceId: options.mainAgentInstanceId,
