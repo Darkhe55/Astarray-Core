@@ -3007,3 +3007,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 构建前迁移 `dist/AstarrayData` 到同级，失败拒绝构建，避免更新删存档。
 - 环境限制：本 Agent 会话里 Electron 原生启动即崩溃（最小 Electron 应用也 0xC0000005），因此构建脚本在 `ELECTRON_RUN_AS_NODE=1` 的受限终端自动跳过冒烟并提示；**请在普通资源管理器/终端手工启动验证**。
 - 门禁：私有 631 用例 / 变异 41-41；公开 3991 用例 / 变异 313-313。
+
+## 2026-10-26 Electron 启动崩溃修复
+
+- 现象：双击 `desktop/dist/Astarray.exe` 无窗口，退出码 -2147483645（0x80000003）；最小 Electron 应用同样崩溃。
+- 定位：Electron 可执行文件放在 `Documents\astarray` 工作区时被本机安全策略拦截；把同一 Electron 运行时复制到 `%LOCALAPPDATA%\Programs\Astarray` 后可正常打开窗口。
+- 修复：
+  - `npm run build:desktop` 现在构建后自动安装到 `%LOCALAPPDATA%\Programs\Astarray`，并创建开始菜单快捷方式；
+  - 新增 `npm run install:desktop` / `npm run start:desktop`；
+  - 数据仍在 `%LOCALAPPDATA%\Astarray\state`，与安装目录分离；
+  - 构建脚本清空 dist 内容而不是删除根目录（Explorer 打开 dist 时目录被锁）。
+- 实测：安装版双击打开 `Astarray GUI` 窗口，`/commands/create-project` 返回 200；`desktop/dist` 里的 exe 仍不适合直接双击（保持为构建暂存）。
+- 门禁：私有 631 用例 / 变异 41-41。
