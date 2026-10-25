@@ -1199,6 +1199,24 @@ export class MissionOrchestrator {
         this.options.onUserEscalation(
           `任务 ${taskId} 失败：${outcome.failureReason}（状态：${outcome.stateSummary}）`,
         );
+        // Provider/运行时级失败（鉴权、端点、超时等）无法原地重试：
+        // 结束 mission 并置 blocked，释放租约，避免侧栏永远显示“运行中”。
+        if (
+          outcome.stateSummary === "运行时异常终止" ||
+          outcome.failureReason.includes("Provider") ||
+          outcome.failureReason.includes("provider")
+        ) {
+          await this.finishMission("blocked");
+          break;
+        }
+        // 其他失败如实迁移 mission 状态（不结束 mission，保留重试/恢复能力）。
+        try {
+          this.options.onMissionGateBlocked?.(
+            `任务 ${taskId} 失败：${outcome.failureReason}`,
+          );
+        } catch {
+          // 状态迁移失败不得影响任务收口
+        }
         break;
       case "ambiguous":
         await this.dagScheduler.blockTaskForHumanDecision(taskId);
@@ -1393,5 +1411,7 @@ export function buildWorkerGuidanceSafePointPort(input: {
       }).applied,
   };
 }
+
+
 
 
