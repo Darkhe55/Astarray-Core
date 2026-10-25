@@ -4,6 +4,7 @@
  * 与 SDK 消费者使用同一入口、同一状态源（不再直接调用内部控制器）。
  */
 import path from "node:path";
+import { astarrayStateDirectory } from "../../../core/src/infra/user-data-paths.js";
 
 import {
   AstarrayApplicationFacade,
@@ -490,7 +491,9 @@ export async function waitForTaskTerminal(
 }
 
 export function defaultStateDirectory(): string {
-  return path.join(process.cwd(), ".astarray");
+  return astarrayStateDirectory();
 }
+
+
 
 
