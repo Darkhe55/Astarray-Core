@@ -47,6 +47,8 @@ export interface ProviderRuntimeConfig {
   /** 仅内存流转的凭据内容；不得进入描述符、错误、日志或导出。 */
   apiKey: string;
   requestTimeoutMilliseconds: number;
+  /** 单次输出上限（来自模型能力）。 */
+  maxOutputTokens?: number;
   /**
    * 真实用量观测端口（2026-10-06 接线）。
    * 由装配层提供（它掌握状态目录），运行时只上报事实、不认识账目与磁盘。
@@ -81,6 +83,7 @@ export interface ResolveProviderRuntimeRequest {
   baseUrl?: string | null;
   protectedCredentialReferenceId?: string | null;
   requestTimeoutMilliseconds?: number;
+  maxOutputTokens?: number;
   providerRequestUsageObserver?: ProviderRequestUsageObserverPort;
 }
 
@@ -194,6 +197,9 @@ export class ProviderRuntimeRegistry {
       protectedCredentialReferenceId: credentialReferenceId ?? "",
       apiKey,
       requestTimeoutMilliseconds: request.requestTimeoutMilliseconds ?? 30_000,
+      ...(request.maxOutputTokens === undefined
+        ? {}
+        : { maxOutputTokens: request.maxOutputTokens }),
       ...(request.providerRequestUsageObserver === undefined
         ? {}
         : { providerRequestUsageObserver: request.providerRequestUsageObserver }),
