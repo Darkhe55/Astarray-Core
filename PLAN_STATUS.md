@@ -2911,3 +2911,17 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   修复：浅底 `#f7f8fa` + 边框 + 圆角 + padding；hover 蓝底、active 更深。
 - 实测（CDP 真实鼠标事件）：右键节点 → 菜单 3 项；点击第一项 → “上级：无”；节点 outline=none；菜单项背景/边框/padding 生效。
 - 门禁：私有 607 用例 / 变异 41-41。
+
+## 2026-10-25 “重启后信息消失”修复（私有）
+
+根因三条：
+1. 桌面版数据目录曾按可写性在 `%LOCALAPPDATA%` / `%APPDATA%` / `%USERPROFILE%` / exe 旁 `data` 之间**静默切换**，且重建 dist 会清掉 exe 旁数据；
+2. GUI 启动不恢复上次选中的项目/任务，界面回到空白（数据还在盘上）；localStorage 因桌面随机端口 origin 变化而失效；
+3. 模型能力改造后 `start-gui-live` 把模型对象当字符串读取，重启时 `modelIdentifier.trim is not a function` 直接崩溃。
+
+修复：
+- 桌面固定使用 `%LOCALAPPDATA%\Astarray\state`（`ASTARRAY_DATA_DIR` 显式覆盖）；不再静默回退；首次启动若标准目录为空且存在 exe 旁 `data\state`，自动迁移。
+- 新增 `gui/chat-selection.json` 服务端持久化 + `/settings/chat-selection`、`/commands/save-chat-selection`；启动时恢复上次项目/任务（localStorage 仅作兜底）。
+- 修正启动器读取 `models[0].modelIdentifier`。
+- 实测：创建项目并选中 → 换端口重启 → 项目列表与选中项自动恢复。
+- 门禁：私有 611 用例 / 变异 41-41。
