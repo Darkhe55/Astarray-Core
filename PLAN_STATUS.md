@@ -2958,3 +2958,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 修复 `readModelAccounts` 在 active=null 时错误回退到第一个账户的问题；禁用状态下编辑账户不会偷偷重新启用。
 - 实测：禁用后重启日志「模型已禁用：以离线模式启动」，`/settings/model-accounts` active=null；桌面 `/commands/restart-service` 后 5s 内服务恢复 200，host 日志记录“重新装配完成”。
 - 门禁：私有 622 用例 / 变异 41-41。
+
+## 2026-10-25 发送反馈/投递入口（私有）
+
+- 发送后立即显示用户气泡，不再等网络；项目内发送成功即选中新 mission 并每 2s 轮询会话，Agent 回复/失败原因及时出现。
+- 选中 mission 时优先显示任务气泡（含失败/门控事件），项目消息流只用于未选中 mission 的群聊场景。
+- 移除输入区旧的「投递给」下拉（与拓扑“选择投递 Agent”冲突），只保留 `chatPickAgentButton` + `chatTargetAgentLabel`；目标 Agent 通过拓扑选择传递。
+- 发送请求增加 catch：服务断连/超时显示“请求未能到达本地服务”，不再静默。
+- 核心：Provider/运行时失败（鉴权、端点、超时）结束 mission 并置 blocked，释放租约，侧栏不再永远“运行中”；其他任务失败仍只迁移状态、保留恢复能力。
+- 实测假 Key：800ms 内出现用户气泡；随后 Agent 气泡显示 `[需要用户] ... Provider 请求失败...`；侧栏该 mission 显示已结束/中断而非运行中。
+- 门禁：公开 3990 用例 / 变异 313-313；私有 625 用例 / 变异 41-41；桌面版重新构建冒烟通过。
