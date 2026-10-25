@@ -2978,3 +2978,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 备份：导出 zip **排除 `providers/`**（Key/账户/端点不进备份）；恢复时保留本机当前 providers，避免恢复把 Key 清掉。
 - 实测：直接服务保存账户+Key+项目到 `%LOCALAPPDATA%\Astarray\state` 成功；桌面正常启动 `data-path.txt` 指向该目录；本地 401 Provider 的 Agent 气泡显示上述错误码与 Key 检查提示。
 - 门禁：公开 3991 用例 / 变异 313-313；私有 627 用例 / 变异 41-41；桌面重新构建冒烟通过。
+
+## 2026-10-25 补充：桌面运行 node 的副本与 EPERM 诊断
+
+- 桌面宿主现在把随包 `node.exe` 复制到 `%LOCALAPPDATA%\Astarray\runtime\node.exe` 并从那里启动服务：
+  - 软件目录更新/重建不会锁住运行中的 node；
+  - 避免软件目录路径本身带来的执行限制。
+- 已确认 EPERM 的现场原因：由 Agent 会话启动的桌面实例继承了受限令牌，该令牌对用户目录只读（dist node 在 TEMP/用户目录均 EPERM；手工用同一 runtime node 写入用户目录正常）。**用户从资源管理器直接启动 exe 使用正常令牌**；这不是代码里的目录选择问题。
+- 用户目录数据路径、备份排除 providers、旧 dist 目录不再回退等修复保留。
