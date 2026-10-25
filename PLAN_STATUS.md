@@ -2883,3 +2883,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 实测（CDP）：DeepSeek 预设生成 2 行，默认 128000/8192；改首行为 64000/4096 + 视觉，新增 custom-vision 32000/2048，保存后 `/settings/model-accounts` 完整保留。
 - 门禁：私有 597 用例 / 变异 41-41。
 - 未做：把这些能力接入运行时（按模型上下文裁剪预算、把 maxOutput 传给 provider）；当前运行时仍使用全局预算。
+
+## 2026-10-25 npm 发布安全构建（私有）
+
+- `npm run build:publish` → `dist-publish/`；`npm run verify:publish` 解包验收。
+- 发布包只含：`cli.js`（公开 CLI 命令面）、`cli/tui.js`（私有 TUI 编译产物）、README、LICENSE、package.json；**无 .ts/.tsx、无 .map、无 sourcesContent、无 tests/desktop/scripts/packages**。
+- 仓库 `package.json` 保持 `private: true`，发布目录的 package.json 才移除并设置 files 白名单；包名默认 `astarray`，`ASTARRAY_PUBLISH_NAME` 可覆盖。
+- TUI 用 esbuild 打包（ink/react 一并打包，`react-devtools-core` 用空实现 shim）；解决 CJS 内建 require 注入（createRequire banner）。
+- 实测：`npm pack` = 5 文件 / 937KB；解包后 `node cli.js --version` = 0.1.0；无参数启动进入 TUI 加载路径并因非 TTY 明确报错；`npm install` 该 tgz 后同样可运行。
+- 限制：打包后的 JS 仍可读；npm 公开渠道无法保证源码不可见。门禁：私有 601 用例 / 变异 41-41。
