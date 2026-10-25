@@ -2840,3 +2840,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 文档：`astarray-ui/desktop/README.md`（Azure Trusted Signing / OV / EV 对比；自签名仅本机有效；无证书时 Unblock-File 临时处理）。
 - 事实：本机无证书，当前 exe 仍是 **NotSigned**，警告会持续到配置证书并重新签名。
 - 门禁：私有 582 用例 / 变异 41-41。
+
+## 2026-10-25 文件夹选择器“一闪即取消”修复（私有 5a4f142）
+
+根因（三条叠加）：
+1. IFileOpenDialog 互操作签名未标 `[PreserveSig]`，`GetOptions`/`GetResult` 的 HRESULT/out 参数被 CLR 解释错 ⇒ Show 很快返回失败，被当成“用户取消”；
+2. 桌面版进程令牌受限，PowerShell `Add-Type` 写 `%TEMP%` 被拒（UnauthorizedAccessException），脚本编译失败；
+3. 对话框以 `IntPtr.Zero` 为 owner，没有父窗口，容易出现在应用后面。
+
+修复：全部 COM 方法 PreserveSig + 显式 HRESULT 检查（仅 0x800704C7 视为取消，其余 stderr + exit 2）；Add-Type 前把 TEMP/TMP 指到 `dist/data/tmp`；MainForm 把窗口句柄写入 `window-handle.txt`，路由以 `-OwnerHandle` 传给脚本、`Show(owner)` 做成应用窗口的模态对话框；路由不再把失败伪装成取消。
+
+验证：脚本 `-CompileOnly`/`-Probe` 通过；直接启动脚本时 `MainWindowTitle=选择项目文件夹`（窗口真实创建）；桌面路径受沙箱桌面隔离限制无法截图确认前景，但进程在 Show 上等待而非立即退出。
+门禁：私有 582 用例 / 变异 41-41。
