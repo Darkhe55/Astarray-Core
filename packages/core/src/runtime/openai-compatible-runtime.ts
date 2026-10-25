@@ -21,6 +21,8 @@ export interface OpenAiCompatibleRuntimeOptions {
   apiKey: string;
   model: string;
   requestTimeoutMilliseconds: number;
+  /** 单次输出上限（来自模型能力）；不传则不下发 max_tokens。 */
+  maxTokens?: number;
   /** 可注入以便测试。 */
   fetchImpl?: typeof fetch;
   /** Provider 运行时/协议标识（写进用量账目；缺省为 openai-compatible）。 */
@@ -79,7 +81,7 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
     agentRunInput: AgentRunInput,
     cancellationSignal: AbortSignal,
   ): AsyncIterable<AgentEvent> {
-    const requestBody = buildChatRequestBody(agentRunInput, this.options.model);
+    const requestBody = buildChatRequestBody(agentRunInput, this.options.model, this.options.maxTokens);
     const serializedRequestBody = JSON.stringify(requestBody);
     /**
      * 用量捕获（2026-10-06）：OpenAI 兼容协议**默认不返回**流式 usage，
@@ -318,9 +320,11 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
 function buildChatRequestBody(
   agentRunInput: AgentRunInput,
   model: string,
+  maxTokens?: number,
 ): unknown {
   return {
     model,
+    ...(maxTokens === undefined || maxTokens <= 0 ? {} : { max_tokens: maxTokens }),
     stream: true,
     /**
      * 流式 usage 必须显式请求（2026-10-06）。

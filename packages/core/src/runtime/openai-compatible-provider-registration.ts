@@ -23,6 +23,7 @@ export function createOpenAiCompatibleProviderRegistration(): ProviderRuntimeReg
         apiKey: config.apiKey,
         model: config.modelIdentifier,
         requestTimeoutMilliseconds: config.requestTimeoutMilliseconds,
+        ...(config.maxOutputTokens === undefined ? {} : { maxTokens: config.maxOutputTokens }),
         providerIdentifier: config.providerId,
         ...(config.providerRequestUsageObserver === undefined
           ? {}
