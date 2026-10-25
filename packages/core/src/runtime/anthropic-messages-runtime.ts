@@ -21,6 +21,10 @@ import {
   computeProviderRequestInputHash,
   type ProviderRequestUsageObserverPort,
 } from "../measurement/provider-request-usage-observation.js";
+import {
+  describeProviderHttpFailure,
+  describeProviderNetworkFailure,
+} from "./provider-failure.js";
 // 复用既有适配器导出的协议标识与 API 版本，避免第二份定义漂移。
 import {
   ANTHROPIC_MESSAGES_API_VERSION,
@@ -174,7 +178,7 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
           body: JSON.stringify(requestBody),
           signal: abortController.signal,
         });
-      } catch {
+      } catch (error) {
         if (cancellationSignal.aborted) {
           yield {
             kind: "runFinished",
@@ -184,16 +188,14 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
           };
           return;
         }
-        throw new DomainError(
-          "provider-timeout",
-          `Provider 请求失败或超时（${this.options.requestTimeoutMilliseconds}ms）`,
-        );
+        throw describeProviderNetworkFailure({
+          error,
+          isTimeout: abortController.signal.aborted,
+          timeoutMilliseconds: this.options.requestTimeoutMilliseconds,
+        });
       }
       if (!response.ok || !response.body) {
-        throw new DomainError(
-          "provider-timeout",
-          `Provider 返回非 2xx: ${response.status} ${response.statusText}`,
-        );
+        throw await describeProviderHttpFailure(response);
       }
 
       // 按 content block 累积：文本块直接转发；tool_use 块累积 id/name/部分 JSON。
