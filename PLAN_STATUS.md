@@ -2998,3 +2998,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   - 数据目录仍优先 `%LOCALAPPDATA%\Astarray`；要回到标准路径，把 `AstarrayGui.exe`、`node.exe`、`%LOCALAPPDATA%\Astarray` 加入火绒信任区即可。
 - 实测：最终构建启动后 `data-path.txt` 指向 `desktop/AstarrayData/state`；创建项目 HTTP 200，Key/账户可写入；不会再出现 `.projects.json...tmp EPERM`。
 - 门禁：私有 627 用例 / 变异 41-41；公开 3991 用例 / 变异 313-313。
+
+## 2026-10-25 桌面迁移到 Electron（私有）
+
+- 新增 `desktop/electron/main.mjs`：Electron BrowserWindow + 本地 `server.mjs` 子进程；服务退出自动重启，关闭窗口结束进程树；支持 `--smoke-test`。
+- 数据目录沿用真实写入探测：用户目录不可写时回退 `desktop/AstarrayData`；启动器优先已安装 Node，否则用 Electron 二进制的 Node 模式运行 server。
+- 新增 `scripts/build-electron.mjs`：复制 Electron 运行时，打包 `resources/app/{package.json,main.mjs,server.mjs}`，输出 `desktop/dist/Astarray.exe`；默认 `npm run build:desktop` 已切到 Electron，旧 WinForms 构建保留为 `build:desktop:winforms`。
+- 构建前迁移 `dist/AstarrayData` 到同级，失败拒绝构建，避免更新删存档。
+- 环境限制：本 Agent 会话里 Electron 原生启动即崩溃（最小 Electron 应用也 0xC0000005），因此构建脚本在 `ELECTRON_RUN_AS_NODE=1` 的受限终端自动跳过冒烟并提示；**请在普通资源管理器/终端手工启动验证**。
+- 门禁：私有 631 用例 / 变异 41-41；公开 3991 用例 / 变异 313-313。
