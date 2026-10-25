@@ -2822,3 +2822,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 单文件 exe 试过：本机 `%TEMP%` 自解压失败（不设 `DOTNET_BUNDLE_EXTRACT_BASE_DIR` 时进程不起、无日志）；设该环境变量后可运行。为避免用户踩坑，交付采用**目录版**（双击 exe 即可，保留整个文件夹）。
 - 实测：`--smoke-test` → `DESKTOP_SMOKE_OK`；启动后 HTTP 200 且页面含 `chatSettingsWorkspace`；退出后无 node 残留。
 - 门禁：私有 581 用例 / 变异 41-41。
+
+## 2026-10-25 GUI 细节修复（私有）
+
+- 设置按钮改为经典齿轮 SVG（保留 aria-label="设置"）。
+- 设置页原为深色（#16161a），与主界面浅色不一致被当成“黑屏”；改为浅色卡片式（#f4f5f7），标签/输入框全宽，经 WebView2 CDP 截图与 DOM 检查确认（背景 rgb(244,245,247)、内容 451 字、无 JS 异常）。
+- CLI/GUI 共用 Windows 标准数据目录：`%LOCALAPPDATA%\Astarray\state`（`ASTARRAY_DATA_DIR` 覆盖；Vitest 保留 cwd/.astarray 兼容）。桌面版 host 依次尝试 LOCALAPPDATA/APPDATA/USERPROFILE，最后才回退 exe 旁 data（受限环境实测会回退，普通双击不会）。
+- 新建项目：客户端补 `.catch`/禁用按钮/“创建中…”，失败不再静默；CDP 实测桌面版创建项目成功（project-mvn93iy3-10c8d1）。
+- 文件夹选择器改为 IFileOpenDialog（FOS_PICKFOLDERS），即带地址栏/侧边栏的现代资源管理器窗口；保留 UTF-8 BOM 与编译自检（-CompileOnly 通过）。
+- 门禁：公开 3988 用例 / 变异 313-313；私有 582 用例 / 变异 41-41。
