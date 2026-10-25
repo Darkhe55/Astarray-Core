@@ -2892,3 +2892,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - TUI 用 esbuild 打包（ink/react 一并打包，`react-devtools-core` 用空实现 shim）；解决 CJS 内建 require 注入（createRequire banner）。
 - 实测：`npm pack` = 5 文件 / 937KB；解包后 `node cli.js --version` = 0.1.0；无参数启动进入 TUI 加载路径并因非 TTY 明确报错；`npm install` 该 tgz 后同样可运行。
 - 限制：打包后的 JS 仍可读；npm 公开渠道无法保证源码不可见。门禁：私有 601 用例 / 变异 41-41。
+
+## 2026-10-25 GUI 布局与 Agent 主题修复（私有）
+
+- 消息气泡：行/气泡 `min-width:0; max-width:100%`，文本与详情 `overflow-wrap:anywhere`，`pre` 限制在列宽内；CDP 注入超长路径后 `#chatBubbles` 横向溢出为 0。
+- 设置按钮：30×30、`flex:0 0 auto`、`align-self:flex-start`、齿轮左对齐；实测宽高 30/30、左侧偏移 10px。
+- Agent 管理：拓扑节点改浅色（`#ffffff`/`#f1f3f6`，文字 `#1f2430`/`#6b7280`）；右键菜单白底深字（`rgb(255,255,255)` / `rgb(31,36,48)`）。
+- “暂时移出工作流”去掉可能被 WebView2 拦截的 `window.confirm`，直接执行并带网络失败提示；CDP 实测返回「已从工作流移除：测试 Agent」。
+- 桌面版重新构建冒烟通过；门禁：私有 605 用例 / 变异 41-41。
