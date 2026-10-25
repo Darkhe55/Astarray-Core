@@ -2986,3 +2986,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   - 避免软件目录路径本身带来的执行限制。
 - 已确认 EPERM 的现场原因：由 Agent 会话启动的桌面实例继承了受限令牌，该令牌对用户目录只读（dist node 在 TEMP/用户目录均 EPERM；手工用同一 runtime node 写入用户目录正常）。**用户从资源管理器直接启动 exe 使用正常令牌**；这不是代码里的目录选择问题。
 - 用户目录数据路径、备份排除 providers、旧 dist 目录不再回退等修复保留。
+
+## 2026-10-25 桌面 EPERM：MiniMax 审查与修复
+
+- 外部审查（MiniMax-M3，只诊断不改代码）结论：失败在 **进程安全上下文/安全软件**，不是目标目录 ACL、原子写算法或 Node 本身；`fs.open(temp,'w')` 在 rename 之前就 EPERM。
+- 实机确认：系统装有**火绒**；它允许在 workspace 下写文件，但阻止该桌面应用写 `%LOCALAPPDATA%`/`%USERPROFILE%` 等用户目录。Task Scheduler 启动同样被拦。
+- 修复（按报告）：
+  - 数据目录选择改为**真实写入探测**（不再只 mkdir）：候选目录逐个写 `.write-probe-*`，失败即跳过；
+  - 用户目录全部不可写时，回退到 `desktop/AstarrayData`（dist 同级，重建只删 dist，不会删该目录）；构建前会把旧 `dist/AstarrayData`/`dist/data` 迁移过去，迁移失败则**拒绝构建**而不是删数据；
+  - 优先使用已安装的 Node（Program Files，受信签名），减少未签名随包 node 被安全软件拦截的概率；
+  - 数据目录仍优先 `%LOCALAPPDATA%\Astarray`；要回到标准路径，把 `AstarrayGui.exe`、`node.exe`、`%LOCALAPPDATA%\Astarray` 加入火绒信任区即可。
+- 实测：最终构建启动后 `data-path.txt` 指向 `desktop/AstarrayData/state`；创建项目 HTTP 200，Key/账户可写入；不会再出现 `.projects.json...tmp EPERM`。
+- 门禁：私有 627 用例 / 变异 41-41；公开 3991 用例 / 变异 313-313。
