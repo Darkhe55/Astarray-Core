@@ -10,6 +10,7 @@ import type { ToolPublicDocumentationRegistryEntry } from "./tools/tool-public-d
 import { promises as fs } from "node:fs";
 import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
 import path from "node:path";
+import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
 
 // 装配层内部使用（不是再导出）：把真实用量观测接到账目存储上（2026-10-06 接线）。
 import { createProviderUsageLedgerObserver } from "./orchestration/provider-usage-ledger-observer.js";
@@ -2893,6 +2894,53 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return settings;
   }
 
+  /** GUI-03-02：读取项目/会话覆盖（只读，不含继承合并）。 */
+  async queryScopedSettings(): Promise<ScopedSettingsDocument> {
+    this.assertOpen();
+    return this.runtime.scopedSettingsStore.read();
+  }
+
+  /** GUI-03-02：CAS 写入项目/会话上下文覆盖。 */
+  async updateScopedContextBudget(input: {
+    scope: "project" | "session";
+    identifier: string;
+    expectedRevision: number;
+    configuredMaximumGlobalContextTokenCount: number;
+  }): Promise<ScopedSettingsDocument> {
+    this.assertOpen();
+    try {
+      return await this.runtime.scopedSettingsStore.updateContext({
+        ...input,
+        updatedByUserId: "authenticated-user",
+      });
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new PublicApplicationError(error.errorCode, error.message);
+      }
+      throw error;
+    }
+  }
+
+  /** GUI-03-02：CAS 写入项目/会话权限覆盖；只存引用，不改权限门禁。 */
+  async updateScopedPermission(input: {
+    scope: "project" | "session";
+    identifier: string;
+    expectedRevision: number;
+    permissionProfileId: string | null;
+  }): Promise<ScopedSettingsDocument> {
+    this.assertOpen();
+    try {
+      return await this.runtime.scopedSettingsStore.updatePermission({
+        ...input,
+        updatedByUserId: "authenticated-user",
+      });
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new PublicApplicationError(error.errorCode, error.message);
+      }
+      throw error;
+    }
+  }
   /**
    * GUI-02-03（2026-11-08）：**历史列表与详情**（只读、分页按需）。
    *
@@ -5224,6 +5272,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return { ...evaluation, admittedAtIso: record.admittedAtIso };
   }
 
+  /** GUI-03-03：更新指令窗口容量；降低容量只排队，不丢弃已接收指令。 */
+  async updateInstructionWindowCapacity(capacity: number): Promise<InstructionWindowSnapshot> {
+    this.assertOpen();
+    const store = await this.getInstructionWindowStore();
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 20) {
+      throw new PublicApplicationError("invalid-window-capacity", "指令窗口容量必须为 1–20 的整数。");
+    }
+    await store.setWindowCapacity(capacity);
+    return store.snapshot();
+  }
+
   /** 指令窗口存储（单一状态目录；无状态目录时响亮失败，不静默降级）。 */
   private async getInstructionWindowStore(): Promise<InstructionWindowStore> {
     if (this.instructionWindowStore !== null) {
@@ -6095,6 +6154,10 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
+
+
 
 
 

@@ -351,6 +351,11 @@ export class MainController {
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
+  /** GUI-03-02：按 mission 解析所属项目（只读；未知返回 null）。 */
+  getMissionProjectIdentifier(missionId: string): string | null {
+    return this.missionProjectIdentifiers.get(missionId) ?? null;
+  }
+
   constructor(private readonly options: MainControllerOptions) {}
 
   /** 模式切换（TUI 调用）：交由状态机校验，非法迁移抛 DomainError。 */
@@ -1337,6 +1342,7 @@ export class MainController {
     ];
   }
 }
+
 
 
 
