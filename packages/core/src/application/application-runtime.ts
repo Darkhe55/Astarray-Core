@@ -116,6 +116,7 @@ import { AgentModelBindingStore } from "../orchestration/agent-model-binding-sto
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
 import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ToolPackageLifecycleService } from "../toolkit/tool-package-lifecycle-service.js";
+import { ToolPackageZipInstaller } from "../toolkit/tool-package-zip-installer.js";
 import { ContextClosureCapsuleStore } from "../orchestration/context-closure-capsule-store.js";
 import {
   HumanVerificationController,
@@ -185,6 +186,7 @@ export interface ApplicationRuntime {
   missionRuntimeRegistry: MissionRuntimeRegistry;
   artifactRecordStore: ArtifactRecordStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
+  toolPackageZipInstaller: ToolPackageZipInstaller;
   /** T09A-R1-04：真实装配事件（指标复算与"下一请求生效"证据）。 */
   contextRuntimeEventStore: ContextRuntimeEventStore;
   /** GUIDE-01-04：运行中指导控制队列（公共入口/CLI 提交与查看状态）。 */
@@ -725,6 +727,7 @@ export async function createApplicationRuntime(
   const missionRuntimeRegistry = new MissionRuntimeRegistry();
   const artifactRecordStore = new ArtifactRecordStore({ baseDirectory: stateDirectory });
   const toolPackageLifecycleService = new ToolPackageLifecycleService({ baseDirectory: stateDirectory });
+  const toolPackageZipInstaller = new ToolPackageZipInstaller({ baseDirectory: stateDirectory });
   // T09A-R1-03：任务完成后的节点收口（节点 → 验证 → 关闭/等待 → 胶囊 → 核验任务）。
   const contextClosureCapsuleStore = new ContextClosureCapsuleStore({
     baseDirectory: stateDirectory,
@@ -1557,6 +1560,7 @@ export async function createApplicationRuntime(
     missionRuntimeRegistry,
     artifactRecordStore,
     toolPackageLifecycleService,
+    toolPackageZipInstaller,
     contextRuntimeEventStore,
     guidanceControlQueue,
     longToolCheckpointController,
@@ -1599,6 +1603,7 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
 
 
 

@@ -3091,6 +3091,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         return service.rollback(input);
     }
   }
+  /** GUI-03-05：预览本地 zip 工具包（不安装）。 */
+  async previewToolPackageZip(zipPath: string) {
+    this.assertOpen();
+    return this.runtime.toolPackageZipInstaller.preview(zipPath);
+  }
+
+  /** GUI-03-05：安装本地 zip；安装不等于启用。 */
+  async installToolPackageZip(input: { zipPath: string; isConfirmed: boolean }) {
+    this.assertOpen();
+    return this.runtime.toolPackageZipInstaller.install(input);
+  }
   /** GUI-03-05：工具包生命周期只读快照（版本/锁/待切换）。 */
   async queryToolPackageLifecycle() {
     this.assertOpen();
@@ -6597,6 +6608,7 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
 
 
 
