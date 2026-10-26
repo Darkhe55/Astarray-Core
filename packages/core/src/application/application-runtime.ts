@@ -217,6 +217,8 @@ export interface ApplicationRuntime {
   accuracyVerificationAuditLog: FileAccuracyVerificationAuditLog;
   /** GIT-PRESERVE-02：远端同步失败后的本地保全（工作树之外的受保护快照）。 */
   localPreservationService: LocalPreservationService;
+  sessionElevationStore: SessionPermissionElevationStore;
+  sessionElevationController: SessionPermissionElevationController;
   shutdown: () => Promise<void>;
 }
 
@@ -1531,6 +1533,8 @@ export async function createApplicationRuntime(
     contextClosureCapsuleStore,
     contextGraphStore,
     mainAgentInstanceId,
+    sessionElevationStore,
+    sessionElevationController,
     shutdown,
   };
 }
@@ -1551,6 +1555,8 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
+
 
 
 
