@@ -114,6 +114,8 @@ import { GlobalContextBudgetStore } from "../orchestration/global-context-budget
 import { ScopedSettingsStore } from "../orchestration/scoped-settings-store.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
+import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
+import { ToolPackageLifecycleService } from "../toolkit/tool-package-lifecycle-service.js";
 import { ContextClosureCapsuleStore } from "../orchestration/context-closure-capsule-store.js";
 import {
   HumanVerificationController,
@@ -181,6 +183,8 @@ export interface ApplicationRuntime {
   scopedSettingsStore: ScopedSettingsStore;
   agentModelBindingStore: AgentModelBindingStore;
   missionRuntimeRegistry: MissionRuntimeRegistry;
+  artifactRecordStore: ArtifactRecordStore;
+  toolPackageLifecycleService: ToolPackageLifecycleService;
   /** T09A-R1-04：真实装配事件（指标复算与"下一请求生效"证据）。 */
   contextRuntimeEventStore: ContextRuntimeEventStore;
   /** GUIDE-01-04：运行中指导控制队列（公共入口/CLI 提交与查看状态）。 */
@@ -719,6 +723,8 @@ export async function createApplicationRuntime(
   await scopedSettingsStore.read();
   const agentModelBindingStore = new AgentModelBindingStore({ baseDirectory: stateDirectory });
   const missionRuntimeRegistry = new MissionRuntimeRegistry();
+  const artifactRecordStore = new ArtifactRecordStore({ baseDirectory: stateDirectory });
+  const toolPackageLifecycleService = new ToolPackageLifecycleService({ baseDirectory: stateDirectory });
   // T09A-R1-03：任务完成后的节点收口（节点 → 验证 → 关闭/等待 → 胶囊 → 核验任务）。
   const contextClosureCapsuleStore = new ContextClosureCapsuleStore({
     baseDirectory: stateDirectory,
@@ -1529,6 +1535,8 @@ export async function createApplicationRuntime(
     scopedSettingsStore,
     agentModelBindingStore,
     missionRuntimeRegistry,
+    artifactRecordStore,
+    toolPackageLifecycleService,
     contextRuntimeEventStore,
     guidanceControlQueue,
     longToolCheckpointController,
@@ -1571,6 +1579,7 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
 
 
 
