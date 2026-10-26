@@ -24,7 +24,7 @@
 | F06 项目上下文覆盖 | implemented-unverified | ScopedSettingsStore + GUI + 提示词装配已接 |
 | F10 会话上下文覆盖 | implemented-unverified | ScopedSettingsStore + GUI + 提示词装配已接 |
 | F02 实验功能 | partial | 目录/默认关闭/存储/只读 UI；无运行时消费者，开关不可启用 |
-| F05 项目工作时段 | partial | 项目作用域存储/UI + dispatch/resume/model/tool 门禁；在途收尾未接 |
+| F05 项目工作时段 | implemented-unverified | 项目作用域存储/UI + dispatch/resume/model/tool 门禁；在途长工具收尾契约测试通过；无自动重派发 |
 | F03 工具生命周期 | implemented-unverified | zip 安装/启停/升级/回退/差异 UI；真实 zip 预览/安装/不自动启用冒烟通过 |
 | F07 指令队列 | implemented-unverified | FIFO/容量/手动置顶已接；无 queue/guidance/smart 模式（用户确认不需要） |
 | F08 会话模型切换 | implemented-unverified | 多账户/candidate/pool/binding/applied-failed + session id 传播；fake-runtime 端到端通过 |
@@ -57,6 +57,7 @@
 ## 6. 结论
 
 不能标记 GUI-03 完成。R01–R04 与 F01 已编码；其余能力受核心公共门面缺失阻塞。后续应先补作用域配置、会话控制、工作时段、工具生命周期与产物查询的受控公共 API，再继续 GUI 接线。
+
 
 
 
