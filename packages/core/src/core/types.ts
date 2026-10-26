@@ -537,6 +537,8 @@ export type ToolCallResult =
       callId: string;
       outputText: string;
       isSideEffectFree: boolean;
+      /** GUI-03-06：工具成功时真实产生的产物（仅由工具实现填写）。 */
+      producedArtifacts?: ProducedArtifact[];
     }
   | {
       kind: "error";
@@ -552,8 +554,6 @@ export type ToolCallResult =
        * 门禁只据此决定"释放预留"还是"进入对账"，不得由模型或上层推断。
        */
       sideEffectStatus?: "none" | "partial" | "unknown";
-      /** GUI-03-06：工具成功时真实产生的产物（仅由工具实现填写）。 */
-      producedArtifacts?: ProducedArtifact[];
     };
 
 /** 工具端口：权限检查必须先于实际执行（策略包装层在 T06）。 */
@@ -772,6 +772,7 @@ export interface GitIntegrationReport {
   unresolvedRisks: string[];
   createdAtIso: string;
 }
+
 
 
 
