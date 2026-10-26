@@ -10,6 +10,7 @@ import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
 import type { RunHistoryStore } from "./run-history-store.js";
 import type { MissionRuntimeLease, MissionRuntimeRegistry } from "./mission-runtime-registry.js";
+import type { ArtifactRecordStore } from "./artifact-record-store.js";
 import { evaluateMergeReadinessWithProvider } from "./git-merge-readiness.js";
 import type { GitMergeReadinessEvidence } from "./git-merge-readiness.js";
 
@@ -136,6 +137,7 @@ export interface MainControllerOptions {
   mainRuntimeFactory: (agentInstanceId: string) => AgentRuntime;
   /** GUI-03 / 方案 A2：mission 预登记 runtime；缺省回退原工厂。 */
   missionRuntimeRegistry?: MissionRuntimeRegistry;
+  artifactRecordStore?: ArtifactRecordStore;
   /** A2：mission 调度前解析模型 binding 并获取 lease；缺省不切换模型。 */
   missionRuntimePreparer?: (input: {
     missionId: string;
@@ -1153,6 +1155,7 @@ export class MainController {
             ? "done"
             : "cancelled";
           this.options.onMissionFinished?.(missionId, status);
+          void this.registerMissionArtifacts(missionId);
           return this.options.missionManager.updateMissionStatus(missionId, status);
         }
         this.options.streamOutput(missionId, `[需要用户] ${message.payload.instructionText}`);
@@ -1328,6 +1331,24 @@ export class MainController {
     });
   }
 
+  private async registerMissionArtifacts(missionId: string): Promise<void> {
+    const store = this.options.artifactRecordStore;
+    if (store === undefined) return;
+    const status = await this.options.missionManager.getMissionStatus(missionId);
+    const projectIdentifier = this.missionProjectIdentifiers.get(missionId) ?? "workspace";
+    for (const task of status.taskChain?.tasks ?? []) {
+      if (typeof task.resultLocation !== "string" || task.resultLocation.trim() === "") continue;
+      await store.register({
+        projectIdentifier,
+        missionIdentifier: missionId,
+        taskIdentifier: task.id,
+        artifactType: "task-result-location",
+        displayName: task.description || task.id,
+        location: task.resultLocation,
+      }).catch(() => undefined);
+    }
+  }
+
   private buildInitialChain(
     missionId: string,
     taskNodes: TaskChainDocument["tasks"],
@@ -1393,6 +1414,7 @@ export class MainController {
     ];
   }
 }
+
 
 
 

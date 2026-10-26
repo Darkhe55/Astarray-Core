@@ -1320,6 +1320,7 @@ export async function createApplicationRuntime(
         }),
     modeMachine,
     missionRuntimeRegistry,
+    artifactRecordStore,
     missionRuntimePreparer: options.missionRuntimePreparer,
     sessionManager,
     taskStore,
@@ -1579,6 +1580,7 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
 
 
 
