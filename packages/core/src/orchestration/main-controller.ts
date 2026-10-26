@@ -138,6 +138,11 @@ export interface MainControllerOptions {
   /** GUI-03 / 方案 A2：mission 预登记 runtime；缺省回退原工厂。 */
   missionRuntimeRegistry?: MissionRuntimeRegistry;
   artifactRecordStore?: ArtifactRecordStore;
+  workWindowGateDecisionProvider?: (input: {
+    missionId: string;
+    projectIdentifier: string | null;
+    nowIso: string;
+  }) => Promise<{ isAllowed: boolean; reasonCode: string; reason: string }>;
   /** A2：mission 调度前解析模型 binding 并获取 lease；缺省不切换模型。 */
   missionRuntimePreparer?: (input: {
     missionId: string;
@@ -424,6 +429,14 @@ export class MainController {
       requestedProjectIdentifier !== undefined && requestedProjectIdentifier !== ""
         ? requestedProjectIdentifier
         : this.options.registeredProjectRoots?.[0]?.projectIdentifier;
+    const workWindowDecision = await this.options.workWindowGateDecisionProvider?.({
+      missionId,
+      projectIdentifier: projectIdentifier ?? null,
+      nowIso: new Date().toISOString(),
+    });
+    if (workWindowDecision !== undefined && !workWindowDecision.isAllowed) {
+      throw new DomainError("work-window-resting", workWindowDecision.reason);
+    }
     await this.options.missionManager.createMission({
       missionId,
       mode,
@@ -1416,6 +1429,7 @@ export class MainController {
     ];
   }
 }
+
 
 
 

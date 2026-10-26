@@ -10,6 +10,7 @@ export type DomainErrorCode =
   | "dependency-not-found"
   | "concurrency-limit-exceeded"
   | "invalid-mode-transition"
+  | "work-window-resting"
   | "tool-not-found"
   | "tool-permission-denied"
   | "permission-ask-pending"
@@ -125,4 +126,5 @@ export class SideEffectNoneError extends Error {
     this.name = "SideEffectNoneError";
   }
 }
+
 

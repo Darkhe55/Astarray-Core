@@ -116,6 +116,8 @@ import { AgentModelBindingStore } from "../orchestration/agent-model-binding-sto
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
 import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
+import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
+import { createPauseReasonState } from "../orchestration/work-window-contract.js";
 import { ExperimentSettingsStore } from "../orchestration/experiment-catalog.js";
 import { ToolPackageLifecycleService } from "../toolkit/tool-package-lifecycle-service.js";
 import { ToolPackageZipInstaller } from "../toolkit/tool-package-zip-installer.js";
@@ -1346,6 +1348,22 @@ export async function createApplicationRuntime(
     modeMachine,
     missionRuntimeRegistry,
     artifactRecordStore,
+    workWindowGateDecisionProvider: async (input) => {
+      const workWindow = await projectWorkWindowStore.read();
+      const decision = evaluateWorkWindowGate({
+        gatePoint: "dispatch",
+        nowIso: input.nowIso,
+        rules: workWindow.rules,
+        pauseReasonState: createPauseReasonState(),
+      });
+      return decision.kind === "allow"
+        ? { isAllowed: true, reasonCode: "allowed", reason: decision.reason }
+        : {
+            isAllowed: false,
+            reasonCode: decision.reasonCode,
+            reason: decision.reason,
+          };
+    },
     missionRuntimePreparer: options.missionRuntimePreparer,
     sessionManager,
     taskStore,
@@ -1611,6 +1629,7 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
 
 
 
