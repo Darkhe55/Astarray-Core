@@ -3,7 +3,7 @@
 > 愿星光破开迷途。
 > May starlight pierce the path astray.
 
-面向长任务的多 Agent 编排工具，公开源码仓库提供核心、CLI 和 Node.js SDK；npm 包 `astarray` 可包含由私有 UI 仓库构建的 CLI/TUI，不包含 Web GUI/桌面版。终端 UI 与 Web GUI 的源码位于私有仓库 `astarray-ui`。设计分工为主 Agent 交流与总体规划、次级调度和项目集成、三级执行任务，必要时受控委派四级。每个具体 Agent 独立存档，通过带来源的消息和附件协作。
+面向长任务的多 Agent 编排工具，公开源码仓库提供核心、CLI 和 Node.js SDK；npm 包 `astarray` 可包含 CLI/TUI，不包含 Web GUI/桌面版。设计分工为主 Agent 交流与总体规划、次级调度和项目集成、三级执行任务，必要时受控委派四级。每个具体 Agent 独立存档，通过带来源的消息和附件协作。
 
 ## 优化目标
 
@@ -36,7 +36,7 @@ node dist/cli.js run "验证本地任务流程" --mode assist --runtime mock --j
 node dist/cli.js status --json
 ~~~
 
-公开源码仓库不包含 UI 源码。npm 包 `astarray` 可包含 CLI/TUI（由私有 UI 仓库构建），但不包含 Web GUI/桌面版；Web GUI 与桌面版需使用私有仓库 `astarray-ui`。公开构建的 `gui` 子命令会明确提示 UI 归属私有库并以非 0 退出。
+公开源码仓库不包含 UI 源码。npm 包 `astarray` 可包含 CLI/TUI，但不包含 Web GUI/桌面版；公开构建的 `gui` 子命令会明确提示此构建不含 Web GUI，并以非 0 退出。
 
 ### 打包与隔离验收
 

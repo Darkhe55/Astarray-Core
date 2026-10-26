@@ -3947,14 +3947,12 @@ export async function executeGuiServeCommand(
   options: GuiServeCommandOptions,
 ): Promise<number> {
   /**
-   * 仓库分层（2026-10-19 用户决策）：**只有 CLI 落在公开库，TUI 与 GUI 统一在私有库**
-   * （`astarray-ui`）。因此公开构建**不包含** Web GUI；真实实现在私有库
-   * `packages/gui/src/cli/gui-serve-command.ts`。
+   * 公开构建只含 CLI，TUI/GUI 不在公开源码中，因此不包含 Web GUI。
    *
    * 这里必须 **fail-closed**：给出明确提示并以非 0 退出，**不得**假装已启动服务器。
    */
   void options;
-  logToStderr("此构建不含 Web GUI（GUI 归属私有库 astarray-ui）。请使用包含 UI 的私有构建，或改用 --json 命令。");
+  logToStderr("此构建不含 Web GUI。请改用 --json 命令。");
   return EXIT_CODES.FAILURE;
 }
 export interface GuideSubmitCommandOptions {
@@ -5453,4 +5451,3 @@ export async function executeToolPackageFeedbackCommand(
 }
 export { executeParameterAuthorizationSettingsCommand } from "./parameter-authorization-settings-command.js";
 export type { ParameterAuthorizationSettingsCommandOptions } from "./parameter-authorization-settings-command.js";
-

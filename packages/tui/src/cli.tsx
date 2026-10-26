@@ -137,7 +137,7 @@ program
       let launchTui: ((stateDirectory: string) => Promise<void>) | null = null;
       try {
         /**
-         * 说明符用**非字面量**拼出：`astarray-ui` 私有构建会提供该模块，
+         * 说明符用**非字面量**拼出：包含 TUI 的构建会提供该模块，
          * 公开构建**没有**这个文件 ⇒ 字面量会被 tsc 静态解析成\"找不到模块\"并把公开构建卡死。
          * 运行期缺失由下方 catch 处理（明确提示 + 非 0 退出）。
          */
@@ -2832,8 +2832,3 @@ process.stdout.write("", () => {
 setTimeout(() => {
   process.exit(convergenceExitCode);
 }, 1_000).unref();
-
-
-
-
-

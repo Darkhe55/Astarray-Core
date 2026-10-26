@@ -8,7 +8,7 @@
  * 4. DIAG 事件**只复用** `DomainError` + `doctor`，不新增网络/磁盘探测；
  * 5. 只存**分类 + 指纹 + 脱敏摘要**，绝不存原始参数、原始错误文本、含用户名的路径；
  * 6. **完全本地，不外传**；CLI `--json` 只读可查；
- * 7. 告警可见面：CLI 可查 + UI（私有库）展示。
+ * 7. 告警可见面：CLI 可查 + UI 展示。
  *
  * 卡内约束（`docs/tasks/OBS01_PERFORMANCE_USAGE_AND_DIAGNOSTICS_TASK_CARDS.md` §2）：
  * "unknown 不记作零"、"路径/堆栈/Provider 错误文本同样检查，不能先写原始日志再只遮盖界面"、
@@ -289,4 +289,3 @@ export function evaluateObservabilityFailure(input: {
           : "采样失败：降级并报告，不阻塞业务操作。",
   };
 }
-
