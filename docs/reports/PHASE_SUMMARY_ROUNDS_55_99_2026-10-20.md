@@ -19,7 +19,7 @@
 3. `verify:relocation-batch` → **11/11**（脱敏样例）
 4. `verify-sdk-consumer` → 通过
 5. `verify-relocate-tarball-dual-process` → 通过
-6. 私有库 `verify:package` → **7/7**
+6. UI `verify:package` → **7/7**
 
 ## 3. 本批次新增交付
 
@@ -63,10 +63,13 @@
 | RELOCATE 真实历史库批量解析 | 产品**还不能端到端运行** ⇒ 产不出真实 `project-location/` 与 `run-history/` | 产品跑通后真实运行一次 |
 | 三张 03 卡的真实入口/成本实测 | 同上（需要真实复用/试验/整理产生数据） | 产品跑通 |
 | macOS 平台证据 | 只有 Windows/WSL2 | 提供 Mac 或 CI `macos-latest` |
-| 人工体验结论 | 必须人点击判断 | 按 `UI_MANUAL_ACCEPTANCE_CHECKLIST_2026-10-19.md` 回填 |
+| 人工体验结论 | 必须人点击判断 | 按 `已迁出的 UI 人工清单` 回填 |
 | USAGE 预算阈值/价格换算 | 需价格表与预算口径（产品决策） | 给出价格与预算定义 |
 | OBS 定时 rotate 的**周期** | 需产品定周期与触发点（判定层已就绪 R113） | 给出周期策略 |
 
 ## 7. 工作树
 
 他人未提交文件（`DELIVERY_REPORT.md`、`IMPLEMENTATION_PLAN.md`、`ORGANIZATION.md`、`docs/*` 等）**全程未触碰**；`.tmp/` 与 `*.tgz` 未入库。
+
+
+

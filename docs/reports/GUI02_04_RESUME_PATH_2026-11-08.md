@@ -1,7 +1,7 @@
 # GUI-02-04 第 49 轮进展：接通**恢复执行入口**（显式 → 对账 → 重新鉴权）
 
 - 提交：`3336620`（第 49 轮）
-- 卡：`docs/tasks/GUI02_AUTHORIZATION_AND_HISTORY_VIEW_TASK_CARD.md` → GUI-02-04
+- 卡：`docs/tasks/已迁出的 UI 任务卡` → GUI-02-04
 - 说明：因卡内 GUI-02-04 单元格已很长（>5KB），本轮进展改为**独立报告**记录，
   卡内只保留指针 —— 避免超长单行单元格被编辑事故截断。
 
@@ -140,4 +140,5 @@ isReauthorizationSatisfied: (missionView.requiredReauthorizationTypes ?? []).len
 **门禁**：`typecheck` **0** ｜ `check` **0（431 文件 / 3255 用例）** ｜ 新套件 **3 passed**。
 
 **仍未完成**：**真实浏览器人工体验**须由用户提供 ⇒ **GUI-02-04 仍不主张通过**。
+
 

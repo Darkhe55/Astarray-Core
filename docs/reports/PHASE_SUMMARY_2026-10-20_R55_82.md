@@ -19,7 +19,7 @@
 3. `npm run verify:relocation-batch` → **11/11**（脱敏样例）
 4. `node scripts/verify-sdk-consumer.mjs astarray-0.1.0.tgz` → 通过
 5. `node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz` → 通过
-6. 私有库 `npm run verify:package` → **7/7**
+6. UI `npm run verify:package` → **7/7**
 
 ## 3. 本批次（第 55–82 轮）交付
 
@@ -32,7 +32,7 @@
 
 ## 4. 修掉的真实缺陷（11 处，均有反例+变异体或等价证据）
 
-副本回执串数据、变异锚点空转、私有库产物入口静默失效、bind 守卫过弱、保留/会话反例过弱、破坏性 API 越界、
+副本回执串数据、变异锚点空转、UI产物入口静默失效、bind 守卫过弱、保留/会话反例过弱、破坏性 API 越界、
 `NaN` 预算裁光历史、`NaN` 分页错页、`NaN` 秒数立即超时、`parseInt` 截断（`5abc`→5）、`waitUntilReady` 未处理拒绝。
 
 ## 5. 我在本批次犯的错（全部已入 backlog 台账）
@@ -50,10 +50,13 @@
 |---|---|---|
 | RELOCATE 真实历史库批量解析 | 项目**还不能端到端运行** ⇒ 产不出真实的 `project-location/` 与 `run-history/`（盘点证实 `.astarray` 里两者都不存在） | 产品能跑通 → 真实运行一次产生这两类数据 |
 | macOS 平台证据 | 只有 Windows/WSL2 环境 | 提供 Mac 或让 CI 跑 `macos-latest` |
-| 人工体验结论 | 必须由人点击并判断"能否看懂/能否完成/哪里别扭" | 按 `UI_MANUAL_ACCEPTANCE_CHECKLIST_2026-10-19.md` 跑一遍并回填 |
+| 人工体验结论 | 必须由人点击并判断"能否看懂/能否完成/哪里别扭" | 按 `已迁出的 UI 人工清单` 跑一遍并回填 |
 | USAGE 预算阈值与价格换算 | 需要价格表与预算口径（产品决策） | 给出价格与预算定义 |
 | OBS 定时自动 rotate | 需要确定周期与触发点（产品决策） | 给出周期/触发策略 |
 
 ## 7. 工作树
 
 `git status --porcelain` **11 项**（8 改 + 3 未跟踪），逐项核对**全部属于他人**（`DELIVERY_REPORT.md`、`IMPLEMENTATION_PLAN.md`、`ORGANIZATION.md`、`docs/*` 等）——本批次**一个都没暂存、没提交、没修改**。
+
+
+
