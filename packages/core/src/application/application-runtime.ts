@@ -1043,6 +1043,21 @@ export async function createApplicationRuntime(
           }).catch(() => undefined);
         }
       },
+      workWindowGateProvider:
+        input.missionIdentifier === undefined
+          ? undefined
+          : async () => {
+              const workWindow = await projectWorkWindowStore.read();
+              const decision = evaluateWorkWindowGate({
+                gatePoint: "tool-execution",
+                nowIso: new Date().toISOString(),
+                rules: workWindow.rules,
+                pauseReasonState: createPauseReasonState(),
+              });
+              return decision.kind === "allow"
+                ? { isAllowed: true, reason: decision.reason }
+                : { isAllowed: false, reason: decision.reason };
+            },
       installationGateGuard,
       taskExecutionId: input.taskExecutionId,
       /**
@@ -1629,6 +1644,7 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
 
 
 
