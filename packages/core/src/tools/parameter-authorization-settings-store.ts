@@ -16,6 +16,8 @@ import {
   type ParameterAuthorizationRule,
 } from "./parameter-authorization.js";
 import { resolveToolAction } from "./tool-action-registry.js";
+import { AsyncMutex } from "../infra/async-mutex.js";
+import { DomainError } from "../core/errors.js";
 
 export const PARAMETER_AUTHORIZATION_SETTINGS_SCHEMA_VERSION =
   "ASTARRAY_PARAMETER_AUTHORIZATION_SETTINGS_V1";
@@ -62,6 +64,7 @@ function buildDefaultDocument(): ParameterAuthorizationSettingsDocument {
 
 export class ParameterAuthorizationSettingsStore {
   private readonly stateDirectory: string;
+  private readonly writeLock = new AsyncMutex();
 
   constructor(options: ParameterAuthorizationSettingsStoreOptions) {
     this.stateDirectory = options.stateDirectory;
@@ -101,6 +104,35 @@ export class ParameterAuthorizationSettingsStore {
     return raw;
   }
 
+  /** GUI-03-03：按 expectedRevision 原子替换完整规则集（保留校验与备份）。 */
+  async replaceDocument(input: {
+    settings: ParameterAuthorizationSettingsDocument["settings"];
+    rules: ParameterAuthorizationRule[];
+    expectedRevision: number;
+  }): Promise<ParameterAuthorizationSettingsDocument> {
+    return this.writeLock.runExclusive(async () => {
+      const current = await this.readSettings();
+      const currentRevision = current.configurationRevision ?? 0;
+      if (currentRevision !== input.expectedRevision) {
+        throw new DomainError(
+          "stale-revision",
+          "参数授权配置 revision 不匹配: 现有 " +
+            currentRevision +
+            "，期望 " +
+            input.expectedRevision,
+        );
+      }
+      const result = await this.writeSettings({
+        settings: input.settings,
+        rules: input.rules,
+        configurationRevision: currentRevision + 1,
+      });
+      if (!result.isValid) {
+        throw new DomainError("invalid-task-chain", result.reason ?? "参数授权配置非法。");
+      }
+      return this.readSettings();
+    });
+  }
   /** 写入设置（先校验，非法一律不落盘）。 */
   async writeSettings(
     document: Omit<ParameterAuthorizationSettingsDocument, "schemaVersion"> & {
@@ -456,3 +488,4 @@ export function evaluateParameterAuthorizationSettingChange(input: {
     isRevisionAppliedImmediately: true,
   };
 }
+

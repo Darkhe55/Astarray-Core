@@ -10,7 +10,9 @@ import type { ToolPublicDocumentationRegistryEntry } from "./tools/tool-public-d
 import { promises as fs } from "node:fs";
 import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
 import path from "node:path";
+import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
+import type { ParameterAuthorizationRule } from "./tools/parameter-authorization.js";
 
 // 装配层内部使用（不是再导出）：把真实用量观测接到账目存储上（2026-10-06 接线）。
 import { createProviderUsageLedgerObserver } from "./orchestration/provider-usage-ledger-observer.js";
@@ -3298,6 +3300,99 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     };
   }
 
+  /** GUI-03-03：读取参数授权规则明细（只读；供设置页展示，不含凭据）。 */
+  async queryParameterAuthorizationRuleDetails(): Promise<{
+    isParameterAuthorizationEnabled: boolean;
+    isParameterRulesEnabled: boolean;
+    configurationRevision: number;
+    rules: ParameterAuthorizationRule[];
+  }> {
+    this.assertOpen();
+    const store = this.createParameterAuthorizationSettingsStore();
+    const document = await store.readSettings();
+    return {
+      isParameterAuthorizationEnabled: document.settings.isParameterAuthorizationEnabled,
+      isParameterRulesEnabled: document.settings.isParameterRulesEnabled,
+      configurationRevision: document.configurationRevision ?? 0,
+      rules: document.rules,
+    };
+  }
+
+  /**
+   * GUI-03-03：GUI 规则集写入。
+   * 服务端重新读取当前规则、检查 revision 和放宽项；不做“信任浏览器确认”的捷径。
+   */
+  async updateParameterAuthorizationRules(input: {
+    isParameterAuthorizationEnabled: boolean;
+    isParameterRulesEnabled: boolean;
+    rules: ParameterAuthorizationRule[];
+    expectedRevision: number;
+    isConfirmedByAuthenticatedUser: boolean;
+  }): Promise<{
+    status: "saved" | "rejected" | "confirmation-required";
+    revision: number;
+    widenedRules: string[];
+    message: string | null;
+  }> {
+    this.assertOpen();
+    const store = this.createParameterAuthorizationSettingsStore();
+    const current = await store.readSettings();
+    const currentRevision = current.configurationRevision ?? 0;
+    if (currentRevision !== input.expectedRevision) {
+      return {
+        status: "rejected",
+        revision: currentRevision,
+        widenedRules: [],
+        message: "配置 revision 已变化，请刷新后重试。",
+      };
+    }
+    const previous = new Map<string, string>();
+    for (const rule of current.rules) {
+      previous.set(rule.ruleIdentifier ?? rule.toolName + "|" + rule.action, rule.decision);
+    }
+    const widenedRules = input.rules
+      .filter((rule) => {
+        const key = rule.ruleIdentifier ?? rule.toolName + "|" + rule.action;
+        const old = previous.get(key);
+        return rule.decision === "allow" && old !== undefined && old !== "allow";
+      })
+      .map((rule) => rule.ruleIdentifier ?? rule.toolName + "|" + rule.action);
+    if (widenedRules.length > 0 && !input.isConfirmedByAuthenticatedUser) {
+      return {
+        status: "confirmation-required",
+        revision: currentRevision,
+        widenedRules,
+        message: "本次修改会放宽 " + String(widenedRules.length) + " 条规则，需要明确确认。",
+      };
+    }
+    try {
+      const updated = await store.replaceDocument({
+        settings: {
+          isParameterAuthorizationEnabled: input.isParameterAuthorizationEnabled,
+          isParameterRulesEnabled: input.isParameterRulesEnabled,
+        },
+        rules: input.rules,
+        expectedRevision: currentRevision,
+      });
+      return {
+        status: "saved",
+        revision: updated.configurationRevision ?? currentRevision + 1,
+        widenedRules,
+        message: null,
+      };
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return {
+          status: "rejected",
+          revision: currentRevision,
+          widenedRules,
+          message: error.message,
+        };
+      }
+      throw error;
+    }
+  }
+
   /**
    * 写入参数授权设置。
    *
@@ -5272,6 +5367,20 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return { ...evaluation, admittedAtIso: record.admittedAtIso };
   }
 
+  /** GUI-03-03：列出会话临时权限提升（只读）。 */
+  async querySessionElevations(sessionId: string): Promise<SessionPermissionElevationRecord[]> {
+    this.assertOpen();
+    return this.runtime.sessionElevationStore.listRecords(sessionId);
+  }
+
+  /** GUI-03-03：撤销单条会话临时权限提升。 */
+  async revokeSessionElevation(input: {
+    sessionId: string;
+    elevationId: string;
+  }): Promise<boolean> {
+    this.assertOpen();
+    return this.runtime.sessionElevationController.revokeElevation(input);
+  }
   /** GUI-03-03：更新指令窗口容量；降低容量只排队，不丢弃已接收指令。 */
   async updateInstructionWindowCapacity(capacity: number): Promise<InstructionWindowSnapshot> {
     this.assertOpen();
@@ -6154,6 +6263,8 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
 
 
 
