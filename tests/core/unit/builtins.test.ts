@@ -502,6 +502,8 @@ describe("T06A 备份层内置工具", () => {
       executionContext(),
     );
     expect(result.isSideEffectFree).toBe(false);
+    expect(result.producedArtifacts).toHaveLength(1);
+    expect(result.producedArtifacts?.[0]?.artifactType).toBe("project-file");
     const written = await fs.readFile(path.join(workspaceDirectory, relativePath), "utf8");
     expect(written).toBe("# NESTED\n");
   });
@@ -521,3 +523,4 @@ describe("T06A 备份层内置工具", () => {
     expect(unchanged).toBe("# 原有\n");
   });
 });
+

@@ -173,6 +173,7 @@ export interface MainControllerOptions {
     workspaceRootPath?: string,
     /** 可选：该任务所属项目（读取文件夹授权扩展边界）。 */
     projectIdentifier?: string,
+    missionIdentifier?: string,
   ) => ToolPort;
   /**
    * E2E-01-03 S2b：把**恢复检查点装饰器**套在 worker 工具端口**最外层**。
@@ -1383,6 +1384,7 @@ export class MainController {
       targetAgentInstanceIdentifier ?? agentInstanceId,
       this.missionWorkspaceRootPaths.get(missionId),
       this.missionProjectIdentifiers.get(missionId),
+      missionId,
     );
     const buildCheckpointingPort = this.options.buildRecoveryCheckpointingToolPort;
     if (buildCheckpointingPort === undefined) {
@@ -1414,6 +1416,8 @@ export class MainController {
     ];
   }
 }
+
+
 
 
 

@@ -82,6 +82,8 @@ export interface PolicyWrapperOptions {
   evidenceQueryGuard?: EvidenceQueryGuard | null;
   /** T06D：证据主张标识（缺省 "default-claim"）。 */
   factVerificationClaimIdentifier?: string | null;
+  /** GUI-03-06：工具成功产生结构化产物时的接收器（身份由装配层捕获）。 */
+  onProducedArtifacts?: (artifacts: ReadonlyArray<import("../core/types.js").ProducedArtifact>) => void | Promise<void>;
   /**
    * T06B：Ponder 本地只读边界引擎（装配后 Ponder 可调用白名单只读工具，
    * 其余 fail-closed；未装配时 Ponder 一律 deny，与旧版一致）。
@@ -383,6 +385,9 @@ export class PolicyWrapper implements ToolPort {
           callId,
           outputText: result.outputText,
           isSideEffectFree: result.isSideEffectFree,
+          ...(result.producedArtifacts === undefined
+            ? {}
+            : { producedArtifacts: result.producedArtifacts }),
         };
       } catch (error) {
         return {
@@ -418,3 +423,5 @@ export class PolicyWrapper implements ToolPort {
     };
   }
 }
+
+

@@ -280,7 +280,15 @@ export async function executeBuiltinTool(
   toolName: string,
   argumentsJson: string,
   executionContext: BuiltinToolExecutionContext,
-): Promise<{ outputText: string; isSideEffectFree: boolean }> {
+): Promise<{
+  outputText: string;
+  isSideEffectFree: boolean;
+  producedArtifacts?: Array<{
+    path: string;
+    artifactType: string;
+    displayName: string;
+  }>;
+}> {
   /**
    * MERGE-01 §1.2：统一入口（**族名 + action**）必须路由到与旧名**同一个实现**。
    *
@@ -537,6 +545,9 @@ export async function executeBuiltinTool(
       return {
         outputText: `已新建项目文件: ${filePath}`,
         isSideEffectFree: false,
+        producedArtifacts: [
+          { path: createdTargetPath, artifactType: "project-file", displayName: filePath },
+        ],
       };
     }
     case "replaceFileContent": {
@@ -736,7 +747,15 @@ export async function executeBuiltinTool(
 async function executeBackupVaultAction(
   args: Record<string, unknown>,
   executionContext: BuiltinToolExecutionContext,
-): Promise<{ outputText: string; isSideEffectFree: boolean }> {
+): Promise<{
+  outputText: string;
+  isSideEffectFree: boolean;
+  producedArtifacts?: Array<{
+    path: string;
+    artifactType: string;
+    displayName: string;
+  }>;
+}> {
   const action = args["action"];
   if (action !== "list" && action !== "read" && action !== "restore") {
     throw new Error("backupVault 参数 action 必须为 list/read/restore");
@@ -777,7 +796,15 @@ async function executeBackupVaultAction(
 async function executeDeleteBackup(
   args: Record<string, unknown>,
   executionContext: BuiltinToolExecutionContext,
-): Promise<{ outputText: string; isSideEffectFree: boolean }> {  const backupIdentifiers = args["backupIdentifiers"];
+): Promise<{
+  outputText: string;
+  isSideEffectFree: boolean;
+  producedArtifacts?: Array<{
+    path: string;
+    artifactType: string;
+    displayName: string;
+  }>;
+}> {  const backupIdentifiers = args["backupIdentifiers"];
   if (
     !Array.isArray(backupIdentifiers) ||
     backupIdentifiers.some((identifier) => typeof identifier !== "string") ||
@@ -836,7 +863,15 @@ async function executeDeleteBackup(
 async function executeFactVerification(
   args: Record<string, unknown>,
   executionContext: BuiltinToolExecutionContext,
-): Promise<{ outputText: string; isSideEffectFree: boolean }> {
+): Promise<{
+  outputText: string;
+  isSideEffectFree: boolean;
+  producedArtifacts?: Array<{
+    path: string;
+    artifactType: string;
+    displayName: string;
+  }>;
+}> {
   const action = args["action"];
   const claimIdentifier =
     executionContext.factVerificationClaimIdentifier ?? "default-claim";
@@ -1233,3 +1268,5 @@ async function searchProjectText(
     ? "（未找到匹配）"
     : results.join("\n");
 }
+
+
