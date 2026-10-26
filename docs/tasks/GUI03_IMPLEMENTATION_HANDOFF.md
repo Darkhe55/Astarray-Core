@@ -26,10 +26,10 @@
 | F02 实验功能 | blocked | 无稳定实验目录/启停公共门面 |
 | F05 项目工作时段 | blocked | 无项目工作时段配置存储/消费者 |
 | F03 工具生命周期 | blocked | 仅只读版本/差异，无安装/升级/回退写服务 |
-| F07 会话输入策略 | partial | 窗口容量已接；队列/引导/智能模式未接 |
-| F08 会话模型切换 | blocked | 无安全点会话模型切换公共门面 |
-| F09 会话临时权限 | partial | 列表/撤销已接；创建仍走会话授权 |
-| F11 任务成果记录 | blocked | 无权威产物查询门面 |
+| F07 指令队列 | implemented-unverified | FIFO/容量/手动置顶已接；无 queue/guidance/smart 模式（用户确认不需要） |
+| F08 会话模型切换 | implemented-unverified | 多账户/candidate/pool/binding/applied-failed + session id 传播；fake-runtime 端到端通过 |
+| F09 会话临时权限 | implemented-unverified | 列表/创建/撤销已接；真实创建未人工验收 |
+| F11 任务成果记录 | partial | 只投影任务链 resultLocation；无独立产物类型/版本/核验记录 |
 | F12 参数授权编辑 | implemented-unverified | 规则明细、GUI 编辑、CAS 写入、放宽二次确认、HTTP 路由已接；真实点击未验收 |
 
 ## 3. 修改文件
@@ -43,7 +43,7 @@
 
 - `npm run typecheck`：通过。
 - Vitest：654 passed。
-- 开发 GUI 最新 CDP 冒烟：导航、4 标签、19 分类、更多隐藏、新消息按钮、详情遮罩、通知 4 开关存在；无 Runtime 异常。\n- 安装版 CDP 冒烟（较早轮次）：导航、19 分类、待处理、cookie、/projects 200。
+- 开发 GUI 最新 CDP 冒烟：导航、4 标签、19 分类、更多隐藏、新消息按钮、详情遮罩、通知 4 开关存在；F07 队列容量、F09 创建输入、F08 模型候选下拉可见；无 Runtime 异常。\n- 修复候选重复：按 provider+model 去重（同一 provider/model 的多账户候选仍需账户标识才能区分）。\n- 安装版 CDP 冒烟（较早轮次）：导航、19 分类、待处理、cookie、/projects 200。
 - 本轮新增通知/F01 与模块拆分后未重新构建安装版。
 
 ## 5. 未验证
@@ -57,6 +57,22 @@
 ## 6. 结论
 
 不能标记 GUI-03 完成。R01–R04 与 F01 已编码；其余能力受核心公共门面缺失阻塞。后续应先补作用域配置、会话控制、工作时段、工具生命周期与产物查询的受控公共 API，再继续 GUI 接线。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
