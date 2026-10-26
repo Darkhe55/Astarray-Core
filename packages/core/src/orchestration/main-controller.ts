@@ -496,6 +496,14 @@ export class MainController {
     if (missionStatus.taskChain === null) {
       throw new DomainError("mission-not-found", `任务不存在: ${missionId}`);
     }
+    const resumeWorkWindowDecision = await this.options.workWindowGateDecisionProvider?.({
+      missionId,
+      projectIdentifier: this.missionProjectIdentifiers.get(missionId) ?? null,
+      nowIso: new Date().toISOString(),
+    });
+    if (resumeWorkWindowDecision !== undefined && !resumeWorkWindowDecision.isAllowed) {
+      throw new DomainError("work-window-resting", resumeWorkWindowDecision.reason);
+    }
     const incompleteTasks = missionStatus.taskChain.tasks.filter(
       (task) => task.status !== "done",
     );
@@ -1457,3 +1465,4 @@ export class MainController {
     ];
   }
 }
+
