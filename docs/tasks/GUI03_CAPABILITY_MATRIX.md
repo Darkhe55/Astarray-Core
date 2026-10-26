@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|
 | F01 | 通知偏好 | 设置→通知 | localStorage | 无 | 本地偏好 | 应用内/系统通知 | 已编码（完成/失败/待处理/系统通知；系统通知需许可） |
 | F02 | 实验功能 | 设置→实验功能 | 无 | 无 | 无 | 无 | 占位不可用 |
-| F03 | 工具包写操作 | 设置→工作流与工具 | `/settings/tool-package-lifecycle`、`/commands/tool-package-lifecycle` | LifecycleService + register/update SDK | lifecycle JSON | 工具注册 | 部分：启用/停用/升级/回退 UI + 升级差异展示；安装与授权差异确认未接 |
+| F03 | 工具包写操作 | 设置→工作流与工具 | lifecycle + preview/install zip | LifecycleService + ZipInstaller | lifecycle JSON + packages | 工具注册 | 已接：安装/启用/停用/升级/回退；逐项授权确认未细分 |
 | F04 | 项目权限覆盖 | 设置→项目权限 | `/settings/scoped`、`/commands/scoped-permission` | ScopedSettingsStore | 项目覆盖 JSON | 任务工具 PolicyWrapper | 已接（按项目在任务端口创建时选择覆盖 profile） |
 | F05 | 项目工作时段 | 设置→工作时段 | 无 | WorkWindow 组件 | 无 | 分派/恢复 | 占位不可用 |
 | F06 | 项目上下文覆盖 | 设置→项目上下文 | `/settings/scoped`、`/commands/scoped-context-budget` | ScopedSettingsStore | 项目覆盖 JSON | 提示词装配 | 已接装配（按 mission 摘要解析项目） |
@@ -31,6 +31,7 @@
 - 仅路由存在不等于接线；仅写配置无消费者不算接好。
 - F01–F12 中大部分仍是设置占位，不能据本表宣称已实现。
 - 本表随 GUI-03 各检查点推进更新。
+
 
 
 
