@@ -111,6 +111,7 @@ import { AgentIndividualMemoryStore } from "../orchestration/agent-individual-me
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
+import { ScopedSettingsStore } from "../orchestration/scoped-settings-store.js";
 import { ContextClosureCapsuleStore } from "../orchestration/context-closure-capsule-store.js";
 import {
   HumanVerificationController,
@@ -175,6 +176,7 @@ export interface ApplicationRuntime {
   ) => Promise<Array<{ taskId: string | null; entryType: string; summary: string }>>;
   /** T09A-R1-02：全局上下文预算策略（CLI/GUI 共用同一权威存储）。 */
   globalContextBudgetStore: GlobalContextBudgetStore;
+  scopedSettingsStore: ScopedSettingsStore;
   /** T09A-R1-04：真实装配事件（指标复算与"下一请求生效"证据）。 */
   contextRuntimeEventStore: ContextRuntimeEventStore;
   /** GUIDE-01-04：运行中指导控制队列（公共入口/CLI 提交与查看状态）。 */
@@ -699,6 +701,10 @@ export async function createApplicationRuntime(
   const globalContextBudgetStore = new GlobalContextBudgetStore({
     baseDirectory: stateDirectory,
   });
+  const scopedSettingsStore = new ScopedSettingsStore({
+    baseDirectory: stateDirectory,
+  });
+  await scopedSettingsStore.read();
   // T09A-R1-03：任务完成后的节点收口（节点 → 验证 → 关闭/等待 → 胶囊 → 核验任务）。
   const contextClosureCapsuleStore = new ContextClosureCapsuleStore({
     baseDirectory: stateDirectory,
@@ -727,7 +733,24 @@ export async function createApplicationRuntime(
       graphStore: contextGraphStore,
       maximumGlobalContextTokenCount: options.globalContextBudgetTokens ?? 4096,
       mandatoryConditions: options.mandatoryContextConditions,
-      budgetPolicyProvider: () => globalContextBudgetStore.readPolicy(),
+      budgetPolicyProvider: async (input) => {
+        const globalPolicy = await globalContextBudgetStore.readPolicy();
+        const scoped = await scopedSettingsStore.read();
+        const missionSummary = await missionManager.readSummary(input.missionId).catch(() => null);
+        const projectIdentifier = missionSummary?.projectIdentifier ?? null;
+        const projectContext = projectIdentifier === null
+          ? undefined
+          : scoped.projects[projectIdentifier]?.context;
+        const sessionContext = scoped.sessions[input.missionId]?.context;
+        const override = sessionContext ?? projectContext;
+        if (override === undefined) return globalPolicy;
+        return {
+          configuredMaximumGlobalContextTokenCount:
+            override.configuredMaximumGlobalContextTokenCount,
+          globalContextBudgetPolicyRevision:
+            globalPolicy.globalContextBudgetPolicyRevision + scoped.revision,
+        };
+      },
       modelInputSpaceTokens: options.modelInputSpaceTokens,
       runtimeEventSink: (event) => contextRuntimeEventStore.append(event),
     });
@@ -936,6 +959,23 @@ export async function createApplicationRuntime(
                 .map((grant) => grant.normalizedRootPath);
             },
           });
+    const scopedPermission =
+      input.projectIdentifier === undefined
+        ? undefined
+        : scopedSettingsStore.getCached().projects[input.projectIdentifier]?.permission;
+    let effectivePermissionProfileReference: PermissionProfileReference =
+      currentPermissionProfileReference;
+    if (scopedPermission?.permissionProfileId != null) {
+      const isBuiltin = (["ponder", "assist", "devolve"] as const).includes(
+        scopedPermission.permissionProfileId as "ponder" | "assist" | "devolve",
+      );
+      effectivePermissionProfileReference = isBuiltin
+        ? {
+            kind: "builtin",
+            profileId: scopedPermission.permissionProfileId as "ponder" | "assist" | "devolve",
+          }
+        : { kind: "custom", profileId: scopedPermission.permissionProfileId };
+    }
     return new PolicyWrapper({
       permissionDecider,
       registry,
@@ -967,7 +1007,7 @@ export async function createApplicationRuntime(
         ? configurablePermissionPolicyEngine
         : null,
       currentPermissionProfileReference: input.useConfigurablePermissionProfileEngine
-        ? currentPermissionProfileReference
+        ? effectivePermissionProfileReference
         : null,
     });
   };
@@ -1470,6 +1510,7 @@ export async function createApplicationRuntime(
     standaloneWorkflowRunner,
     readMissionResultSummaries,
     globalContextBudgetStore,
+    scopedSettingsStore,
     contextRuntimeEventStore,
     guidanceControlQueue,
     longToolCheckpointController,
@@ -1510,3 +1551,11 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
+
+
+
+
+
+
+

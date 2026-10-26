@@ -165,7 +165,7 @@ export interface ContextPromptProviderOptions {
   maximumGlobalContextTokenCount: number;
   mandatoryConditions?: NecessaryContextCondition[];
   /** T09A-R1-02：预算策略提供者（设置变化通过 revision 使选择缓存失效）。 */
-  budgetPolicyProvider?: () => Promise<{
+  budgetPolicyProvider?: (input: ContextPromptProviderInput) => Promise<{
     configuredMaximumGlobalContextTokenCount: number;
     globalContextBudgetPolicyRevision: number;
   }>;
@@ -220,7 +220,7 @@ export function createContextPromptProvider(
     const policy =
       options.budgetPolicyProvider === undefined
         ? null
-        : await options.budgetPolicyProvider();
+        : await options.budgetPolicyProvider(input);
     const budget = resolveContextBudget({
       configuredMaximumGlobalContextTokenCount:
         policy?.configuredMaximumGlobalContextTokenCount ??
@@ -326,4 +326,5 @@ export function createContextPromptProvider(
     return assembled;
   };
 }
+
 
