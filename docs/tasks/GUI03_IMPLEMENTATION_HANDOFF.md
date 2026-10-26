@@ -43,7 +43,7 @@
 
 - `npm run typecheck`：通过。
 - Vitest：654 passed。
-- 开发 GUI 最新 CDP 冒烟：导航、4 标签、19 分类、更多隐藏、新消息按钮、详情遮罩、通知 4 开关存在；F07 队列容量、F09 创建输入、F08 模型候选下拉可见；页面切换与 `/projects`、`/settings`、`/settings/scoped`、`/settings/model-bindings`、`/settings/model-candidates`、`/settings/session-elevations`、`/support/package/preview` 均 200；无 Runtime 异常。\n- 修复候选重复：按 provider+model 去重（同一 provider/model 的多账户候选仍需账户标识才能区分）。\n- 真实 GUI 支持包导出：`/support/package/preview` 200、`/commands/export-support-package` 200，生成 zip，未上传。\n- 真实 GUI 数据备份导出：`/settings/data-backup` 200、`/commands/export-data` 200，生成 zip；恢复未执行。\n- 真实 GUI 文件夹授权空状态：`/folder/grants` 200，返回空集合与解释；项目标识已从工作区名注入。\n- 真实 GUI 数据恢复：临时状态导出后 `/commands/restore-data` 200，返回 safetyBackupPath；未在正式状态执行。\n- F11 端到端：修复 mission artifact root 与 PolicyWrapper 成功回调后，Provider 写工具创建文件并登记 ArtifactRecordStore，测试通过。\n- GUI 发送离线路径：`/commands/send-message` 202，outbox 文件生成，明确 queued-offline。\n- 安装版 CDP 冒烟（较早轮次）：导航、19 分类、待处理、cookie、/projects 200。\n- 桌面版已重建并安装到 `%LOCALAPPDATA%\\Programs\\Astarray\\Astarray.exe`；构建脚本因 `ELECTRON_RUN_AS_NODE` 跳过 Electron 冒烟，桌面运行时未重新点击验收。
+- 开发 GUI 最新 CDP 冒烟：导航、4 标签、19 分类、更多隐藏、新消息按钮、详情遮罩、通知 4 开关存在；F07 队列容量、F09 创建输入、F08 模型候选下拉可见；页面切换与 `/projects`、`/settings`、`/settings/scoped`、`/settings/model-bindings`、`/settings/model-candidates`、`/settings/session-elevations`、`/support/package/preview` 均 200；无 Runtime 异常。\n- 修复候选重复：按 provider+model 去重（同一 provider/model 的多账户候选仍需账户标识才能区分）。\n- 真实 GUI 支持包导出：`/support/package/preview` 200、`/commands/export-support-package` 200，生成 zip，未上传。\n- 真实 GUI 数据备份导出：`/settings/data-backup` 200、`/commands/export-data` 200，生成 zip；恢复未执行。\n- 真实 GUI 文件夹授权空状态：`/folder/grants` 200，返回空集合与解释；项目标识已从工作区名注入。\n- 真实 GUI 数据恢复：临时状态导出后 `/commands/restore-data` 200，返回 safetyBackupPath；未在正式状态执行。\n- F11 端到端：修复 mission artifact root 与 PolicyWrapper 成功回调后，Provider 写工具创建文件并登记 ArtifactRecordStore，测试通过。\n- GUI 发送离线路径：`/commands/send-message` 202，outbox 文件生成，明确 queued-offline。\n- 安装版 CDP 冒烟（较早轮次）：导航、19 分类、待处理、cookie、/projects 200。\n- 桌面版已重建并安装到 `%LOCALAPPDATA%\\Programs\\Astarray\\Astarray.exe`；清除 `ELECTRON_RUN_AS_NODE` 后真实启动 CDP 冒烟通过：标题、设置入口、19 分类、`/projects`、`/settings`、`/settings/scoped`、模型绑定、工具包生命周期、工作时段、实验目录、`/folder/grants` 均 200，无 Runtime 异常。
 - 本轮新增通知/F01 与模块拆分后未重新构建安装版。
 
 ## 5. 未验证
@@ -57,6 +57,7 @@
 ## 6. 结论
 
 不能标记 GUI-03 完成。R01–R04 与 F01 已编码；其余能力受核心公共门面缺失阻塞。后续应先补作用域配置、会话控制、工作时段、工具生命周期与产物查询的受控公共 API，再继续 GUI 接线。
+
 
 
 
