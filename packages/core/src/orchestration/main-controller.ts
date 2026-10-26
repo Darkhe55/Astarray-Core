@@ -1099,9 +1099,8 @@ export class MainController {
       ...(this.options.workWindowGate === undefined
         ? {}
         : { workWindowGate: this.options.workWindowGate }),
-      ...(this.options.artifactWorkspaceRootPath === undefined
-        ? {}
-        : { artifactWorkspaceRootPath: this.options.artifactWorkspaceRootPath }),
+      artifactWorkspaceRootPath:
+        this.missionWorkspaceRootPaths.get(missionId) ?? this.options.artifactWorkspaceRootPath,
       contextPromptProvider: this.options.contextPromptProvider,
       guidanceControlQueue: this.options.guidanceControlQueue,
       contextNodeLifecycle: this.options.contextNodeLifecycle ?? null,
@@ -1227,9 +1226,8 @@ export class MainController {
       ...(this.options.missionDiagnosticEventPort === undefined
         ? {}
         : { missionDiagnosticEventPort: this.options.missionDiagnosticEventPort }),
-      ...(this.options.artifactWorkspaceRootPath === undefined
-        ? {}
-        : { artifactWorkspaceRootPath: this.options.artifactWorkspaceRootPath }),
+      artifactWorkspaceRootPath:
+        this.missionWorkspaceRootPaths.get(missionId) ?? this.options.artifactWorkspaceRootPath,
       contextPromptProvider: this.options.contextPromptProvider,
       guidanceControlQueue: this.options.guidanceControlQueue,
       contextNodeLifecycle: this.options.contextNodeLifecycle ?? null,
@@ -1459,19 +1457,3 @@ export class MainController {
     ];
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
