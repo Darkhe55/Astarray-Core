@@ -20,6 +20,7 @@ import type { ToolLoopProgressGuardPort } from "../runtime/tool-loop.js";
 
 import type {
   AgentMode,
+  AgentRunInput,
   AgentRuntime,
   FeedbackTransportPort,
   TaskChainDocument,
@@ -1116,9 +1117,11 @@ export class MainController {
       workerFactories: {
         runtimeFactory: (agentInstanceId, task) => {
           const lease = this.options.missionRuntimeRegistry?.get(missionId);
-          return lease === undefined || lease === null
-            ? this.options.workerRuntimeFactory(agentInstanceId, task)
-            : lease.runtime;
+          const baseRuntime =
+            lease === undefined || lease === null
+              ? this.options.workerRuntimeFactory(agentInstanceId, task)
+              : lease.runtime;
+          return this.wrapRuntimeForWorkWindow(baseRuntime, missionId);
         },
         toolDescriptorFactory: this.options.resolveToolDescriptors,
         toolPortFactory: (task, agentInstanceId) =>
@@ -1234,9 +1237,11 @@ export class MainController {
       workerFactories: {
         runtimeFactory: (agentInstanceId, task) => {
           const lease = this.options.missionRuntimeRegistry?.get(missionId);
-          return lease === undefined || lease === null
-            ? this.options.workerRuntimeFactory(agentInstanceId, task)
-            : lease.runtime;
+          const baseRuntime =
+            lease === undefined || lease === null
+              ? this.options.workerRuntimeFactory(agentInstanceId, task)
+              : lease.runtime;
+          return this.wrapRuntimeForWorkWindow(baseRuntime, missionId);
         },
         toolDescriptorFactory: this.options.resolveToolDescriptors,
         toolPortFactory: (task, agentInstanceId) =>
@@ -1345,6 +1350,31 @@ export class MainController {
     });
   }
 
+  private wrapRuntimeForWorkWindow(runtime: AgentRuntime, missionId: string): AgentRuntime {
+    const provider = this.options.workWindowGateDecisionProvider;
+    if (provider === undefined) return runtime;
+    const projectIdentifier = this.missionProjectIdentifiers.get(missionId) ?? null;
+    return {
+      async *run(input: AgentRunInput, signal: AbortSignal) {
+        const decision = await provider({
+          missionId,
+          projectIdentifier,
+          nowIso: new Date().toISOString(),
+        });
+        if (!decision.isAllowed) {
+          yield {
+            kind: "runFinished",
+            agentId: input.agentId,
+            reason: "error",
+            detail: "work-window-resting: " + decision.reason,
+          };
+          return;
+        }
+        yield* runtime.run(input, signal);
+      },
+    };
+  }
+
   private async registerMissionArtifacts(missionId: string): Promise<void> {
     const store = this.options.artifactRecordStore;
     if (store === undefined) return;
@@ -1429,6 +1459,8 @@ export class MainController {
     ];
   }
 }
+
+
 
 
 
