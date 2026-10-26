@@ -84,6 +84,7 @@ export interface PolicyWrapperOptions {
   factVerificationClaimIdentifier?: string | null;
   /** GUI-03-06：工具成功产生结构化产物时的接收器（身份由装配层捕获）。 */
   onProducedArtifacts?: (artifacts: ReadonlyArray<import("../core/types.js").ProducedArtifact>) => void | Promise<void>;
+  workWindowGateProvider?: () => Promise<{ isAllowed: boolean; reason: string }>;
   /**
    * T06B：Ponder 本地只读边界引擎（装配后 Ponder 可调用白名单只读工具，
    * 其余 fail-closed；未装配时 Ponder 一律 deny，与旧版一致）。
@@ -157,6 +158,17 @@ export class PolicyWrapper implements ToolPort {
         errorMessage: "工具调用被取消",
         isIdempotencyConfirmed: true,
         // 被取消的调用从未进入执行 → 确定无副作用（门禁可释放预留、允许重试）。
+        sideEffectStatus: "none",
+      };
+    }
+    const workWindowDecision = await this.options.workWindowGateProvider?.();
+    if (workWindowDecision !== undefined && !workWindowDecision.isAllowed) {
+      return {
+        kind: "error",
+        callId,
+        errorCode: "tool-permission-denied",
+        errorMessage: workWindowDecision.reason,
+        isIdempotencyConfirmed: true,
         sideEffectStatus: "none",
       };
     }
@@ -423,5 +435,6 @@ export class PolicyWrapper implements ToolPort {
     };
   }
 }
+
 
 
