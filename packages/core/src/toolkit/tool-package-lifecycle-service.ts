@@ -92,6 +92,8 @@ export class ToolPackageLifecycleService {
     locks: ReturnType<ToolPackageVersionController["listProjectLocks"]>;
     pendingSwitches: ReturnType<ToolPackageVersionController["listPendingSwitches"]>;
   }> {
+    // 外部安装器可能已写入文件：列表每次从磁盘重载，避免缓存空快照。
+    this.isLoaded = false;
     await this.load();
     return {
       versions: this.controller.listRegisteredVersions(),
@@ -169,4 +171,5 @@ export class ToolPackageLifecycleService {
     });
   }
 }
+
 
