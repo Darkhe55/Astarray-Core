@@ -13,6 +13,7 @@ import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
 import type { ArtifactRecord } from "./orchestration/artifact-record-store.js";
+import { EXPERIMENT_CATALOG } from "./orchestration/experiment-catalog.js";
 import { AgentModelBindingStore } from "./orchestration/agent-model-binding-store.js";
 import { ModelRuntimePool } from "./runtime/model-runtime-pool.js";
 import type {
@@ -3090,6 +3091,40 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       case "rollback":
         return service.rollback(input);
     }
+  }
+  async queryExperimentCatalog() {
+    this.assertOpen();
+    const settings = await this.runtime.experimentSettingsStore.read();
+    return {
+      settings,
+      entries: EXPERIMENT_CATALOG.map((entry) => ({
+        ...entry,
+        isEnabled: settings.enabledExperimentIdentifiers.includes(
+          entry.experimentIdentifier,
+        ),
+        canEnable: entry.runtimeConsumerWired,
+      })),
+    };
+  }
+
+  async updateExperimentSettings(input: {
+    enabledExperimentIdentifiers: string[];
+    expectedRevision: number;
+  }) {
+    this.assertOpen();
+    return this.runtime.experimentSettingsStore.update(input);
+  }
+  async queryWorkWindowConfig() {
+    this.assertOpen();
+    return this.runtime.projectWorkWindowStore.read();
+  }
+
+  async updateWorkWindowConfig(input: {
+    rules: import("./orchestration/work-window-contract.js").WorkWindowRule[];
+    expectedRevision: number;
+  }) {
+    this.assertOpen();
+    return this.runtime.projectWorkWindowStore.update(input);
   }
   /** GUI-03-05：预览本地 zip 工具包（不安装）。 */
   async previewToolPackageZip(zipPath: string) {
@@ -6608,6 +6643,8 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
 
 
 
