@@ -392,6 +392,14 @@ export class PolicyWrapper implements ToolPort {
           factVerificationClaimIdentifier:
             this.options.factVerificationClaimIdentifier ?? null,
         });
+        if (
+          result.producedArtifacts !== undefined &&
+          this.options.onProducedArtifacts !== undefined
+        ) {
+          void Promise.resolve(
+            this.options.onProducedArtifacts(result.producedArtifacts),
+          ).catch(() => undefined);
+        }
         return {
           kind: "success",
           callId,

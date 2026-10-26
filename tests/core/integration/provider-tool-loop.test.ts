@@ -249,4 +249,57 @@ describe("T07D-R2-03：Provider 工具循环与完成门禁", () => {
 
     expect(result.status).not.toBe("done");
   });
+
+  it("写工具成功后登记权威产物（含 workspaceRootPath）", async () => {
+    const server = await startFakeServer(async (_body, response, requestIndex) => {
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      if (requestIndex === 0) {
+        response.write(
+          sseToolCall(
+            "createProjectFile",
+            JSON.stringify({ filePath: "f11-artifact.txt", content: "ARTIFACT-CONTENT" }),
+          ),
+        );
+        response.end();
+        return;
+      }
+      response.write(sseContent("已创建产物。\n" + completionMarkerLine(), "stop"));
+      response.end();
+    });
+    const application = await createProviderApplication(server.endpoint);
+    const createArguments = JSON.stringify({
+      filePath: "f11-artifact.txt",
+      content: "ARTIFACT-CONTENT",
+    });
+    await application.grantSessionAuthorization(
+      "createProjectFile",
+      createArguments,
+      Math.floor(Date.now() / 1000),
+    );
+    await application.grantScopeAuthorizationForToolCall({
+      toolName: "createProjectFile",
+      argumentsJson: createArguments,
+    });
+    await application.submitTask({
+      sessionId: "session-1",
+      taskIdentifier: "task-1",
+      prompt: "创建 f11-artifact.txt 并汇报",
+      workspaceRootPath: fixtureDirectory,
+    });
+    const deadline = Date.now() + 50_000;
+    let status = "accepted";
+    while (!["done", "failed", "blocked", "cancelled"].includes(status) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      status = (
+        await application.queryTask({ sessionId: "session-1", taskIdentifier: "task-1" })
+      ).status;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const artifacts = await application.queryArtifacts();
+    await application.shutdown();
+    expect(status).toBe("done");
+    expect(
+      artifacts.some((artifact) => artifact.location.endsWith("f11-artifact.txt")),
+    ).toBe(true);
+  });
 });
