@@ -1,0 +1,43 @@
+# GUI-03 能力接线矩阵
+
+日期：2026-10-26。状态：初版（静态审计 + 本轮接线进度），不是完成率。
+
+| 编号 | 能力 | UI 控件 | HTTP 路由 | 公共服务 | 权威存储 | 运行时消费者 | 当前状态 |
+|---|---|---|---|---|---|---|
+| F01 | 通知偏好 | 设置→通知 | localStorage | 无 | 本地偏好 | 应用内/系统通知 | 已编码（完成/失败/待处理/系统通知；系统通知需许可） |
+| F02 | 实验功能 | 设置→实验功能 | 无 | 无 | 无 | 无 | 占位不可用 |
+| F03 | 工具包写操作 | 设置→工作流与工具 | 只读 `/state.toolPackages` | `listToolPackages` | 工具包存储 | 工具注册 | 只读；安装/升级/回退未接 |
+| F04 | 项目权限覆盖 | 设置→项目权限 | `/settings/scoped`、`/commands/scoped-permission` | ScopedSettingsStore | 项目覆盖 JSON | 任务工具 PolicyWrapper | 已接（按项目在任务端口创建时选择覆盖 profile） |
+| F05 | 项目工作时段 | 设置→工作时段 | 无 | WorkWindow 组件 | 无 | 分派/恢复 | 占位不可用 |
+| F06 | 项目上下文覆盖 | 设置→项目上下文 | `/settings/scoped`、`/commands/scoped-context-budget` | ScopedSettingsStore | 项目覆盖 JSON | 提示词装配 | 已接装配（按 mission 摘要解析项目） |
+| F07 | 会话输入策略 | 设置→输入策略 | `/commands/instruction-window-capacity` | InstructionWindowStore | instruction-window JSON | 指令排队 | 部分：窗口容量已接；队列/引导/智能模式未接 |
+| F08 | 会话模型切换 | 设置→当前模型 | 无 | 模型账户/Agent 模型 | 模型账户 | Provider 调用 | 占位继承 |
+| F09 | 会话临时权限 | 设置→临时权限 | 无 | 单次授权 API | 无 | 权限门禁 | 占位；单次授权≠会话预设 |
+| F10 | 会话上下文覆盖 | 设置→当前上下文 | `/settings/scoped`、`/commands/scoped-context-budget` | ScopedSettingsStore | 会话覆盖 JSON | 提示词装配 | 已接装配（missionId 作为会话） |
+| F11 | 任务成果记录 | 成果页任务成果 | 无产物记录路由 | 无查询门面 | 无 | 无 | 明确不可用；项目文件为辅助 |
+| F12 | 参数级工具授权 | 设置→默认权限模式 | 现有只读 | `updateParameterAuthorizationSettings` | 参数规则存储 | 工具门禁 | GUI 只读 |
+
+## 四项漏项
+
+| 编号 | 状态 | 证据 |
+|---|---|---|
+| R01 模块拆分 | 已编码 | `ui/navigation.ts`、`ui/theme.ts`、`ui/settings.ts`、`ui/conversation-scroll.ts`、`ui/detail-panel.ts` 均已真实使用 |
+| R02 保存并离开 | 已编码 | 模型账户/预算写入等待真实 Promise `saved`；显示开关为纯视图状态、不写服务；数据页按钮各自有独立结果 |
+| R03 稳定消息 ID 计数 | 已编码 | `chatBubbleStableKey` + `renderedBubbleIds`；未做真实流式验收 |
+| R04 详情宽度同步 | 已编码 | `--chat-detail-width` + `ResizeObserver`；未做拖拽后视觉验收 |
+
+## 说明
+
+- 仅路由存在不等于接线；仅写配置无消费者不算接好。
+- F01–F12 中大部分仍是设置占位，不能据本表宣称已实现。
+- 本表随 GUI-03 各检查点推进更新。
+
+
+
+
+
+
+
+
+
+
