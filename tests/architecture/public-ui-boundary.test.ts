@@ -1,14 +1,14 @@
 /**
- * 公开库 UI 边界守卫（2026-10-19 R29，用户决策：**只有 CLI 落在公开库；TUI 与 GUI 统一放私有库**）。
+ * 公开库 UI 边界守卫（2026-10-19 R29，用户决策：**只有 CLI 落在公开库；TUI 与 GUI 统一放UI**）。
  *
  * 规则：
  * - 公开源码 = `packages/core/src/**` + `packages/tui/src/**`，**但排除** `packages/tui/src/ui/**`
- *   与 `packages/tui/src/cli/tui.tsx`（终端 UI，属私有库 `astarray-ui`）；
+ *   与 `packages/tui/src/cli/tui.tsx`（终端 UI，属UI `UI`）；
  * - 公开源码**不得**按路径引用 `packages/gui/**`、`.../ui/**`、`public-gui`。
  *
  * 本测试把**当前仍存在的接缝**钉成**显式白名单**（数量与内容都必须精确）：
  * - 新增任何一条 UI 引用 ⇒ 红（防止耦合再长回来）；
- * - 一旦把某条接缝迁到私有库（白名单条目消失）⇒ **也红**，提示同步缩小白名单
+ * - 一旦把某条接缝迁到UI（白名单条目消失）⇒ **也红**，提示同步缩小白名单
  *   （避免"迁走了但白名单还留着"这种假通过）。
  *
  * 关键词匹配用 `(^|[/\\])gui([/\\]|$)` 这类**路径段**判定，避免把 `guidance` 误判成 `gui`。
@@ -24,24 +24,24 @@ const publicSourceDirectories = [
   path.join(repositoryRoot, "packages", "tui", "src"),
 ];
 
-/** 公开源码里被排除的私有 UI 路径（相对仓库根，正斜杠）。 */
+/** 公开源码里被排除的UI 路径（相对仓库根，正斜杠）。 */
 const privateUiRelativePaths = ["packages/tui/src/ui/", "packages/tui/src/cli/tui.tsx"];
 
 /**
  * **当前**唯一允许的两条 UI 接缝（都必须是**动态、可选**导入）。
  *
- * 迁到私有库后请**删除对应条目**——本测试会因"白名单条目已不存在"而变红，提醒你同步。
+ * 迁到UI后请**删除对应条目**——本测试会因"白名单条目已不存在"而变红，提醒你同步。
  */
 /**
  * **当前**允许的 UI 接缝：**为空**。
  *
- * 2026-10-19 R32 已完成收口：`gui serve` 实现迁到私有库 `astarray-ui`（公开侧只留 fail-closed 提示）、
+ * 2026-10-19 R32 已完成收口：`gui serve` 实现迁到UI `UI`（公开侧只留 fail-closed 提示）、
  * TUI 启动桥改为**非字面量**动态导入（缺失即提示 + 非 0 退出），随后删除了公开库内的 UI 本地副本。
  * 若将来确实需要新增接缝，必须在这里显式登记并写明理由。
  */
 const pinnedUiSeamAllowlist: Array<{ filePath: string; specifierFragment: string; rationale: string }> = [];
 
-/** 私有 UI 的**绝对**位置（解析后的目标判定，避免把 core 内部的 `gui/` 模块误判）。 */
+/** UI 的**绝对**位置（解析后的目标判定，避免把 core 内部的 `gui/` 模块误判）。 */
 const privateUiRoots = [
   path.join(repositoryRoot, "packages", "gui"),
   path.join(repositoryRoot, "packages", "tui", "src", "ui"),
@@ -53,11 +53,11 @@ const privateTuiBridgeBaseNames = new Set([
 ]);
 
 /**
- * 判定一条模块说明符是否指向**私有 UI**。
+ * 判定一条模块说明符是否指向**UI**。
  *
  * - 相对说明符 ⇒ 解析成绝对路径，再看是否落在 `packages/gui/**`、`packages/tui/src/ui/**`
  *   或 TUI 启动桥 `cli/tui.*`（因此 core 自己的 `src/gui/**` **不会**被误判）；
- * - 包名说明符 ⇒ 只拦 `public-gui` 与 `astarray-ui`。
+ * - 包名说明符 ⇒ 只拦 `public-gui` 与 `UI`。
  */
 function isPrivateUiSpecifier(specifier: string, fromFilePath: string): boolean {
   if (specifier.startsWith(".")) {
@@ -72,7 +72,7 @@ function isPrivateUiSpecifier(specifier: string, fromFilePath: string): boolean 
       );
     });
   }
-  return specifier === "public-gui" || specifier.startsWith("astarray-ui");
+  return specifier === "public-gui";
 }
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
@@ -145,7 +145,7 @@ describe("公开库 UI 边界（用户决策 2026-10-19：只有 CLI 在公开�
     );
     expect(
       unexpected,
-      `出现了新的 UI 引用（应迁到私有库 astarray-ui，而不是耦合进公开库）：${JSON.stringify(unexpected)}`,
+      `出现了新的 UI 引用（应迁到UI UI，而不是耦合进公开库）：${JSON.stringify(unexpected)}`,
     ).toEqual([]);
   });
 
@@ -164,7 +164,7 @@ describe("公开库 UI 边界（用户决策 2026-10-19：只有 CLI 在公开�
     }
   });
 
-  it("③ 私有 UI 源码本身不计入公开边界（它们不属于公开库）", async () => {
+  it("③ UI 源码本身不计入公开边界（它们不属于公开库）", async () => {
     const uiDirectoryPath = path.join(repositoryRoot, "packages", "tui", "src", "ui");
     const exists = await fs
       .stat(uiDirectoryPath)
@@ -176,5 +176,6 @@ describe("公开库 UI 边界（用户决策 2026-10-19：只有 CLI 在公开�
     }
   });
 });
+
 
 

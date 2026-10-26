@@ -11,7 +11,7 @@
 > `npm run test:coverage` **exit 0 — stmts 92.10 / branches 85.40 / funcs 93.37 / lines 92.22**（阈值 85 全过；余量 +0.28pp）；
 > `npm run verify:mutation-kills` **exit 0 — 185/185 被拦下**（`--check-anchors` **185/185 锚点有效**）；
 > `npm pack` **267 文件** sha256 `2ee3b45a…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` **24/24** /
-> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）。
 >
 > **本批（第 55–73 轮）主要交付**：① `OBS-01` 三线贯通（PERF 契约→采样→样本→保留→执行→会话采集器→聚合→`--summary`→
 > `run --perf-collect` 接线→`obs perf-rotate`；DIAG 证据包契约→`obs diag export`→正文→章节；USAGE 请求级账目→聚合）
@@ -84,7 +84,7 @@
 > （上一轮 3045 用例 → 本轮 3047：新增 2 条反例。）
 >
 > **① GUI-02 卡片汇总层补齐（`5a0fec8`）**：把"安装专用流程 3 片 + 另 5 项修复"的提交号
-> 写进本文件 GUI-02 行与 `docs/tasks/GUI02_AUTHORIZATION_AND_HISTORY_VIEW_TASK_CARD.md`
+> 写进本文件 GUI-02 行与 `已迁出的 UI 任务卡`
 > （此前如实登记为未做，见 `1b756ca` 提交说明第 5 项）。9 个提交号已用
 > `git cat-file -e` 逐个验证存在（missing=0），内容自述按 `git show --stat` 复核。
 >
@@ -357,12 +357,12 @@
 |---|---|---|
 > **本表为历史快照（2026-10-19 及以前）。当前权威状态见文件末尾「2026-10-23 统一对账」。**
 
-| OBS-01 | **in_progress（2026-10-19 R37：PERF/DIAG 采集契约层 done）** | 卡：`docs/tasks/OBS01_PERFORMANCE_USAGE_AND_DIAGNOSTICS_TASK_CARDS.md` §2/§3。**2026-10-19 R37：OBS PERF/DIAG 采集契约层**（用户 2026-10-19 按推荐批准）。交付 `observability-collection-contract.ts`：①**默认 off**（未显式开启不采样）；②**采样预算**：每进程 ≥5s 一条、存储 ≤10MB（耗尽 ⇒ **停可选采集并报告，不静默删历史**）；③**指标白名单**只含进程内四项（RSS/事件循环延迟/任务时长/队列深度），**OS 级与未知字段一律拒绝**、非有限数值或负数同样拒绝（**unknown 不记作零**），并记录 `droppedSampleCount`；④**DIAG 只接受 domain-error / doctor**，**网络/磁盘探测一律拒绝**；含原始参数/用户目录/疑似凭据 ⇒ 拒绝；缺分类 ⇒ 拒绝；⑤**指纹**只依赖（来源+分类+操作）⇒ 同类问题聚合；⑥**边界可核对**：不上传、不存原始参数/原始错误文本、不采 OS 级、仅本地、默认 off；⑦**观测故障不阻塞业务**（降级 + 报告）。**9 条反例 + 3 条变异体**（无视默认开关／接受 OS 级指标／接受原始参数，均被拦下）。**未做**：真实采集点接线（进程/任务采样、DIAG 生产事件）、CLI 只读查询、环形落盘与丢样计数持久化。 **不主张 OBS-01 已实施完成**。 **2026-10-19 R38：OBS 只读查询入口 `astarray obs perf|diag`**（用户 2026-10-19 决策：CLI `--json` 只读可查）。`obs perf`：摘要/明细分页（`--detail/--page-size/--cursor`）、时间窗（`--since/--until`）、回显 `coverage`（命中/总数/丢弃行数/窗口）与**内存保留数**；`obs diag`：按指纹聚合、**事实与推断分列**、`--mission/--agent` 过滤（子 Agent 不得读同级记录）。两条铁律落地：①**"没有样本" ≠ "用量为零"**（`hasSamples:false` + 明确 notice；空结果不得当 0 消耗）；②**观测故障降级并报告、不阻塞业务**（读取失败 ⇒ `kind:"degraded"` + 原因 + exit 0，绝不抛给调用方）。反例 **5 条**（进程内）：空库不报零／分页与时间窗／诊断聚合与个体过滤／坏行显式报告丢弃数／**受控注入读取失败必降级**；变异体 **2 条**（空库报有用量／读取失败直接抛错），均被拦下。**过程发现**：把样本路径做成目录（EISDIR）**测不到** catch 分支（store 折算成丢弃行）⇒ 改用**受控注入**才能真正覆盖降级路径；否则变异体会"假存活"。**未做**：真实采集点接线（R37 契约已就绪）、UI 展示（私有库）、落盘环形与丢样计数持久化。 **2026-10-19 R39：OBS 采样 tick**（把 R37 契约接到**可测的采样动作**上）。交付 `observability-sampler.ts` + `runPerfSamplingTick`（**端口注入**：指标读取/时钟/PID/落盘）：①默认关闭 ⇒ 不采样；②间隔未到/预算耗尽 ⇒ 不采样；③**白名单外（OS 级）指标 ⇒ 拒绝并降级**；④**拿不到某项指标就省略该字段**（unknown 不记作零，绝不填 0）；⑤读指标失败/落盘失败 ⇒ **降级 + 丢样计数递增**，**不抛给业务**（R37 契约）；⑥任务事实（耗时/队列）与进程指标合并后仍走白名单。**8 条反例 + 3 条变异体**（落盘失败直接抛错／拿不到就填 0／无视采集开关，均被拦下）。**如实边界（刻意收窄）**：**未提供「生产默认端口」**——进程样本与既有 `PerfSampleEvent` 字段不重合（后者要求 `operationKind`+`durationMilliseconds`，硬填 0 违反 unknown 不记作零）⇒ 进程样本要落盘需先决定**新增事件类型或独立文件**（数据 schema 决策），生产接线在该决定后进行。**不主张采样已上线**。 **2026-10-19 R51：进程样本落盘的事件 schema（用户决策：独立事件类型 + 独立文件）**。新增 `process-sample-store.ts`：`eventType: "process"`、独立文件 `perf/process-samples.jsonl`、**指标全部可选**（拿不到就不写该字段 ⇒ unknown 不记作零）、**白名单校验**（OS 级/未知字段拒绝写入）、**坏行如实计数**（`discardedLineCount`，不静默丢弃）、**丢样计数持久化**；`createProcessSampleStorePorts` 把 R39 的采样 tick 接到该 store（**收掉 R39 刻意留白的"无生产端口"**）；SDK 导出 store 与端口。**7 条反例 + 2 条变异体**（接受未知字段／坏行静默丢弃，均被拦下）。门禁：全量（低并发）**467 文件 / 3439 用例 exit 0**；`--check-anchors` **147/147**。**未做**：真实定时触发器（OS 级/进程内定时器接线）、10MB/24h 预算的实际轮转、`obs` CLI 对进程样本的查询视图。 **2026-10-19 R52：`astarray obs process` 只读查询**（R51 进程样本的公开入口）。①`executeObsProcessCommand`：时间窗（`--since/--until`）+ `--limit`（缺省 50）、回显 `coverage`（总数/命中/返回/**丢弃行数**/**丢样累计**）；②**没有样本 ≠ 没有资源消耗**（`hasSamples:false` + 明确 notice）；③**读取失败降级 exit 0**（不把观测故障抛给调用方）；④`cli.tsx` 注册 `obs process`（非法 `--limit` ⇒ usage error 2）。反例 **2 条**（进程内）：无样本不报零（含丢弃行/丢样均为 0）／坏行计数 + 时间窗 + limit + 丢样累计；变异体 **2 条**（空结果报有样本／丢弃行数恒 0），均被拦下；`--check-anchors` **149/149**。门禁：全量（低并发）**467 文件 / 3439 用例 exit 0**（首跑 `accuracy-policy-gate` 抖动，单跑 7/7 通过后复跑全绿）。**未做**：真实定时触发器（谁每隔 ≥5s 调 tick）、10MB/24h 轮转实际执行、UI 概览（私有库）。 **2026-10-19 R53：进程样本保留策略（10MB 预算 + 24h 保留）**。新增 `process-sample-retention.ts` + `planProcessSampleRetention`：①**先按 24h 过期淘汰**，②再在保留期内**从最新往回**累计 10MB 预算（超预算先裁最旧），③过期/超预算**分别计数**并给出`oldestDroppedAtIso` 与**保留窗口**（`retainedOldestAtIso`/`retainedNewestAtIso`），④非法时间/坏时间戳 ⇒ 不猜测（非法 `nowIso` 直接 no-action；坏样本时间按过期保守处理并计数）。**7 条反例 + 2 条变异体**（先裁最新／把裁剪数清零，均被拦下）。**过程发现（重要）**：`retention-drops-newest-first` 一开始**存活** —— 反例④只断言计数，而"从新往旧"与"从旧往新"裁剪**计数完全相同**；补 `retained*AtIso` 窗口字段后，反例能断言"保留的是哪一段"，变异立刻被拦下。门禁：全量（低并发）**468 文件 / 3448 用例 exit 0**；`--check-anchors` **151/151**。**未做**：按计划**真正重写文件**（本模块只判定不落盘）、定时触发器接线。 **2026-10-19 R54：保留策略的执行（判定 → 备份 → 原子重写）**。新增 `process-sample-retention-apply.ts` + `applyProcessSampleRetention`：①**无需裁剪时不动文件**（不产生备份、不改 mtime）；②需裁剪时**先备份**到`perf/process-samples.backup-<时间戳>.jsonl`，**备份失败即放弃重写**（文件保持原样）；③重写走 `temp → fsync → rename`（原子，不留半截文件）；④坏行不参与保留计算但**丢弃行数如实回传**。**4 条反例 + 2 条变异体**（跳过备份／重写保留最旧，均被拦下）。**过程发现（架构守卫拦住了我）**：第一版直接用裸 `fs.writeFile/rename/rm` 做重写，被 `destructive-file-api-guard`（T12-05）判红 ⇒ 改为把破坏性 API 收进**白名单模块**`infra/atomic-json.ts`（新增 `writeAtomicTextFile` / `copyFileWithBackup`，均带理由注释），retention-apply 只调用这两个 helper ⇒ 守卫恢复绿。这也顺带修正了一个变异锚点（同步更新后仍被拦下）。门禁：全量（低并发）**469 文件 / 3452 用例 exit 0**；`--check-anchors` **153/153**。**未做**：定时触发器（谁每隔 ≥5s 调 tick 并按预算触发 rotate）。 **2026-10-19 R56：OBS 采样调度器**。新增 `observability-sampling-scheduler.ts` + `createPerfSamplingScheduler`：**定时器端口注入**（测试用假实现，不依赖真实时钟）、**默认不常驻**（未开启不排定时器）、**start/stop 幂等**（重复 start 不产生第二个定时器；stop 必清理）、**间隔下限 5s**（小于下限直接拒绝，不静默改值）、每次 tick 只调注入的 `onTick`（调度器自己不读指标、不写盘）。**5 条反例 + 2 条变异体**（无视采集开关／重复 start 双定时器，均被拦下）。门禁：全量（低并发）**470 文件 / 3457 用例 exit 0**；`--check-anchors` **155/155**。**未做**：把调度器接到**真实进程生命周期**（哪个入口在会话开始时启动、关闭时 stop）——这一步会改变运行时行为，需要明确落点后再接；本轮只交付可测的调度单元。 **2026-10-19 R57：OBS 会话采集器**。新增 `session-perf-collector.ts` + `createSessionPerfCollector`：把 **调度器 + 采样 tick + 落盘 + 关闭时保留整理** 组合成一个可测单元：①**默认关闭 ⇒ 不排定时器、不写任何文件**（连 `perf/` 目录都不创建）；②`sampleNow()` 落盘一条；③**stop() 清定时器并按保留策略整理一次**（先备份再重写，R54）；④未 start 就 stop ⇒ `not-running`（幂等）；⑤tick 失败/白名单外指标 ⇒ **只累计丢样、不抛业务错误**。**6 条反例 + 2 条变异体**（关闭时仍采样／stop 跳过整理，均被拦下）。**过程发现（第二次同类问题）**：`collector-stop-skips-retention` 一开始**存活** —— 反例②只断言 `retention.kind === "no-action"`，而变异恰恰让它恒为 `no-action`。补了反例⑥（预置 48h 前样本 ⇒ stop 必须 `rewritten` 且文件被裁剪）后才被拦下。门禁：全量（低并发）**472 文件 / 3463 用例 exit 0**；`--check-anchors` **157/157**。**未做**：把采集器接到**真实入口**（`run` 命令生命周期）——会改变运行时行为，等落点确认。 **2026-10-19 R58：进程样本聚合**。新增 `process-sample-aggregate.ts` + `aggregateProcessSamples`：**逐字段**给出 `sampleCount`/min/max/mean/median，**缺字段的样本不计入该字段分母**（unknown 不记作零），全缺时为 `null`（不可报告）而不是 0；同时回传**覆盖窗口**（最早/最晚）、丢弃行数、丢样累计。**6 条反例 + 2 条变异体**（缺字段补 0／偶数中位数只取上中位，均被拦下）。**过程发现**：`aggregate-missing-field-counted-as-zero` 第一版写成了**死代码**（`continue` 之后的 `push(0)` 永不执行）⇒ 变异存活；改成 `if (value === undefined) { push(0); continue; }` 后立即被拦下 —— 即「变异体本身写错也会表现为存活」，必须核对注入后的语义是否真的改变了行为。门禁：全量（低并发）**473 文件 / 3469 用例 exit 0**；`--check-anchors` **159/159**。**未做**：`obs process --summary` 的 CLI 开关（聚合器已导出，接线下一步）。 **2026-10-19 R59：`astarray obs process --summary`**（把 R58 聚合器接到公开入口）。①`--summary` 返回**聚合摘要**（逐字段 sampleCount/min/max/mean/median）且**不再返回逐条样本**；②聚合**遵守时间窗**（与查询范围一致，覆盖窗口如实回显）；③缺字段不计入分母、全缺为 `null`（unknown 不记作零）。反例 **1 条**（进程内，⑧）：摘要只给聚合 + 时间窗生效 + 缺字段为 null；变异体 **2 条**（摘要忽略时间窗／摘要仍返回逐条样本），均被拦下。**过程发现**：新增的 `--summary` 让 `discardedLineCount: report.discardedLineCount,` 在 perf 与 process 两处出现，原本唯一的变异锚点变成**命中 2 次**（`--check-anchors` 立刻报出来）⇒ 锚点补上前一行上下文后恢复唯一。这正是 R35 那条活规则的价值：**锚点漂移会在秒级自检里暴露**，不必等全量变异。门禁：全量（低并发）**472 文件 / 3470 用例 exit 0**；`--check-anchors` **161/161**。 **2026-10-19 R61：DIAG 证据包契约**。新增 `diagnostic-evidence-pack-contract.ts`：导出证据包前**强制校验**六项：①用户主动发起（不自动生成）②不请求联网上传（**不自动外发**）③时间窗口非空（覆盖范围可界定）④版本与平台齐备（跨平台可复现）⑤脱敏说明非空⑥不含原始参数/凭据；另加：**章节白名单**（`findings-summary`/`coverage-window`/`redaction-notes`/`degraded-status`），未知章节拒绝（不把任意内部数据塞进证据包）；清单三项安全常量固化（`isAutoUploaded`/`containsRawArguments`/`containsSecrets` 恒 false）。**6 条反例 + 2 条变异体**（允许自动上传／允许含敏感内容，均被拦下）。门禁：全量（低并发）**473 文件 / 3476 用例 exit 0**；`--check-anchors` **163/163**。**未做**：真实证据包生成（打包文件/读取诊断库/CLI 导出命令）—— 本卡只交付契约层。 **2026-10-19 R62：`astarray obs diag export`**（把 R61 证据包契约接到公开入口）。①用户主动执行命令导出到**指定文件**（`--output/--since/--until/--platform/--redaction/--sections`）；②**不联网上传**：输出明确 `isAutoUploaded:false` 并提示「如需外发请自行处理该文件」；③契约拒绝（缺窗口/缺平台/缺脱敏说明/未知章节/空章节）⇒ **exit 1 且不写任何文件**；④写入走白名单模块 `infra/atomic-json.ts` 的原子文本写（不触碰破坏性 API 守卫）。反例 **1 条**（⑨）：允许时写文件且未上传、缺窗口与未知章节均拒绝且不落盘；变异体 **2 条**（拒绝仍写文件／报告已自动上传），均被拦下。门禁：全量（低并发）**473 文件 / 3477 用例 exit 0**；`--check-anchors` **165/165**。**未做**：证据包内容真实生成（当前清单只含元数据 + 章节声明；实际 findings 正文与覆盖率导出下一步）。 **2026-10-19 R63：证据包正文生成**。`obs diag export` 现在真的写入正文：①按用户给的**时间窗**读取诊断摘要；②只写**指纹级聚合**（fingerprint/errorCode/component/severity/occurrenceCount/首末时间/isInference/证据引用），**绝不写** `messageText` 或原始参数；③正文含 `coverage`（命中/总数）、`bySeverity`、`byRecoveryState`、`isReportable`；④读取失败 ⇒ **不写文件**并 exit 1（不产出残缺证据）；⑤输出仍明确 `isAutoUploaded:false`。反例 **1 条**（⑩）：只统计窗口内事件、findings 指纹非空、**窗口内外的原始错误文本都不得出现**；变异体 **2 条**（把错误文本写进包／正文忽略时间窗），均被拦下。门禁：全量（低并发）**473 文件 / 3478 用例 exit 0**；`--check-anchors` **167/167**。**未做**：把证据包接到 `obs diag` 的分页/检索结果（当前固定导出全窗口聚合）。 **2026-10-19 R64：证据包正文按声明章节组装**。此前 `--sections` 只写进清单、正文总是全量（**声明与内容不一致**）；现在正文严格按声明组装：`findings-summary` ⇒ findings（指纹级）+ bySeverity/byRecoveryState；`coverage-window` ⇒ coverage；`redaction-notes` ⇒ 脱敏说明回显；`degraded-status` ⇒ 丢弃行数/isReportable/unreportableReason。未声明的章节**不得出现**（反例⑪直接断言 body 里没有 findings / bySeverity / redactionNotes）。**1 条反例（⑪）+ 2 条变异体**（无视章节声明／丢掉降级状态），均被拦下。门禁：全量（低并发）**473 文件 / 3479 用例 exit 0**；`--check-anchors` **169/169**。 **2026-10-19 R67：USAGE-01-01 请求级账目契约**。新增 `usage-ledger-contract.ts`：①**来源必须显式**（`provider` / `local-estimate` / `missing`）；②**unknown 不记作零**（`missing` ⇒ 计数必须 null 且给原因，写数字即拒绝）；③**估算不得声明可结算**（`local-estimate` + `isBillable` ⇒ 拒绝）；④**总量/子量自洽**（子量之和 > 总量 ⇒ 拒绝）；⑤**同键同内容 ⇒ 幂等复用**、**同键异参 ⇒ 拒绝**（同一次调用不得被记两次或改数）；⑥缺请求标识/修订非法 ⇒ 拒绝。**7 条反例 + 2 条变异体**（估算声明可结算／缺失写 0，均被拦下）。门禁：全量（低并发）exit 0；`--check-anchors` **171/171**。**未做**：真实捕获接线与持久化去重/分页/预算（属 USAGE-01-02）、公开查询与导出（属 03）。 **2026-10-19 R68：OBS 采集接 `run`（用户决策：只接 run、`--perf-collect`、默认 off）——本轮只完成可测的 helper，CLI 接线未完成**。交付 `run-perf-collection.ts` + `prepareRunPerfCollection`：①未开启 ⇒ **返回 null**（不建目录、不排定时器，零开销）；②开启 ⇒ 返回**未 start** 的采集器（由调用方在会话开始/结束处 start/stop）；③可用注入的定时器端口测试。**2 条反例 + 1 条变异体**（未开启仍创建采集器），被拦下；`--check-anchors` **172/172**。**未完成（如实）**：`executeRunCommand` 内部尚未调用该 helper，`astarray run --perf-collect` 这个 CLI 开关**我做了又撤掉**——原因是本轮剩余预算不足以安全改动那个大体量函数（盲改运行时会带来真实回归风险），宁可**不发布一个什么都不做的开关**。下一轮补：在 run 装配点创建/start、在 `finally` stop。门禁：全量（低并发）exit 0；typecheck/lint 0。 |
+| OBS-01 | **in_progress（2026-10-19 R37：PERF/DIAG 采集契约层 done）** | 卡：`docs/tasks/OBS01_PERFORMANCE_USAGE_AND_DIAGNOSTICS_TASK_CARDS.md` §2/§3。**2026-10-19 R37：OBS PERF/DIAG 采集契约层**（用户 2026-10-19 按推荐批准）。交付 `observability-collection-contract.ts`：①**默认 off**（未显式开启不采样）；②**采样预算**：每进程 ≥5s 一条、存储 ≤10MB（耗尽 ⇒ **停可选采集并报告，不静默删历史**）；③**指标白名单**只含进程内四项（RSS/事件循环延迟/任务时长/队列深度），**OS 级与未知字段一律拒绝**、非有限数值或负数同样拒绝（**unknown 不记作零**），并记录 `droppedSampleCount`；④**DIAG 只接受 domain-error / doctor**，**网络/磁盘探测一律拒绝**；含原始参数/用户目录/疑似凭据 ⇒ 拒绝；缺分类 ⇒ 拒绝；⑤**指纹**只依赖（来源+分类+操作）⇒ 同类问题聚合；⑥**边界可核对**：不上传、不存原始参数/原始错误文本、不采 OS 级、仅本地、默认 off；⑦**观测故障不阻塞业务**（降级 + 报告）。**9 条反例 + 3 条变异体**（无视默认开关／接受 OS 级指标／接受原始参数，均被拦下）。**未做**：真实采集点接线（进程/任务采样、DIAG 生产事件）、CLI 只读查询、环形落盘与丢样计数持久化。 **不主张 OBS-01 已实施完成**。 **2026-10-19 R38：OBS 只读查询入口 `astarray obs perf|diag`**（用户 2026-10-19 决策：CLI `--json` 只读可查）。`obs perf`：摘要/明细分页（`--detail/--page-size/--cursor`）、时间窗（`--since/--until`）、回显 `coverage`（命中/总数/丢弃行数/窗口）与**内存保留数**；`obs diag`：按指纹聚合、**事实与推断分列**、`--mission/--agent` 过滤（子 Agent 不得读同级记录）。两条铁律落地：①**"没有样本" ≠ "用量为零"**（`hasSamples:false` + 明确 notice；空结果不得当 0 消耗）；②**观测故障降级并报告、不阻塞业务**（读取失败 ⇒ `kind:"degraded"` + 原因 + exit 0，绝不抛给调用方）。反例 **5 条**（进程内）：空库不报零／分页与时间窗／诊断聚合与个体过滤／坏行显式报告丢弃数／**受控注入读取失败必降级**；变异体 **2 条**（空库报有用量／读取失败直接抛错），均被拦下。**过程发现**：把样本路径做成目录（EISDIR）**测不到** catch 分支（store 折算成丢弃行）⇒ 改用**受控注入**才能真正覆盖降级路径；否则变异体会"假存活"。**未做**：真实采集点接线（R37 契约已就绪）、UI 展示（UI）、落盘环形与丢样计数持久化。 **2026-10-19 R39：OBS 采样 tick**（把 R37 契约接到**可测的采样动作**上）。交付 `observability-sampler.ts` + `runPerfSamplingTick`（**端口注入**：指标读取/时钟/PID/落盘）：①默认关闭 ⇒ 不采样；②间隔未到/预算耗尽 ⇒ 不采样；③**白名单外（OS 级）指标 ⇒ 拒绝并降级**；④**拿不到某项指标就省略该字段**（unknown 不记作零，绝不填 0）；⑤读指标失败/落盘失败 ⇒ **降级 + 丢样计数递增**，**不抛给业务**（R37 契约）；⑥任务事实（耗时/队列）与进程指标合并后仍走白名单。**8 条反例 + 3 条变异体**（落盘失败直接抛错／拿不到就填 0／无视采集开关，均被拦下）。**如实边界（刻意收窄）**：**未提供「生产默认端口」**——进程样本与既有 `PerfSampleEvent` 字段不重合（后者要求 `operationKind`+`durationMilliseconds`，硬填 0 违反 unknown 不记作零）⇒ 进程样本要落盘需先决定**新增事件类型或独立文件**（数据 schema 决策），生产接线在该决定后进行。**不主张采样已上线**。 **2026-10-19 R51：进程样本落盘的事件 schema（用户决策：独立事件类型 + 独立文件）**。新增 `process-sample-store.ts`：`eventType: "process"`、独立文件 `perf/process-samples.jsonl`、**指标全部可选**（拿不到就不写该字段 ⇒ unknown 不记作零）、**白名单校验**（OS 级/未知字段拒绝写入）、**坏行如实计数**（`discardedLineCount`，不静默丢弃）、**丢样计数持久化**；`createProcessSampleStorePorts` 把 R39 的采样 tick 接到该 store（**收掉 R39 刻意留白的"无生产端口"**）；SDK 导出 store 与端口。**7 条反例 + 2 条变异体**（接受未知字段／坏行静默丢弃，均被拦下）。门禁：全量（低并发）**467 文件 / 3439 用例 exit 0**；`--check-anchors` **147/147**。**未做**：真实定时触发器（OS 级/进程内定时器接线）、10MB/24h 预算的实际轮转、`obs` CLI 对进程样本的查询视图。 **2026-10-19 R52：`astarray obs process` 只读查询**（R51 进程样本的公开入口）。①`executeObsProcessCommand`：时间窗（`--since/--until`）+ `--limit`（缺省 50）、回显 `coverage`（总数/命中/返回/**丢弃行数**/**丢样累计**）；②**没有样本 ≠ 没有资源消耗**（`hasSamples:false` + 明确 notice）；③**读取失败降级 exit 0**（不把观测故障抛给调用方）；④`cli.tsx` 注册 `obs process`（非法 `--limit` ⇒ usage error 2）。反例 **2 条**（进程内）：无样本不报零（含丢弃行/丢样均为 0）／坏行计数 + 时间窗 + limit + 丢样累计；变异体 **2 条**（空结果报有样本／丢弃行数恒 0），均被拦下；`--check-anchors` **149/149**。门禁：全量（低并发）**467 文件 / 3439 用例 exit 0**（首跑 `accuracy-policy-gate` 抖动，单跑 7/7 通过后复跑全绿）。**未做**：真实定时触发器（谁每隔 ≥5s 调 tick）、10MB/24h 轮转实际执行、UI 概览（UI）。 **2026-10-19 R53：进程样本保留策略（10MB 预算 + 24h 保留）**。新增 `process-sample-retention.ts` + `planProcessSampleRetention`：①**先按 24h 过期淘汰**，②再在保留期内**从最新往回**累计 10MB 预算（超预算先裁最旧），③过期/超预算**分别计数**并给出`oldestDroppedAtIso` 与**保留窗口**（`retainedOldestAtIso`/`retainedNewestAtIso`），④非法时间/坏时间戳 ⇒ 不猜测（非法 `nowIso` 直接 no-action；坏样本时间按过期保守处理并计数）。**7 条反例 + 2 条变异体**（先裁最新／把裁剪数清零，均被拦下）。**过程发现（重要）**：`retention-drops-newest-first` 一开始**存活** —— 反例④只断言计数，而"从新往旧"与"从旧往新"裁剪**计数完全相同**；补 `retained*AtIso` 窗口字段后，反例能断言"保留的是哪一段"，变异立刻被拦下。门禁：全量（低并发）**468 文件 / 3448 用例 exit 0**；`--check-anchors` **151/151**。**未做**：按计划**真正重写文件**（本模块只判定不落盘）、定时触发器接线。 **2026-10-19 R54：保留策略的执行（判定 → 备份 → 原子重写）**。新增 `process-sample-retention-apply.ts` + `applyProcessSampleRetention`：①**无需裁剪时不动文件**（不产生备份、不改 mtime）；②需裁剪时**先备份**到`perf/process-samples.backup-<时间戳>.jsonl`，**备份失败即放弃重写**（文件保持原样）；③重写走 `temp → fsync → rename`（原子，不留半截文件）；④坏行不参与保留计算但**丢弃行数如实回传**。**4 条反例 + 2 条变异体**（跳过备份／重写保留最旧，均被拦下）。**过程发现（架构守卫拦住了我）**：第一版直接用裸 `fs.writeFile/rename/rm` 做重写，被 `destructive-file-api-guard`（T12-05）判红 ⇒ 改为把破坏性 API 收进**白名单模块**`infra/atomic-json.ts`（新增 `writeAtomicTextFile` / `copyFileWithBackup`，均带理由注释），retention-apply 只调用这两个 helper ⇒ 守卫恢复绿。这也顺带修正了一个变异锚点（同步更新后仍被拦下）。门禁：全量（低并发）**469 文件 / 3452 用例 exit 0**；`--check-anchors` **153/153**。**未做**：定时触发器（谁每隔 ≥5s 调 tick 并按预算触发 rotate）。 **2026-10-19 R56：OBS 采样调度器**。新增 `observability-sampling-scheduler.ts` + `createPerfSamplingScheduler`：**定时器端口注入**（测试用假实现，不依赖真实时钟）、**默认不常驻**（未开启不排定时器）、**start/stop 幂等**（重复 start 不产生第二个定时器；stop 必清理）、**间隔下限 5s**（小于下限直接拒绝，不静默改值）、每次 tick 只调注入的 `onTick`（调度器自己不读指标、不写盘）。**5 条反例 + 2 条变异体**（无视采集开关／重复 start 双定时器，均被拦下）。门禁：全量（低并发）**470 文件 / 3457 用例 exit 0**；`--check-anchors` **155/155**。**未做**：把调度器接到**真实进程生命周期**（哪个入口在会话开始时启动、关闭时 stop）——这一步会改变运行时行为，需要明确落点后再接；本轮只交付可测的调度单元。 **2026-10-19 R57：OBS 会话采集器**。新增 `session-perf-collector.ts` + `createSessionPerfCollector`：把 **调度器 + 采样 tick + 落盘 + 关闭时保留整理** 组合成一个可测单元：①**默认关闭 ⇒ 不排定时器、不写任何文件**（连 `perf/` 目录都不创建）；②`sampleNow()` 落盘一条；③**stop() 清定时器并按保留策略整理一次**（先备份再重写，R54）；④未 start 就 stop ⇒ `not-running`（幂等）；⑤tick 失败/白名单外指标 ⇒ **只累计丢样、不抛业务错误**。**6 条反例 + 2 条变异体**（关闭时仍采样／stop 跳过整理，均被拦下）。**过程发现（第二次同类问题）**：`collector-stop-skips-retention` 一开始**存活** —— 反例②只断言 `retention.kind === "no-action"`，而变异恰恰让它恒为 `no-action`。补了反例⑥（预置 48h 前样本 ⇒ stop 必须 `rewritten` 且文件被裁剪）后才被拦下。门禁：全量（低并发）**472 文件 / 3463 用例 exit 0**；`--check-anchors` **157/157**。**未做**：把采集器接到**真实入口**（`run` 命令生命周期）——会改变运行时行为，等落点确认。 **2026-10-19 R58：进程样本聚合**。新增 `process-sample-aggregate.ts` + `aggregateProcessSamples`：**逐字段**给出 `sampleCount`/min/max/mean/median，**缺字段的样本不计入该字段分母**（unknown 不记作零），全缺时为 `null`（不可报告）而不是 0；同时回传**覆盖窗口**（最早/最晚）、丢弃行数、丢样累计。**6 条反例 + 2 条变异体**（缺字段补 0／偶数中位数只取上中位，均被拦下）。**过程发现**：`aggregate-missing-field-counted-as-zero` 第一版写成了**死代码**（`continue` 之后的 `push(0)` 永不执行）⇒ 变异存活；改成 `if (value === undefined) { push(0); continue; }` 后立即被拦下 —— 即「变异体本身写错也会表现为存活」，必须核对注入后的语义是否真的改变了行为。门禁：全量（低并发）**473 文件 / 3469 用例 exit 0**；`--check-anchors` **159/159**。**未做**：`obs process --summary` 的 CLI 开关（聚合器已导出，接线下一步）。 **2026-10-19 R59：`astarray obs process --summary`**（把 R58 聚合器接到公开入口）。①`--summary` 返回**聚合摘要**（逐字段 sampleCount/min/max/mean/median）且**不再返回逐条样本**；②聚合**遵守时间窗**（与查询范围一致，覆盖窗口如实回显）；③缺字段不计入分母、全缺为 `null`（unknown 不记作零）。反例 **1 条**（进程内，⑧）：摘要只给聚合 + 时间窗生效 + 缺字段为 null；变异体 **2 条**（摘要忽略时间窗／摘要仍返回逐条样本），均被拦下。**过程发现**：新增的 `--summary` 让 `discardedLineCount: report.discardedLineCount,` 在 perf 与 process 两处出现，原本唯一的变异锚点变成**命中 2 次**（`--check-anchors` 立刻报出来）⇒ 锚点补上前一行上下文后恢复唯一。这正是 R35 那条活规则的价值：**锚点漂移会在秒级自检里暴露**，不必等全量变异。门禁：全量（低并发）**472 文件 / 3470 用例 exit 0**；`--check-anchors` **161/161**。 **2026-10-19 R61：DIAG 证据包契约**。新增 `diagnostic-evidence-pack-contract.ts`：导出证据包前**强制校验**六项：①用户主动发起（不自动生成）②不请求联网上传（**不自动外发**）③时间窗口非空（覆盖范围可界定）④版本与平台齐备（跨平台可复现）⑤脱敏说明非空⑥不含原始参数/凭据；另加：**章节白名单**（`findings-summary`/`coverage-window`/`redaction-notes`/`degraded-status`），未知章节拒绝（不把任意内部数据塞进证据包）；清单三项安全常量固化（`isAutoUploaded`/`containsRawArguments`/`containsSecrets` 恒 false）。**6 条反例 + 2 条变异体**（允许自动上传／允许含敏感内容，均被拦下）。门禁：全量（低并发）**473 文件 / 3476 用例 exit 0**；`--check-anchors` **163/163**。**未做**：真实证据包生成（打包文件/读取诊断库/CLI 导出命令）—— 本卡只交付契约层。 **2026-10-19 R62：`astarray obs diag export`**（把 R61 证据包契约接到公开入口）。①用户主动执行命令导出到**指定文件**（`--output/--since/--until/--platform/--redaction/--sections`）；②**不联网上传**：输出明确 `isAutoUploaded:false` 并提示「如需外发请自行处理该文件」；③契约拒绝（缺窗口/缺平台/缺脱敏说明/未知章节/空章节）⇒ **exit 1 且不写任何文件**；④写入走白名单模块 `infra/atomic-json.ts` 的原子文本写（不触碰破坏性 API 守卫）。反例 **1 条**（⑨）：允许时写文件且未上传、缺窗口与未知章节均拒绝且不落盘；变异体 **2 条**（拒绝仍写文件／报告已自动上传），均被拦下。门禁：全量（低并发）**473 文件 / 3477 用例 exit 0**；`--check-anchors` **165/165**。**未做**：证据包内容真实生成（当前清单只含元数据 + 章节声明；实际 findings 正文与覆盖率导出下一步）。 **2026-10-19 R63：证据包正文生成**。`obs diag export` 现在真的写入正文：①按用户给的**时间窗**读取诊断摘要；②只写**指纹级聚合**（fingerprint/errorCode/component/severity/occurrenceCount/首末时间/isInference/证据引用），**绝不写** `messageText` 或原始参数；③正文含 `coverage`（命中/总数）、`bySeverity`、`byRecoveryState`、`isReportable`；④读取失败 ⇒ **不写文件**并 exit 1（不产出残缺证据）；⑤输出仍明确 `isAutoUploaded:false`。反例 **1 条**（⑩）：只统计窗口内事件、findings 指纹非空、**窗口内外的原始错误文本都不得出现**；变异体 **2 条**（把错误文本写进包／正文忽略时间窗），均被拦下。门禁：全量（低并发）**473 文件 / 3478 用例 exit 0**；`--check-anchors` **167/167**。**未做**：把证据包接到 `obs diag` 的分页/检索结果（当前固定导出全窗口聚合）。 **2026-10-19 R64：证据包正文按声明章节组装**。此前 `--sections` 只写进清单、正文总是全量（**声明与内容不一致**）；现在正文严格按声明组装：`findings-summary` ⇒ findings（指纹级）+ bySeverity/byRecoveryState；`coverage-window` ⇒ coverage；`redaction-notes` ⇒ 脱敏说明回显；`degraded-status` ⇒ 丢弃行数/isReportable/unreportableReason。未声明的章节**不得出现**（反例⑪直接断言 body 里没有 findings / bySeverity / redactionNotes）。**1 条反例（⑪）+ 2 条变异体**（无视章节声明／丢掉降级状态），均被拦下。门禁：全量（低并发）**473 文件 / 3479 用例 exit 0**；`--check-anchors` **169/169**。 **2026-10-19 R67：USAGE-01-01 请求级账目契约**。新增 `usage-ledger-contract.ts`：①**来源必须显式**（`provider` / `local-estimate` / `missing`）；②**unknown 不记作零**（`missing` ⇒ 计数必须 null 且给原因，写数字即拒绝）；③**估算不得声明可结算**（`local-estimate` + `isBillable` ⇒ 拒绝）；④**总量/子量自洽**（子量之和 > 总量 ⇒ 拒绝）；⑤**同键同内容 ⇒ 幂等复用**、**同键异参 ⇒ 拒绝**（同一次调用不得被记两次或改数）；⑥缺请求标识/修订非法 ⇒ 拒绝。**7 条反例 + 2 条变异体**（估算声明可结算／缺失写 0，均被拦下）。门禁：全量（低并发）exit 0；`--check-anchors` **171/171**。**未做**：真实捕获接线与持久化去重/分页/预算（属 USAGE-01-02）、公开查询与导出（属 03）。 **2026-10-19 R68：OBS 采集接 `run`（用户决策：只接 run、`--perf-collect`、默认 off）——本轮只完成可测的 helper，CLI 接线未完成**。交付 `run-perf-collection.ts` + `prepareRunPerfCollection`：①未开启 ⇒ **返回 null**（不建目录、不排定时器，零开销）；②开启 ⇒ 返回**未 start** 的采集器（由调用方在会话开始/结束处 start/stop）；③可用注入的定时器端口测试。**2 条反例 + 1 条变异体**（未开启仍创建采集器），被拦下；`--check-anchors` **172/172**。**未完成（如实）**：`executeRunCommand` 内部尚未调用该 helper，`astarray run --perf-collect` 这个 CLI 开关**我做了又撤掉**——原因是本轮剩余预算不足以安全改动那个大体量函数（盲改运行时会带来真实回归风险），宁可**不发布一个什么都不做的开关**。下一轮补：在 run 装配点创建/start、在 `finally` stop。门禁：全量（低并发）exit 0；typecheck/lint 0。 |
 | RELOCATE-01 | **01–04 本地可证部分 done（含 tarball 双进程证据，2026-10-18）** | [冷启动定位与历史恢复任务卡](docs/tasks/RELOCATE01_COLD_START_PROJECT_RELINK_TASK_CARD.md)。01 身份检测 → 02 确认登记 → 03 解析/恢复（只读控制面 SDK 可达；**路径解析/恢复门禁尚未接线**）→ 04 入口：命令名经用户确认＝**选项 A**，`astarray project status` 已注册（提交 `4e43ad48`）。**本轮新增证据**：① argv 级 `project status --json` ⇒ exit 0、`unregistered`、**未创建目录**；② **tarball 双进程**（`scripts/verify-relocate-tarball-dual-process.mjs` exit 0）：隔离 `npm install`（41 包）后进程 A 用**已安装包公开出口**写登记+历史，独立进程 B 用已安装包 CLI 读出 `identity-confirmed` / `isHistoryLoadable:true` / **`isExecutionAllowed:false`** / `requiredUserAction:"只读恢复对账"`，项目根条目数 0、查看历史后历史文件数不变。**⇒ 此前"本机 npm install 不生成 node_modules ⇒ 无 tarball 证据"的说法已被实测推翻并更正**（证据：`docs/reports/RELOCATE01_04_TARBALL_DUAL_PROCESS_EVIDENCE_2026-10-18.md`）。**仍未完成**：TUI/GUI 入口、人工体验（确认卡）、跨平台（本证据仅 Windows/Node v24.18.0）。工作中迁移不在本卡范围 **接线片（R31）**：**2026-10-19 用户决策（按推荐，已生效）**：①**触发点**：冷启动只处理进行中/未决项目，其余按需；②**自动恢复边界**：只读且无副作用可自动，**含写/外部副作用必须人工确认**；③**不满足即 blocked**（不自动降级、不重放）；④对账入口 `astarray project reconcile`；⑤**symlink/junction 指向项目外一律拒绝**；⑥`project status --json` 的 `relocation` 段可选出现。 新增 `project-relocation-reconciler.ts`（已完成为跳过、解析失败/未决操作阻塞即 blocked、含写须人工确认、只读可自动恢复），**8 条反例 + 3 条变异体**。**未做**：冷启动批量扫描真实历史库、`astarray project reconcile` CLI、`project status` 的 relocation 可选段。 **2026-10-19 R33（用户批准：用脱敏样例验证 relocate）**：新增 `npm run verify:relocation-batch`。①**脱敏样例**：`scripts/lib/relocation-batch-sample.mjs` 构造 4 个虚构项目（alpha/beta/gamma/delta），路径全部形如 `/sample/projects/...`，不含本机用户名/盘符/凭据；覆盖正常改写、已在新根不改写、`..` 逃逸、种类未声明、跨设备、嵌套旧根歧义、已完成不重放、旧一次性许可、临时提升、未知非幂等副作用、含写项目。②**批量执行**：`scripts/verify-relocation-batch-sample.mjs` 用**已构建的公开 SDK**（`dist/public-sdk.js`）逐项目跑 `reconcileProjectRelocation`，把结果压成计数/稳定代码，再由可单测判定器判定（11 条判据，缺观测/项目缺失都算失败）。③**实测结果**：**11/11 判据通过、exit 0**；`npm run test:scripts` **51/51**。④**过程中发现并修掉一个真实缺陷**：批量对账第一次跑就**抛 TypeError**——一条观测残缺的未决操作（扁平结构、缺 `operation` 子对象）让 `decideRecoveryAfterRelocation` 读到 `undefined`。现已在 `reconcileProjectRelocation` 增加**输入校验**：观测残缺 ⇒ `blocked`（不抛错、不放行），反例第 ⑨ 条 + 变异体 `relocate-reconciler-malformed-observation-passes` 均落地（该变异体被拦下）。**边界（如实）**：这是**脱敏样例**证据，**不等于**真实历史库已验证；真实历史库批量解析仍未验证。 **2026-10-19 R34：`astarray project reconcile` 已接通公开入口**（命令名按用户 2026-10-19 批准）。输入是**显式 JSON**（projectIdentifier / projectStatus / locationMappings / declaredStructuredResourceKinds /references / pendingOperations / hasWriteOrExternalSideEffects），不猜历史库、只读、不重放。退出码：**0** 可继续（只读自动恢复）；**1** blocked **或**含写需人工确认（非零更安全）；**2** 用法/输入错误。反例：**argv 级 5 条**（真实 `dist/cli.js`）+ **进程内 4 条**（直接导入 src，保证变异可见）；变异体 **2 条**（含写也 exit 0／改写计数恒 0），均被拦下。**未做**：`project status --json` 的 `relocation` 可选段；冷启动自动触发（目前是**用户显式执行**对账）。 **2026-10-19 R36：`project status --json` 增加 `relocation` 可选段**（用户 2026-10-19 决策：可选、向后兼容）。出现条件：位置登记为**旧格式**（`legacy`，卡内纪律：旧格式不得自动升级，必须走用户显式对账）。段内含 `registrationReadKind` / `classification` / `isHistoryLoadable` / `isExecutionAllowed` /`requiredUserAction` / `reason` / **`reconcileCommandHint`**（指向 `astarray project reconcile --input <json> --json`）。`absent` / `valid` / `invalid` 三种情形**不输出**该段，既有字段结构不变（向后兼容）。反例 **3 条**（旧格式必带段与入口提示／有效登记必须不带段／无登记不带段，先红后绿）+变异体 **2 条**（无条件输出该段／旧格式隐藏对账入口），均被拦下。至此 RELOCATE-01-03/04 的本地可证部分仅剩「冷启动**自动**触发」与「真实历史库批量解析」两项未做。 **2026-10-19 R71（用户澄清，重要）**：``project-location/`` 与 ``run-history/`` 的**实物当前无法提供** ——原因是**项目还不能完整运行**，所以任何生成内容都**不可能来自真实操作的工作目录或历史**。⇒ RELOCATE-01-03 的"真实历史库批量解析"属于**产品能力阻塞**（不是缺用户输入、也不是缺代码）：只有等产品能端到端跑起来、真实产生位置登记与运行历史后，这项才可验证。**在此之前**：脱敏样例（R33）是唯一证据，**不得**以任何方式暗示"真实历史已验证"。**解除条件（客观）**：产品可完整运行 ⇒ 用一次真实运行生成 ``project-location/`` 与 ``run-history/`` ⇒ 跑同一套 `verify:relocation-batch` 逻辑即可。 |
-| HISTORY-01 | **in_progress（2026-10-18：01/02 done；03 公开侧 SDK+CLI done；04 未开始）** | 卡：`docs/tasks/HISTORY01_LOCAL_RUN_HISTORY_AND_RESUME_VIEW_TASK_CARD.md` §8。**01 审计**：既有 `mission-history-reader.ts` 无工具/失败字段 ⇒ 缺口属实。**02 数据层与端到端写入**：`run-history-store.ts`（工具/失败/过程说明/检查点/恢复分界、resume 分段不覆盖、坏文件拒绝覆盖、内容哈希去重）+ `onToolFailed` 钩子 + 四层透传（装配→控制器 assist/devolve 两处→编排器→worker）；端到端用例（假 Provider 发 `tool_call`）证明 `stateDirectory/run-history/*.json` 出现且含 `tool-call`。**03 公开侧（本轮）**：新增 `run-history-view.ts`（游标分页/种类过滤/三个显示开关/不可信文本安全渲染/列表只读当前页）与 `astarray history list|show`，31 条→**35 条**反例（R1 增检索/锚点 4 条）+ 4 条永久变异体（均被拦下）；`npm run check` exit 0（**474 文件 / 3463 用例**），`test:coverage` exit 0（分支 85.22%），`npm pack` 269 文件 + 两项 verify exit 0。**04 的 tarball 回溯部分（本轮）**：`scripts/verify-relocate-tarball-dual-process.mjs` 在**隔离安装的 tarball** 上用已安装包 CLI 读回另一进程写入的历史（工具调用 + `permission-denied`、`storedEventCount=3`），查看后历史文件数不变（**不重放**）、文本输出无控制序列。**未完成（不得声称 done）**：TUI 面板与 GUI 运行历史时间线、虚拟列表、关键词搜索、证据锚点、滚动保持；`HISTORY-01-04` 的**资源测量与人工体验**。**顺带修两处基线红灯**：① 工作树未提交的 `sourceAgentInstanceId` 改写（等于去除来源冒充自身记忆）已恢复；② `tests/gui/**` 误入公开门禁（分层提交只改了 `coverage.exclude`）已补 `test.exclude` | **2026-10-20**：01-04 的**资源测量**已补（`verify:history-measurement`：真实 RunHistoryStore 种子 2,000/20,000 条；首页 3.795→3.356ms（0.88×）、锚点 1.348→2.811ms、检索 11.826→30.833ms；分页有界、内存 ≤64 MiB、增长 ≤10×）；GUI 历史面板已 done（私有库）。**剩**：人工体验。
-| 仓库分层（2026-10-19 决策） | **已完成（R32）** | **2026-10-19 R32 收口（用户已授权私有库改动）**：公开库**已不含任何 UI 源码**。①`gui serve` 真实实现（389 行，含门面覆盖/CSRF/SSE/安装与授权询问通道）迁到私有库`astarray-ui/packages/gui/src/cli/gui-serve-command.ts`（提交 `7a9c791`）；公开侧 `executeGuiServeCommand` 改为 **fail-closed 提示**（非 0 退出，绝不假装启动服务器）；②TUI 启动桥 `./cli/tui.js` 改为**非字面量**动态导入（公开构建缺该模块时明确提示 + 非 0），然后删除公开库内的 UI 本地副本：`packages/gui/`、`packages/tui/src/ui/`、`packages/tui/src/cli/tui.tsx`、`tests/gui/`、GUI 专用脚本（删除前逐文件比对：**41/41 与私有库副本字节相同**，私有库无未提交改动）；③依赖 UI 的 7 个公开测试迁到私有库（含 3 条 gui 诊断用例）；④`verify:mutation-kills` 的**9 条纯私有 UI 变异体**移出公开 harness（清单见 `docs/reports/MUTATIONS_MOVED_TO_PRIVATE_UI_2026-10-19.md`，私有库需重建同名守卫），另 3 条只删掉其中已失效的 `tests/gui` 用例路径；⑤公开库 UI 边界活规则白名单**清空为 0 条**（新增 UI 引用即红）。**门禁**：`typecheck`/`lint` 0；全量（低并发）**3396 用例 exit 0**；`npm run build` 成功。 **2026-10-19 R41：私有库 `astarray-ui` 最小门禁 + 迁移代码可编译**（推送 `8f733d9`）。①新增 `tsconfig.json`（strict + noUncheckedIndexedAccess，先收窄到 `packages/gui`）与 `npm run typecheck`；②补齐 R32 迁入 `gui-serve-command.ts` 缺失的 import / `GuiServeCommandOptions` / 段落，并**恢复** GUI 专用的 `openLocalBrowser` / `waitForLocalShutdownSignal`（R32 从公开库移除后归私有库）；③解决**双模块身份冲突**：`packages/core` 统一走同级真实路径，实测 `tsc --noEmit -p .` ⇒ **exit 0**。**踩坑记录（重要）**：私有库自己的 `packages/tui/**` 是**终端 UI**，与公开库 `packages/tui/src/cli/**` 同名不同物⇒ 不能建同名 junction（会覆盖 UI 目录），改为**显式同级相对路径**引用公开 CLI，并在注释里写明原因。**未做**：UI 与 tests 纳入 typecheck、私有库测试骨架与 vitest 配置、`gui serve` 接成 CLI 入口、重建 R32 外迁的 9 条变异体与 3 条诊断用例。 **2026-10-19 R42：私有库 GUI CLI 入口 + 可跑测试门禁**（推送 `9de3396`）。①`packages/gui/src/cli/gui-cli.ts`：`astarray-ui gui serve`（含 `--port/--runtime/--credential-reference/--diagnostics-file`…），**端口与超时先于任何网络动作校验**（非法即 exit 2，不启动服务器）、`--help` 打印用法；`package.json` 增加 `bin` 与 `scripts`；②`vitest.config.ts`：`include tests/gui/**`，把 **5 个仍按公开库布局引用**的迁移用例**显式 exclude** 并写明原因与重接方式（不静默跳过）；③`npm run check`（typecheck + test）实测 **27 文件 / 184 用例全绿、exit 0**；④新增 **5 条**参数解析反例（缺省值／完整参数／非法端口与超时／未知子命令 exit 2／--help exit 0）。**如实边界**：私有库尚无构建产物（`dist/`），`bin` 指向 TS 源码；5 个迁移用例与 **9 条外迁变异体**仍未重接/重建；TUI 与 tests 仍未纳入 typecheck。 **2026-10-19 R43：私有库迁移用例重接**（推送 `6d1f51d`）。①`gui-command.test.ts`：把导入从公开库 `commands.js` 改为**本仓库** `gui-serve-command.js`（该用例真正要测的是迁移后的实现），2 条用例恢复通过（含**真实 loopback 服务启动/关闭收口**）；②`gui02-04-recovery-success-path.test.ts`：`packages/core/**` 与 `tests/support` fixture 改指**同级公开库**（显式 `../../../../astarray/...`），3 条用例恢复通过；③私有库 `npm run check`（typecheck + test）⇒**29 文件 / 189 用例全绿、exit 0**（R42 为 27/184）。**踩坑记录**：相对路径层数容易算错（`tests/gui/integration/` → 同级仓库是 **4** 层 `..`，不是 5），错误会表现为 `Cannot find module`；修正后即通过。**仍排除 3 个**（需要私有库先有构建产物 `dist/cli.js`）：`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`；以及 **9 条外迁变异体**仍未重建。 **2026-10-19 R44：私有库构建产物 + GUI-02-02 接线守卫迁移**（推送 `2d96757`）。①`tsup.config.ts` 打包 `packages/gui/src/cli/gui-cli.ts` → `dist/cli.js`（bundle 依赖，避免相对路径在 `dist/` 下失效），`bin`/`main` 指向产物；②**修掉一个只在产物里暴露的缺陷**：入口判定用 `import.meta.url.endsWith("gui-cli.js")`，打包后文件名是 `cli.js` ⇒ 入口**根本没执行**（`--port 99999` 也静默 exit 0）；改为「进程入口文件 == 当前模块文件」比较。实测：`--help` exit 0、非法端口 exit 2。③把公开库两条 GUI-02-02 用例守的**事实**迁成源码级守卫（`gui02-02-wiring-guards.test.ts`，3 条）：必须传入 `onPermissionAskWithIdentity`（否则待决授权永不登记）、覆盖 `listPendingInstallationInquiries` 前必须 bind（防自递归）、覆盖项不得同名自调用；**拔线实测**：删掉该接线 ⇒ 1 条立即变红。④私有库 `npm run check` ⇒ **30 文件 / 192 用例全绿、exit 0**。**如实边界**：3 个公开库布局用例（`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`）的前提已被分层决策移除 ⇒ 明确不再迁移（守卫由上面新增用例接续）；**9 条外迁变异体**仍未重建。 **2026-10-19 R46：私有库最小变异校验**（推送 `c91c10c`）。新增 `scripts/verify-mutation-kills.mjs` + `npm run verify:mutation-kills`：锚点必须**恰好命中 1 次**（失效即脚本错误、不静默跳过）、注入后只跑**点名用例**、`finally` 恢复并**校验内容哈希**。本轮**重建 3 条**（不是 R32 那 9 条的原样恢复——它们的 find/replace 已随公开库改动失效，按**现实现重新推导**）：①去掉 `onPermissionAskWithIdentity`（待决授权永不登记）②去掉 `.bind(application)`（覆盖同名方法自递归）③接受非法端口（用法错误变成启动期失败）。**实测 3/3 全部被拦下**。**过程中发现守卫太弱**：第 ② 条一开始**存活**——守卫只断言「取了引用」与「调用的是那个引用」，而「只取引用不 bind」同样满足 ⇒ 已把守卫补成**必须出现 `.bind(application)`**，随即被拦下。私有库门禁：`npm run check` **30 文件 / 192 用例全绿**；`--check-anchors` **3/3**。**如实边界**：R32 外迁的 9 条原始变异体**并未**逐条复原（内容已不可考）；本轮的 3 条是针对**当前实现**重建的等价守卫。 **2026-10-19 R47：私有库变异锚点活规则**（推送 `8de5840`）。新增 `tests/gui/unit/mutation-anchors-live.test.ts`：秒级跑 `--check-anchors`，任一锚点命中次数 ≠ 1 即红，且要求至少检查 **3** 条（防空转）。`check:full` 现为 **typecheck + test + build + verify:mutation-kills**，把"拔线必失败"纳入常规门禁。私有库门禁：`npm run check` ⇒ **31 文件 / 193 用例全绿**；`--check-anchors` **3/3**。**动机（沿用公开库 R35 事故）**：锚点失效会让变异体静默空转；把它做成秒级测试后不必等全量变异才发现。 **2026-10-19 R48：私有库打包产物验收**（推送 `23bfb16`）。新增 `scripts/verify-package.mjs` + `npm run verify:package`：`npm pack` → 临时目录**隔离安装** →用**已安装的** `node_modules/astarray-ui/dist/cli.js` 跑 4 类判据：`--help` exit 0 且打印用法、非法端口 exit 2、未知参数 exit 2、缺子命令 exit 2 且打印用法；另加 3 条产物判据（tgz 产出、安装成功、安装产物含 `dist/cli.js`）⇒ **7/7 通过**。`package.json` 增加 `files: ["dist"]`（避免把源码打进产物）与 `verify:package` 脚本；验收后自动清理 tgz。**为什么值得做**：R44 那个「入口判定在产物里失效」的缺陷说明**只测源码不够**，必须验真实产物。 **2026-10-19 R49：私有库跨项目视图守卫**（推送 `67d9a67`）。新增 `tests/gui/unit/gui-cross-project-view.test.ts`（3 条）：①副本**恒标记** `isCopyOfExternalSource:true`（输入漏传也不会显示成原件）②`displayLabel` 明确写出「副本」+ 来源项目 + `@r<rev>` + 目标路径③**只透传视图字段**（内部字段不得漏到界面，白名单式断言）。新增 **2 条变异体**：`gui-cross-project-view-hides-copy-mark`（把副本标成原件）、`gui-cross-project-view-leaks-internal-field`（把内部字段原样透传）。私有库实测：`verify:mutation-kills` **5/5 被拦下**、`--check-anchors` **5/5**、`npm run check` **34 文件 / 196 用例全绿**。**如实边界**：R32 外迁的 9 条原始变异体仍未逐条复原；本仓库现有 **5 条**为按当前实现重建的等价守卫，GUI-02-03 其余视图行为仍需补用例。 |
+| HISTORY-01 | **in_progress（2026-10-18：01/02 done；03 公开侧 SDK+CLI done；04 未开始）** | 卡：`docs/tasks/HISTORY01_LOCAL_RUN_HISTORY_AND_RESUME_VIEW_TASK_CARD.md` §8。**01 审计**：既有 `mission-history-reader.ts` 无工具/失败字段 ⇒ 缺口属实。**02 数据层与端到端写入**：`run-history-store.ts`（工具/失败/过程说明/检查点/恢复分界、resume 分段不覆盖、坏文件拒绝覆盖、内容哈希去重）+ `onToolFailed` 钩子 + 四层透传（装配→控制器 assist/devolve 两处→编排器→worker）；端到端用例（假 Provider 发 `tool_call`）证明 `stateDirectory/run-history/*.json` 出现且含 `tool-call`。**03 公开侧（本轮）**：新增 `run-history-view.ts`（游标分页/种类过滤/三个显示开关/不可信文本安全渲染/列表只读当前页）与 `astarray history list|show`，31 条→**35 条**反例（R1 增检索/锚点 4 条）+ 4 条永久变异体（均被拦下）；`npm run check` exit 0（**474 文件 / 3463 用例**），`test:coverage` exit 0（分支 85.22%），`npm pack` 269 文件 + 两项 verify exit 0。**04 的 tarball 回溯部分（本轮）**：`scripts/verify-relocate-tarball-dual-process.mjs` 在**隔离安装的 tarball** 上用已安装包 CLI 读回另一进程写入的历史（工具调用 + `permission-denied`、`storedEventCount=3`），查看后历史文件数不变（**不重放**）、文本输出无控制序列。**未完成（不得声称 done）**：TUI 面板与 GUI 运行历史时间线、虚拟列表、关键词搜索、证据锚点、滚动保持；`HISTORY-01-04` 的**资源测量与人工体验**。**顺带修两处基线红灯**：① 工作树未提交的 `sourceAgentInstanceId` 改写（等于去除来源冒充自身记忆）已恢复；② `tests/gui/**` 误入公开门禁（分层提交只改了 `coverage.exclude`）已补 `test.exclude` | **2026-10-20**：01-04 的**资源测量**已补（`verify:history-measurement`：真实 RunHistoryStore 种子 2,000/20,000 条；首页 3.795→3.356ms（0.88×）、锚点 1.348→2.811ms、检索 11.826→30.833ms；分页有界、内存 ≤64 MiB、增长 ≤10×）；GUI 历史面板已 done（UI）。**剩**：人工体验。
+| 仓库分层（2026-10-19 决策） | **已完成（R32）** | **2026-10-19 R32 收口（用户已授权UI改动）**：公开库**已不含任何 UI 源码**。①`gui serve` 真实实现（389 行，含门面覆盖/CSRF/SSE/安装与授权询问通道）迁到UI`UI/packages/gui/src/cli/gui-serve-command.ts`（提交 `7a9c791`）；公开侧 `executeGuiServeCommand` 改为 **fail-closed 提示**（非 0 退出，绝不假装启动服务器）；②TUI 启动桥 `./cli/tui.js` 改为**非字面量**动态导入（公开构建缺该模块时明确提示 + 非 0），然后删除公开库内的 UI 本地副本：`packages/gui/`、`packages/tui/src/ui/`、`packages/tui/src/cli/tui.tsx`、`tests/gui/`、GUI 专用脚本（删除前逐文件比对：**41/41 与UI副本字节相同**，UI无未提交改动）；③依赖 UI 的 7 个公开测试迁到UI（含 3 条 gui 诊断用例）；④`verify:mutation-kills` 的**9 条纯UI 变异体**移出公开 harness（清单见 `已迁出的 UI 迁移清单`，UI需重建同名守卫），另 3 条只删掉其中已失效的 `tests/gui` 用例路径；⑤公开库 UI 边界活规则白名单**清空为 0 条**（新增 UI 引用即红）。**门禁**：`typecheck`/`lint` 0；全量（低并发）**3396 用例 exit 0**；`npm run build` 成功。 **2026-10-19 R41：UI `UI` 最小门禁 + 迁移代码可编译**（推送 `8f733d9`）。①新增 `tsconfig.json`（strict + noUncheckedIndexedAccess，先收窄到 `packages/gui`）与 `npm run typecheck`；②补齐 R32 迁入 `gui-serve-command.ts` 缺失的 import / `GuiServeCommandOptions` / 段落，并**恢复** GUI 专用的 `openLocalBrowser` / `waitForLocalShutdownSignal`（R32 从公开库移除后归UI）；③解决**双模块身份冲突**：`packages/core` 统一走同级真实路径，实测 `tsc --noEmit -p .` ⇒ **exit 0**。**踩坑记录（重要）**：UI自己的 `packages/tui/**` 是**终端 UI**，与公开库 `packages/tui/src/cli/**` 同名不同物⇒ 不能建同名 junction（会覆盖 UI 目录），改为**显式同级相对路径**引用公开 CLI，并在注释里写明原因。**未做**：UI 与 tests 纳入 typecheck、UI测试骨架与 vitest 配置、`gui serve` 接成 CLI 入口、重建 R32 外迁的 9 条变异体与 3 条诊断用例。 **2026-10-19 R42：UI GUI CLI 入口 + 可跑测试门禁**（推送 `9de3396`）。①`packages/gui/src/cli/gui-cli.ts`：`UI gui serve`（含 `--port/--runtime/--credential-reference/--diagnostics-file`…），**端口与超时先于任何网络动作校验**（非法即 exit 2，不启动服务器）、`--help` 打印用法；`package.json` 增加 `bin` 与 `scripts`；②`vitest.config.ts`：`include tests/gui/**`，把 **5 个仍按公开库布局引用**的迁移用例**显式 exclude** 并写明原因与重接方式（不静默跳过）；③`npm run check`（typecheck + test）实测 **27 文件 / 184 用例全绿、exit 0**；④新增 **5 条**参数解析反例（缺省值／完整参数／非法端口与超时／未知子命令 exit 2／--help exit 0）。**如实边界**：UI尚无构建产物（`dist/`），`bin` 指向 TS 源码；5 个迁移用例与 **9 条外迁变异体**仍未重接/重建；TUI 与 tests 仍未纳入 typecheck。 **2026-10-19 R43：UI迁移用例重接**（推送 `6d1f51d`）。①`gui-command.test.ts`：把导入从公开库 `commands.js` 改为**本仓库** `gui-serve-command.js`（该用例真正要测的是迁移后的实现），2 条用例恢复通过（含**真实 loopback 服务启动/关闭收口**）；②`gui02-04-recovery-success-path.test.ts`：`packages/core/**` 与 `tests/support` fixture 改指**同级公开库**（显式 `../../../../astarray/...`），3 条用例恢复通过；③UI `npm run check`（typecheck + test）⇒**29 文件 / 189 用例全绿、exit 0**（R42 为 27/184）。**踩坑记录**：相对路径层数容易算错（`tests/gui/integration/` → 同级仓库是 **4** 层 `..`，不是 5），错误会表现为 `Cannot find module`；修正后即通过。**仍排除 3 个**（需要UI先有构建产物 `dist/cli.js`）：`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`；以及 **9 条外迁变异体**仍未重建。 **2026-10-19 R44：UI构建产物 + GUI-02-02 接线守卫迁移**（推送 `2d96757`）。①`tsup.config.ts` 打包 `packages/gui/src/cli/gui-cli.ts` → `dist/cli.js`（bundle 依赖，避免相对路径在 `dist/` 下失效），`bin`/`main` 指向产物；②**修掉一个只在产物里暴露的缺陷**：入口判定用 `import.meta.url.endsWith("gui-cli.js")`，打包后文件名是 `cli.js` ⇒ 入口**根本没执行**（`--port 99999` 也静默 exit 0）；改为「进程入口文件 == 当前模块文件」比较。实测：`--help` exit 0、非法端口 exit 2。③把公开库两条 GUI-02-02 用例守的**事实**迁成源码级守卫（`gui02-02-wiring-guards.test.ts`，3 条）：必须传入 `onPermissionAskWithIdentity`（否则待决授权永不登记）、覆盖 `listPendingInstallationInquiries` 前必须 bind（防自递归）、覆盖项不得同名自调用；**拔线实测**：删掉该接线 ⇒ 1 条立即变红。④UI `npm run check` ⇒ **30 文件 / 192 用例全绿、exit 0**。**如实边界**：3 个公开库布局用例（`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`）的前提已被分层决策移除 ⇒ 明确不再迁移（守卫由上面新增用例接续）；**9 条外迁变异体**仍未重建。 **2026-10-19 R46：UI最小变异校验**（推送 `c91c10c`）。新增 `scripts/verify-mutation-kills.mjs` + `npm run verify:mutation-kills`：锚点必须**恰好命中 1 次**（失效即脚本错误、不静默跳过）、注入后只跑**点名用例**、`finally` 恢复并**校验内容哈希**。本轮**重建 3 条**（不是 R32 那 9 条的原样恢复——它们的 find/replace 已随公开库改动失效，按**现实现重新推导**）：①去掉 `onPermissionAskWithIdentity`（待决授权永不登记）②去掉 `.bind(application)`（覆盖同名方法自递归）③接受非法端口（用法错误变成启动期失败）。**实测 3/3 全部被拦下**。**过程中发现守卫太弱**：第 ② 条一开始**存活**——守卫只断言「取了引用」与「调用的是那个引用」，而「只取引用不 bind」同样满足 ⇒ 已把守卫补成**必须出现 `.bind(application)`**，随即被拦下。UI门禁：`npm run check` **30 文件 / 192 用例全绿**；`--check-anchors` **3/3**。**如实边界**：R32 外迁的 9 条原始变异体**并未**逐条复原（内容已不可考）；本轮的 3 条是针对**当前实现**重建的等价守卫。 **2026-10-19 R47：UI变异锚点活规则**（推送 `8de5840`）。新增 `tests/gui/unit/mutation-anchors-live.test.ts`：秒级跑 `--check-anchors`，任一锚点命中次数 ≠ 1 即红，且要求至少检查 **3** 条（防空转）。`check:full` 现为 **typecheck + test + build + verify:mutation-kills**，把"拔线必失败"纳入常规门禁。UI门禁：`npm run check` ⇒ **31 文件 / 193 用例全绿**；`--check-anchors` **3/3**。**动机（沿用公开库 R35 事故）**：锚点失效会让变异体静默空转；把它做成秒级测试后不必等全量变异才发现。 **2026-10-19 R48：UI打包产物验收**（推送 `23bfb16`）。新增 `scripts/verify-package.mjs` + `npm run verify:package`：`npm pack` → 临时目录**隔离安装** →用**已安装的** `node_modules/UI/dist/cli.js` 跑 4 类判据：`--help` exit 0 且打印用法、非法端口 exit 2、未知参数 exit 2、缺子命令 exit 2 且打印用法；另加 3 条产物判据（tgz 产出、安装成功、安装产物含 `dist/cli.js`）⇒ **7/7 通过**。`package.json` 增加 `files: ["dist"]`（避免把源码打进产物）与 `verify:package` 脚本；验收后自动清理 tgz。**为什么值得做**：R44 那个「入口判定在产物里失效」的缺陷说明**只测源码不够**，必须验真实产物。 **2026-10-19 R49：UI跨项目视图守卫**（推送 `67d9a67`）。新增 `tests/gui/unit/gui-cross-project-view.test.ts`（3 条）：①副本**恒标记** `isCopyOfExternalSource:true`（输入漏传也不会显示成原件）②`displayLabel` 明确写出「副本」+ 来源项目 + `@r<rev>` + 目标路径③**只透传视图字段**（内部字段不得漏到界面，白名单式断言）。新增 **2 条变异体**：`gui-cross-project-view-hides-copy-mark`（把副本标成原件）、`gui-cross-project-view-leaks-internal-field`（把内部字段原样透传）。UI实测：`verify:mutation-kills` **5/5 被拦下**、`--check-anchors` **5/5**、`npm run check` **34 文件 / 196 用例全绿**。**如实边界**：R32 外迁的 9 条原始变异体仍未逐条复原；本仓库现有 **5 条**为按当前实现重建的等价守卫，GUI-02-03 其余视图行为仍需补用例。 |
 | 变异门禁（2026-10-19 R35） | **全绿且无空转** | **2026-10-19 R35（第 35 轮全量门禁）**：变异 **135/135 全部被拦下**（首次无"存活"；此前长期存在的私有 GUI 抖动用例已在 R32 随 UI 外迁移出公开 harness）。`npm pack` **263 文件** sha256 `604f7446…`（比 R30 的 269 少 6 个：R32 已把 GUI 代码移出公开库）；**五项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) /`verify-sdk-consumer` / tarball 双进程搬迁回溯。**本轮的真正发现（如实）**：`run-history-view-ignores-cursor` 的锚点**早已失效**（源码 `eligible`→`matched` 后未同步），⇒ 这条变异体长期**空转**（从未注入反事实），只有跑全量才报出来。已修锚点并**新增 `--check-anchors` 静态自检** +活规则 `tests/architecture/mutation-anchors-live.test.ts`（秒级：任一锚点命中次数≠1 即红，且要求检查条数 >100 防空转）。→ 交付后 `--check-anchors` 报 **135/135 条有效**。 |
-| CLIENT-01 | **in_progress（2026-10-18 R3–R7：FOLDER-01-01/02、SECRETARY-01-01/02 的本地可证部分 done）** | 卡：`docs/tasks/CLIENT01_FOLDER_GRANTS_SECRETARY_AND_ONBOARDING_TASK_CARDS.md`。 **FOLDER-01-01**：`folder-grant-request.ts` —— 候选分类 8 类、短授权卡视图模型 （完整绝对路径、只读·含子目录·期限、`isBatch:false`、`isDefaultApproved:false`、被拒项无批准动作）、 批量逐项队列、**逐段**包含判定（`old-project-extra` 不属于 `old-project`）、真实路径不一致提示；**13 条反例 + 3 条变异体**。 **FOLDER-01-02**：`folder-grant-store.ts` —— 签发先评估（未获认证用户确认即拒）、幂等重放不重复登记、 同 ID 异参 `conflict`、陈旧 revision 拒绝、原子写+写前备份（坏集合拒绝覆盖）、`evaluate()` 八类 fail-closed 复检、 撤销只影响之后、重启可读回；**14 条反例 + 3 条变异体**。 **SECRETARY-01-01（R6）**：`secretary-agent-contract.ts` —— 默认关闭/仅认证用户、工作区必须为客户端数据目录的专职子目录 （不得等于或包含主目录/安装目录）、能力矩阵只含两项只读（禁止项目源文件读取/替用户授权/管理执行/Git 合并）、 可见列表默认空且未选项目连只读报告也拒、任务转交目标不明必须先澄清（绝不广播）；**9 条反例 + 3 条变异体**。 **SECRETARY-01-02（R7）**：`secretary-relay-contract.ts` —— 模式切换隔离常量（不复制历史/不重复任务/不改归属）、 最小报告附件（来源/项目/revision/时间/哈希缺一即拒，`isMinimal:true`，指纹随 revision/哈希变化）、 新鲜度（过期如实给最后更新时间、非法时间戳报 unknown）、任务行键含项目（同名任务不串线）、 派发幂等（同键同目标重放不重复派发、同键异目标 conflict）、回执只能前进、同级回派有界并升级用户； **9 条反例 + 4 条变异体**。 **SECRETARY-01-03（R8）**：`secretary-first-start.ts` —— IANA 时区日历日（DST 边界实测）、 触发需**同时**满足跨本地日 + 离线 ≥ 用户阈值 + 该日未处理（**单纯跨午夜短重启不触发**）、 时钟回拨不触发、崩溃无关闭时刻用心跳并标估计值（心跳也缺则保守不触发）、 同日领取排他（多窗口只有一个能领、同窗口重放幂等）、触发不阻塞启动且仍需 CURATE 授权、 收拢视图 `areOlderDeleted:false`（收拢不删除）且旧**待决策/未完成仍可见**、快捷入口四项； **11 条反例 + 4 条变异体**。  **FOLDER-01-03（R15，CLI 侧；命令名经用户确认＝选项 A）**： `packages/tui/src/cli/folder-command.ts` + `cli.tsx` 注册 `astarray folder request / approve / revoke / check` —— `request` 只出卡不落库、多 `--path` 逐项出卡（无 `--approve-all`）、`approve` 为认证用户确认、 `revoke` 只影响之后、`check` 只读且 fail-closed（拒绝即非 0 退出）、 `--permission`/`--duration` 只接受固定枚举（默认只读+仅本次会话）、 `--known-project-root <id>=<path>` 显式声明已知根；**14 条反例（10 进程内 + 4 argv）+ 4 条变异体**。 **未开始**：TUI/GUI 入口（UI 落点待用户决策）、与工具执行门禁的产品接线、人工体验、包级 tarball 验收。 **ONBOARD-01-01（R24）**：`onboarding-hint-contract.ts` —— 首次提示逐字卡内文案、**「不再提示」持久化生效**、 跳过不重复弹首次、**忙碌类五类抑制**（输入/授权/错误/紧急/高负载）、**迁移后状态缺失不重复弹**、 **默认 7 天冷却且需本地可解释信号**、**推荐不构成授权**、无遥测无画像；**8 条反例 + 3 条变异体**。 **其余未开始**：TUI/GUI 入口、与工具执行门禁的产品接线、 SECRETARY-01-03/04、习惯引导。**不主张整卡通过** | **2026-10-20**：FOLDER-01-03 的 **GUI 面板**（出卡不落库/人工确认批准/撤销保留历史/复检 fail-closed）与 **TUI 只读面板**（路径/读写/期限/子目录、候选卡标「尚未登记」、撤销项保留）已 done；私有库变异 19/19。**剩**：TUI 侧批准/撤销动作（当前由 CLI/GUI 承担，避免重复实现判定）。
+| CLIENT-01 | **in_progress（2026-10-18 R3–R7：FOLDER-01-01/02、SECRETARY-01-01/02 的本地可证部分 done）** | 卡：`docs/tasks/CLIENT01_FOLDER_GRANTS_SECRETARY_AND_ONBOARDING_TASK_CARDS.md`。 **FOLDER-01-01**：`folder-grant-request.ts` —— 候选分类 8 类、短授权卡视图模型 （完整绝对路径、只读·含子目录·期限、`isBatch:false`、`isDefaultApproved:false`、被拒项无批准动作）、 批量逐项队列、**逐段**包含判定（`old-project-extra` 不属于 `old-project`）、真实路径不一致提示；**13 条反例 + 3 条变异体**。 **FOLDER-01-02**：`folder-grant-store.ts` —— 签发先评估（未获认证用户确认即拒）、幂等重放不重复登记、 同 ID 异参 `conflict`、陈旧 revision 拒绝、原子写+写前备份（坏集合拒绝覆盖）、`evaluate()` 八类 fail-closed 复检、 撤销只影响之后、重启可读回；**14 条反例 + 3 条变异体**。 **SECRETARY-01-01（R6）**：`secretary-agent-contract.ts` —— 默认关闭/仅认证用户、工作区必须为客户端数据目录的专职子目录 （不得等于或包含主目录/安装目录）、能力矩阵只含两项只读（禁止项目源文件读取/替用户授权/管理执行/Git 合并）、 可见列表默认空且未选项目连只读报告也拒、任务转交目标不明必须先澄清（绝不广播）；**9 条反例 + 3 条变异体**。 **SECRETARY-01-02（R7）**：`secretary-relay-contract.ts` —— 模式切换隔离常量（不复制历史/不重复任务/不改归属）、 最小报告附件（来源/项目/revision/时间/哈希缺一即拒，`isMinimal:true`，指纹随 revision/哈希变化）、 新鲜度（过期如实给最后更新时间、非法时间戳报 unknown）、任务行键含项目（同名任务不串线）、 派发幂等（同键同目标重放不重复派发、同键异目标 conflict）、回执只能前进、同级回派有界并升级用户； **9 条反例 + 4 条变异体**。 **SECRETARY-01-03（R8）**：`secretary-first-start.ts` —— IANA 时区日历日（DST 边界实测）、 触发需**同时**满足跨本地日 + 离线 ≥ 用户阈值 + 该日未处理（**单纯跨午夜短重启不触发**）、 时钟回拨不触发、崩溃无关闭时刻用心跳并标估计值（心跳也缺则保守不触发）、 同日领取排他（多窗口只有一个能领、同窗口重放幂等）、触发不阻塞启动且仍需 CURATE 授权、 收拢视图 `areOlderDeleted:false`（收拢不删除）且旧**待决策/未完成仍可见**、快捷入口四项； **11 条反例 + 4 条变异体**。  **FOLDER-01-03（R15，CLI 侧；命令名经用户确认＝选项 A）**： `packages/tui/src/cli/folder-command.ts` + `cli.tsx` 注册 `astarray folder request / approve / revoke / check` —— `request` 只出卡不落库、多 `--path` 逐项出卡（无 `--approve-all`）、`approve` 为认证用户确认、 `revoke` 只影响之后、`check` 只读且 fail-closed（拒绝即非 0 退出）、 `--permission`/`--duration` 只接受固定枚举（默认只读+仅本次会话）、 `--known-project-root <id>=<path>` 显式声明已知根；**14 条反例（10 进程内 + 4 argv）+ 4 条变异体**。 **未开始**：TUI/GUI 入口（UI 落点待用户决策）、与工具执行门禁的产品接线、人工体验、包级 tarball 验收。 **ONBOARD-01-01（R24）**：`onboarding-hint-contract.ts` —— 首次提示逐字卡内文案、**「不再提示」持久化生效**、 跳过不重复弹首次、**忙碌类五类抑制**（输入/授权/错误/紧急/高负载）、**迁移后状态缺失不重复弹**、 **默认 7 天冷却且需本地可解释信号**、**推荐不构成授权**、无遥测无画像；**8 条反例 + 3 条变异体**。 **其余未开始**：TUI/GUI 入口、与工具执行门禁的产品接线、 SECRETARY-01-03/04、习惯引导。**不主张整卡通过** | **2026-10-20**：FOLDER-01-03 的 **GUI 面板**（出卡不落库/人工确认批准/撤销保留历史/复检 fail-closed）与 **TUI 只读面板**（路径/读写/期限/子目录、候选卡标「尚未登记」、撤销项保留）已 done；UI变异 19/19。**剩**：TUI 侧批准/撤销动作（当前由 CLI/GUI 承担，避免重复实现判定）。
 | EXP-01 | **in_progress（2026-10-18 R9/R11：FOLD-01-01 与 EXPLORE-01-01 的纯判定层 done）** | 卡：`docs/tasks/EXP01_WORKFLOW_DISCOVERY_AND_HISTORY_MAINTENANCE_TASK_CARDS.md`。 **FOLD-01-01**：`workflow-fold-contract.ts` —— 候选十项必填、等价必须有明确前置条件（拒绝相似文本）、 步骤偏序校验（缺依赖/自环/成环拒绝）、**不可折叠项冻结**（授权/结果/回执/裁决/nonce/批准指纹）、 副作用参数须有名称+schema、版本化登记（`requiresPerStepAuthorization:true`、 `reusesPreviousAuthorization:false`）、回退守卫（未知副作用即拒、`doesAutoReplayOldWorkflow:false`）； **9 条反例 + 4 条变异体**。 **EXPLORE-01-01**：`explore-plan-contract.ts` —— 问题指纹（问题+证据+版本）、计划必填（无停止条件即拒）、 预算五维**扣减不透支**、启动六类拒绝（默认关/范围未授权/**资源未知且无本地预算**/重复组合/并发超限/预算耗尽）、 低于用户任务优先级且不能自行续预算、停止六类条件；**9 条反例 + 4 条变异体**。 **CURATE-01-01（R12）**：`curation-plan-contract.ts` —— 授权绑定精确 `planRevision` + **参数指纹** （批准后改参数即失效）、**未授权零自动整理**（无授权/非认证/已撤销/旧 revision/指纹不符全拒）、 **本地确定性**重大变更矩阵（范围扩大、换 Provider/模型、加外发、提频、加预算、扩时段、改保留策略、换方法）、 **无法归类的差异按重大处理**（模型称'小改'绕不过）、纯 UI 调整记小版本但仍留记录、 **等待只暂停新方案**（旧方案可继续）、用户拒绝则保留旧方案或停用；**9 条反例 + 4 条变异体**。 **FOLD-01-02（R21）**：`workflow-fold-package.ts` —— 候选必须先过 FOLD-01-01、**作者不得验收自己**、 **至少两种不同输入**、**必须覆盖分支差异/部分失败**、验证须证据驱动、 **展开后每步权限不得超出原批准集合**（拒绝借折叠扩权）、缺标识/版本拒绝、 **同版本同内容幂等**、**同版本异内容冲突**、包指纹随参数/前置条件变化；**9 条反例 + 3 条变异体**。 **EXPLORE-01-02（R22）**：`explore-trial-contract.ts` —— **真实用户数据/生产远端禁止**、 **隔离方式必填**（隔离目录/fixture/假服务）、取消/休息/预算/并发四类不开始、 **试验键=参数+种子+版本**且重复键去重复用（不重跑不耗预算）、记录须带证据哈希且阴性结果保留、 **重启不刷新预算**（无快照视为未知、预算置零）；**8 条反例 + 3 条变异体**。 **CURATE-01-02（R23）**：`curation-execution-contract.ts` —— 单实例锁、**错过周期合并为 1 次**、 按已提交游标增量、启动六类拒绝（取消/休息/授权无效/旧 revision/预算/锁）、 **摘要失败原文不变且不谎报覆盖**、个体隔离、重启续处理仅授权有效且 revision 相符并沿用原游标； **8 条反例 + 3 条变异体**。**FOLD-01-03（R27，判定层）**：`workflow-fold-lifecycle.ts` —— 复用门禁（停用/未登记版本拒绝、 参数 schema 必须完全一致）、**回退四类阻塞**（同版本/目标不可用/**未知副作用**/**在途实例**）、 回归时停用新版本且 **`shouldAutoRerunOldWorkflow` 恒 false**、停用须记原因并保留历史； **7 条反例 + 3 条变异体**。**未开始**：FOLD-01-03 的真实产品入口与 tarball 包测试、EXPLORE-01-03、CURATE-01-03。**不主张实验功能可用（全部默认关闭）** **包级验收（R28）**：新增 `npm run verify:contract-sdk -- <tarball>`，用已安装包观测 17 项契约语义并由可单测判定器判定（缺观测/判据过少都算失败）；实测 tarball sha256 `95858fc4…` ⇒ **17/17 exit 0**。**仍不主张三张 03 卡通过**（真实产品入口与成本收益未做）。 |
 | LESSON-01 | **in_progress（2026-10-18 R13：LESSON-01-01 契约层 done）** | 卡：`docs/tasks/LESSON01_MODEL_ALIGNED_COMMUNICATION_MEMORY_TASK_CARD.md`。 `lesson-record-contract.ts` —— 记录字段齐全性、**配置快照必须取自运行时**（重建即拒）、 **unknown 必须显式**（空版本拒；unknown 只能参考匹配）、**事实/假设分离**、事实须带证据、 **配置快照含凭据即拒**、**主 Agent 模型永不可写**（`MAIN_AGENT_LESSON_WRITE_CAPABILITY="none"`）、 模型只能写自己存档/控制面可代理、未核验不得自批推广、默认范围 **task**、未验证**不自动注入**、 严格匹配（方向/职责/双方模型/任务类型）、模型无关规范需用户确认；**11 条反例 + 4 条变异体**。 **未开始**：LESSON-01-02（工具扩展/三层范围/推广审查）、LESSON-01-03（接线/恢复/包消费）。 **不主张经验系统可用（尚无写入工具与自动注入接线）** |
 | WORKWINDOW-01 | **in_progress（2026-10-18 R14：WORKWINDOW-01-01 契约层 done）** | 卡：`docs/tasks/2026-10-01_RUNTIME_USABILITY_AND_RELIABILITY_TASK_CARDS.md` §4。 `work-window-contract.ts` —— 白/黑名单规则（左闭右开、跨午夜、次日凌晨归属前一天）、**无规则=全天可工作**、 **一次性例外优先**、**同优先级休息优先**（项目规则不能无声覆盖全局休息）、IANA 时区（**DST 重复小时不重复启动**、 非法时区保守休息）、**暂停原因分别记录**（解除时段暂停不清除用户暂停）、**恢复六类阻塞** （休息/暂停/用户停止/授权失效/租约失效/**未知副作用**）、**时钟跳变检测**（墙钟 vs 单调钟）； **12 条反例 + 4 条变异体**。**未开始**：WORKWINDOW-01-02（派发/模型/工具执行前统一门禁接线）、 WORKWINDOW-01-03（设置与对话入口、重启包测试）。**不主张时段功能已生效** |
@@ -602,7 +602,7 @@ provider + 权限询问路径下，CLI 打印结果后**不自然退出**（实�
 | E2E-01 独立工作助手验收 | pending | 上述四张返修卡通过 |
 | BRIDGE-01 外部接入MVP | **done（2026-10-10）**；**Linux 平台验证已补齐（2026-11-08，WSL2）**；仅缺 macOS 平台验证 | 脚本化 stdio 闭环 20/20 + **真实第三方客户端（opencode/pi）消费已完成**；**Linux 侧 2026-11-08 在 WSL2／Ubuntu 26.04／Node v22.22.1 复跑同一脚本：exit 0、`checkCount=20`、20/20、0 失败**；macOS 按用户指示先跳过保留待补。详见 `docs/reports/BRIDGE01_04_REAL_CLIENT_EVIDENCE_2026-10-10.md` 与 `docs/reports/BRIDGE01_LINUX_PLATFORM_EVIDENCE_WSL2_2026-11-08.md` |
 | GUI-01-R GUI产品接线 | **本地可证 + 单平台（Windows）口径收口（2026-10-11）** | 01/02/03a/03b/04a/04b 全部交付；**人工体验第 2 轮已完成**（十项定论、6 个真实缺陷均已修）；§1-5 授权与「重启后列表为空」转出至 GUI-02 |
-| GUI-02 授权呈现闭环与历史任务视图 | **in_progress（GUI-02-01：核心契约/请求实体/事件/裁决入口/安全预览/R1 返修 **＋ 片①②③ 已交付**）** | 检查点：01 公共授权契约与安全反例 / 02 GUI 授权闭环 / 03 历史列表 / 04 重启与包级验收。**GUI-02-01 片①②③ 已交付（2026-10-11，均有独立提交与门禁）**：① CLI 登记请求实体（身份通路 `a0c59b6`/`d6740fe`/`841e9f4`/`0e7bedd`，反例 `9d498e9`）；② 门面统一"登记+广播事件"、并修正片① 越层 import（`27ed9fa`）；③ CLI 裁决经同一服务 + **登记幂等** + **修掉"登记异步 vs 裁决同步"时序竞态**（`01d472e`）；片②③ 均复跑 **6 套授权回归 36/36** ⇒ 行为不变。**GUI-02-01 剩余**：片④ 基线两项（退出码代码级已定、TTY 逐字输出需真实 TTY ⇒ 未实测）。**GUI-02-02 本地可证部分已交付（2026-10-11，三片三次独立提交+门禁）**：① 核心能力（`7145ce3`：待授权列表**只读且解码身份**、裁决入口**只接受锚点与裁决**、权威事实**默认 fail-closed**；反例 8 条实现前全红并**捕获"身份不能往返"真实缺陷**）；② 传输层（`f6219bf`：`GET /permission-asks` + `POST /commands/permission-ask-decision`，CSRF 复用全局门禁，错误码 400/403/404/409，生产入口**预生成 CSRF 同时交给两边**避免静默失效）；③ 界面呈现（`a7cf9f6`：独立详情卡 + **批准本次/拒绝**，**不默认选中**、**无批量批准入口**、敏感路径提示不盲目批准、409 提示刷新后重新裁决）。**仍未完成**：~~**安装等专用流程的独立入口未实现**（仅钉住"无批量入口"这一必要条件）~~ → **已交付（2026-10-12，见下）**；**真实浏览器人工体验须由用户提供**。**GUI-02-02 安装专用流程已交付（2026-10-12，另 3 片 + 5 项修复，均有独立提交）**：① 待决安装询问注册表（`1e48ed1`，revision 校验／阶段匹配／超时或取消 ⇒ **fail-closed**）；② 界面侧安装通道 + 门面独立入口（`1c986f0`，`InstallationGateInterfacePort`）；③ 两条专用路由 + 生产接线 + 界面卡片 + **「不可被普通授权卡绕过」反例**（`e7afc49`／`3d3f6b4`）；另修 `ca6ee0b`（安装通道内部异常收敛为 **fail-closed**，不穿透工具执行路径）、`10cfa46`（`recover abandon` 误报 `abandoned: true`）、`5ebb73a`（CRLF 下静态 `source` 未省略）、`73e6244`（权限询问误导性告警）、`d332ded`（补交漏交的门面 async 修复，修 `origin/main` 的 typecheck 失败）。**审计结论（纠正最初假设）**：安装**不会**被普通授权卡绕过 —— `InstallationGateGuard` **自己**完成完整判定（询问已有资源 → 独立开关 → `askAllowOnce` → 授权 → **执行前复检**）；**真正的缺口是 GUI 侧 `installationUserPort` 曾为 `null` ⇒ 安装走不通**，本段为 GUI 补上这条独立通道。**本段其余未解决项**（如实）：`cancel()` 的 2 秒上限未修；全量 `test` 约 30% 概率间歇失败——详见 `docs/reports/SESSION_HANDOFF_2026-10-12.md` §0.4。**GUI-02-03 数据层与三条硬不变量已交付（2026-11-08，`4fc53d4`）；三视图 UI／项目字段／路由仍未做**及详情 / 04 重启与包级验收；**每轮一个检查点**。**提取边界已确认**：授权登记·状态迁移·裁决校验提取到**核心应用服务层**，CLI 仅留终端 I/O 适配，GUI 复用同一服务、不复制规则，**核心不得反向依赖 TUI**；"CLI 行为不变"= 公开可观察行为兼容。基线：`docs/reports/GUI02_01_EXISTING_PERMISSION_ASK_BEHAVIOR_BASELINE_2026-10-11.md`。卡：docs/tasks/GUI02_AUTHORIZATION_AND_HISTORY_VIEW_TASK_CARD.md <br>**2026-11-08 续记（`ed4b5e6` + `743071e` + `35eb104` + `0a81e8c` + `96329ca`）：** GUI 授权闭环**已打通并经端到端自动验证**：`提交 → 授权请求出现 → 批准 → blocked→running→done → 产物真实落盘`。修掉两处「半成品」实现 —— ① `gui` 命令创建应用时**没传** `onPermissionAskWithIdentity` ⇒ 没人登记待决授权 ⇒ `/permission-asks` 恒空；② GUI 的批准只记录裁决、**没做** CLI 的三步（会话级授权 / 作用域一次性授权 / 下发 `unblock` 唤醒）。另修掉：恢复中心**分页 + 可恢复项优先**（用户实测 103 条里只有 1 条可恢复、找不到）、`aria-live` 误用（翻页念整批列表、淹没状态播报）。证据：`docs/reports/GUI_AUTHORIZATION_CLOSURE_END_TO_END_2026-11-08.md`、`docs/reports/GUI_MANUAL_EXPERIENCE_ROUND3_2026-11-08.md`。**仍未完成**：Linux/macOS 平台人工体验（Windows 浏览器连不进 WSL，实测过）⇒ 整卡不判通过。 |
+| GUI-02 授权呈现闭环与历史任务视图 | **in_progress（GUI-02-01：核心契约/请求实体/事件/裁决入口/安全预览/R1 返修 **＋ 片①②③ 已交付**）** | 检查点：01 公共授权契约与安全反例 / 02 GUI 授权闭环 / 03 历史列表 / 04 重启与包级验收。**GUI-02-01 片①②③ 已交付（2026-10-11，均有独立提交与门禁）**：① CLI 登记请求实体（身份通路 `a0c59b6`/`d6740fe`/`841e9f4`/`0e7bedd`，反例 `9d498e9`）；② 门面统一"登记+广播事件"、并修正片① 越层 import（`27ed9fa`）；③ CLI 裁决经同一服务 + **登记幂等** + **修掉"登记异步 vs 裁决同步"时序竞态**（`01d472e`）；片②③ 均复跑 **6 套授权回归 36/36** ⇒ 行为不变。**GUI-02-01 剩余**：片④ 基线两项（退出码代码级已定、TTY 逐字输出需真实 TTY ⇒ 未实测）。**GUI-02-02 本地可证部分已交付（2026-10-11，三片三次独立提交+门禁）**：① 核心能力（`7145ce3`：待授权列表**只读且解码身份**、裁决入口**只接受锚点与裁决**、权威事实**默认 fail-closed**；反例 8 条实现前全红并**捕获"身份不能往返"真实缺陷**）；② 传输层（`f6219bf`：`GET /permission-asks` + `POST /commands/permission-ask-decision`，CSRF 复用全局门禁，错误码 400/403/404/409，生产入口**预生成 CSRF 同时交给两边**避免静默失效）；③ 界面呈现（`a7cf9f6`：独立详情卡 + **批准本次/拒绝**，**不默认选中**、**无批量批准入口**、敏感路径提示不盲目批准、409 提示刷新后重新裁决）。**仍未完成**：~~**安装等专用流程的独立入口未实现**（仅钉住"无批量入口"这一必要条件）~~ → **已交付（2026-10-12，见下）**；**真实浏览器人工体验须由用户提供**。**GUI-02-02 安装专用流程已交付（2026-10-12，另 3 片 + 5 项修复，均有独立提交）**：① 待决安装询问注册表（`1e48ed1`，revision 校验／阶段匹配／超时或取消 ⇒ **fail-closed**）；② 界面侧安装通道 + 门面独立入口（`1c986f0`，`InstallationGateInterfacePort`）；③ 两条专用路由 + 生产接线 + 界面卡片 + **「不可被普通授权卡绕过」反例**（`e7afc49`／`3d3f6b4`）；另修 `ca6ee0b`（安装通道内部异常收敛为 **fail-closed**，不穿透工具执行路径）、`10cfa46`（`recover abandon` 误报 `abandoned: true`）、`5ebb73a`（CRLF 下静态 `source` 未省略）、`73e6244`（权限询问误导性告警）、`d332ded`（补交漏交的门面 async 修复，修 `origin/main` 的 typecheck 失败）。**审计结论（纠正最初假设）**：安装**不会**被普通授权卡绕过 —— `InstallationGateGuard` **自己**完成完整判定（询问已有资源 → 独立开关 → `askAllowOnce` → 授权 → **执行前复检**）；**真正的缺口是 GUI 侧 `installationUserPort` 曾为 `null` ⇒ 安装走不通**，本段为 GUI 补上这条独立通道。**本段其余未解决项**（如实）：`cancel()` 的 2 秒上限未修；全量 `test` 约 30% 概率间歇失败——详见 `docs/reports/SESSION_HANDOFF_2026-10-12.md` §0.4。**GUI-02-03 数据层与三条硬不变量已交付（2026-11-08，`4fc53d4`）；三视图 UI／项目字段／路由仍未做**及详情 / 04 重启与包级验收；**每轮一个检查点**。**提取边界已确认**：授权登记·状态迁移·裁决校验提取到**核心应用服务层**，CLI 仅留终端 I/O 适配，GUI 复用同一服务、不复制规则，**核心不得反向依赖 TUI**；"CLI 行为不变"= 公开可观察行为兼容。基线：`docs/reports/GUI02_01_EXISTING_PERMISSION_ASK_BEHAVIOR_BASELINE_2026-10-11.md`。卡：已迁出的 UI 任务卡 <br>**2026-11-08 续记（`ed4b5e6` + `743071e` + `35eb104` + `0a81e8c` + `96329ca`）：** GUI 授权闭环**已打通并经端到端自动验证**：`提交 → 授权请求出现 → 批准 → blocked→running→done → 产物真实落盘`。修掉两处「半成品」实现 —— ① `gui` 命令创建应用时**没传** `onPermissionAskWithIdentity` ⇒ 没人登记待决授权 ⇒ `/permission-asks` 恒空；② GUI 的批准只记录裁决、**没做** CLI 的三步（会话级授权 / 作用域一次性授权 / 下发 `unblock` 唤醒）。另修掉：恢复中心**分页 + 可恢复项优先**（用户实测 103 条里只有 1 条可恢复、找不到）、`aria-live` 误用（翻页念整批列表、淹没状态播报）。证据：`docs/reports/GUI_AUTHORIZATION_CLOSURE_END_TO_END_2026-11-08.md`、`docs/reports/GUI_MANUAL_EXPERIENCE_ROUND3_2026-11-08.md`。**仍未完成**：Linux/macOS 平台人工体验（Windows 浏览器连不进 WSL，实测过）⇒ 整卡不判通过。 |
 | WB-00 细节微淘原型 | pending | GUI-01-R；未来探索 |
 
 ## Batch OBS/SMART/PROJECT（OBS-01、SMART-01、PROJECT-01 三卡）检查点记录
@@ -2314,7 +2314,7 @@ LESSON-01-03（dispatch/receive/review 三节点接线）✅；PERF-01-02 ✅；
 
 **已知抖动**：`g2-progress-guard` 的对照用例在高并发下偶发失败（单文件 2/2 通过），属时间敏感断言。
 
-## 2026-10-23 GUI 接线（私有库 08e1074）
+## 2026-10-23 GUI 接线（UI 08e1074）
 
 | 端点 | 内容 |
 |---|---|
@@ -2323,35 +2323,35 @@ LESSON-01-03（dispatch/receive/review 三节点接线）✅；PERF-01-02 ✅；
 | `GET /agents/instruction-window` | 缺参 400；状态未接入 ⇒ `isAvailable:false` + 如实原因；提供状态 ⇒ 菜单区块（积压时批量提交禁用） |
 
 - 页面壳：右栏新增 **Agent 右键菜单**（contextmenu / Shift+F10 / Escape）与「运行状态」面板；
-- 反例 7 条 + 变异体 2 条；私有库门禁：**325 用例 / 变异 25-25 / 包验收 7-7**。
+- 反例 7 条 + 变异体 2 条；UI门禁：**325 用例 / 变异 25-25 / 包验收 7-7**。
 
 **未做**：GUI 的用量与诊断面板（下一步）；人工体验（需你操作）。
 
-## 2026-10-23 GUI 用量/诊断面板（私有库 ce81894）
+## 2026-10-23 GUI 用量/诊断面板（UI ce81894）
 
 | 端点 | 行为 |
 |---|---|
 | `GET /observability/usage` | 未配状态目录 ⇒ 501；空账目 ⇒ `entryCount:0` 且提示「空 ≠ 无消耗」；**金额恒 null**；分页有界（≤200，`nextCursor` 正确） |
 | `GET /observability/diagnostics` | 未配状态目录 ⇒ 501；返回脱敏证据包摘要，`containsFullSession/SourceCode/RawLogs` 全 false；空库计数 0（不编造） |
 
-- 反例 6 条 + 变异体 2 条；私有库门禁：**331 用例 / 变异 27-27 / 包验收 7-7**。
+- 反例 6 条 + 变异体 2 条；UI门禁：**331 用例 / 变异 27-27 / 包验收 7-7**。
 - 右栏现有面板：运行状态（秘书/引导）、用量、诊断、观测（性能）；Agent 右键菜单含指令窗口。
 
 **剩余**：人工体验（需你操作），其余不依赖新数据的项已全部交付。
 
-## 2026-10-23 Agent 右键入口订正（私有库 478a07a）
+## 2026-10-23 Agent 右键入口订正（UI 478a07a）
 
 - 用户反馈：右键对象应是**消息里的 Agent 头像**（我先做在右栏列表行上，已改）。
 - 头像右键 ⇒ Agent 菜单（指令窗口区块 + 修改 agent 设置）；左键 ⇒ 修改设置；**用户气泡不弹**。
 - 指令窗口未接入时菜单仍保留设置入口；选中 agent 缺省 `primary`。
-- 反例 6 条 + 变异体 2 条；私有库门禁 **337 用例 / 变异 29-29 / 包验收 7-7**。
+- 反例 6 条 + 变异体 2 条；UI门禁 **337 用例 / 变异 29-29 / 包验收 7-7**。
 
-## 2026-10-23 布局订正（私有库 7180dab）
+## 2026-10-23 布局订正（UI 7180dab）
 
 - 用户实测：“弹出菜单像底栏，不是窗口” ⇒ `.agent-context-menu` 改为 `position: fixed` 浮层（`z-index:1000`、阴影、圆角），并在 `agentMenuPlace` 里按视口收边。
 - 用户实测：“右栏列表实际在左栏” ⇒ 新增独立右侧栏 `#chatStatusPane`（`grid-column: -1`，默认列 `var(--chat-rail) minmax(0,1fr) var(--chat-status)`；打开工作区时四列），把 Agent 列表、运行状态、用量、诊断移到右侧；窄屏（≤1180px）隐藏。
 - 布局护栏测试随之更新：仍禁止**布局面板**用 `fixed`，同时断言弹出菜单**必须** `fixed` 且状态栏在 `</main>` 之后、`grid-column: -1`。
-- 私有库门禁：**338 用例 / 变异 31-31 / 包验收 7-7**。
+- UI门禁：**338 用例 / 变异 31-31 / 包验收 7-7**。
 
 ## 2026-10-23 统一对账（权威）
 
@@ -2386,29 +2386,29 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 ### E. 未核对（旧卡，无状态列，未在本轮审计）
 
-`GUI02_AUTHORIZATION_AND_HISTORY_VIEW_TASK_CARD.md`、`WB00_MICRO_EDIT_WORKBENCH_PROTOTYPE_TASK_CARD.md`、
+`已迁出的 UI 任务卡`、`WB00_MICRO_EDIT_WORKBENCH_PROTOTYPE_TASK_CARD.md`、
 `BATCH6_REPAIR_TASK_CARDS.md`、`B6R10_FINAL_ACCEPTANCE.md`（保留平台阻塞结论）。
 
 ## 2026-10-23 补充核对：B6R-04b（TUI 权限组控制面）
 
-- 代码已在私有库：`packages/tui/src/ui/components/panels.tsx`（`PermissionProfilePanel`）、`app.tsx`（头栏显示 + 刷新/切换）、`state/app-state.ts`（分页/搜索/当前组）；
-- 私有库测试：`tests/tui/component/tui.test.tsx` 覆盖权限组面板；
+- 代码已在UI：`packages/tui/src/ui/components/panels.tsx`（`PermissionProfilePanel`）、`app.tsx`（头栏显示 + 刷新/切换）、`state/app-state.ts`（分页/搜索/当前组）；
+- UI测试：`tests/tui/component/tui.test.tsx` 覆盖权限组面板；
 - 结论：**B6R-04b 不再是 pending**，本地可证部分 done（tarball 安装后的 TUI 人工体验仍属人工项）。
 ## 2026-10-23 订正：GUI-02 的 01/02 已存在（我先前的判断有误）
 
 - **我先前写"私有 GUI 无 `/permission-ask` 路由"是错的**：`gui-server.ts` 已有 `/permission-asks`、`/commands/permission-ask-decision`、
   `/installation-inquiries` 与 `/commands/installation-inquiry-decision`，并按 GUI-02 的安全要求校验 CSRF/主体/项目会话可见性/裁决权/指纹/revision；
 - 因此 **GUI-02-01 与 GUI-02-02 属本地可证部分已交付**（卡内 2026-10-11/12 记录一致）；
-- **再次订正（同日）**：GUI-02-03（三视图历史）与 GUI-02-04（重启/恢复按钮/包入口）**也已在私有库实现并有测试**
+- **再次订正（同日）**：GUI-02-03（三视图历史）与 GUI-02-04（重启/恢复按钮/包入口）**也已在UI实现并有测试**
   （`gui02-03-*`、`gui02-04-*` 共 8 个测试文件）⇒ **GUI-02 本地可证部分全部 done**，只剩人工体验。
 - 卡内行已按证据回填（`GUI-02-03` / `GUI-02-04` 标 ✅ 本地可证 done）。
 
-## 2026-10-23 布局修复（私有库 40df419）
+## 2026-10-23 布局修复（UI 40df419）
 
 - 用户实测：“agent 菜单位置不对，应在右侧展开；现在跑到界面右上角，并把除标题外内容挤到底部”。
 - **根因**：`#chatStatusPane` 只设了 `grid-column: -1`、没设 `grid-row`，CSS Grid 自动放置把它塞进**表头行**（row 1），该行被状态面板撑高，会话（row 2）被推到页面底部。
 - **修复**：`grid-row: 2`，与左栏/会话同处内容行；`grid-column: -1` 保持最右列。
-- 护栏新增断言 `grid-row: 2`，并加 1 条变异体（改回 row 1 ⇒ 必须变红）；私有库门禁 **338 用例 / 变异 32-32 / 包验收 7-7**。
+- 护栏新增断言 `grid-row: 2`，并加 1 条变异体（改回 row 1 ⇒ 必须变红）；UI门禁 **338 用例 / 变异 32-32 / 包验收 7-7**。
 
 
 
@@ -2417,12 +2417,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **协议**：UI 改动我不亲自动手；我写"可执行提示词"（目标 / 交互契约 / 硬约束 / 自检命令 / 交付格式），由 **MiniMax-M3** 子 agent 实现，我只做**评审 + 跑门禁 + 提交**。
 - **通道**：DSH profile 已配置 `minimax-cn`（模型 `MiniMax-M3` / `MiniMax-M2.7` / `MiniMax-M2.7-highspeed`，anthropic-messages 协议）；探测调用返回正常。
 - **方法参考**（按方法论文档名引用，本次未联网拉取）：`anthropics/skills` 的 frontend-design 技能、`superdesigndev/superdesign` 的 agent 设计工作法、GitHub Primer 可访问性规范。
-- **第一次委托（私有库 0982ae5）**：Agent 菜单与两个弹窗的可访问性/键盘交互（role=menu、方向键/Home/End/Enter/Space、Escape 归还焦点、aria-modal、aria-disabled、focus-visible、prefers-reduced-motion）。
+- **第一次委托（UI 0982ae5）**：Agent 菜单与两个弹窗的可访问性/键盘交互（role=menu、方向键/Home/End/Enter/Space、Escape 归还焦点、aria-modal、aria-disabled、focus-visible、prefers-reduced-motion）。
   - 新增 23 条用例（`tests/gui/integration/gui-agent-menu-a11y.test.ts`）；
   - 我的复跑：**371 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；
   - 子 agent 自述两点保留：①点菜单项关闭不归还焦点（有意）；②用例是源码级静态断言 + `vm.Script` 解析，**焦点行为仍需人工在浏览器核一次**。
 
-## 2026-10-23 GUI 布局重做（私有库 2f31057，MiniMax-M3 子 agent 实现）
+## 2026-10-23 GUI 布局重做（UI 2f31057，MiniMax-M3 子 agent 实现）
 
 用户实测问题：右侧状态栏常驻约占半屏；展开工作区时会话被挤掉；项目/工作区/会话只用左半边；会话覆盖工作区右侧。
 
@@ -2434,10 +2434,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 5. **状态改弹窗**：删除常驻 `#chatStatusPane`；运行状态/用量/诊断进入 `statusDialog` / `usageDialog` / `diagDialog`；**Agent 状态仍在头像右键菜单 → 弹窗**；
 6. 移除「隐藏左栏/隐藏会话」旧按钮与 `chatHideRail` / `chatHideConversation` 逻辑。
 
-门禁（我复跑）：私有库 **396 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；路由文件未改。
+门禁（我复跑）：UI **396 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；路由文件未改。
 风险：以上为**源码级静态断言**，分隔条拖拽手感、浮层对比度、弹窗焦点行为需浏览器实测。
 
-## 2026-10-23 GUI 修正第二轮（私有库 79bbbcb，MiniMax-M3 实现）
+## 2026-10-23 GUI 修正第二轮（UI 79bbbcb，MiniMax-M3 实现）
 
 用户实测问题与修复：
 1. **工作区位置**：改为在**项目区与会话区之间**以列展开（不覆盖）；`body.chatWorkspaceOpen #chatRightRegion { grid-template-columns: minmax(0,5fr) minmax(0,3fr) }`，工作区第 1 列、会话第 2 列，默认 **5:3**，关闭时单列。
@@ -2445,10 +2445,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 3. **状态/用量/诊断脱离 agent**：删除标题栏「状态/用量/诊断」按钮与三个独立弹窗；并入 **Agent 状态弹窗**四区块（指令窗口 / 运行状态 / 用量 / 诊断），打开即刷新，任一失败只影响本区块。
   - 原 `agentMenuPanel`（Agent 列表）与 `obsOverview`（观测）迁到项目区（id 与文案保留）——**是否保留待用户确认**。
 
-门禁（我复跑）：私有库 **425 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；路由未改。
+门禁（我复跑）：UI **425 用例通过 / 变异 34-34 / 包验收 7-7 / build 成功**；路由未改。
 风险：仍为静态+运行时 HTML 断言，5:3 像素观感、分隔条手感、弹窗真实焦点行为需浏览器实测。
 
-## 2026-10-24 GUI 第三轮（私有库 a7b7a47）
+## 2026-10-24 GUI 第三轮（UI a7b7a47）
 
 - **Agent 状态弹窗打不开的真因（已修）**：`chatDialogOpen(dialog, triggerSlot)` 形参名与函数体引用的 `trigger` 不一致 ⇒ 点击时抛 `ReferenceError`，`showModal()` 永远执行不到。修正形参为 `(dialog, trigger, triggerSlotName)`，两个调用点补槽位名；新增回归用例 5 条 + 1 条变异（`gui-dialog-open-uses-undefined-trigger`）。
 - **工作区/会话可拖动**：新增 `#chatWorkspaceSplitter`（separator 语义 + 方向键 ±2%/Shift ±8%），`--chat-workspace-col` 默认 62.5%（5:3），钳制 20%–80%。
@@ -2456,7 +2456,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **文件夹授权移入会话区**：`#folderGrantPanel` 移到 `main` 内、按当前项目显示（`#folderGrantProjectLabel`）。
 - **工作区按钮改为「关闭会话区 / 打开会话区」**：关闭后工作区占满右侧，按钮可恢复。
 
-门禁：私有库 **448 用例 / 变异 41-41 / 包验收 7-7 / build 成功**。
+门禁：UI **448 用例 / 变异 41-41 / 包验收 7-7 / build 成功**。
 
 ## 2026-10-24 TOOLKIT-01-06 真实 token 实测
 
@@ -2516,19 +2516,19 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 反例 2 条 + 变异 2 条（失败显示成已投递、空状态写成“没有数据”）；公开库 **3,941 用例通过**，锚点 301/301。
 - 仍 pending：TUI/GUI 入口与 tarball 隔离闭环（COMM-01-03 剩余部分）。
 
-## 2026-10-24 GUI 只读协作状态（私有库 5185b43，MiniMax-M3 实现）
+## 2026-10-24 GUI 只读协作状态（UI 5185b43，MiniMax-M3 实现）
 
 - 新增 `GET /collaboration/status`：无状态目录 ⇒ 501；读失败 ⇒ 502；200 返回 agents / deliveries / view / inboxFileCount / invalidInboxCount / notice；**只读**（前后状态目录字节一致有测试守住）。
 - Agent 状态弹窗新增「协作（只读）」区块：Agent 数 / 投递记录 / 可投递节点 / 暂停 / 丢弃 / 是否存在环，并写明「只读：不投递、不改归属」；失败只影响本区块。
-- 门禁：私有库 **466 用例 / 变异 41-41 / 包验收 7-7**。
+- 门禁：UI **466 用例 / 变异 41-41 / 包验收 7-7**。
 - **事故记录**：子 agent 写回时把 `gui-server.ts` / `project-chat-routes.ts` 整体改成 CRLF，导致 4 条按 LF 切片/锚点的既有测试变红（不是既有失败）。我按仓库既有 LF 约定归一化后全绿；尚未加 `.gitattributes` 固定行尾，后续仍可能复发。
 
 ## 2026-10-24 COMM-01-03 收尾（TUI 入口 + tarball 闭环）
 
-- **TUI 只读入口**（私有库 8fa9457，MiniMax-M3 实现）：`CollaborationStatusPanel` + `collaboration-status-ports.ts`。面板聚焦时自动刷新一次、按 `r` 再刷新；展示 Agent/投递/可投递/暂停/丢弃/环；失败显示只读错误视图（计数 0、`isWritable:false`、写明「不可用：原因」）；**无任何投递/写盘路径**（源码级守卫测试）。
+- **TUI 只读入口**（UI 8fa9457，MiniMax-M3 实现）：`CollaborationStatusPanel` + `collaboration-status-ports.ts`。面板聚焦时自动刷新一次、按 `r` 再刷新；展示 Agent/投递/可投递/暂停/丢弃/环；失败显示只读错误视图（计数 0、`isWritable:false`、写明「不可用：原因」）；**无任何投递/写盘路径**（源码级守卫测试）。
 - **tarball 隔离闭环**：扩展 `verify-comm-package.mjs`，在安装包上跑 `collaboration status --json`（`isWritable:false`、空状态写「空 ≠ 不存在」）、`inbox list --json`（空 ≠ 无消息）、`inbox deliver`（无收件箱 ⇒ 退出码 2），并断言这些只读命令**不改动状态目录文件清单**。
   - 实测：`.tmp/comm-pkg/astarray-0.1.0.tgz` → 临时安装 → 脚本退出码 0（原有 fork/IPC 崩溃重放等判据同时通过）。
-- 门禁：私有库 **495 用例 / 变异 41-41 / 包验收 7-7**；公开库新增包级判据通过。
+- 门禁：UI **495 用例 / 变异 41-41 / 包验收 7-7**；公开库新增包级判据通过。
 
 ## 2026-10-24 EVENT-01 控制通道 / 取消 / 分阶段确认 / 崩溃重放
 
@@ -2572,12 +2572,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - CLI：`project entry --choice relocate --confirm-new-root <path> --expected-location-revision <n>`（0=已重定位，4=拒绝）。
 - 反例：服务 5 条 + CLI 2 条；变异 2 条。**GUI 仍走同一服务的接线待做**。
 
-## 2026-10-24 RELOCATE GUI apply（私有库 42fb578，MiniMax-M3 实现）
+## 2026-10-24 RELOCATE GUI apply（UI 42fb578，MiniMax-M3 实现）
 
 - `POST /commands/project-relocation-apply`：无状态目录 501；缺字段或 `confirm !== true` 400；revision 过期/身份不符/不可达 409；成功 200 并**由同一控制面服务**写入登记（revision+1、保留 previousRootPath）。
 - GUI 重定位弹窗新增「新项目根 / 观测标识 / 确认重定位」：点「重定位项目位置」只展开、不提交；点「确认重定位」才 POST；成功/失败文案分开，不自动确认。
 - `/projects/relocation` 现在返回 `expectedLocationRevision`，避免 GUI 总按 1 处理。
-- 反例：路由 11 条 + 页面 14 条；私有库 **520 用例 / 变异 41-41 / 包验收 7-7**。
+- 反例：路由 11 条 + 页面 14 条；UI **520 用例 / 变异 41-41 / 包验收 7-7**。
 - 风险（子 agent 已如实说明）：观测标识仍由用户/调用方提供（核心只校验与登记一致），未接入真实目录标识探测；浏览器点击未实测。
 
 ## 2026-10-24 两项验收改为"内测实况"判定（用户决定）
@@ -2589,25 +2589,25 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 ## 2026-10-24 GUI 真实模型模式（用户选择：云知声 + 显式启动）
 
-- 新增 `astarray-ui/scripts/start-gui-live.mjs`（npm `start:gui-live`）：显式启动才连真实模型；
+- 新增 `UI/scripts/start-gui-live.mjs`（npm `start:gui-live`）：显式启动才连真实模型；
   - provider：云知声 `u2-flash`（Anthropic Messages 兼容端点），凭据按 `prov-unisound-1` 读取，**不打印、不落盘**；
   - `--check` 只验证配置就绪，**不发起任何模型调用**（实测退出码 0）；
   - 启动后 `/agents` 与 `/projects` 均返回 `isModelConnected: true`（实测，未发消息）。
 - GUI 聊天「发送」分流：真实模式 ⇒ `POST /commands/submit`（显示「已受理：mission …（受理不等于完成）」并刷新）；离线仍走 `/commands/send-message`（outbox）。
-- 门禁：私有库 **527 用例 / 变异 41-41 / 包验收 7-7**。
+- 门禁：UI **527 用例 / 变异 41-41 / 包验收 7-7**。
 - **离线发送路由已确认存在**（在私有 `project-chat-routes.ts`，不是缺失）——子 agent 的疑点已核清。
 - 下一步：用 live 模式做 B/C/D/F 组人工验收（每次发送都是真实计费调用）。
 
-## 2026-10-24 GUI 设置入口（私有库 9e53d06，MiniMax-M3 实现）
+## 2026-10-24 GUI 设置入口（UI 9e53d06，MiniMax-M3 实现）
 
 - 项目区**左下角**新增「设置」按钮 `#chatOpenSettingsButton`（`margin-top:auto` 贴底；折叠态用更高特异性规则放行，仍可点）。
 - 点击打开**顶层设置弹窗** `#chatSettingsDialog`：原有设置区块（上下文预算 + 权限组 + 结果行）整体移入，既有 8 个 id 一字未改；新增关闭按钮与焦点归还。
 - 复用既有接口：`GET /settings`（打开时刷新）、`POST /commands/set-context-budget`、`POST /commands/switch-permission-profile`（路径与请求体未改）。
 - 实测（live 模式，未发模型调用）：页面含按钮与弹窗、`margin-top:auto` 存在、`/settings` 返回 `sessionId/mode/context/permissionProfiles`。
-- 门禁：私有库 **545 用例 / 变异 41-41 / 包验收 7-7**。
+- 门禁：UI **545 用例 / 变异 41-41 / 包验收 7-7**。
 - 注意：`gui-workspace-and-agent-status-dialog` 的「顶层弹窗总数」断言由 4 改为 5（合法新增）；该计数不再充当上限守卫。
 
-## 2026-10-24 GUI 新建项目 / 多文件夹 / 项目内会话 / 系统文件夹选择器（私有库 e3236e8）
+## 2026-10-24 GUI 新建项目 / 多文件夹 / 项目内会话 / 系统文件夹选择器（UI e3236e8）
 
 - **新建项目**：项目区顶部「＋ 新建项目」按钮 → 弹窗（名称 + 文件夹列表）→ `POST /commands/create-project`；项目存储 `<state>/gui/projects.json`（原子写、revision 复核、**损坏拒绝覆盖**）。
 - **多文件夹**：一个项目可管理多个文件夹（`add-project-folder` / `remove-project-folder`；至少保留一个）；项目列表显示「N 个文件夹 · M 个会话」。
@@ -2615,40 +2615,40 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **系统资源管理器选择**：`POST /commands/pick-folder` 调 `scripts/pick-folder.ps1`（Windows `FolderBrowserDialog`）；重定位弹窗的「新项目根路径」旁也有「浏览…」。
   - **多选结论**：`FolderBrowserDialog` **不支持一次多选**；实现为「重复添加」+「粘贴多路径（换行/分号分隔）」。若必须原生多选，需要改用 COM `IFileOpenDialog`（可后续加）。
 - `/projects` 已合并受管项目（即使 0 个 mission 也展示）。
-- 门禁：私有库 **551 用例 / 变异 41-41 / 包验收 7-7**；新增 6 条反例（存储 2 + 路由 3 + 页面 1）。
+- 门禁：UI **551 用例 / 变异 41-41 / 包验收 7-7**；新增 6 条反例（存储 2 + 路由 3 + 页面 1）。
 
-## 2026-10-24 修复：GUI 一直显示「连接中…」（私有库 60e8d4a）
+## 2026-10-24 修复：GUI 一直显示「连接中…」（UI 60e8d4a）
 
 - **现象**：live 模式顶部 `会话：gui-live-… 连接中…` 永不变成「已连接」。
 - **根因**：我在「新建项目」的多路径拆分里写了 `.split(/[;\n]/)`。这段页面脚本位于 **TS 模板字符串**中 ⇒ `\n` 在生成 HTML 时变成**真实换行**，正则字面量跨行 ⇒ **整页脚本语法错误**（`Invalid regular expression: missing /`）⇒ `EventSource("/events")` 根本不会执行，状态永远停在初始文案（`/events` 本身是正常的，实测 200 + snapshot）。
 - **修复**：改用运行时构造分隔符正则（`new RegExp("[;" + String.fromCharCode(10) + "]")`），不再依赖模板转义。
-- **回归**：新增「页面脚本可被解析」测试（提取所有 `<script>` 用 `vm.Script` 解析，服务端插值先掩码）；私有库 **552 用例 / 变异 41-41 / 包验收 7-7**。
+- **回归**：新增「页面脚本可被解析」测试（提取所有 `<script>` 用 `vm.Script` 解析，服务端插值先掩码）；UI **552 用例 / 变异 41-41 / 包验收 7-7**。
 - 提示：此类问题静态字符串断言抓不到，只有真解析（或浏览器）能抓到——该测试已补上。
 
-## 2026-10-24 修复：「浏览…」点击无效（私有库 da7a3c7）
+## 2026-10-24 修复：「浏览…」点击无效（UI da7a3c7）
 
 - **根因**：选择器脚本路径算错了一级——从 `packages/gui/src/server` 用 `../../../scripts/pick-folder.ps1` 实际指向 `packages/scripts/`，脚本不存在 ⇒ `powershell -File` 退出码 1、stdout 为空 ⇒ 路由把它当成**用户取消**（200 cancelled），前端没有任何提示，看起来就是“点击无效”。
 - **修复**：
-  1. 用 `fileURLToPath(import.meta.url)` + **四级**上溯定位 `astarray-ui/scripts/pick-folder.ps1`，并以 `process.cwd()/scripts` 兜底；支持 `ASTARRAY_PICK_FOLDER_SCRIPT` 覆盖（测试/排障）；
+  1. 用 `fileURLToPath(import.meta.url)` + **四级**上溯定位 `UI/scripts/pick-folder.ps1`，并以 `process.cwd()/scripts` 兜底；支持 `ASTARRAY_PICK_FOLDER_SCRIPT` 覆盖（测试/排障）；
   2. 脚本缺失 ⇒ **502 `folder-picker-script-missing`**；进程启动失败/非零退出 ⇒ **502 `folder-picker-failed`** 带真实错误，**不再伪装成取消**；
   3. 两个弹窗（新建项目 / 重定位）都显示选择结果或错误文案，取消时写「已取消选择」。
-- 证据：新增 ⑧ 号用例用桩脚本走真实 `powershell -File` 路径，返回 `C:/chosen-folder`；私有库 **553 用例 / 变异 41-41 / 包验收 7-7**。
+- 证据：新增 ⑧ 号用例用桩脚本走真实 `powershell -File` 路径，返回 `C:/chosen-folder`；UI **553 用例 / 变异 41-41 / 包验收 7-7**。
 
-## 2026-10-24 修复：文件夹选择器 PowerShell 编码（私有库 2ab582b）
+## 2026-10-24 修复：文件夹选择器 PowerShell 编码（UI 2ab582b）
 
 - **报错原文**：`文件夹选择器异常退出（code=1）：… ParserError … 字符串缺少终止符`（乱码）。
 - **根因**：`pick-folder.ps1` 以 **UTF-8 无 BOM** 保存；Windows PowerShell 5.1 对 `.ps1` 默认按 ANSI 读取 ⇒ 中文注释/字符串被解析坏，引号丢失 ⇒ 语法错误。
 - **修复**：脚本改存 **UTF-8 with BOM**（已用 PowerShell 解析器验证 `parse-ok`）；Node 端对 PowerShell 的 stderr 先按 UTF-8 解、出现替换符再按 **GBK** 解，不再显示乱码；新增测试断言脚本**必须带 BOM**。
-- 门禁：私有库 **554 用例 / 变异 41-41 / 包验收 7-7**。
+- 门禁：UI **554 用例 / 变异 41-41 / 包验收 7-7**。
 
-## 2026-10-24 修复：新建项目后弹「重定位/项目尚未登记」（私有库 5d6d167、e514ee0）
+## 2026-10-24 修复：新建项目后弹「重定位/项目尚未登记」（UI 5d6d167、e514ee0）
 
 - **原因**：项目是新建的，但**没有位置登记**；进入项目时重定位检查判定 `unregistered` ⇒ 阻断式弹窗（且旧逻辑对非阻断提示也弹窗）。
 - **修复 1（5d6d167）**：`POST /commands/create-project` 创建后**立即写位置登记**（rootPath=第一个文件夹、revision 1、confirmedBy=user）；重定位弹窗**只有阻断级才打开**，非阻断最多显示一行 chip；登记写失败会在结果里如实提示 `registrationWarning`。
 - **修复 2（e514ee0）**：对**修复前已创建**的受管项目，进入时按受管存储里的第一个文件夹**补登记**（fail-closed：写失败仍按未登记处理，不伪造成功）。
-- 证据：新增用例 ⑩（新建即登记且 `prompt.isBlocking=false`）与 ⑪（旧项目进入自动补登记）；私有库 **556 用例 / 变异 41-41**。
+- 证据：新增用例 ⑩（新建即登记且 `prompt.isBlocking=false`）与 ⑪（旧项目进入自动补登记）；UI **556 用例 / 变异 41-41**。
 
-## 2026-10-24 GUI 项目右键菜单（私有库 08eec04、8854f47）
+## 2026-10-24 GUI 项目右键菜单（UI 08eec04、8854f47）
 
 - 项目条目**右键**弹出菜单：收起任务列表 / 展开任务列表（按当前状态切换）、归档项目 / 取消归档、项目设置、删除项目。
 - **归档**：默认列表隐藏；项目区「显示已归档」开关（`includeArchived=true`）可查看，归档项目带「［已归档］」标记。
@@ -2656,57 +2656,57 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - **项目设置**：改名（`/commands/update-project`）、增加文件夹（`/commands/add-project-folder` + 系统选择器）、移除文件夹（`/commands/remove-project-folder`，至少保留一个）。
 - **收起状态**：客户端内存态（重启后恢复展开）；如需持久化可后续加。
 - 接口：`archive-project` / `delete-project` / `update-project`；`/projects?includeArchived=true`。
-- 门禁：私有库 **558 用例 / 变异 41-41 / 包验收 7-7**。
+- 门禁：UI **558 用例 / 变异 41-41 / 包验收 7-7**。
 
-## 2026-10-24 修复：进入项目误报「项目位置与登记不一致」（私有库 77d1ae6）
+## 2026-10-24 修复：进入项目误报「项目位置与登记不一致」（UI 77d1ae6）
 
 - **现象**：新建项目进入即弹「项目位置与登记不一致」，点「重定位」又提示「新根与当前登记根相同：无需重定位」。
 - **根因**：重定位检查拿 `workspaceRootPath`（GUI 进程的工作区，例如 astarray 仓库根）与项目的**登记根**比较；登记根是项目自己的文件夹 ⇒ 永远不相等 ⇒ 每个项目都报“位置不一致”。
 - **修复**：受管项目改用**它自己的第一个文件夹**作为“当前目录”参与比较；只有非受管（mission 派生）项目才回退到 `workspaceRootPath`。
-- 证据：新增用例 ⑭（项目文件夹 ≠ GUI 工作区时 `prompt.isBlocking === false`）；私有库 **559 用例 / 变异 41-41**。
+- 证据：新增用例 ⑭（项目文件夹 ≠ GUI 工作区时 `prompt.isBlocking === false`）；UI **559 用例 / 变异 41-41**。
 - 说明：若某个项目之前被错误地“重定位”到 GUI 工作区，其登记根与项目文件夹会不一致——此时提示是**真实的**，用「重定位」选回项目文件夹即可。
 
-## 2026-10-24 修复：右键菜单关不掉 + 左上角黑色空框（私有库 93a036d）
+## 2026-10-24 修复：右键菜单关不掉 + 左上角黑色空框（UI 93a036d）
 
 - **同一根因**：`.agent-context-menu { display: flex; }` 覆盖了 HTML `hidden` 属性 ⇒ 隐藏时仍按 `position: fixed` 渲染在左上角（空黑框），且点击外部虽把 `hidden=true`，视觉上仍显示 ⇒ “菜单收不掉”。
 - **修复**：新增 `.agent-context-menu[hidden] { display: none; }`（对项目菜单与 Agent 菜单同时生效）；关闭逻辑（外部点击 / Escape / 选中菜单项）保持不变。
-- 回归测试：断言该 CSS 规则存在、关闭函数与外部点击/Escape 监听存在；私有库 **560 用例 / 变异 41-41**。
+- 回归测试：断言该 CSS 规则存在、关闭函数与外部点击/Escape 监听存在；UI **560 用例 / 变异 41-41**。
 
-## 2026-10-24 工作区按项目根展开（私有库 9eb0d35）
+## 2026-10-24 工作区按项目根展开（UI 9eb0d35）
 
 - **用户口径**：每个项目的会话区点「工作区」应展开**该项目文件夹**下的内容，而不是 GUI 进程的全局工作区。
 - 服务端：新增 `resolveWorkspaceRootForRequest()` —— 优先**受管项目的第一个文件夹**，其次位置登记根，最后才回退 `workspaceRootPath`；`/workspace/tree`、`/workspace/file`、`/commands/workspace-write` 全部按该根解析并返回 `rootPath/projectIdentifier`；写入仍受 `outside-workspace-root` 限制（不能写出项目）。
 - 前端：工作区请求携带 `projectIdentifier`；工作区标题显示「根目录：…」；切换项目时若工作区打开则按新项目根重载；`/workspace/file` 与写接口同样带项目。
-- 证据：新增用例 ⑯（项目内文件可见、全局工作区文件不可见、`../` 写入被 400 拒绝）与 ⑰（页面携带项目与根目录显示）；私有库 **562 用例 / 变异 41-41 / 包验收 7-7**。
+- 证据：新增用例 ⑯（项目内文件可见、全局工作区文件不可见、`../` 写入被 400 拒绝）与 ⑰（页面携带项目与根目录显示）；UI **562 用例 / 变异 41-41 / 包验收 7-7**。
 - 提示：修复前的项目若无文件夹（极少），会回退到位置登记根。
 
-## 2026-10-24 GUI 项目内 Agent 管理（私有库 e1f0b0a 之前一笔：agent 管理）
+## 2026-10-24 GUI 项目内 Agent 管理（UI e1f0b0a 之前一笔：agent 管理）
 
 - 会话区标题栏新增「Agent 管理」按钮 → 弹窗显示**该项目 Agent 拓扑**（按层级缩进树 + 模型 + 已移出标记）。
 - 「＋ 创建 Agent」→ 弹窗：名称、层级 1–4、模型（默认 u2-flash）、上级选择（2–4 级必选，且上级层级必须更高、同项目、未移出）。
 - 右键 Agent 节点菜单：上级、下级列表、**从工作流移除**（二次确认；同时回收核心 `AgentCreationRegistry` 登记）。
 - 存储：`<state>/gui/project-agents.json`（原子写 + revision + 损坏拒绝覆盖）；父子绑定以核心登记为准。
-- 反例：存储校验/重复移除、2 级缺上级 400、上级层级不合法、移除后核心回收；私有库 **566 用例 / 变异 41-41 / 包验收 7-7**。
+- 反例：存储校验/重复移除、2 级缺上级 400、上级层级不合法、移除后核心回收；UI **566 用例 / 变异 41-41 / 包验收 7-7**。
 - 未做/限制：核心登记**不支持更改上级**（菜单只提供查看，不提供 reparent）；模型为自由文本，未与 provider 配置联动。
 
-## 2026-10-24 创建 Agent 的模型下拉与可用性校验（私有库）
+## 2026-10-24 创建 Agent 的模型下拉与可用性校验（UI）
 
 - 新接口 `GET /models/available`：只读 `<state>/providers/provider-catalog.json` + `provider-credentials.json`，返回模型、provider、协议、是否有凭据、不可用原因。
 - 页面：创建 Agent 的模型输入改为**下拉**；打开弹窗时拉取列表，缺凭据/未知 profile 的条目**显示但禁用**并带原因；无可用模型时提示先配置凭据。
 - 创建 Agent 时服务端**校验**：模型必须“已知 profile + 有凭据”，否则 400 `model-unavailable`（fail-closed）。
-- 反例：缺凭据条目不可用、未配置模型 400、可用模型 200；页面断言下拉与接口。私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
+- 反例：缺凭据条目不可用、未配置模型 400、可用模型 200；页面断言下拉与接口。UI **568 用例 / 变异 41-41 / 包验收 7-7**。
 - 限制：未知 provider profile **不猜模型名**（显示 profileId）；`live-provider-1` 的模型名在 catalog 里没有独立字段，故按 profileId 展示。
 
-## 2026-10-24 Agent 暂时移出与恢复（私有库 765457d）
+## 2026-10-24 Agent 暂时移出与恢复（UI 765457d）
 
 - 右键菜单改为「**暂时移出工作流（可恢复）**」：二次确认文案说明“进入待命列表，可随时恢复”。
 - 暂时移出**不回收核心登记**（否则无法恢复）；仅标记 `removedFromWorkflowAtIso`。
 - Agent 管理弹窗新增「**待命列表（已暂时移出，可恢复）**」，每项带「恢复」按钮 → `POST /commands/restore-project-agent`。
 - 接口：`remove-project-agent`（语义改为暂时移出）、`restore-project-agent`；存储新增 `restoreToWorkflow` / `listStandby`。
-- 反例：移出后可恢复且登记 `recycledAtIso` 仍为 null、未移出时恢复被拒、页面含待命列表/恢复入口；私有库 **568 用例 / 变异 41-41**。
+- 反例：移出后可恢复且登记 `recycledAtIso` 仍为 null、未移出时恢复被拒、页面含待命列表/恢复入口；UI **568 用例 / 变异 41-41**。
 - 说明：**永久移除**未提供（需要另行设计审计与二次确认）；如需要我再加。
 
-## 2026-10-24 Agent 连接拓扑图（私有库 3ca8c38）
+## 2026-10-24 Agent 连接拓扑图（UI 3ca8c38）
 
 - Agent 管理弹窗不再用缩进列表，改为 **SVG 连接拓扑图**：
   - 按层级 1–4 分行；每行按数量居中排布，节点宽 170、高 54；
@@ -2715,20 +2715,20 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   - 图尺寸随层级数与每行最大节点数计算（viewBox 自适应宽度），无 Agent 时显示一行提示而不是空图；
   - 节点支持点击查看详情、右键打开菜单（上级/下级/暂时移出）。
 - 待命列表保留在拓扑图下方（带「恢复」）。
-- 测试：页面含 `<svg id="projectAgentsGraph">`、`createElementNS`、拓扑 aria 文案；私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
+- 测试：页面含 `<svg id="projectAgentsGraph">`、`createElementNS`、拓扑 aria 文案；UI **568 用例 / 变异 41-41 / 包验收 7-7**。
 - 说明：当前是**树形分层布局**（同层不交叉、单父）；若需要真正力导向/多父 DAG，需要额外布局算法，可后续加。
 
-## 2026-10-24 投递 Agent 选择（私有库 900a6a0 + 测试修正）
+## 2026-10-24 投递 Agent 选择（UI 900a6a0 + 测试修正）
 
 - 会话组合器新增「**选择投递 Agent**」按钮 + 目标标签（默认「默认投递」）。
 - 点击按钮打开 **Agent 拓扑图的选择模式**（标题「选择投递 Agent（点击节点）」），点任一节点即选定并关闭；关闭弹窗取消选择。
 - 选择按**项目**记忆（`targetProjectAgents[projectId]`），切换项目时标签刷新。
 - 离线队列：`/commands/send-message` 的 `targetAgentIdentifier` 优先用所选 Agent。
 - 真实模型路径：当前 `/commands/submit`（核心 `submitTask`）**不接受目标 Agent**，所以选择后会明确提示「按会话默认路由执行（指定 agent 尚未接线）」，不假装已投递。
-- 反例：页面含选择按钮/标签/选择入口；离线 send 断言更新为目标优先；私有库 **568 用例 / 变异 41-41**。
+- 反例：页面含选择按钮/标签/选择入口；离线 send 断言更新为目标优先；UI **568 用例 / 变异 41-41**。
 - 下一步若要真正“投递给指定 agent”，需要在核心 `submitTask` 增加 targetAgent 输入并让编排器按该 agent 建任务（跨仓库改动）。
 
-## 2026-10-24 GUI 修复：消息归属项目 + 拓扑图遮挡右键菜单（公开库 07f741d9、私有库 a35619c）
+## 2026-10-24 GUI 修复：消息归属项目 + 拓扑图遮挡右键菜单（公开库 07f741d9、UI a35619c）
 
 - **消息不见了（根因）**：`/commands/submit` 的 mission 项目来自运行时固定登记的 `registeredProjectRoots[0]`（默认 `workspace`）；GUI 多项目下，用户在“我的项目”里发消息，mission 却落到 `workspace` ⇒ 项目下看不到、只显示“没有运行历史文件”。
   - 修复：公开核心 `submitTask` 新增可选 `projectIdentifier`，经 `handleUserMessage(message, { projectIdentifier })` 落到 mission；空/缺省回退运行时根（行为不变）；幂等 hash 纳入项目，避免同键跨项目复用。
@@ -2738,23 +2738,23 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 测试：公开 SDK 反例（mission.projectIdentifier 等于指定项目）、GUI 页面断言（submit 带项目、popover）；公开 **3,972 用例 / 变异 313-313**，私有 **568 用例 / 变异 41-41**。
 - 另：修正一条**过期的变异点名**（`relocate-entry-confirmed-is-blocking` 期望用例名从「① 身份一致」改为「② 身份一致」），否则该变异永远假存活。
 
-## 2026-10-24 移除旧「提交用户指导」区块（私有库 fbea0c8）
+## 2026-10-24 移除旧「提交用户指导」区块（UI fbea0c8）
 
 - **用户判断正确**：旧区块（`#prompt` / `#submit` / `#submit-result`，标题「提交用户指导」）与聊天组合器是**同一个功能**——都 POST `/commands/submit`；保留会造成两个入口、两套状态文案。
 - 移除：整个 `<section aria-labelledby="submit-heading">`、`resultElement` 声明、旧 click 处理器；聊天组合器（`#chatComposerText` / `#chatSendButton`）成为唯一发送入口。
 - 保留价值：旧处理器里“解析响应前检查 HTTP 状态、失败不得呈现成受理”的断言**没有丢**——移到 `chatSendMessageToModel`（断言 `if (!result.ok)` + 真实错误文案），测试意图不变。
 - 同步更新 a11y 断言（`submit-result` 不再存在；`prompt` 控件已删）。
-- 门禁：私有库 **568 用例 / 变异 41-41 / 包验收 7-7**。
+- 门禁：UI **568 用例 / 变异 41-41 / 包验收 7-7**。
 
-## 2026-10-24 右键菜单错位修复（私有库 d63fe6f）
+## 2026-10-24 右键菜单错位修复（UI d63fe6f）
 
 - **现象**：改为 top layer（`popover`）后，菜单不再被 Agent 拓扑弹窗遮挡，但位置相对落点偏移。
 - **根因**：popover 的 UA 默认样式是 `inset: 0; margin: auto`（默认居中）；只设 `left/top` 时，`right/bottom` 仍为 0 + `margin:auto`，浏览器把菜单位置重新居中。
 - **修复**：`#projectContextMenu[popover] { margin: 0; inset: auto; }`，并在打开时显式 `style.margin = "0"; style.right = "auto"; style.bottom = "auto"`，再设 `left/top`。
 - 说明：普通 `z-index` **无法**压过原生 `<dialog>` 的 top layer；正确做法就是 popover/另一层 top layer。此前遗漏的是清掉 UA 居中样式。
-- 测试：断言 popover 重置样式与 `margin = "0"`；私有库 **568 用例 / 变异 41-41**。
+- 测试：断言 popover 重置样式与 `margin = "0"`；UI **568 用例 / 变异 41-41**。
 
-## 2026-10-24 会话区未选项目留白 + Agent 任务执行现状评估（私有库 ba89c28）
+## 2026-10-24 会话区未选项目留白 + Agent 任务执行现状评估（UI ba89c28）
 
 - **GUI**：`chatRenderChat()` 在 `selectedProjectIdentifier` 为空时给 `#chatPanel` 加 `chatPanelBlank`，CSS 隐藏会话标题栏、气泡区、输入框 ⇒ 会话区**完全空白**（不写提示、不留占位）；选择项目后恢复。
 - **执行能力评估（如实）**：live 模式能真实调用云知声 u2-flash、创建 mission 并运行工具循环，但**还不是“完整 agent 任务”**：
@@ -2762,7 +2762,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   2. 运行中的 mission 没有实时事件流进聊天区（聊天读运行历史，未完成时提示“没有运行历史文件”）；
   3. Agent 拓扑/投递目标只落 GUI 元数据，**未驱动编排**（`submitTask` 不接受 targetAgent）；
   4. 权限/审批弹窗与文件夹授权尚未接到实际工具调用。
-- 门禁：私有库 **568 用例 / 变异 41-41**。
+- 门禁：UI **568 用例 / 变异 41-41**。
 
 ## 2026-10-24 GUI 完整任务执行四项缺口（公开 b183141d / b97608da / 94b7629e；私有 d91da4e / 07dd450 / 2bd311d / ec901c3 / 后续）
 
@@ -2806,7 +2806,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 门禁：公开 3,982 用例（两例并行抖动，单跑通过）/ 变异 313-313；私有 573 用例 / 变异 41-41。
 - 残留：未实现「候选建议/补充信息输入框」（核心无候选生成接口，未伪造）；GUI 设置恢复中心等区块仍复用原节点。
 
-## 2026-10-25 GUI 桌面版（私有库）
+## 2026-10-25 GUI 桌面版（UI）
 
 - `npm run build:desktop` → `desktop/dist/AstarrayGui.exe`：
   - C# WinForms + **WebView2** 外壳（无浏览器地址栏），启动随包 `node.exe server.mjs`（esbuild 打包的 GUI 服务），找到回环端口后直接导航；关闭窗口 `Kill(entireProcessTree:true)` 结束 node。
@@ -2837,7 +2837,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 - 原因：exe 无 Authenticode 签名（且下载文件带 Mark-of-the-Web），SmartScreen 无法确认发布者；与代码/打包无关。
 - 已内置签名构建：`node scripts/build-desktop.mjs --self-contained --sign`（`ASTARRAY_SIGN_PFX`/`ASTARRAY_SIGN_PFX_PASSWORD` 或 `ASTARRAY_SIGN_THUMBPRINT`），调用 Windows SDK `signtool`，时间戳默认 DigiCert，签名后 `signtool verify /pa` 失败即构建失败。
 - 已加 exe 元数据（Product/Company/FileVersion = Astarray / 0.1.0）。
-- 文档：`astarray-ui/desktop/README.md`（Azure Trusted Signing / OV / EV 对比；自签名仅本机有效；无证书时 Unblock-File 临时处理）。
+- 文档：`UI/desktop/README.md`（Azure Trusted Signing / OV / EV 对比；自签名仅本机有效；无证书时 Unblock-File 临时处理）。
 - 事实：本机无证书，当前 exe 仍是 **NotSigned**，警告会持续到配置证书并重新签名。
 - 门禁：私有 582 用例 / 变异 41-41。
 
@@ -3019,3 +3019,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
   - 构建脚本清空 dist 内容而不是删除根目录（Explorer 打开 dist 时目录被锁）。
 - 实测：安装版双击打开 `Astarray GUI` 窗口，`/commands/create-project` 返回 200；`desktop/dist` 里的 exe 仍不适合直接双击（保持为构建暂存）。
 - 门禁：私有 631 用例 / 变异 41-41。
+
+
+
+

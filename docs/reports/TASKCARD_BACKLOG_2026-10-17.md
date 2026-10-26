@@ -510,7 +510,7 @@ worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + �
 
 | 检查 | 结果 |
 | --- | --- |
-| `git log/status` | HEAD = `b603ad6f` = `origin/main`；**工作树不干净**：10 个已修改文件 + 未跟踪的私有 UI（`packages/gui/`、`packages/tui/src/ui/`、`tests/gui/` 等）—— 均**非本轮产生**，按纪律**不动、不提交** |
+| `git log/status` | HEAD = `b603ad6f` = `origin/main`；**工作树不干净**：10 个已修改文件 + 未跟踪的UI（`packages/gui/`、`packages/tui/src/ui/`、`tests/gui/` 等）—— 均**非本轮产生**，按纪律**不动、不提交** |
 | `npm run typecheck` / `lint` | exit 0 |
 | `npm run build` | 在沙箱下 `spawn EPERM`（esbuild 需管道 stdio）；改用完整文件权限后 exit 0 |
 | `npm run test` | **2 文件 / 5 用例失败** ⇒ 基线**不是绿的**，先修（见 §14.2）|
@@ -561,7 +561,7 @@ worker 的选项到底由谁组装"查清（`main-controller.ts:897` 附近 + �
 | 4 | backlog Tier 3 队列里其余卡（多数为外部/重型，逐张判） | 每张先读"未完成"段 |
 
 > **未提交他人改动**：工作树原有的 10 个已修改文件（含 `IMPLEMENTATION_PLAN.md` 的
-> `docs/tasks/accepted/` 链接修正、`HANDOFF_2026-09-28.md` 的路径回填等）与全部未跟踪私有 UI
+> `docs/tasks/accepted/` 链接修正、`HANDOFF_2026-09-28.md` 的路径回填等）与全部未跟踪UI
 > **均未暂存**；本轮提交只含 §14.2–14.4 的实际改动。
 
 ---
@@ -615,7 +615,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | --- | --- | --- |
 | 1 | `OBS-01 PERF-01-01` 的"开关前后测量"（`PLAN_STATUS` 唯一未覆盖项；`PERF` 采集本身也未接线） | 需先决定是否接线 `perfSampleSink`（改变生产行为） |
 | 2 | `HISTORY-01-04` 资源测量（大量事件 + 超长输出的首次可读延迟/内存上界） | 可本地做，需定规模与设备记录口径 |
-| 3 | TUI/GUI 历史视图（需你先定 UI 代码落点：公开库内 or `astarray-ui` 私有库） | **需用户一句话** |
+| 3 | TUI/GUI 历史视图（需你先定 UI 代码落点：公开库内 or `UI` UI） | **需用户一句话** |
 | 4 | backlog Tier 3 其余卡逐张判（多数为外部/重型） | 每张先读"未完成"段 |
 
 ---
@@ -643,7 +643,7 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R7 | `CLIENT-01 / SECRETARY-01-02`：项目/汇总模式、**最小报告附件**（来源/项目/revision/时间/哈希）、新鲜度（过期如实给最后更新时间）、任务行键含项目（不串线）、派发幂等/冲突、回执只能前进、同级回派有界 | 新增 `secretary-relay-contract.ts` + `tests/core/unit/client01-secretary-relay.test.ts`（**9 条**）；4 条变异体（串线／重复派发／状态倒退／复制历史）均被拦下；SDK 导出 | `check` **478/3508 exit 0**（首跑 `completion-gate-counterexamples A0` 抖动 ⇒ 单跑 8/8、复跑全绿）；`coverage` **478 文件 / 3508 用例、分支 85.32% exit 0**（首跑 `anthropic-messages-runtime ⑰` 抖动 ⇒ 复跑全绿） |
 | R8 | `CLIENT-01 / SECRETARY-01-03`：次日首次启动判定（IANA 时区/DST）、同日领取排他、历史收拢（收拢不删除、旧未决可见） | 新增 `secretary-first-start.ts` + `tests/core/unit/client01-secretary-first-start.test.ts`（**11 条**）；4 条变异体（忽略离线阈值／重复处理同日／领取不排他／收拢当删除）均被拦下；SDK 导出 | `check` **479/3519 exit 0**；`coverage` 分支 **85.33% exit 0** |
 | R9 | `EXP-01 / FOLD-01-01`：等价折叠的**复用契约**（十项必填候选、明确前置条件、步骤偏序、不可折叠项冻结、副作用参数、版本化登记、回退守卫） | 新增 `workflow-fold-contract.ts` + `tests/core/unit/exp01-fold-contract.test.ts`（**9 条**）；4 条变异体（折入不可折叠项／跳过副作用参数校验／关掉逐步骤授权／复用旧许可）均被拦下；SDK 导出 | `check` **480/3528 exit 0**；`coverage` 分支 **85.39% exit 0** |
-| R10 | **5 轮一次全量门禁**：变异全量（95 条）+ 隔离包三项 | — | 变异 **94/95**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed` ⇒ **单独复跑 2/2 被拦下**（与 R5 同一 GUI 用例的负载抖动；**该守卫与用例都在未跟踪私有 UI**，公开门禁不保证它）⇒ 如实记录、不当作缺口；`npm pack` **269 文件** sha256 `a30c0cf4…`；`verify-package` / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
+| R10 | **5 轮一次全量门禁**：变异全量（95 条）+ 隔离包三项 | — | 变异 **94/95**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed` ⇒ **单独复跑 2/2 被拦下**（与 R5 同一 GUI 用例的负载抖动；**该守卫与用例都在未跟踪UI**，公开门禁不保证它）⇒ 如实记录、不当作缺口；`npm pack` **269 文件** sha256 `a30c0cf4…`；`verify-package` / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
 | R11 | `EXP-01 / EXPLORE-01-01`：问题指纹、计划必填、独立预算（**不透支**）、启动六类拒绝、停止六类条件 | 新增 `explore-plan-contract.ts` + `tests/core/unit/exp01-explore-plan.test.ts`（**9 条**）；4 条变异体（资源未知仍启动／允许透支／无进展不停／重复组合放行）均被拦下；SDK 导出 | `check` **481/3537 exit 0**；`coverage` 分支 **85.43% exit 0** |
 | R12 | `EXP-01 / CURATE-01-01`：授权绑定 revision+参数指纹、未授权零自动整理、**本地确定性**重大变更矩阵、未知差异按重大、等待只暂停新方案 | 新增 `curation-plan-contract.ts` + `tests/core/unit/exp01-curation-plan.test.ts`（**9 条**）；4 条变异体（忽略范围扩大／未知差异降级／跳过指纹／连旧方案一起停）均被拦下；SDK 导出 | `check` **482/3546 exit 0**；`coverage` 分支 **85.49% exit 0** |
 | R13 | `LESSON-01-01`：沟通经验记录契约（事件时配置快照、unknown 显式、事实/假设分离、个体归属写入、匹配与自动注入） | 新增 `lesson-record-contract.ts` + `tests/core/unit/lesson01-record-contract.test.ts`（**11 条**）；4 条变异体（主 Agent 可写／接受重建快照／事实假设混写／未知版本按精确匹配）均被拦下；SDK 导出 | `check` **483/3557 exit 0**；`coverage` 分支 **85.54% exit 0** |
@@ -661,44 +661,44 @@ node scripts/verify-relocate-tarball-dual-process.mjs astarray-0.1.0.tgz   # exi
 | R26 | `PROJECT-01-04`：**跨项目副本回执按个体过滤**（发现并修复"list --agent 串数据"） | `summarizeCopyReceipts` 增加 `filter`（来源/目标/接收个体）并解析 `receivingAgentInstanceId`； 摘要条目新增该字段（可追溯）；CLI 三个过滤参数同时传入。 反例 `cross-project-copy-receipt-filter.test.ts`（**3 条，修复前 3 红**）； 变异 `cross-project-copy-receipts-ignore-agent-filter` 被拦下 | 低并发全量 `npx vitest run --maxWorkers=2` **493/3635 exit 0** |
 | R27 | `EXP-01 / FOLD-01-03`（判定层）：复用/停用/回退——已停用或未登记版本拒绝、参数 schema 必须一致、 未知副作用与在途实例阻塞回退、回归时停用新版本但**不自动重跑**、停用须记原因并留历史 | 新增 `workflow-fold-lifecycle.ts` + `tests/core/unit/exp01-fold-lifecycle.test.ts`（**7 条**）； 3 条变异体（未知副作用回退／自动重跑／复用停用版本）均被拦下；SDK 导出 | 低并发全量 `npx vitest run --maxWorkers=2` **494/3642 exit 0** |
 | R28 | **契约层 SDK 的包级验收**：新增 `verify:contract-sdk`（隔离安装 tarball ⇒ 用已安装包观测 17 项 fail-closed 语义 ⇒ 纯函数判定）| 新增 `scripts/contract-sdk-scenario.mjs`、`scripts/verify-contract-sdk-package.mjs`、 `scripts/lib/contract-sdk-checks.mjs`(+`.test.mjs` 5 条，含"缺观测/空对象/单项退化"必须拒绝)； `npm run test:scripts` **44/44**；对 tarball sha256 `95858fc4…` 实跑 **17/17 判据通过、exit 0** （过程中判据真实抓到一个错误：观测脚本把 `mode` 写成 `working` 而非 `work-whitelist` ⇒ 白名单外被判 working； 修正后 `resting`）| `check` **exit 0**；`npm pack` 269 文件 |
-| R29 | **公开库 UI 边界**（用户决策：只有 CLI 在公开库，TUI+GUI 统一私有库）：新增活规则守卫 + 接缝清点 | 新增 `tests/architecture/public-ui-boundary.test.ts`（3 条）：公开源码里的 UI 引用必须**精确等于钉住白名单** （新增即红）、白名单条目**迁走后必须删除**（否则红，防假通过）、私有 UI 文件不计入公开边界； 实测清点：公开库对 UI 的依赖**只剩 2 条** —— `commands.ts` 的 `gui serve`（静态可解析的动态导入，**待迁**） 与 `cli.tsx` 的 `./cli/tui.js`（可选动态导入，缺失即明确提示并非 0 退出）； **证据**：临时移走 `packages/gui` 后 `tsc --noEmit` **只有 1 条产品错误**（`commands.ts(3983)` 找不到 gui-server）， 移回后文件数不变（4/4）| `typecheck`/`lint` exit 0；该守卫 3/3 |
+| R29 | **公开库 UI 边界**（用户决策：只有 CLI 在公开库，TUI+GUI 统一UI）：新增活规则守卫 + 接缝清点 | 新增 `tests/architecture/public-ui-boundary.test.ts`（3 条）：公开源码里的 UI 引用必须**精确等于钉住白名单** （新增即红）、白名单条目**迁走后必须删除**（否则红，防假通过）、UI 文件不计入公开边界； 实测清点：公开库对 UI 的依赖**只剩 2 条** —— `commands.ts` 的 `gui serve`（静态可解析的动态导入，**待迁**） 与 `cli.tsx` 的 `./cli/tui.js`（可选动态导入，缺失即明确提示并非 0 退出）； **证据**：临时移走 `packages/gui` 后 `tsc --noEmit` **只有 1 条产品错误**（`commands.ts(3983)` 找不到 gui-server）， 移回后文件数不变（4/4）| `typecheck`/`lint` exit 0；该守卫 3/3 |
 | R30 | **5 轮一次全量门禁**：变异全量（138 条）+ 隔离包**四项** verify（新增 `verify:contract-sdk`） | — | 变异 **137/138**；唯一"存活"仍是 `gui0203-views-runtime-state-collapsed`（未跟踪私有 GUI 抖动，第 4 次） ⇒ **单独复跑 1/1 拦下**；`npm pack` **269 文件** sha256 `95858fc4…`； `verify-package` / **`verify:contract-sdk` 17/17** / `verify-sdk-consumer` / tarball 双进程 **均 exit 0** |
 | R31 | `RELOCATE-01-03` 接线片（**用户已按推荐批准**）：判定编排 `project-relocation-reconciler.ts` | 已完成跳过、解析失败 blocked、未决操作阻塞 blocked、**含写须人工确认**、只读可自动； 8 条反例 + 3 条变异体均被拦下；SDK 导出 | 全量（低并发）**exit 0**；**未做**：冷启动批量扫描真实历史库、`project reconcile` CLI、`status` 可选段 |
-| R32 | **公开库 UI 收口**（分层决策执行完成）| **2026-10-19 R32 收口（用户已授权私有库改动）**：公开库**已不含任何 UI 源码**。①`gui serve` 真实实现（389 行，含门面覆盖/CSRF/SSE/安装与授权询问通道）迁到私有库`astarray-ui/packages/gui/src/cli/gui-serve-command.ts`（提交 `7a9c791`）；公开侧 `executeGuiServeCommand` 改为 **fail-closed 提示**（非 0 退出，绝不假装启动服务器）；②TUI 启动桥 `./cli/tui.js` 改为**非字面量**动态导入（公开构建缺该模块时明确提示 + 非 0），然后删除公开库内的 UI 本地副本：`packages/gui/`、`packages/tui/src/ui/`、`packages/tui/src/cli/tui.tsx`、`tests/gui/`、GUI 专用脚本（删除前逐文件比对：**41/41 与私有库副本字节相同**，私有库无未提交改动）；③依赖 UI 的 7 个公开测试迁到私有库（含 3 条 gui 诊断用例）；④`verify:mutation-kills` 的**9 条纯私有 UI 变异体**移出公开 harness（清单见 `docs/reports/MUTATIONS_MOVED_TO_PRIVATE_UI_2026-10-19.md`，私有库需重建同名守卫），另 3 条只删掉其中已失效的 `tests/gui` 用例路径；⑤公开库 UI 边界活规则白名单**清空为 0 条**（新增 UI 引用即红）。**门禁**：`typecheck`/`lint` 0；全量（低并发）**3396 用例 exit 0**；`npm run build` 成功。 |
+| R32 | **公开库 UI 收口**（分层决策执行完成）| **2026-10-19 R32 收口（用户已授权UI改动）**：公开库**已不含任何 UI 源码**。①`gui serve` 真实实现（389 行，含门面覆盖/CSRF/SSE/安装与授权询问通道）迁到UI`UI/packages/gui/src/cli/gui-serve-command.ts`（提交 `7a9c791`）；公开侧 `executeGuiServeCommand` 改为 **fail-closed 提示**（非 0 退出，绝不假装启动服务器）；②TUI 启动桥 `./cli/tui.js` 改为**非字面量**动态导入（公开构建缺该模块时明确提示 + 非 0），然后删除公开库内的 UI 本地副本：`packages/gui/`、`packages/tui/src/ui/`、`packages/tui/src/cli/tui.tsx`、`tests/gui/`、GUI 专用脚本（删除前逐文件比对：**41/41 与UI副本字节相同**，UI无未提交改动）；③依赖 UI 的 7 个公开测试迁到UI（含 3 条 gui 诊断用例）；④`verify:mutation-kills` 的**9 条纯UI 变异体**移出公开 harness（清单见 `已迁出的 UI 迁移清单`，UI需重建同名守卫），另 3 条只删掉其中已失效的 `tests/gui` 用例路径；⑤公开库 UI 边界活规则白名单**清空为 0 条**（新增 UI 引用即红）。**门禁**：`typecheck`/`lint` 0；全量（低并发）**3396 用例 exit 0**；`npm run build` 成功。 |
 | R33 | **RELOCATE 批量对账（脱敏样例）** | **2026-10-19 R33（用户批准：用脱敏样例验证 relocate）**：新增 `npm run verify:relocation-batch`。①**脱敏样例**：`scripts/lib/relocation-batch-sample.mjs` 构造 4 个虚构项目（alpha/beta/gamma/delta），路径全部形如 `/sample/projects/...`，不含本机用户名/盘符/凭据；覆盖正常改写、已在新根不改写、`..` 逃逸、种类未声明、跨设备、嵌套旧根歧义、已完成不重放、旧一次性许可、临时提升、未知非幂等副作用、含写项目。②**批量执行**：`scripts/verify-relocation-batch-sample.mjs` 用**已构建的公开 SDK**（`dist/public-sdk.js`）逐项目跑 `reconcileProjectRelocation`，把结果压成计数/稳定代码，再由可单测判定器判定（11 条判据，缺观测/项目缺失都算失败）。③**实测结果**：**11/11 判据通过、exit 0**；`npm run test:scripts` **51/51**。④**过程中发现并修掉一个真实缺陷**：批量对账第一次跑就**抛 TypeError**——一条观测残缺的未决操作（扁平结构、缺 `operation` 子对象）让 `decideRecoveryAfterRelocation` 读到 `undefined`。现已在 `reconcileProjectRelocation` 增加**输入校验**：观测残缺 ⇒ `blocked`（不抛错、不放行），反例第 ⑨ 条 + 变异体 `relocate-reconciler-malformed-observation-passes` 均落地（该变异体被拦下）。**边界（如实）**：这是**脱敏样例**证据，**不等于**真实历史库已验证；真实历史库批量解析仍未验证。 |
 | R34 | `RELOCATE-01-03` **CLI 入口**：`astarray project reconcile` | **2026-10-19 R34：`astarray project reconcile` 已接通公开入口**（命令名按用户 2026-10-19 批准）。输入是**显式 JSON**（projectIdentifier / projectStatus / locationMappings / declaredStructuredResourceKinds /references / pendingOperations / hasWriteOrExternalSideEffects），不猜历史库、只读、不重放。退出码：**0** 可继续（只读自动恢复）；**1** blocked **或**含写需人工确认（非零更安全）；**2** 用法/输入错误。反例：**argv 级 5 条**（真实 `dist/cli.js`）+ **进程内 4 条**（直接导入 src，保证变异可见）；变异体 **2 条**（含写也 exit 0／改写计数恒 0），均被拦下。**未做**：`project status --json` 的 `relocation` 可选段；冷启动自动触发（目前是**用户显式执行**对账）。 |
 | R35 | **5 轮一次全量门禁**：变异 135/135 + 隔离包**五项** verify + 锚点活规则 | **2026-10-19 R35（第 35 轮全量门禁）**：变异 **135/135 全部被拦下**（首次无"存活"；此前长期存在的私有 GUI 抖动用例已在 R32 随 UI 外迁移出公开 harness）。`npm pack` **263 文件** sha256 `604f7446…`（比 R30 的 269 少 6 个：R32 已把 GUI 代码移出公开库）；**五项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) /`verify-sdk-consumer` / tarball 双进程搬迁回溯。**本轮的真正发现（如实）**：`run-history-view-ignores-cursor` 的锚点**早已失效**（源码 `eligible`→`matched` 后未同步），⇒ 这条变异体长期**空转**（从未注入反事实），只有跑全量才报出来。已修锚点并**新增 `--check-anchors` 静态自检** +活规则 `tests/architecture/mutation-anchors-live.test.ts`（秒级：任一锚点命中次数≠1 即红，且要求检查条数 >100 防空转）。→ 交付后 `--check-anchors` 报 **135/135 条有效**。 |
 | R36 | `RELOCATE-01-04` 余项：`project status --json` 的 `relocation` 可选段 | **2026-10-19 R36：`project status --json` 增加 `relocation` 可选段**（用户 2026-10-19 决策：可选、向后兼容）。出现条件：位置登记为**旧格式**（`legacy`，卡内纪律：旧格式不得自动升级，必须走用户显式对账）。段内含 `registrationReadKind` / `classification` / `isHistoryLoadable` / `isExecutionAllowed` /`requiredUserAction` / `reason` / **`reconcileCommandHint`**（指向 `astarray project reconcile --input <json> --json`）。`absent` / `valid` / `invalid` 三种情形**不输出**该段，既有字段结构不变（向后兼容）。反例 **3 条**（旧格式必带段与入口提示／有效登记必须不带段／无登记不带段，先红后绿）+变异体 **2 条**（无条件输出该段／旧格式隐藏对账入口），均被拦下。至此 RELOCATE-01-03/04 的本地可证部分仅剩「冷启动**自动**触发」与「真实历史库批量解析」两项未做。 |
 | R37 | `OBS-01` PERF/DIAG **采集契约**（默认 off/预算/白名单/脱敏/不阻塞业务） | **2026-10-19 R37：OBS PERF/DIAG 采集契约层**（用户 2026-10-19 按推荐批准）。交付 `observability-collection-contract.ts`：①**默认 off**（未显式开启不采样）；②**采样预算**：每进程 ≥5s 一条、存储 ≤10MB（耗尽 ⇒ **停可选采集并报告，不静默删历史**）；③**指标白名单**只含进程内四项（RSS/事件循环延迟/任务时长/队列深度），**OS 级与未知字段一律拒绝**、非有限数值或负数同样拒绝（**unknown 不记作零**），并记录 `droppedSampleCount`；④**DIAG 只接受 domain-error / doctor**，**网络/磁盘探测一律拒绝**；含原始参数/用户目录/疑似凭据 ⇒ 拒绝；缺分类 ⇒ 拒绝；⑤**指纹**只依赖（来源+分类+操作）⇒ 同类问题聚合；⑥**边界可核对**：不上传、不存原始参数/原始错误文本、不采 OS 级、仅本地、默认 off；⑦**观测故障不阻塞业务**（降级 + 报告）。**9 条反例 + 3 条变异体**（无视默认开关／接受 OS 级指标／接受原始参数，均被拦下）。**未做**：真实采集点接线（进程/任务采样、DIAG 生产事件）、CLI 只读查询、环形落盘与丢样计数持久化。 |
-| R38 | `OBS-01` **只读查询入口**：`astarray obs perf\|diag` | **2026-10-19 R38：OBS 只读查询入口 `astarray obs perf|diag`**（用户 2026-10-19 决策：CLI `--json` 只读可查）。`obs perf`：摘要/明细分页（`--detail/--page-size/--cursor`）、时间窗（`--since/--until`）、回显 `coverage`（命中/总数/丢弃行数/窗口）与**内存保留数**；`obs diag`：按指纹聚合、**事实与推断分列**、`--mission/--agent` 过滤（子 Agent 不得读同级记录）。两条铁律落地：①**"没有样本" ≠ "用量为零"**（`hasSamples:false` + 明确 notice；空结果不得当 0 消耗）；②**观测故障降级并报告、不阻塞业务**（读取失败 ⇒ `kind:"degraded"` + 原因 + exit 0，绝不抛给调用方）。反例 **5 条**（进程内）：空库不报零／分页与时间窗／诊断聚合与个体过滤／坏行显式报告丢弃数／**受控注入读取失败必降级**；变异体 **2 条**（空库报有用量／读取失败直接抛错），均被拦下。**过程发现**：把样本路径做成目录（EISDIR）**测不到** catch 分支（store 折算成丢弃行）⇒ 改用**受控注入**才能真正覆盖降级路径；否则变异体会"假存活"。**未做**：真实采集点接线（R37 契约已就绪）、UI 展示（私有库）、落盘环形与丢样计数持久化。 |
+| R38 | `OBS-01` **只读查询入口**：`astarray obs perf\|diag` | **2026-10-19 R38：OBS 只读查询入口 `astarray obs perf|diag`**（用户 2026-10-19 决策：CLI `--json` 只读可查）。`obs perf`：摘要/明细分页（`--detail/--page-size/--cursor`）、时间窗（`--since/--until`）、回显 `coverage`（命中/总数/丢弃行数/窗口）与**内存保留数**；`obs diag`：按指纹聚合、**事实与推断分列**、`--mission/--agent` 过滤（子 Agent 不得读同级记录）。两条铁律落地：①**"没有样本" ≠ "用量为零"**（`hasSamples:false` + 明确 notice；空结果不得当 0 消耗）；②**观测故障降级并报告、不阻塞业务**（读取失败 ⇒ `kind:"degraded"` + 原因 + exit 0，绝不抛给调用方）。反例 **5 条**（进程内）：空库不报零／分页与时间窗／诊断聚合与个体过滤／坏行显式报告丢弃数／**受控注入读取失败必降级**；变异体 **2 条**（空库报有用量／读取失败直接抛错），均被拦下。**过程发现**：把样本路径做成目录（EISDIR）**测不到** catch 分支（store 折算成丢弃行）⇒ 改用**受控注入**才能真正覆盖降级路径；否则变异体会"假存活"。**未做**：真实采集点接线（R37 契约已就绪）、UI 展示（UI）、落盘环形与丢样计数持久化。 |
 | R39 | `OBS-01` **采样 tick**（端口注入、失败降级、unknown 不填零） | **2026-10-19 R39：OBS 采样 tick**（把 R37 契约接到**可测的采样动作**上）。交付 `observability-sampler.ts` + `runPerfSamplingTick`（**端口注入**：指标读取/时钟/PID/落盘）：①默认关闭 ⇒ 不采样；②间隔未到/预算耗尽 ⇒ 不采样；③**白名单外（OS 级）指标 ⇒ 拒绝并降级**；④**拿不到某项指标就省略该字段**（unknown 不记作零，绝不填 0）；⑤读指标失败/落盘失败 ⇒ **降级 + 丢样计数递增**，**不抛给业务**（R37 契约）；⑥任务事实（耗时/队列）与进程指标合并后仍走白名单。**8 条反例 + 3 条变异体**（落盘失败直接抛错／拿不到就填 0／无视采集开关，均被拦下）。**如实边界（刻意收窄）**：**未提供「生产默认端口」**——进程样本与既有 `PerfSampleEvent` 字段不重合（后者要求 `operationKind`+`durationMilliseconds`，硬填 0 违反 unknown 不记作零）⇒ 进程样本要落盘需先决定**新增事件类型或独立文件**（数据 schema 决策），生产接线在该决定后进行。**不主张采样已上线**。 |
 | R40 | **5 轮一次全量门禁**：变异 145/145 + 隔离包五项 verify | **2026-10-19 R40（第 40 轮全量门禁）**：变异 **145/145 全部被拦下**；`npm pack` **263 文件** sha256 `44d1b793…`；**五项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) /`verify-sdk-consumer` / tarball 双进程搬迁回溯。门禁基线：全量（低并发）**466 文件 / 3432 用例**、`--check-anchors` **145/145 条有效**。 |
-| R41 | **私有库最小门禁**（用户已授权改动私有仓库）| **2026-10-19 R41：私有库 `astarray-ui` 最小门禁 + 迁移代码可编译**（推送 `8f733d9`）。①新增 `tsconfig.json`（strict + noUncheckedIndexedAccess，先收窄到 `packages/gui`）与 `npm run typecheck`；②补齐 R32 迁入 `gui-serve-command.ts` 缺失的 import / `GuiServeCommandOptions` / 段落，并**恢复** GUI 专用的 `openLocalBrowser` / `waitForLocalShutdownSignal`（R32 从公开库移除后归私有库）；③解决**双模块身份冲突**：`packages/core` 统一走同级真实路径，实测 `tsc --noEmit -p .` ⇒ **exit 0**。**踩坑记录（重要）**：私有库自己的 `packages/tui/**` 是**终端 UI**，与公开库 `packages/tui/src/cli/**` 同名不同物⇒ 不能建同名 junction（会覆盖 UI 目录），改为**显式同级相对路径**引用公开 CLI，并在注释里写明原因。**未做**：UI 与 tests 纳入 typecheck、私有库测试骨架与 vitest 配置、`gui serve` 接成 CLI 入口、重建 R32 外迁的 9 条变异体与 3 条诊断用例。 |
-| R42 | **私有库 GUI CLI 入口 + 测试门禁** | **2026-10-19 R42：私有库 GUI CLI 入口 + 可跑测试门禁**（推送 `9de3396`）。①`packages/gui/src/cli/gui-cli.ts`：`astarray-ui gui serve`（含 `--port/--runtime/--credential-reference/--diagnostics-file`…），**端口与超时先于任何网络动作校验**（非法即 exit 2，不启动服务器）、`--help` 打印用法；`package.json` 增加 `bin` 与 `scripts`；②`vitest.config.ts`：`include tests/gui/**`，把 **5 个仍按公开库布局引用**的迁移用例**显式 exclude** 并写明原因与重接方式（不静默跳过）；③`npm run check`（typecheck + test）实测 **27 文件 / 184 用例全绿、exit 0**；④新增 **5 条**参数解析反例（缺省值／完整参数／非法端口与超时／未知子命令 exit 2／--help exit 0）。**如实边界**：私有库尚无构建产物（`dist/`），`bin` 指向 TS 源码；5 个迁移用例与 **9 条外迁变异体**仍未重接/重建；TUI 与 tests 仍未纳入 typecheck。 |
-| R43 | **私有库迁移用例重接**（2 条恢复可跑） | **2026-10-19 R43：私有库迁移用例重接**（推送 `6d1f51d`）。①`gui-command.test.ts`：把导入从公开库 `commands.js` 改为**本仓库** `gui-serve-command.js`（该用例真正要测的是迁移后的实现），2 条用例恢复通过（含**真实 loopback 服务启动/关闭收口**）；②`gui02-04-recovery-success-path.test.ts`：`packages/core/**` 与 `tests/support` fixture 改指**同级公开库**（显式 `../../../../astarray/...`），3 条用例恢复通过；③私有库 `npm run check`（typecheck + test）⇒**29 文件 / 189 用例全绿、exit 0**（R42 为 27/184）。**踩坑记录**：相对路径层数容易算错（`tests/gui/integration/` → 同级仓库是 **4** 层 `..`，不是 5），错误会表现为 `Cannot find module`；修正后即通过。**仍排除 3 个**（需要私有库先有构建产物 `dist/cli.js`）：`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`；以及 **9 条外迁变异体**仍未重建。 |
-| R44 | **私有库构建 + 接线守卫迁移** | **2026-10-19 R44：私有库构建产物 + GUI-02-02 接线守卫迁移**（推送 `2d96757`）。①`tsup.config.ts` 打包 `packages/gui/src/cli/gui-cli.ts` → `dist/cli.js`（bundle 依赖，避免相对路径在 `dist/` 下失效），`bin`/`main` 指向产物；②**修掉一个只在产物里暴露的缺陷**：入口判定用 `import.meta.url.endsWith("gui-cli.js")`，打包后文件名是 `cli.js` ⇒ 入口**根本没执行**（`--port 99999` 也静默 exit 0）；改为「进程入口文件 == 当前模块文件」比较。实测：`--help` exit 0、非法端口 exit 2。③把公开库两条 GUI-02-02 用例守的**事实**迁成源码级守卫（`gui02-02-wiring-guards.test.ts`，3 条）：必须传入 `onPermissionAskWithIdentity`（否则待决授权永不登记）、覆盖 `listPendingInstallationInquiries` 前必须 bind（防自递归）、覆盖项不得同名自调用；**拔线实测**：删掉该接线 ⇒ 1 条立即变红。④私有库 `npm run check` ⇒ **30 文件 / 192 用例全绿、exit 0**。**如实边界**：3 个公开库布局用例（`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`）的前提已被分层决策移除 ⇒ 明确不再迁移（守卫由上面新增用例接续）；**9 条外迁变异体**仍未重建。 |
+| R41 | **UI最小门禁**（用户已授权改动UI）| **2026-10-19 R41：UI `UI` 最小门禁 + 迁移代码可编译**（推送 `8f733d9`）。①新增 `tsconfig.json`（strict + noUncheckedIndexedAccess，先收窄到 `packages/gui`）与 `npm run typecheck`；②补齐 R32 迁入 `gui-serve-command.ts` 缺失的 import / `GuiServeCommandOptions` / 段落，并**恢复** GUI 专用的 `openLocalBrowser` / `waitForLocalShutdownSignal`（R32 从公开库移除后归UI）；③解决**双模块身份冲突**：`packages/core` 统一走同级真实路径，实测 `tsc --noEmit -p .` ⇒ **exit 0**。**踩坑记录（重要）**：UI自己的 `packages/tui/**` 是**终端 UI**，与公开库 `packages/tui/src/cli/**` 同名不同物⇒ 不能建同名 junction（会覆盖 UI 目录），改为**显式同级相对路径**引用公开 CLI，并在注释里写明原因。**未做**：UI 与 tests 纳入 typecheck、UI测试骨架与 vitest 配置、`gui serve` 接成 CLI 入口、重建 R32 外迁的 9 条变异体与 3 条诊断用例。 |
+| R42 | **UI GUI CLI 入口 + 测试门禁** | **2026-10-19 R42：UI GUI CLI 入口 + 可跑测试门禁**（推送 `9de3396`）。①`packages/gui/src/cli/gui-cli.ts`：`UI gui serve`（含 `--port/--runtime/--credential-reference/--diagnostics-file`…），**端口与超时先于任何网络动作校验**（非法即 exit 2，不启动服务器）、`--help` 打印用法；`package.json` 增加 `bin` 与 `scripts`；②`vitest.config.ts`：`include tests/gui/**`，把 **5 个仍按公开库布局引用**的迁移用例**显式 exclude** 并写明原因与重接方式（不静默跳过）；③`npm run check`（typecheck + test）实测 **27 文件 / 184 用例全绿、exit 0**；④新增 **5 条**参数解析反例（缺省值／完整参数／非法端口与超时／未知子命令 exit 2／--help exit 0）。**如实边界**：UI尚无构建产物（`dist/`），`bin` 指向 TS 源码；5 个迁移用例与 **9 条外迁变异体**仍未重接/重建；TUI 与 tests 仍未纳入 typecheck。 |
+| R43 | **UI迁移用例重接**（2 条恢复可跑） | **2026-10-19 R43：UI迁移用例重接**（推送 `6d1f51d`）。①`gui-command.test.ts`：把导入从公开库 `commands.js` 改为**本仓库** `gui-serve-command.js`（该用例真正要测的是迁移后的实现），2 条用例恢复通过（含**真实 loopback 服务启动/关闭收口**）；②`gui02-04-recovery-success-path.test.ts`：`packages/core/**` 与 `tests/support` fixture 改指**同级公开库**（显式 `../../../../astarray/...`），3 条用例恢复通过；③UI `npm run check`（typecheck + test）⇒**29 文件 / 189 用例全绿、exit 0**（R42 为 27/184）。**踩坑记录**：相对路径层数容易算错（`tests/gui/integration/` → 同级仓库是 **4** 层 `..`，不是 5），错误会表现为 `Cannot find module`；修正后即通过。**仍排除 3 个**（需要UI先有构建产物 `dist/cli.js`）：`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`；以及 **9 条外迁变异体**仍未重建。 |
+| R44 | **UI构建 + 接线守卫迁移** | **2026-10-19 R44：UI构建产物 + GUI-02-02 接线守卫迁移**（推送 `2d96757`）。①`tsup.config.ts` 打包 `packages/gui/src/cli/gui-cli.ts` → `dist/cli.js`（bundle 依赖，避免相对路径在 `dist/` 下失效），`bin`/`main` 指向产物；②**修掉一个只在产物里暴露的缺陷**：入口判定用 `import.meta.url.endsWith("gui-cli.js")`，打包后文件名是 `cli.js` ⇒ 入口**根本没执行**（`--port 99999` 也静默 exit 0）；改为「进程入口文件 == 当前模块文件」比较。实测：`--help` exit 0、非法端口 exit 2。③把公开库两条 GUI-02-02 用例守的**事实**迁成源码级守卫（`gui02-02-wiring-guards.test.ts`，3 条）：必须传入 `onPermissionAskWithIdentity`（否则待决授权永不登记）、覆盖 `listPendingInstallationInquiries` 前必须 bind（防自递归）、覆盖项不得同名自调用；**拔线实测**：删掉该接线 ⇒ 1 条立即变红。④UI `npm run check` ⇒ **30 文件 / 192 用例全绿、exit 0**。**如实边界**：3 个公开库布局用例（`gui02-02-cli-wiring-self-recursion`、`gui02-02-permission-ask-registration-wiring`、`gui02-04-package-entry`）的前提已被分层决策移除 ⇒ 明确不再迁移（守卫由上面新增用例接续）；**9 条外迁变异体**仍未重建。 |
 | R45 | **5 轮一次全量门禁**：变异 145/145 + 隔离包五项 verify | **2026-10-19 R45（第 45 轮全量门禁）**：变异 **145/145 全部被拦下**；`npm pack` **263 文件** sha256 `44d1b793…`（与 R40 一致：期间公开库只改文档与测试）；**五项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) /`verify-sdk-consumer` / tarball 双进程搬迁回溯。 |
-| R46 | **私有库最小变异校验**（3 条重建守卫，全部被拦下） | **2026-10-19 R46：私有库最小变异校验**（推送 `c91c10c`）。新增 `scripts/verify-mutation-kills.mjs` + `npm run verify:mutation-kills`：锚点必须**恰好命中 1 次**（失效即脚本错误、不静默跳过）、注入后只跑**点名用例**、`finally` 恢复并**校验内容哈希**。本轮**重建 3 条**（不是 R32 那 9 条的原样恢复——它们的 find/replace 已随公开库改动失效，按**现实现重新推导**）：①去掉 `onPermissionAskWithIdentity`（待决授权永不登记）②去掉 `.bind(application)`（覆盖同名方法自递归）③接受非法端口（用法错误变成启动期失败）。**实测 3/3 全部被拦下**。**过程中发现守卫太弱**：第 ② 条一开始**存活**——守卫只断言「取了引用」与「调用的是那个引用」，而「只取引用不 bind」同样满足 ⇒ 已把守卫补成**必须出现 `.bind(application)`**，随即被拦下。私有库门禁：`npm run check` **30 文件 / 192 用例全绿**；`--check-anchors` **3/3**。**如实边界**：R32 外迁的 9 条原始变异体**并未**逐条复原（内容已不可考）；本轮的 3 条是针对**当前实现**重建的等价守卫。 |
-| R47 | **私有库变异锚点活规则** | **2026-10-19 R47：私有库变异锚点活规则**（推送 `8de5840`）。新增 `tests/gui/unit/mutation-anchors-live.test.ts`：秒级跑 `--check-anchors`，任一锚点命中次数 ≠ 1 即红，且要求至少检查 **3** 条（防空转）。`check:full` 现为 **typecheck + test + build + verify:mutation-kills**，把"拔线必失败"纳入常规门禁。私有库门禁：`npm run check` ⇒ **31 文件 / 193 用例全绿**；`--check-anchors` **3/3**。**动机（沿用公开库 R35 事故）**：锚点失效会让变异体静默空转；把它做成秒级测试后不必等全量变异才发现。 |
-| R48 | **私有库打包产物验收**（7/7 判据） | **2026-10-19 R48：私有库打包产物验收**（推送 `23bfb16`）。新增 `scripts/verify-package.mjs` + `npm run verify:package`：`npm pack` → 临时目录**隔离安装** →用**已安装的** `node_modules/astarray-ui/dist/cli.js` 跑 4 类判据：`--help` exit 0 且打印用法、非法端口 exit 2、未知参数 exit 2、缺子命令 exit 2 且打印用法；另加 3 条产物判据（tgz 产出、安装成功、安装产物含 `dist/cli.js`）⇒ **7/7 通过**。`package.json` 增加 `files: ["dist"]`（避免把源码打进产物）与 `verify:package` 脚本；验收后自动清理 tgz。**为什么值得做**：R44 那个「入口判定在产物里失效」的缺陷说明**只测源码不够**，必须验真实产物。 |
-| R49 | **私有库跨项目视图守卫**（副本可分辨/视图白名单；5 条变异体全拦下） | **2026-10-19 R49：私有库跨项目视图守卫**（推送 `67d9a67`）。新增 `tests/gui/unit/gui-cross-project-view.test.ts`（3 条）：①副本**恒标记** `isCopyOfExternalSource:true`（输入漏传也不会显示成原件）②`displayLabel` 明确写出「副本」+ 来源项目 + `@r<rev>` + 目标路径③**只透传视图字段**（内部字段不得漏到界面，白名单式断言）。新增 **2 条变异体**：`gui-cross-project-view-hides-copy-mark`（把副本标成原件）、`gui-cross-project-view-leaks-internal-field`（把内部字段原样透传）。私有库实测：`verify:mutation-kills` **5/5 被拦下**、`--check-anchors` **5/5**、`npm run check` **34 文件 / 196 用例全绿**。**如实边界**：R32 外迁的 9 条原始变异体仍未逐条复原；本仓库现有 **5 条**为按当前实现重建的等价守卫，GUI-02-03 其余视图行为仍需补用例。 |
+| R46 | **UI最小变异校验**（3 条重建守卫，全部被拦下） | **2026-10-19 R46：UI最小变异校验**（推送 `c91c10c`）。新增 `scripts/verify-mutation-kills.mjs` + `npm run verify:mutation-kills`：锚点必须**恰好命中 1 次**（失效即脚本错误、不静默跳过）、注入后只跑**点名用例**、`finally` 恢复并**校验内容哈希**。本轮**重建 3 条**（不是 R32 那 9 条的原样恢复——它们的 find/replace 已随公开库改动失效，按**现实现重新推导**）：①去掉 `onPermissionAskWithIdentity`（待决授权永不登记）②去掉 `.bind(application)`（覆盖同名方法自递归）③接受非法端口（用法错误变成启动期失败）。**实测 3/3 全部被拦下**。**过程中发现守卫太弱**：第 ② 条一开始**存活**——守卫只断言「取了引用」与「调用的是那个引用」，而「只取引用不 bind」同样满足 ⇒ 已把守卫补成**必须出现 `.bind(application)`**，随即被拦下。UI门禁：`npm run check` **30 文件 / 192 用例全绿**；`--check-anchors` **3/3**。**如实边界**：R32 外迁的 9 条原始变异体**并未**逐条复原（内容已不可考）；本轮的 3 条是针对**当前实现**重建的等价守卫。 |
+| R47 | **UI变异锚点活规则** | **2026-10-19 R47：UI变异锚点活规则**（推送 `8de5840`）。新增 `tests/gui/unit/mutation-anchors-live.test.ts`：秒级跑 `--check-anchors`，任一锚点命中次数 ≠ 1 即红，且要求至少检查 **3** 条（防空转）。`check:full` 现为 **typecheck + test + build + verify:mutation-kills**，把"拔线必失败"纳入常规门禁。UI门禁：`npm run check` ⇒ **31 文件 / 193 用例全绿**；`--check-anchors` **3/3**。**动机（沿用公开库 R35 事故）**：锚点失效会让变异体静默空转；把它做成秒级测试后不必等全量变异才发现。 |
+| R48 | **UI打包产物验收**（7/7 判据） | **2026-10-19 R48：UI打包产物验收**（推送 `23bfb16`）。新增 `scripts/verify-package.mjs` + `npm run verify:package`：`npm pack` → 临时目录**隔离安装** →用**已安装的** `node_modules/UI/dist/cli.js` 跑 4 类判据：`--help` exit 0 且打印用法、非法端口 exit 2、未知参数 exit 2、缺子命令 exit 2 且打印用法；另加 3 条产物判据（tgz 产出、安装成功、安装产物含 `dist/cli.js`）⇒ **7/7 通过**。`package.json` 增加 `files: ["dist"]`（避免把源码打进产物）与 `verify:package` 脚本；验收后自动清理 tgz。**为什么值得做**：R44 那个「入口判定在产物里失效」的缺陷说明**只测源码不够**，必须验真实产物。 |
+| R49 | **UI跨项目视图守卫**（副本可分辨/视图白名单；5 条变异体全拦下） | **2026-10-19 R49：UI跨项目视图守卫**（推送 `67d9a67`）。新增 `tests/gui/unit/gui-cross-project-view.test.ts`（3 条）：①副本**恒标记** `isCopyOfExternalSource:true`（输入漏传也不会显示成原件）②`displayLabel` 明确写出「副本」+ 来源项目 + `@r<rev>` + 目标路径③**只透传视图字段**（内部字段不得漏到界面，白名单式断言）。新增 **2 条变异体**：`gui-cross-project-view-hides-copy-mark`（把副本标成原件）、`gui-cross-project-view-leaks-internal-field`（把内部字段原样透传）。UI实测：`verify:mutation-kills` **5/5 被拦下**、`--check-anchors` **5/5**、`npm run check` **34 文件 / 196 用例全绿**。**如实边界**：R32 外迁的 9 条原始变异体仍未逐条复原；本仓库现有 **5 条**为按当前实现重建的等价守卫，GUI-02-03 其余视图行为仍需补用例。 |
 | R50 | **5 轮一次全量门禁**（变异 145/145 + 包 263 文件） | **2026-10-19 R50（第 50 轮全量门禁）**：变异 **145/145 全部被拦下**；`npm pack` **263 文件** sha256 `44d1b793…`（与 R45 一致：期间公开库只改测试/文档）。**注**：本轮在同一次会话里直接续做 R51（用户答复了 schema 决策），故 R50 的"五项 verify"与 R51 的改动一起在下一次全量门禁（R55）复核；**不主张本轮已跑完五项**。 |
 | R51 | **进程样本落盘 schema**（独立事件类型+独立文件，采样 tick 接上生产端口） | **2026-10-19 R51：进程样本落盘的事件 schema（用户决策：独立事件类型 + 独立文件）**。新增 `process-sample-store.ts`：`eventType: "process"`、独立文件 `perf/process-samples.jsonl`、**指标全部可选**（拿不到就不写该字段 ⇒ unknown 不记作零）、**白名单校验**（OS 级/未知字段拒绝写入）、**坏行如实计数**（`discardedLineCount`，不静默丢弃）、**丢样计数持久化**；`createProcessSampleStorePorts` 把 R39 的采样 tick 接到该 store（**收掉 R39 刻意留白的"无生产端口"**）；SDK 导出 store 与端口。**7 条反例 + 2 条变异体**（接受未知字段／坏行静默丢弃，均被拦下）。门禁：全量（低并发）**467 文件 / 3439 用例 exit 0**；`--check-anchors` **147/147**。**未做**：真实定时触发器（OS 级/进程内定时器接线）、10MB/24h 预算的实际轮转、`obs` CLI 对进程样本的查询视图。 |
-| R52 | `OBS-01` **obs process 只读查询** | **2026-10-19 R52：`astarray obs process` 只读查询**（R51 进程样本的公开入口）。①`executeObsProcessCommand`：时间窗（`--since/--until`）+ `--limit`（缺省 50）、回显 `coverage`（总数/命中/返回/**丢弃行数**/**丢样累计**）；②**没有样本 ≠ 没有资源消耗**（`hasSamples:false` + 明确 notice）；③**读取失败降级 exit 0**（不把观测故障抛给调用方）；④`cli.tsx` 注册 `obs process`（非法 `--limit` ⇒ usage error 2）。反例 **2 条**（进程内）：无样本不报零（含丢弃行/丢样均为 0）／坏行计数 + 时间窗 + limit + 丢样累计；变异体 **2 条**（空结果报有样本／丢弃行数恒 0），均被拦下；`--check-anchors` **149/149**。门禁：全量（低并发）**467 文件 / 3439 用例 exit 0**（首跑 `accuracy-policy-gate` 抖动，单跑 7/7 通过后复跑全绿）。**未做**：真实定时触发器（谁每隔 ≥5s 调 tick）、10MB/24h 轮转实际执行、UI 概览（私有库）。 |
+| R52 | `OBS-01` **obs process 只读查询** | **2026-10-19 R52：`astarray obs process` 只读查询**（R51 进程样本的公开入口）。①`executeObsProcessCommand`：时间窗（`--since/--until`）+ `--limit`（缺省 50）、回显 `coverage`（总数/命中/返回/**丢弃行数**/**丢样累计**）；②**没有样本 ≠ 没有资源消耗**（`hasSamples:false` + 明确 notice）；③**读取失败降级 exit 0**（不把观测故障抛给调用方）；④`cli.tsx` 注册 `obs process`（非法 `--limit` ⇒ usage error 2）。反例 **2 条**（进程内）：无样本不报零（含丢弃行/丢样均为 0）／坏行计数 + 时间窗 + limit + 丢样累计；变异体 **2 条**（空结果报有样本／丢弃行数恒 0），均被拦下；`--check-anchors` **149/149**。门禁：全量（低并发）**467 文件 / 3439 用例 exit 0**（首跑 `accuracy-policy-gate` 抖动，单跑 7/7 通过后复跑全绿）。**未做**：真实定时触发器（谁每隔 ≥5s 调 tick）、10MB/24h 轮转实际执行、UI 概览（UI）。 |
 | R53 | `OBS-01` **进程样本保留策略**（10MB/24h，裁剪原因如实）| **2026-10-19 R53：进程样本保留策略（10MB 预算 + 24h 保留）**。新增 `process-sample-retention.ts` + `planProcessSampleRetention`：①**先按 24h 过期淘汰**，②再在保留期内**从最新往回**累计 10MB 预算（超预算先裁最旧），③过期/超预算**分别计数**并给出`oldestDroppedAtIso` 与**保留窗口**（`retainedOldestAtIso`/`retainedNewestAtIso`），④非法时间/坏时间戳 ⇒ 不猜测（非法 `nowIso` 直接 no-action；坏样本时间按过期保守处理并计数）。**7 条反例 + 2 条变异体**（先裁最新／把裁剪数清零，均被拦下）。**过程发现（重要）**：`retention-drops-newest-first` 一开始**存活** —— 反例④只断言计数，而"从新往旧"与"从旧往新"裁剪**计数完全相同**；补 `retained*AtIso` 窗口字段后，反例能断言"保留的是哪一段"，变异立刻被拦下。门禁：全量（低并发）**468 文件 / 3448 用例 exit 0**；`--check-anchors` **151/151**。**未做**：按计划**真正重写文件**（本模块只判定不落盘）、定时触发器接线。 |
 | R54 | `OBS-01` **保留策略执行**（先备份 + 原子重写；破坏性 API 收进白名单模块） | **2026-10-19 R54：保留策略的执行（判定 → 备份 → 原子重写）**。新增 `process-sample-retention-apply.ts` + `applyProcessSampleRetention`：①**无需裁剪时不动文件**（不产生备份、不改 mtime）；②需裁剪时**先备份**到`perf/process-samples.backup-<时间戳>.jsonl`，**备份失败即放弃重写**（文件保持原样）；③重写走 `temp → fsync → rename`（原子，不留半截文件）；④坏行不参与保留计算但**丢弃行数如实回传**。**4 条反例 + 2 条变异体**（跳过备份／重写保留最旧，均被拦下）。**过程发现（架构守卫拦住了我）**：第一版直接用裸 `fs.writeFile/rename/rm` 做重写，被 `destructive-file-api-guard`（T12-05）判红 ⇒ 改为把破坏性 API 收进**白名单模块**`infra/atomic-json.ts`（新增 `writeAtomicTextFile` / `copyFileWithBackup`，均带理由注释），retention-apply 只调用这两个 helper ⇒ 守卫恢复绿。这也顺带修正了一个变异锚点（同步更新后仍被拦下）。门禁：全量（低并发）**469 文件 / 3452 用例 exit 0**；`--check-anchors` **153/153**。**未做**：定时触发器（谁每隔 ≥5s 调 tick 并按预算触发 rotate）。 |
-| R55 | **5 轮一次全量门禁**：变异 153/153 + **六项** verify（含私有库） | **2026-10-19 R55（第 55 轮全量门禁，含 R50 欠账补跑）**：变异 **153/153 全部被拦下**；`npm pack` **263 文件** sha256 `0d02889d…`；**六项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) / `verify-sdk-consumer` /tarball 双进程搬迁回溯 / **私有库 `verify:package`(7/7)**。门禁基线：全量（低并发）**469 文件 / 3452 用例**、`--check-anchors` **153/153**。**补账说明**：R50 当时只跑了变异与打包、未跑五项 verify（同一会话内直接续做 R51），本轮已全部补跑并通过。 |
+| R55 | **5 轮一次全量门禁**：变异 153/153 + **六项** verify（含UI） | **2026-10-19 R55（第 55 轮全量门禁，含 R50 欠账补跑）**：变异 **153/153 全部被拦下**；`npm pack` **263 文件** sha256 `0d02889d…`；**六项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) / `verify-sdk-consumer` /tarball 双进程搬迁回溯 / **UI `verify:package`(7/7)**。门禁基线：全量（低并发）**469 文件 / 3452 用例**、`--check-anchors` **153/153**。**补账说明**：R50 当时只跑了变异与打包、未跑五项 verify（同一会话内直接续做 R51），本轮已全部补跑并通过。 |
 | R56 | `OBS-01` **采样调度器**（端口注入/默认不常驻/幂等/5s 下限） | **2026-10-19 R56：OBS 采样调度器**。新增 `observability-sampling-scheduler.ts` + `createPerfSamplingScheduler`：**定时器端口注入**（测试用假实现，不依赖真实时钟）、**默认不常驻**（未开启不排定时器）、**start/stop 幂等**（重复 start 不产生第二个定时器；stop 必清理）、**间隔下限 5s**（小于下限直接拒绝，不静默改值）、每次 tick 只调注入的 `onTick`（调度器自己不读指标、不写盘）。**5 条反例 + 2 条变异体**（无视采集开关／重复 start 双定时器，均被拦下）。门禁：全量（低并发）**470 文件 / 3457 用例 exit 0**；`--check-anchors` **155/155**。**未做**：把调度器接到**真实进程生命周期**（哪个入口在会话开始时启动、关闭时 stop）——这一步会改变运行时行为，需要明确落点后再接；本轮只交付可测的调度单元。 |
 | R57 | `OBS-01` **会话采集器**（组合调度+tick+落盘+关闭整理） | **2026-10-19 R57：OBS 会话采集器**。新增 `session-perf-collector.ts` + `createSessionPerfCollector`：把 **调度器 + 采样 tick + 落盘 + 关闭时保留整理** 组合成一个可测单元：①**默认关闭 ⇒ 不排定时器、不写任何文件**（连 `perf/` 目录都不创建）；②`sampleNow()` 落盘一条；③**stop() 清定时器并按保留策略整理一次**（先备份再重写，R54）；④未 start 就 stop ⇒ `not-running`（幂等）；⑤tick 失败/白名单外指标 ⇒ **只累计丢样、不抛业务错误**。**6 条反例 + 2 条变异体**（关闭时仍采样／stop 跳过整理，均被拦下）。**过程发现（第二次同类问题）**：`collector-stop-skips-retention` 一开始**存活** —— 反例②只断言 `retention.kind === "no-action"`，而变异恰恰让它恒为 `no-action`。补了反例⑥（预置 48h 前样本 ⇒ stop 必须 `rewritten` 且文件被裁剪）后才被拦下。门禁：全量（低并发）**472 文件 / 3463 用例 exit 0**；`--check-anchors` **157/157**。**未做**：把采集器接到**真实入口**（`run` 命令生命周期）——会改变运行时行为，等落点确认。 |
 | R58 | `OBS-01` **进程样本聚合**（逐字段分母、缺字段不补零、覆盖窗口） | **2026-10-19 R58：进程样本聚合**。新增 `process-sample-aggregate.ts` + `aggregateProcessSamples`：**逐字段**给出 `sampleCount`/min/max/mean/median，**缺字段的样本不计入该字段分母**（unknown 不记作零），全缺时为 `null`（不可报告）而不是 0；同时回传**覆盖窗口**（最早/最晚）、丢弃行数、丢样累计。**6 条反例 + 2 条变异体**（缺字段补 0／偶数中位数只取上中位，均被拦下）。**过程发现**：`aggregate-missing-field-counted-as-zero` 第一版写成了**死代码**（`continue` 之后的 `push(0)` 永不执行）⇒ 变异存活；改成 `if (value === undefined) { push(0); continue; }` 后立即被拦下 —— 即「变异体本身写错也会表现为存活」，必须核对注入后的语义是否真的改变了行为。门禁：全量（低并发）**473 文件 / 3469 用例 exit 0**；`--check-anchors` **159/159**。**未做**：`obs process --summary` 的 CLI 开关（聚合器已导出，接线下一步）。 |
 | R59 | `OBS-01` **obs process --summary**（聚合摘要 + 时间窗一致） | **2026-10-19 R59：`astarray obs process --summary`**（把 R58 聚合器接到公开入口）。①`--summary` 返回**聚合摘要**（逐字段 sampleCount/min/max/mean/median）且**不再返回逐条样本**；②聚合**遵守时间窗**（与查询范围一致，覆盖窗口如实回显）；③缺字段不计入分母、全缺为 `null`（unknown 不记作零）。反例 **1 条**（进程内，⑧）：摘要只给聚合 + 时间窗生效 + 缺字段为 null；变异体 **2 条**（摘要忽略时间窗／摘要仍返回逐条样本），均被拦下。**过程发现**：新增的 `--summary` 让 `discardedLineCount: report.discardedLineCount,` 在 perf 与 process 两处出现，原本唯一的变异锚点变成**命中 2 次**（`--check-anchors` 立刻报出来）⇒ 锚点补上前一行上下文后恢复唯一。这正是 R35 那条活规则的价值：**锚点漂移会在秒级自检里暴露**，不必等全量变异。门禁：全量（低并发）**472 文件 / 3470 用例 exit 0**；`--check-anchors` **161/161**。 |
-| R60 | **5 轮一次全量门禁**：变异 161/161 + 六项 verify | **2026-10-19 R60（第 60 轮全量门禁）**：变异 **161/161 全部被拦下**；`npm pack` **263 文件** sha256 `ab186cbb…`；**六项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) / `verify-sdk-consumer` /tarball 双进程搬迁回溯 / 私有库 `verify:package`(7/7)。门禁基线：全量（低并发）**472 文件 / 3470 用例**、`--check-anchors` **161/161**。 |
+| R60 | **5 轮一次全量门禁**：变异 161/161 + 六项 verify | **2026-10-19 R60（第 60 轮全量门禁）**：变异 **161/161 全部被拦下**；`npm pack` **263 文件** sha256 `ab186cbb…`；**六项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) / `verify-sdk-consumer` /tarball 双进程搬迁回溯 / UI `verify:package`(7/7)。门禁基线：全量（低并发）**472 文件 / 3470 用例**、`--check-anchors` **161/161**。 |
 | R61 | `DIAG-01-02` **证据包契约**（用户主动/不外发/窗口与脱敏齐备/章节白名单） | **2026-10-19 R61：DIAG 证据包契约**。新增 `diagnostic-evidence-pack-contract.ts`：导出证据包前**强制校验**六项：①用户主动发起（不自动生成）②不请求联网上传（**不自动外发**）③时间窗口非空（覆盖范围可界定）④版本与平台齐备（跨平台可复现）⑤脱敏说明非空⑥不含原始参数/凭据；另加：**章节白名单**（`findings-summary`/`coverage-window`/`redaction-notes`/`degraded-status`），未知章节拒绝（不把任意内部数据塞进证据包）；清单三项安全常量固化（`isAutoUploaded`/`containsRawArguments`/`containsSecrets` 恒 false）。**6 条反例 + 2 条变异体**（允许自动上传／允许含敏感内容，均被拦下）。门禁：全量（低并发）**473 文件 / 3476 用例 exit 0**；`--check-anchors` **163/163**。**未做**：真实证据包生成（打包文件/读取诊断库/CLI 导出命令）—— 本卡只交付契约层。 |
 | R62 | `DIAG-01-02` **obs diag export**（用户主动/不写即拒绝/不联网） | **2026-10-19 R62：`astarray obs diag export`**（把 R61 证据包契约接到公开入口）。①用户主动执行命令导出到**指定文件**（`--output/--since/--until/--platform/--redaction/--sections`）；②**不联网上传**：输出明确 `isAutoUploaded:false` 并提示「如需外发请自行处理该文件」；③契约拒绝（缺窗口/缺平台/缺脱敏说明/未知章节/空章节）⇒ **exit 1 且不写任何文件**；④写入走白名单模块 `infra/atomic-json.ts` 的原子文本写（不触碰破坏性 API 守卫）。反例 **1 条**（⑨）：允许时写文件且未上传、缺窗口与未知章节均拒绝且不落盘；变异体 **2 条**（拒绝仍写文件／报告已自动上传），均被拦下。门禁：全量（低并发）**473 文件 / 3477 用例 exit 0**；`--check-anchors` **165/165**。**未做**：证据包内容真实生成（当前清单只含元数据 + 章节声明；实际 findings 正文与覆盖率导出下一步）。 |
 | R63 | `DIAG-01-02` **证据包正文生成**（指纹级聚合/不写错误文本/遵守时间窗） | **2026-10-19 R63：证据包正文生成**。`obs diag export` 现在真的写入正文：①按用户给的**时间窗**读取诊断摘要；②只写**指纹级聚合**（fingerprint/errorCode/component/severity/occurrenceCount/首末时间/isInference/证据引用），**绝不写** `messageText` 或原始参数；③正文含 `coverage`（命中/总数）、`bySeverity`、`byRecoveryState`、`isReportable`；④读取失败 ⇒ **不写文件**并 exit 1（不产出残缺证据）；⑤输出仍明确 `isAutoUploaded:false`。反例 **1 条**（⑩）：只统计窗口内事件、findings 指纹非空、**窗口内外的原始错误文本都不得出现**；变异体 **2 条**（把错误文本写进包／正文忽略时间窗），均被拦下。门禁：全量（低并发）**473 文件 / 3478 用例 exit 0**；`--check-anchors` **167/167**。**未做**：把证据包接到 `obs diag` 的分页/检索结果（当前固定导出全窗口聚合）。 |
 | R64 | `DIAG-01-02` **证据包按章节组装**（声明与内容一致） | **2026-10-19 R64：证据包正文按声明章节组装**。此前 `--sections` 只写进清单、正文总是全量（**声明与内容不一致**）；现在正文严格按声明组装：`findings-summary` ⇒ findings（指纹级）+ bySeverity/byRecoveryState；`coverage-window` ⇒ coverage；`redaction-notes` ⇒ 脱敏说明回显；`degraded-status` ⇒ 丢弃行数/isReportable/unreportableReason。未声明的章节**不得出现**（反例⑪直接断言 body 里没有 findings / bySeverity / redactionNotes）。**1 条反例（⑪）+ 2 条变异体**（无视章节声明／丢掉降级状态），均被拦下。门禁：全量（低并发）**473 文件 / 3479 用例 exit 0**；`--check-anchors` **169/169**。 |
-| R65 | **5 轮一次全量门禁**：变异 169/169 + 六项 verify | **2026-10-19 R65（第 65 轮全量门禁）**：变异 **169/169 全部被拦下**；`npm pack` **263 文件** sha256 `ea2e7241…`；**六项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) / `verify-sdk-consumer` /tarball 双进程搬迁回溯 / 私有库 `verify:package`(7/7)。门禁基线：全量（低并发）**473 文件 / 3479 用例**、`--check-anchors` **169/169**。 |
-| R66 | **UI 人工体验清单 + 活规则**（未填=未验证） | **2026-10-19 R66：UI 人工体验清单**（用户决策项 4 的推荐默认：我先出清单，人去跑）。新增 `docs/reports/UI_MANUAL_ACCEPTANCE_CHECKLIST_2026-10-19.md`：可执行前置（setup-links + build + `gui serve`）、**五个必测流程**（冷启动状态/待授权卡/历史与过程说明/设置修改/证据包导出）与「能否看懂·能否完成·哪里别扭」三问、记录格式、以及**边界声明**：未填写 = 未验证，清单存在**不等于**通过。新增活规则 `tests/architecture/ui-manual-acceptance-checklist.test.ts`（3 条）：清单必须存在、五流程齐全、前置命令真实可执行；**只校验结构，不校验「是否通过」**（那必须人填）。门禁：全量（低并发）exit 0；typecheck/lint 0。**未做**：实际人工体验（需要你/他人按清单点击并回填结论）。 |
+| R65 | **5 轮一次全量门禁**：变异 169/169 + 六项 verify | **2026-10-19 R65（第 65 轮全量门禁）**：变异 **169/169 全部被拦下**；`npm pack` **263 文件** sha256 `ea2e7241…`；**六项 verify 全 exit 0**：`verify-package` / `verify:contract-sdk`(17/17) / `verify:relocation-batch`(11/11) / `verify-sdk-consumer` /tarball 双进程搬迁回溯 / UI `verify:package`(7/7)。门禁基线：全量（低并发）**473 文件 / 3479 用例**、`--check-anchors` **169/169**。 |
+| R66 | **UI 人工体验清单 + 活规则**（未填=未验证） | **2026-10-19 R66：UI 人工体验清单**（用户决策项 4 的推荐默认：我先出清单，人去跑）。新增 `已迁出的 UI 人工清单`：可执行前置（setup-links + build + `gui serve`）、**五个必测流程**（冷启动状态/待授权卡/历史与过程说明/设置修改/证据包导出）与「能否看懂·能否完成·哪里别扭」三问、记录格式、以及**边界声明**：未填写 = 未验证，清单存在**不等于**通过。新增活规则 `已迁出的 UI 清单测试`（3 条）：清单必须存在、五流程齐全、前置命令真实可执行；**只校验结构，不校验「是否通过」**（那必须人填）。门禁：全量（低并发）exit 0；typecheck/lint 0。**未做**：实际人工体验（需要你/他人按清单点击并回填结论）。 |
 | R67 | `USAGE-01-01` **请求级账目契约**（来源/修订/不记零/估算不可结算/同键异参） | **2026-10-19 R67：USAGE-01-01 请求级账目契约**。新增 `usage-ledger-contract.ts`：①**来源必须显式**（`provider` / `local-estimate` / `missing`）；②**unknown 不记作零**（`missing` ⇒ 计数必须 null 且给原因，写数字即拒绝）；③**估算不得声明可结算**（`local-estimate` + `isBillable` ⇒ 拒绝）；④**总量/子量自洽**（子量之和 > 总量 ⇒ 拒绝）；⑤**同键同内容 ⇒ 幂等复用**、**同键异参 ⇒ 拒绝**（同一次调用不得被记两次或改数）；⑥缺请求标识/修订非法 ⇒ 拒绝。**7 条反例 + 2 条变异体**（估算声明可结算／缺失写 0，均被拦下）。门禁：全量（低并发）exit 0；`--check-anchors` **171/171**。**未做**：真实捕获接线与持久化去重/分页/预算（属 USAGE-01-02）、公开查询与导出（属 03）。 |
 | R68 | `OBS-01` **run 采集 helper**（默认 off/不自动 start；CLI 接线未完成） | **2026-10-19 R68：OBS 采集接 `run`（用户决策：只接 run、`--perf-collect`、默认 off）——本轮只完成可测的 helper，CLI 接线未完成**。交付 `run-perf-collection.ts` + `prepareRunPerfCollection`：①未开启 ⇒ **返回 null**（不建目录、不排定时器，零开销）；②开启 ⇒ 返回**未 start** 的采集器（由调用方在会话开始/结束处 start/stop）；③可用注入的定时器端口测试。**2 条反例 + 1 条变异体**（未开启仍创建采集器），被拦下；`--check-anchors` **172/172**。**未完成（如实）**：`executeRunCommand` 内部尚未调用该 helper，`astarray run --perf-collect` 这个 CLI 开关**我做了又撤掉**——原因是本轮剩余预算不足以安全改动那个大体量函数（盲改运行时会带来真实回归风险），宁可**不发布一个什么都不做的开关**。下一轮补：在 run 装配点创建/start、在 `finally` stop。门禁：全量（低并发）exit 0；typecheck/lint 0。 |
 
@@ -806,8 +806,8 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 
 | 项 | 需要什么 |
 | --- | --- |
-| TUI/GUI 入口（FOLDER-01-03 余项、SECRETARY-01-04、HISTORY-01-03 余项） | UI 代码落点：公开库内 or `astarray-ui` 私有库 |
-| **UI 落点（已决策）** | **2026-10-19 用户决策（分层，正式）**：**只有 CLI 落在公开库（core+CLI）**；**TUI 与 GUI 统一放在私有库 `astarray-ui`**，公开库不含任何 UI 源码。权威副本以 `astarray-ui` 为准；公开库目录内残留的 UI 是**待删除的本地副本**（仅为当前 CLI 的 `gui serve` 类型依赖而存在）。 |
+| TUI/GUI 入口（FOLDER-01-03 余项、SECRETARY-01-04、HISTORY-01-03 余项） | UI 代码落点：公开库内 or `UI` UI |
+| **UI 落点（已决策）** | **2026-10-19 用户决策（分层，正式）**：**只有 CLI 落在公开库（core+CLI）**；**TUI 与 GUI 统一放在UI `UI`**，公开库不含任何 UI 源码。权威副本以 `UI` 为准；公开库目录内残留的 UI 是**待删除的本地副本**（仅为当前 CLI 的 `gui serve` 类型依赖而存在）。 |
 | `RELOCATE-01-03` 路径解析/恢复门禁**接线** | 在哪一层强制（设计决定） |
 | `OBS` 的 `PERF`/`DIAG` **生产采集接线** | 是否接受采样开销/事件语义（改生产行为） |
 | `EVENT-01` | 验收口径 |
@@ -818,7 +818,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 1. **含反引号/多行的文本一律写进 `.mjs` 再执行**（PowerShell 双引号会把反引号当转义符；本轮踩了 3 次）。
 2. **追加表格行要"插入"而不是"替换上一行"**：本轮有 2 次把上一轮的行覆盖掉，均已修复；判定方法是插入后立刻 `Select-String '^\| R'` 数一遍。
 3. **默认并发抖动用 `check:low-parallel`** 取可复现证据；不因此放宽断言。
-4. **未跟踪私有 UI 的守卫不在公开门禁范围内**：出现"存活"先逐条单独复跑，再判定。
+4. **未跟踪UI 的守卫不在公开门禁范围内**：出现"存活"先逐条单独复跑，再判定。
 
 > **R38 推送状态（如实）**：R38 提交 `58964415` 连续 **5 次**推送失败（`Connection reset`，exit 128），
 > 按纪律跳过本次上传、下一轮合并重试；`origin/main` 仍为 `48be30c1`。
@@ -837,7 +837,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 
 > **R70（2026-10-19，第 70 轮全量门禁）**：变异 **172/172 全部被拦下**；`npm pack` **263 文件**
 > sha256 `0ed7a994…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
-> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）。
 
 
 > **R71 阻塞登记（RELOCATE 真实样例）**：用户 2026-10-19 澄清 —— ``project-location/`` 与
@@ -868,7 +868,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 
 > **R75（2026-10-19，第 75 轮全量门禁）**：变异 **176/176 全部被拦下**；`npm pack` **263 文件**
 > sha256 `b4c1c7d8…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
-> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）。
 
 > **R76（2026-10-19）`obs perf rotate`**：把 R53/R54 的保留策略变成**显式可预览**操作。
 > ①默认 **dry-run**：只报告计划（样本数/丢弃行/判定/原因），**不改盘、不产生备份**；
@@ -904,7 +904,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 
 > **R80（2026-10-19，第 80 轮全量门禁）**：变异 **181/181 全部被拦下**；`npm pack` **263 文件**
 > sha256 `440350e5…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
-> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）。
 
 > **R81（2026-10-19）`workflow run --task-revision` 校验**：`abc` ⇒ NaN ⇒ 任务定位错乱/"找不到任务"
 > （用户以为任务不存在）。现于 CLI 边界要求 **≥1 的整数**，非法即 `USAGE_ERROR` 并指出参数名；
@@ -938,7 +938,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 
 > **R85（2026-10-20，第 85 轮全量门禁）**：变异 **182/182 全部被拦下**；`npm pack` **263 文件**
 > sha256 `b5bae191…`；**六项 verify 全 exit 0**（`verify-package` / `verify:contract-sdk` 17/17 /
-> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）。
 
 > **R86（2026-10-20）`commands.ts` 的分页/预算也改成"严格纯数字 + 数值下限"双条件**：
 > 原来只拦 `NaN`/`≤0`，`"5abc"` 仍会被 `parseInt` 截成 5（静默按错值执行）。
@@ -982,7 +982,7 @@ npm pack（R16）      269 文件 sha256 95c207f6…；verify-package / verify-s
 > `npm pack` **263 文件** sha256 `3ac712c4…`（**第一次 pack 失败**：默认并发下 1 条用例抖动，
 > `--maxWorkers=2` 全 3528 用例通过；按 AGENTS.md 的已知并发抖动处理，重跑 pack 成功）；
 > **六项 verify 全 exit 0**（`verify-package` 263 / `verify:contract-sdk` 17/17 / `verify:relocation-batch` 11/11 /
-> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）。
 > **`test:coverage` exit 0**（分支 85.28%）。
 > **注意（流程事故）**：第一次 pack 失败后，我**先用旧 tarball 跑了六项 verify**（sha256 与 R85 相同 = `b5bae191`），
 > 那组结果**不能算数**；重新打包（`3ac712c4`）后的六项才是本轮证据。教训：**pack 失败时必须先确认产物新鲜度再跑 verify**。
@@ -1026,7 +1026,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **R95（2026-10-20，第 95 轮全量门禁）**：变异 **184/184 全部被拦下**（`--check-anchors` **184/184**）；
 > `npm pack` **263 文件** sha256 `23bb1104…`（本轮**先删除旧 tarball 再打包**，避免 R90 那种"在陈旧产物上跑 verify"）；
 > **六项 verify 全 exit 0**（`verify-package` 263 / `verify:contract-sdk` 17/17 / `verify:relocation-batch` 11/11 /
-> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）；
+> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）；
 > `test:coverage` **exit 0**（3531 用例、分支 **85.30%**）。
 
 > **R96（2026-10-20）卫生与隐私自检（AGENTS.md 要求的提交前例检，本轮首次系统性做）**：
@@ -1055,7 +1055,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **R99（2026-10-20，第 99 轮全量门禁）**：变异 **185/185 全部被拦下**；`npm pack` **263 文件**
 > sha256 `23bb1104…`（先删旧产物再打包）；**六项 verify 全 exit 0**（`verify-package` 263 / `verify:contract-sdk` 17/17 /
-> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）。
+> `verify:relocation-batch` 11/11 / `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）。
 > 覆盖率与本轮全量用例见 R98（**3534 用例、分支 85.30%**，同一 HEAD 系）。
 
 > **R100（2026-10-20）阶段收尾**：新增 `docs/reports/PHASE_SUMMARY_2026-10-20_R55_82.md` —— 只写可复核事实：
@@ -1078,10 +1078,10 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **不要**把这段读成"全部完成"——它是"停在一个可复核的点"。
 
 > **R101（2026-10-20，第 85 轮）私库全量门禁（本窗口首次跑 `npm run check`）**：
-> `astarray-ui` → **exit 0 — 32 文件 / 196 用例**，typecheck + lint + build 同链通过。
+> `UI` → **exit 0 — 32 文件 / 196 用例**，typecheck + lint + build 同链通过。
 > 此前本窗口对私库只跑过 `verify:package`（7/7），**未跑过完整 check** —— 这一项现在补上。
-> **过程事故**：第一次调用路径写错（`cd ../astarray-ui` 在 workspace 根下指向 `Documents\astarray-ui`，
-> 实际私库在 `Documents\astarray\astarray-ui`），`npm` 报 ENOENT；改正路径后通过。
+> **过程事故**：第一次调用路径写错（`cd ../UI` 在 workspace 根下指向 `Documents\UI`，
+> 实际私库在 `Documents\astarray\UI`），`npm` 报 ENOENT；改正路径后通过。
 > 教训：本会话 workspace 根是 `Documents\astarray`，公开库在 `astarray/` 子目录 —— **相对路径深度容易错**（同类错误此前也发生过）。
 
 > **R102（2026-10-20）备份清理判定（补一个真实运维缺口）**：R54 的保留执行每次 `--apply` 都写一份
@@ -1127,7 +1127,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > ⑤冲突/未决/未知保留计数⑥``isOriginalHistoryDeleted:false``、``isRevokedContentRetained:true``⑦可选仅看 active 方案结果。
 > **7 条反例 + 2 条变异体**（无来源仍展示／跨个体合并）被拦下；``--check-anchors`` **193/193**；
 > ``test:coverage`` **exit 0**（**3558 用例**、分支 **85.35%**）。
-> **未做**：历史界面本体（私有库 GUI/TUI）与 tarball 包入口展示。
+> **未做**：历史界面本体（UI GUI/TUI）与 tarball 包入口展示。
 
 > **R106（2026-10-20）``FOLD-01-03`` 补「工具内部逐步授权」判定层**：折叠成「一个工具」后，
 > 用户点一次「允许复用」**不等于**允许其内部所有动作；若内部直接继承外层批准，就是用一次宽授权换掉逐步确认。
@@ -1162,7 +1162,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **R100（2026-10-20，第 93 轮：第 100 个检查点的全量门禁）**：变异 **199/199 全部被拦下**（锚点 199/199）；
 > ``npm pack`` **267 文件** sha256 ``9f32db7f…``（先删旧产物再打包）；**六项 verify 全 exit 0**：
 > ``verify-package``（267 文件）/ ``verify:contract-sdk`` **24/24** / ``verify:relocation-batch`` **11/11** /
-> ``verify-sdk-consumer`` / tarball 双进程搬迁回溯 / 私有库 ``verify:package`` **7/7**。
+> ``verify-sdk-consumer`` / tarball 双进程搬迁回溯 / UI ``verify:package`` **7/7**。
 > ``test:coverage`` **exit 0** —— **3575 用例**、stmts **92.10** / branches **85.36** / funcs **93.38** / lines **92.21**。
 > **说明**：包内文件从 263 → **267**（本批新增 4 个判定模块进入产物）；判定条数 17 → **24**。
 
@@ -1202,7 +1202,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **R114（2026-10-20，第 98 轮）全量门禁**：变异 **203/203 全部被拦下**；`npm pack` **267 文件** sha256 `2ee3b45a…`；
 > **六项 verify 全 exit 0**（`verify-package` 267 / `verify:contract-sdk` **26/26** / `verify:relocation-batch` 11/11 /
-> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / 私有库 `verify:package` 7/7）；
+> `verify-sdk-consumer` / tarball 双进程搬迁回溯 / UI `verify:package` 7/7）；
 > `vitest run --coverage --maxWorkers=2` **exit 0** —— **3591 用例**、stmts **92.10** / branches **85.40** / funcs **93.37** / lines **92.22**。
 
 > **第 100 轮（2026-10-20）轮次用尽，收尾登记（不主张目标达成）**：
@@ -1218,15 +1218,15 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > 因此本行同时记录**每项的解除条件**（详见 `docs/reports/PHASE_SUMMARY_ROUNDS_55_99_2026-10-20.md` §6）。
 
 > **2026-10-20 GUI 重设计 + 人工验收记录（跨库）**：用户指出原 GUI 的五个必测流程**都无法执行**（没有项目信息、
-> 没有真实模型、没有执行历史、授权不发生、证据包为空），并给出聊天软件式规格。已在**私有库**完成重设计：
+> 没有真实模型、没有执行历史、授权不发生、证据包为空），并给出聊天软件式规格。已在**UI**完成重设计：
 > ①/projects 由 mission 历史聚合项目（未标注项目单列、损坏样本保留、**空状态必带原因**）
 > ②/projects/chat 读真实运行历史生成**群聊气泡**（带稳定证据锚点）③/agents + POST /commands/send-message
 > （投递给指定 agent + 思考强度；未接模型时 **202 queued-offline**，不伪造回复）④工作区 /workspace/tree|file
 > 与 /commands/workspace-write（有界目录、纯文本白名单、拒绝 ../绝对路径、256 KiB 上限、原子写）
 > ⑤页面为**三列 grid**：默认 [项目列表][会话]，打开工作区 [项目列表][工作区][会话]（用户第一轮指出
 > "工作区在右侧、左栏压住会话"，已改为真 grid 并删掉 position: fixed 覆盖层）。
-> 私有库门禁：**232 用例全绿**、变异 **11/11 被拦下**、uild 成功、erify:package **7/7**。
-> **人工验收记录已代填**：`astarray-ui/docs/GUI_MANUAL_ACCEPTANCE_2026-10-20.md`（用户确认项 9 条 + 离线未验证项
+> UI门禁：**232 用例全绿**、变异 **11/11 被拦下**、uild 成功、erify:package **7/7**。
+> **人工验收记录已代填**：`UI/docs/已迁出的 UI 人工记录`（用户确认项 9 条 + 离线未验证项
 > 分档标注；浏览器/窗口宽度待补）。本行不主张"五个流程全部通过"：流程 2/5 仍**未验证**（需真实模型运行）。
 
 > **2026-10-20 ``DOCVIEW-01-02``：首批格式适配器 + 定位回执（本地可证部分 done）**。
@@ -1238,9 +1238,9 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **2026-10-20 批量推进（用户指定顺序）**：
 > ① ``DOCVIEW-01-02`` 首批适配器（公开库，提交 ``2e565771``）：text/markdown/html，块级定位回执 + 降级如实标注 + 损坏即拒绝；
-> ② ``HISTORY-01-04`` GUI 历史面板（私有库 ``39617ec``）：服务端显示开关（隐藏≠删除）、子串检索、锚点定位、保持滚动；
-> ③ ``FOLDER-01-03`` GUI 授权卡（私有库 ``8bc1e6b``）：出卡不落库、人工确认才批准、撤销保留历史、复检 fail-closed。
-> 三件共新增 **32 条反例 + 9 条变异体**；私有库 ``verify:mutation-kills`` **17/17**、``check`` **248 用例**、``verify:package`` **7/7**。
+> ② ``HISTORY-01-04`` GUI 历史面板（UI ``39617ec``）：服务端显示开关（隐藏≠删除）、子串检索、锚点定位、保持滚动；
+> ③ ``FOLDER-01-03`` GUI 授权卡（UI ``8bc1e6b``）：出卡不落库、人工确认才批准、撤销保留历史、复检 fail-closed。
+> 三件共新增 **32 条反例 + 9 条变异体**；UI ``verify:mutation-kills`` **17/17**、``check`` **248 用例**、``verify:package`` **7/7**。
 > 仍阻塞：真实模型（流程 2/4/5）、macOS 平台证据、HISTORY-01-04 的真实历史人工体验与资源测量。
 
 > **2026-10-20 门禁修复（基线红，非本批功能引起）**：`tests/core/unit/obs01-session-perf-collector.test.ts` 的采样端口把
@@ -1350,7 +1350,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **剩余如实**：TUI 批准/撤销按钮（CLI/GUI 已覆盖能力）、LESSON 真实存档装配与场景 A/B/C、多项目真实业务链路、macOS 平台证据（外部）。
 
 > **2026-10-20 最终收口（A+B，双库）**：公开库 3747 用例 / 分支 85.40 / 变异 245-245 / pack 267 文件 sha EDE... /
-> 六个验收 + 三个新增包级验收（docview、perf、project）全通过；私有库 318 用例 / 变异 23-23 / typecheck 现覆盖 TUI / 包验收 7-7。
+> 六个验收 + 三个新增包级验收（docview、perf、project）全通过；UI 318 用例 / 变异 23-23 / typecheck 现覆盖 TUI / 包验收 7-7。
 > **剩余均为外部或需产品决定**：macOS 平台证据；LESSON 真实存档装配与场景 A/B/C、多项目真实链路；TUI 入口一行的端口注入（分层遗留）。
 
 > **2026-10-21 ``DIAG-01-03`` 公开入口包级验收（公开库）**：``verify:diagnostic-package``。
@@ -1454,7 +1454,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **2026-10-23 ``ONBOARD-01-02`` 公开包入口（公开库）**：``astarray onboarding status``（只读、可 ``--json``）。
 > 包级验收：首次提示、忙碌/不再提示/冷却抑制、迁移不重复弹、两处入口不抢焦点/不隐式授权、损坏状态 fail-closed。
-> **6 条命令反例 + 2 条变异体**。**未做**：真实界面展示（私有库）。
+> **6 条命令反例 + 2 条变异体**。**未做**：真实界面展示（UI）。
 
 > **2026-10-23 ``COMM-01-02`` 并发绑定/恢复（公开库）**：``comm02-concurrent-binding.test.ts``（4 条）。
 > 并发登记重启读回、幂等登记、创建者不被覆盖、回收后不可投递但历史保留。
@@ -1462,19 +1462,19 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **2026-10-23 已知抖动（第 2 例）**：``history01-run-history-e2e.test.ts`` 的"工具调用后 run-history 出现"在高并发全量下偶发失败（单文件 1/1 通过；``check:low-parallel`` 3868 全绿）；属时间敏感断言。
 
-> **2026-10-23 私有库 GUI 接线（08e1074）**：`/status/secretary`、`/status/onboarding`、`/agents/instruction-window`；
+> **2026-10-23 UI GUI 接线（08e1074）**：`/status/secretary`、`/status/onboarding`、`/agents/instruction-window`；
 > 右栏「运行状态」面板 + Agent 右键菜单（contextmenu/Shift+F10/Escape）。
-> 反例 7 + 变异体 2；私有库 325 用例 / 变异 25-25 / 包验收 7-7。**未做**：GUI 用量与诊断面板、人工体验。
+> 反例 7 + 变异体 2；UI 325 用例 / 变异 25-25 / 包验收 7-7。**未做**：GUI 用量与诊断面板、人工体验。
 
-> **2026-10-23 私有库 GUI 用量/诊断面板（ce81894）**：`/observability/usage`、`/observability/diagnostics`。
+> **2026-10-23 UI GUI 用量/诊断面板（ce81894）**：`/observability/usage`、`/observability/diagnostics`。
 > 空账目提示「空≠无消耗」、金额恒 null、分页有界；诊断脱敏且空库不编造。反例 6 + 变异体 2。
-> 私有库门禁：331 用例 / 变异 27-27 / 包验收 7-7。
+> UI门禁：331 用例 / 变异 27-27 / 包验收 7-7。
 
-> **2026-10-23 Agent 头像右键（私有库 478a07a，用户订正）**：右键消息头像开 Agent 菜单（含指令窗口 + 修改设置），
-> 左键仍是修改设置、用户气泡不弹；未接入时保留设置入口。反例 6 + 变异体 2；私有库 337 用例 / 变异 29-29。
+> **2026-10-23 Agent 头像右键（UI 478a07a，用户订正）**：右键消息头像开 Agent 菜单（含指令窗口 + 修改设置），
+> 左键仍是修改设置、用户气泡不弹；未接入时保留设置入口。反例 6 + 变异体 2；UI 337 用例 / 变异 29-29。
 
-> **2026-10-23 GUI 布局订正（私有库 7180dab）**：右键菜单改 viewport-clamped 浮层；新增右侧栏 `#chatStatusPane`（grid-column -1）承载 Agent/运行状态/用量/诊断。
-> 布局护栏更新（禁止布局面板 fixed、弹出菜单必须 fixed、状态栏在 main 之后）。私有库 338 用例 / 变异 31-31 / 包验收 7-7。
+> **2026-10-23 GUI 布局订正（UI 7180dab）**：右键菜单改 viewport-clamped 浮层；新增右侧栏 `#chatStatusPane`（grid-column -1）承载 Agent/运行状态/用量/诊断。
+> 布局护栏更新（禁止布局面板 fixed、弹出菜单必须 fixed、状态栏在 main 之后）。UI 338 用例 / 变异 31-31 / 包验收 7-7。
 
 > **2026-10-23 推送失败记录（公开库）**：布局订正台账提交连续 8 次被 GitHub 连接 reset 挡下；本地已提交、门禁无关（仅文档）。下次开工合并补推。
 
@@ -1499,15 +1499,15 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **2026-10-23 三件准备件**：①`SUM-02-04` 标注评估口径 + 模板 + `verify:summary-annotation`（8 反例 + 2 变异体）；
 > ②`EVENT-01` 口径校验 + 模板 + 方案文档（6 反例 + 2 变异体，缺口径时退出码 2、不开工）；
-> ③`GUI_MANUAL_ACCEPTANCE_2026-10-23.md` 人工体验勾选表（A–F 六组，含失败判定）。
+> ③`已迁出的 UI 人工记录` 人工体验勾选表（A–F 六组，含失败判定）。
 
 > **2026-10-23 已知抖动（第 3 例）**：``e2e01-vertical-rework.test.ts`` 在低并发全量下偶发失败（单文件 1/1 通过、重跑全量 3888 全绿）；属时间敏感断言。
 
-> **2026-10-23 UI 委托通道建立**：UI 改动改为「我写提示词 → MiniMax-M3 子 agent 实现 → 我评审+门禁+提交」。首次委托：Agent 菜单/弹窗可访问性（私有库 0982ae5），371 用例 / 变异 34-34 / 包验收 7-7。
+> **2026-10-23 UI 委托通道建立**：UI 改动改为「我写提示词 → MiniMax-M3 子 agent 实现 → 我评审+门禁+提交」。首次委托：Agent 菜单/弹窗可访问性（UI 0982ae5），371 用例 / 变异 34-34 / 包验收 7-7。
 
-> **2026-10-23 GUI 布局重做（私有库 2f31057，MiniMax-M3 实现）**：标题栏全宽；项目区可拖拽/可收起（按钮在标题栏）；会话占满右侧；工作区改浮层不挤会话；状态/用量/诊断改弹窗；删除旧隐藏左栏按钮。396 用例 / 变异 34-34 / 包验收 7-7。静态断言为主，需浏览器实测。
+> **2026-10-23 GUI 布局重做（UI 2f31057，MiniMax-M3 实现）**：标题栏全宽；项目区可拖拽/可收起（按钮在标题栏）；会话占满右侧；工作区改浮层不挤会话；状态/用量/诊断改弹窗；删除旧隐藏左栏按钮。396 用例 / 变异 34-34 / 包验收 7-7。静态断言为主，需浏览器实测。
 
-> **2026-10-23 GUI 修正第二轮（私有库 79bbbcb）**：工作区改项目与会话之间的 5:3 列；修复 dialog 嵌套导致的 Agent 状态弹窗打不开；运行状态/用量/诊断并入 Agent 状态弹窗，删除标题栏独立按钮。425 用例 / 变异 34-34 / 包验收 7-7。
+> **2026-10-23 GUI 修正第二轮（UI 79bbbcb）**：工作区改项目与会话之间的 5:3 列；修复 dialog 嵌套导致的 Agent 状态弹窗打不开；运行状态/用量/诊断并入 Agent 状态弹窗，删除标题栏独立按钮。425 用例 / 变异 34-34 / 包验收 7-7。
 
 > **TOOLKIT-01-06 真实 token（2026-10-24）**：云知声 u2-flash 实测 2 轮 4 请求，input 7207 / output 292 / cached 1987，延迟 mean 4317ms，脚本 6/6 通过；工具调用数与费用仍标未测；整卡仍不判通过。
 
@@ -1527,7 +1527,7 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 > **COMM-01-03 只读状态（2026-10-24）**：`collaboration status` CLI + `collaboration-status.ts`（归属拓扑 + 投递状态，failed→dropped，空≠不存在）。3941 用例 / 301 锚点 / 2 新变异被拦下。TUI/GUI 入口与 tarball 闭环未做。
 
-> **COMM-01-03 收尾（2026-10-24）**：TUI 只读协作面板（聚焦自动刷新 / r 刷新 / 失败只读错误视图，无写路径）+ tarball 包级闭环（`collaboration status` / `inbox list` / `inbox deliver` 退出码与只读性）。私有库 495 用例 / 41 变异 / 7-7。
+> **COMM-01-03 收尾（2026-10-24）**：TUI 只读协作面板（聚焦自动刷新 / r 刷新 / 失败只读错误视图，无写路径）+ tarball 包级闭环（`collaboration status` / `inbox list` / `inbox deliver` 退出码与只读性）。UI 495 用例 / 41 变异 / 7-7。
 
 > **EVENT-01 安装包状态入口（2026-10-24）**：`event-incident-journal.ts` + `event status` CLI + `verify:event01-package`（空≠无事件、只读、损坏退出码 2）。5 反例 + 2 变异。本地可证部分完成。
 
@@ -1536,3 +1536,8 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 > **EVENT-01 门禁接缝（2026-10-24）**：控制通道接到工具循环 `workWindowGate`，critical 事故时模型调用 0 次、低严重度不阻断（3 条集成反例 + 1 变异）。生产事件源仍按产品策略默认不注入。
 
 > **2026-10-24 验收口径调整（用户决定）**：SUM-02-04 与 EXP-01 改为**内测实况**判定，当前不做人工标注/样本采集；GUI 验收需先真实接入模型 API（离线 demo 不适用）。
+
+
+
+
+

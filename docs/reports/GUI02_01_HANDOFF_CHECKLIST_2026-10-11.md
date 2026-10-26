@@ -37,7 +37,7 @@
 
 ### 1.3 文档
 
-- `docs/tasks/GUI02_AUTHORIZATION_AND_HISTORY_VIEW_TASK_CARD.md` —— 检查点与用户边界（含字段白名单、S1–S6、N1–N4）
+- `docs/tasks/已迁出的 UI 任务卡` —— 检查点与用户边界（含字段白名单、S1–S6、N1–N4）
 - `docs/reports/GUI02_01_EXISTING_PERMISSION_ASK_BEHAVIOR_BASELINE_2026-10-11.md` —— B1–B8 行为基线（含 §6.5 退出码的代码级证据）
 - `docs/reports/GUI02_01_REMEDIATION_APPROVAL_FINGERPRINT_GAP_2026-10-11.md` —— 缺陷条目（**已修，方案 R1 / 用户选 A**）
 - `docs/reports/COVERAGE_FLAKE_COUPLING_CORRECTION_2026-10-11.md` —— 覆盖率与抖动耦合的更正
@@ -204,3 +204,4 @@ if (permissionAsk !== null) {
 | 实现 | `run-command.ts` **一处 import + 一处调用**（§5.2 草案）⇒ 小 |
 | 验证 | 6 套授权回归 + `check` + `test:coverage`（branch 门槛 85，余量约 16 分支） |
 | 提交 | 单独提交；暂存前确认**不含 `README.md`** |
+
