@@ -3114,12 +3114,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.runtime.experimentSettingsStore.update(input);
   }
-  async queryWorkWindowConfig() {
+  async queryWorkWindowConfig(projectIdentifier?: string) {
     this.assertOpen();
-    return this.runtime.projectWorkWindowStore.read();
+    const document = await this.runtime.projectWorkWindowStore.read();
+    return {
+      revision: document.revision,
+      rules: document.projects[projectIdentifier ?? "default"] ?? [],
+    };
   }
 
   async updateWorkWindowConfig(input: {
+    projectIdentifier?: string;
     rules: import("./orchestration/work-window-contract.js").WorkWindowRule[];
     expectedRevision: number;
   }) {
@@ -6643,6 +6648,7 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
 
 
 
