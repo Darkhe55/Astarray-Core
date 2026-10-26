@@ -43,7 +43,7 @@
 
 - `npm run typecheck`：通过。
 - Vitest：654 passed。
-- 开发 GUI 最新 CDP 冒烟：导航、4 标签、19 分类、更多隐藏、新消息按钮、详情遮罩、通知 4 开关存在；F07 队列容量、F09 创建输入、F08 模型候选下拉可见；页面切换与 `/projects`、`/settings`、`/settings/scoped`、`/settings/model-bindings`、`/settings/model-candidates`、`/settings/session-elevations`、`/support/package/preview` 均 200；无 Runtime 异常。\n- 修复候选重复：按 provider+model 去重（同一 provider/model 的多账户候选仍需账户标识才能区分）。\n- 安装版 CDP 冒烟（较早轮次）：导航、19 分类、待处理、cookie、/projects 200。
+- 开发 GUI 最新 CDP 冒烟：导航、4 标签、19 分类、更多隐藏、新消息按钮、详情遮罩、通知 4 开关存在；F07 队列容量、F09 创建输入、F08 模型候选下拉可见；页面切换与 `/projects`、`/settings`、`/settings/scoped`、`/settings/model-bindings`、`/settings/model-candidates`、`/settings/session-elevations`、`/support/package/preview` 均 200；无 Runtime 异常。\n- 修复候选重复：按 provider+model 去重（同一 provider/model 的多账户候选仍需账户标识才能区分）。\n- 真实 GUI 支持包导出：`/support/package/preview` 200、`/commands/export-support-package` 200，生成 zip，未上传。\n- 真实 GUI 数据备份导出：`/settings/data-backup` 200、`/commands/export-data` 200，生成 zip；恢复未执行。\n- 安装版 CDP 冒烟（较早轮次）：导航、19 分类、待处理、cookie、/projects 200。
 - 本轮新增通知/F01 与模块拆分后未重新构建安装版。
 
 ## 5. 未验证
@@ -57,6 +57,7 @@
 ## 6. 结论
 
 不能标记 GUI-03 完成。R01–R04 与 F01 已编码；其余能力受核心公共门面缺失阻塞。后续应先补作用域配置、会话控制、工作时段、工具生命周期与产物查询的受控公共 API，再继续 GUI 接线。
+
 
 
 
