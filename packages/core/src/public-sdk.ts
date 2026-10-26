@@ -3047,6 +3047,50 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.modelCandidates.map((candidate) => ({ ...candidate }));
   }
+  /** GUI-03-05：安装/登记工具包版本（源内容由调用方提供；不联网）。 */
+  async registerToolPackageVersion(registration: {
+    toolPackageId: string;
+    version: number;
+    contentHash: string;
+    sourceProjectIdentifier: string;
+    declaredSideEffects: string[];
+    declaredDependencies: string[];
+    permissionRequirements: string[];
+  }): Promise<void> {
+    this.assertOpen();
+    await this.runtime.toolPackageLifecycleService.install(registration);
+  }
+
+  /** GUI-03-05：项目锁定/启用/升级/回退/停用。 */
+  async updateToolPackageLifecycle(input:
+    | { action: "lock"; projectIdentifier: string; toolPackageId: string; version: number; contentHash: string }
+    | { action: "enable"; projectIdentifier: string; toolPackageId: string; version: number }
+    | { action: "disable"; projectIdentifier: string; toolPackageId: string }
+    | {
+        action: "upgrade";
+        projectIdentifier: string;
+        toolPackageId: string;
+        targetVersion: number;
+        targetContentHash: string;
+        isReauthorized: boolean;
+      }
+    | { action: "rollback"; projectIdentifier: string; toolPackageId: string; targetVersion: number }
+  ) {
+    this.assertOpen();
+    const service = this.runtime.toolPackageLifecycleService;
+    switch (input.action) {
+      case "lock":
+        return service.lock(input);
+      case "enable":
+        return service.enable(input);
+      case "disable":
+        return service.disable(input);
+      case "upgrade":
+        return service.upgrade(input);
+      case "rollback":
+        return service.rollback(input);
+    }
+  }
   /** GUI-03-05：工具包生命周期只读快照（版本/锁/待切换）。 */
   async queryToolPackageLifecycle() {
     this.assertOpen();
@@ -6553,6 +6597,7 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
 
 
 
