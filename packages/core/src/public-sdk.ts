@@ -12,6 +12,7 @@ import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-stor
 import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
+import type { ArtifactRecord } from "./orchestration/artifact-record-store.js";
 import { AgentModelBindingStore } from "./orchestration/agent-model-binding-store.js";
 import { ModelRuntimePool } from "./runtime/model-runtime-pool.js";
 import type {
@@ -3045,6 +3046,50 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   > {
     this.assertOpen();
     return this.modelCandidates.map((candidate) => ({ ...candidate }));
+  }
+  /** GUI-03-05：工具包生命周期只读快照（版本/锁/待切换）。 */
+  async queryToolPackageLifecycle() {
+    this.assertOpen();
+    return this.runtime.toolPackageLifecycleService.list();
+  }
+  /** GUI-03-06：读取成果记录；可按项目/任务过滤。 */
+  async queryArtifacts(input?: {
+    projectIdentifier?: string;
+    missionIdentifier?: string;
+  }): Promise<ArtifactRecord[]> {
+    this.assertOpen();
+    const document = await this.runtime.artifactRecordStore.read();
+    return document.records.filter(
+      (record) =>
+        (input?.projectIdentifier === undefined ||
+          record.projectIdentifier === input.projectIdentifier) &&
+        (input?.missionIdentifier === undefined ||
+          record.missionIdentifier === input.missionIdentifier),
+    );
+  }
+
+  /** GUI-03-06：显式登记成果（工具成功路径应调用此入口）。 */
+  async registerArtifact(input: {
+    projectIdentifier: string;
+    missionIdentifier: string;
+    taskIdentifier: string;
+    sourceAgentInstanceId?: string | null;
+    artifactType: string;
+    displayName: string;
+    location: string;
+    contentDigest?: string | null;
+  }): Promise<ArtifactRecord> {
+    this.assertOpen();
+    return this.runtime.artifactRecordStore.register(input);
+  }
+
+  /** GUI-03-06：更新成果核验状态。 */
+  async verifyArtifact(input: {
+    artifactIdentifier: string;
+    status: "unverified" | "verified" | "failed";
+  }): Promise<ArtifactRecord> {
+    this.assertOpen();
+    return this.runtime.artifactRecordStore.verify(input);
   }
   /** GUI-03 / 方案 A：读取模型绑定（只读）。 */
   async queryAgentModelBindings(): Promise<ModelBindingDocument> {
@@ -6508,6 +6553,8 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
 
 
 
