@@ -957,6 +957,8 @@ export async function createApplicationRuntime(
     workspaceRootPath?: string;
     /** 本任务所属项目（用于读取该项目的文件夹授权并扩展边界）。 */
     projectIdentifier?: string;
+    missionIdentifier?: string;
+    taskIdentifier?: string;
   }): PolicyWrapper => {
     const folderGrantStore = new FolderGrantStore({ baseDirectory: stateDirectory });
     const taskWorkspaceBoundary =
@@ -1016,6 +1018,20 @@ export async function createApplicationRuntime(
       ponderGitRepositoryPath: taskWorkspaceBoundary.getWorkspaceRoot(),
       evidenceBundleBuilder,
       factVerificationClaimIdentifier: input.factVerificationClaimIdentifier,
+      onProducedArtifacts: async (artifacts) => {
+        if (input.missionIdentifier === undefined || input.taskIdentifier === undefined) return;
+        for (const artifact of artifacts) {
+          await artifactRecordStore.register({
+            projectIdentifier: input.projectIdentifier ?? "workspace",
+            missionIdentifier: input.missionIdentifier,
+            taskIdentifier: input.taskIdentifier,
+            sourceAgentInstanceId: input.agentInstanceId,
+            artifactType: artifact.artifactType,
+            displayName: artifact.displayName,
+            location: artifact.path,
+          }).catch(() => undefined);
+        }
+      },
       installationGateGuard,
       taskExecutionId: input.taskExecutionId,
       /**
@@ -1400,6 +1416,7 @@ export async function createApplicationRuntime(
       agentInstanceId?: string,
       workspaceRootPath?: string,
       projectIdentifier?: string,
+      missionIdentifier?: string,
     ) =>
       new ScopeGatedToolPort(
         createPolicyWrapperForAgent({
@@ -1408,6 +1425,8 @@ export async function createApplicationRuntime(
           factVerificationClaimIdentifier: `task-exec:${agentInstanceId ?? task.id}`,
           taskExecutionId: `task-exec:${agentInstanceId ?? task.id}`,
           useConfigurablePermissionProfileEngine: true,
+          missionIdentifier: missionIdentifier ?? "unknown-mission",
+          taskIdentifier: task.id,
           ...(workspaceRootPath === undefined ? {} : { workspaceRootPath }),
           ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
         }),
@@ -1580,6 +1599,8 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
+
 
 
 
