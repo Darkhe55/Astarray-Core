@@ -1,6 +1,6 @@
 # GUI-03：GUI 现有产品能力完整接入与遗漏编码补齐
 
-日期：2026-10-26。状态：in-progress（R01–R04/F01 已编码，其余受核心门面缺失阻塞）。本卡包含静态审计基线与可直接执行的编码步骤。
+日期：2026-10-26。状态：in-progress（F01/F03/F04/F06/F07/F08/F09/F10/F11/F12 已接；F02 受实验运行时消费者阻塞；F05 在途收尾未接）。本卡包含静态审计基线与可直接执行的编码步骤。
 
 ## 1. 审计范围与可信边界
 
@@ -131,13 +131,14 @@ UX-02 的 R01–R04 未完成前不能继续写“全部编码完成”；GUI-02
 | 1 | GUI-03-01：R01–R04、能力台账 | implemented-unverified（R01 五模块、R02 写入 async、R03 稳定 ID、R04 宽度同步、矩阵已建） |
 | 2 | GUI-03-02：F04/F06/F10 | implemented-unverified（存储/SDK/GUI/权限 PolicyWrapper/提示词装配已接） |
 | 3 | GUI-03-03：F07/F08/F09/F12 | implemented-unverified（F07 FIFO/置顶、F08 绑定切换、F09 创建/撤销、F12 规则编辑已接） |
-| 4 | GUI-03-04：F01/F02/F05 | in-progress（F01 通知偏好已编码；F02/F05 缺后端，未开始） |
-| 5 | GUI-03-05：F03 | pending |
-| 6 | GUI-03-06：F11 | pending |
+| 4 | GUI-03-04：F01/F02/F05 | in-progress（F01 完成；F02 目录/默认关闭只读；F05 存储+dispatch/model/tool 门禁；在途收尾/项目作用域未接） |
+| 5 | GUI-03-05：F03 | implemented-unverified（zip 安装/启停/升级/回退/差异；真实包冒烟未做） |
+| 6 | GUI-03-06：F11 | implemented-unverified（工具/任务登记+成果页；真实工具任务端到端未做） |
 | 7 | GUI-03-07：基础入口和双生产装配 | in-progress（会话/任务/成果/历史/待处理/设置、/projects、/settings 系列、支持包预览已冒烟；发送/文件夹/备份/桌面装配未逐项） |
 | 8 | GUI-03-08：状态与交接 | in-progress（交接初版已建；待各检查点收口） |
 
 每轮一个检查点；超过 3 小时拆成该检查点下的明确剩余步骤继续，不同时修改同一模板。缺少安全语义或并行冲突只阻塞相关项。全部编码完成后标 `implemented-unverified`，仍不得宣称已验收或发布可用。
+
 
 
 
