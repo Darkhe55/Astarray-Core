@@ -23,6 +23,7 @@ describe("工作时段配置", () => {
   it("① 保存规则并 revision 递增", async () => {
     const store = await createStore();
     const updated = await store.update({
+      projectIdentifier: "project-a",
       expectedRevision: 1,
       rules: [
         {
@@ -40,7 +41,8 @@ describe("工作时段配置", () => {
       ],
     });
     expect(updated.revision).toBe(2);
-    expect(updated.rules).toHaveLength(1);
+    expect(updated.projects["project-a"]).toHaveLength(1);
+    expect(await store.readRules("project-b")).toEqual([]);
   });
 
   it("② 过期 revision 拒绝", async () => {
@@ -50,3 +52,5 @@ describe("工作时段配置", () => {
     );
   });
 });
+
+
