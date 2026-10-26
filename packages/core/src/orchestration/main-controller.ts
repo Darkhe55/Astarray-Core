@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
 import type { RunHistoryStore } from "./run-history-store.js";
+import type { MissionRuntimeLease, MissionRuntimeRegistry } from "./mission-runtime-registry.js";
 import { evaluateMergeReadinessWithProvider } from "./git-merge-readiness.js";
 import type { GitMergeReadinessEvidence } from "./git-merge-readiness.js";
 
@@ -133,6 +134,15 @@ export interface MainControllerOptions {
   contextNodeLifecycle?: ContextNodeLifecyclePort | null;
   /** 次级/主 Agent 的 LLM 运行时工厂。 */
   mainRuntimeFactory: (agentInstanceId: string) => AgentRuntime;
+  /** GUI-03 / 方案 A2：mission 预登记 runtime；缺省回退原工厂。 */
+  missionRuntimeRegistry?: MissionRuntimeRegistry;
+  /** A2：mission 调度前解析模型 binding 并获取 lease；缺省不切换模型。 */
+  missionRuntimePreparer?: (input: {
+    missionId: string;
+    projectIdentifier: string | null;
+    sessionIdentifier: string | null;
+    agentInstanceId: string | null;
+  }) => Promise<MissionRuntimeLease | null>;
   workerRuntimeFactory: (
     agentInstanceId: string,
     task: TaskDependencyNode,
@@ -348,6 +358,7 @@ export class MainController {
   private readonly missionWorkspaceRootPaths = new Map<string, string>();
   /** mission → 所属项目（文件夹授权按项目查询）。 */
   private readonly missionProjectIdentifiers = new Map<string, string>();
+  private readonly missionSessionIdentifiers = new Map<string, string>();
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -390,6 +401,7 @@ export class MainController {
       readonly workspaceRootPath?: string;
       /** 可选：指定执行该任务的 Agent 实例。 */
       readonly targetAgentInstanceIdentifier?: string;
+      readonly sessionIdentifier?: string;
     },
   ): Promise<string> {
     const mode = this.options.modeMachine.getCurrentMode();
@@ -426,6 +438,9 @@ export class MainController {
     if (projectIdentifier !== undefined) {
       this.missionProjectIdentifiers.set(missionId, projectIdentifier);
     }
+    if (options?.sessionIdentifier !== undefined && options.sessionIdentifier.trim() !== "") {
+      this.missionSessionIdentifiers.set(missionId, options.sessionIdentifier);
+    }
     const requestedTargetAgentInstanceIdentifier =
       options?.targetAgentInstanceIdentifier?.trim();
     if (
@@ -436,6 +451,15 @@ export class MainController {
         missionId,
         requestedTargetAgentInstanceIdentifier,
       );
+    }
+    const preparedLease = await this.options.missionRuntimePreparer?.({
+      missionId,
+      projectIdentifier: projectIdentifier ?? null,
+      sessionIdentifier: options?.sessionIdentifier ?? null,
+      agentInstanceId: requestedTargetAgentInstanceIdentifier ?? null,
+    });
+    if (preparedLease !== null && preparedLease !== undefined) {
+      this.options.missionRuntimeRegistry?.register(preparedLease);
     }
     if (mode === "assist") {
       this.launchAssistMission(missionId, taskNodes);
@@ -470,6 +494,15 @@ export class MainController {
       );
     }
     await this.options.missionManager.updateMissionStatus(missionId, "running");
+    const preparedLease = await this.options.missionRuntimePreparer?.({
+      missionId,
+      projectIdentifier: this.missionProjectIdentifiers.get(missionId) ?? null,
+      sessionIdentifier: this.missionSessionIdentifiers.get(missionId) ?? null,
+      agentInstanceId: this.missionTargetAgentIdentifiers.get(missionId) ?? null,
+    });
+    if (preparedLease !== null && preparedLease !== undefined) {
+      this.options.missionRuntimeRegistry?.register(preparedLease);
+    }
     if (mode === "devolve") {
       this.launchDevolveMission(missionId, incompleteTasks);
     } else {
@@ -1035,6 +1068,7 @@ export class MainController {
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
       onMissionGateBlocked: (failureReason) => {
+        this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
         void this.options.missionManager
           .updateMissionStatus(missionId, "blocked")
@@ -1064,7 +1098,12 @@ export class MainController {
         ? { isCheckpointResumeEnabled: true }
         : {}),
       workerFactories: {
-        runtimeFactory: this.options.workerRuntimeFactory,
+        runtimeFactory: (agentInstanceId, task) => {
+          const lease = this.options.missionRuntimeRegistry?.get(missionId);
+          return lease === undefined || lease === null
+            ? this.options.workerRuntimeFactory(agentInstanceId, task)
+            : lease.runtime;
+        },
         toolDescriptorFactory: this.options.resolveToolDescriptors,
         toolPortFactory: (task, agentInstanceId) =>
           this.buildWorkerToolPortWithRecoveryCheckpointing(
@@ -1109,6 +1148,7 @@ export class MainController {
           return;
         }
         if (message.payload.instructionText.startsWith("任务完成状态:")) {
+          this.options.missionRuntimeRegistry?.release(missionId);
           const status = message.payload.instructionText.includes("done")
             ? "done"
             : "cancelled";
@@ -1156,6 +1196,7 @@ export class MainController {
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
       onMissionGateBlocked: (failureReason) => {
+        this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
         void this.options.missionManager
           .updateMissionStatus(missionId, "blocked")
@@ -1174,7 +1215,12 @@ export class MainController {
       contextNodeLifecycle: this.options.contextNodeLifecycle ?? null,
       contextLifecycleModeKey: "devolve",
       workerFactories: {
-        runtimeFactory: this.options.workerRuntimeFactory,
+        runtimeFactory: (agentInstanceId, task) => {
+          const lease = this.options.missionRuntimeRegistry?.get(missionId);
+          return lease === undefined || lease === null
+            ? this.options.workerRuntimeFactory(agentInstanceId, task)
+            : lease.runtime;
+        },
         toolDescriptorFactory: this.options.resolveToolDescriptors,
         toolPortFactory: (task, agentInstanceId) =>
           this.buildWorkerToolPortWithRecoveryCheckpointing(
@@ -1245,7 +1291,12 @@ export class MainController {
     missionId: string,
     scheduler: AssistScheduler | DevolveScheduler,
   ): void {
-    void scheduler.start().catch((error: Error) => {
+    void scheduler.start()
+      .then(() => {
+        this.options.missionRuntimeRegistry?.release(missionId);
+      })
+      .catch((error: Error) => {
+        this.options.missionRuntimeRegistry?.release(missionId);
       this.activeOrchestrators.delete(missionId);
       this.options.streamOutput(missionId, `[mission-locked] ${error.message}`);
       void this.options.missionManager
@@ -1342,6 +1393,12 @@ export class MainController {
     ];
   }
 }
+
+
+
+
+
+
 
 
 

@@ -12,6 +12,13 @@ import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-stor
 import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
+import { AgentModelBindingStore } from "./orchestration/agent-model-binding-store.js";
+import { ModelRuntimePool } from "./runtime/model-runtime-pool.js";
+import type {
+  ModelBindingDocument,
+  ModelBindingScope,
+  ResolvedModelBinding,
+} from "./orchestration/agent-model-binding-store.js";
 import type { ParameterAuthorizationRule } from "./tools/parameter-authorization.js";
 
 // 装配层内部使用（不是再导出）：把真实用量观测接到账目存储上（2026-10-06 接线）。
@@ -1989,6 +1996,16 @@ export interface PublicApplicationOptions {
   runtime?: "mock" | "provider";
   /** Provider 配置（runtime=provider 时必填；只含受保护凭据引用）。 */
   provider?: PublicProviderConfiguration;
+  /** 可选：会话/Agent 可切换的其他模型配置（同 registry、不同 endpoint/credential）。 */
+  modelConfigurations?: Array<{
+    providerId: string;
+    modelIdentifier: string;
+    baseUrl: string;
+    protectedCredentialReferenceId: string;
+    requestTimeoutMilliseconds: number;
+    maxOutputTokens?: number;
+    allowedModelIdentifiers?: string[];
+  }>;
   /** Provider 运行时注册表（嵌入方注入；runtime=provider 且未提供则稳定失败）。 */
   providerRuntimeRegistry?: ProviderRuntimeRegistry;
   /** 可选流式输出钩子（headless 写 stderr；不暴露内部字段）。 */
@@ -2369,6 +2386,15 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     let workerRuntimeFactory:
       | ((agentInstanceId: string, task: TaskDependencyNode) => AgentRuntime)
       | undefined;
+    let modelCandidatesForFacade: Array<{ providerId: string; modelIdentifier: string }> = [];
+    let missionRuntimePreparer:
+      | ((input: {
+          missionId: string;
+          projectIdentifier: string | null;
+          sessionIdentifier: string | null;
+          agentInstanceId: string | null;
+        }) => Promise<import("./orchestration/mission-runtime-registry.js").MissionRuntimeLease | null>)
+      | undefined;
     if (runtimeKind === "provider") {
       const registry = options.providerRuntimeRegistry;
       if (registry === undefined) {
@@ -2407,6 +2433,117 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         });
         mainRuntimeFactory = () => resolved.createRuntime();
         workerRuntimeFactory = () => resolved.createRuntime();
+        const modelBindingStore = new AgentModelBindingStore({
+          baseDirectory: options.stateDirectory,
+        });
+        const configuredModels = [
+          {
+            providerId: provider.providerId,
+            modelIdentifier: provider.modelIdentifier,
+            baseUrl: provider.baseUrl ?? "",
+            protectedCredentialReferenceId:
+              provider.protectedCredentialReferenceId ?? "",
+            requestTimeoutMilliseconds:
+              provider.requestTimeoutMilliseconds ?? 120000,
+            ...(provider.maxOutputTokens === undefined
+              ? {}
+              : { maxOutputTokens: provider.maxOutputTokens }),
+            allowedModelIdentifiers: provider.allowedModelIdentifiers,
+          },
+          ...(options.modelConfigurations ?? []),
+        ];
+        const candidateKeys = new Set<string>();
+        modelCandidatesForFacade = configuredModels
+          .filter((candidate) => {
+            const key = candidate.providerId + "|" + candidate.modelIdentifier;
+            if (candidateKeys.has(key)) return false;
+            candidateKeys.add(key);
+            return true;
+          })
+          .map((candidate) => ({
+            providerId: candidate.providerId,
+            modelIdentifier: candidate.modelIdentifier,
+          }));
+        const findModelConfiguration = (providerId: string, modelIdentifier: string) =>
+          configuredModels.find(
+            (candidate) =>
+              candidate.providerId === providerId &&
+              candidate.modelIdentifier === modelIdentifier,
+          );
+        const modelRuntimePool = new ModelRuntimePool({
+          maximumCachedConfigurations: 8,
+          resolve: async (configuration) => {
+            const candidate = findModelConfiguration(
+              configuration.providerId,
+              configuration.modelIdentifier,
+            );
+            return registry.resolveRuntime({
+              providerId: configuration.providerId,
+              modelIdentifier: configuration.modelIdentifier,
+              allowedModelIdentifiers:
+                candidate?.allowedModelIdentifiers ?? [configuration.modelIdentifier],
+              baseUrl: configuration.baseUrl,
+              protectedCredentialReferenceId:
+                configuration.protectedCredentialReferenceId,
+              requestTimeoutMilliseconds:
+                configuration.requestTimeoutMilliseconds,
+              maxOutputTokens: candidate?.maxOutputTokens,
+              providerRequestUsageObserver: providerUsageObserver,
+            });
+          },
+        });
+        missionRuntimePreparer = async (input) => {
+          const resolvedBinding = await modelBindingStore.resolve({
+            projectIdentifier: input.projectIdentifier,
+            sessionIdentifier: input.sessionIdentifier ?? input.missionId,
+            agentInstanceId: input.agentInstanceId,
+          });
+          if (resolvedBinding === null) return null;
+          try {
+            const candidate = findModelConfiguration(
+              resolvedBinding.binding.providerId,
+              resolvedBinding.binding.modelIdentifier,
+            );
+            if (candidate === undefined) {
+              await modelBindingStore.markFailed({
+                scope: resolvedBinding.scope,
+                scopeIdentifier: resolvedBinding.scopeIdentifier,
+                reason: "模型配置不存在或不在允许列表",
+              });
+              return null;
+            }
+            const lease = await modelRuntimePool.acquire({
+              configuration: {
+                configurationKey: [
+                  candidate.providerId,
+                  candidate.modelIdentifier,
+                  candidate.baseUrl,
+                  candidate.protectedCredentialReferenceId,
+                ].join("|"),
+                providerId: candidate.providerId,
+                modelIdentifier: candidate.modelIdentifier,
+                baseUrl: candidate.baseUrl,
+                protectedCredentialReferenceId: candidate.protectedCredentialReferenceId,
+                requestTimeoutMilliseconds: candidate.requestTimeoutMilliseconds,
+              },
+              agentInstanceId: input.agentInstanceId ?? "main",
+              missionId: input.missionId,
+            });
+            await modelBindingStore.markApplied({
+              scope: resolvedBinding.scope,
+              scopeIdentifier: resolvedBinding.scopeIdentifier,
+              missionId: input.missionId,
+            });
+            return lease;
+          } catch (error) {
+            await modelBindingStore.markFailed({
+              scope: resolvedBinding.scope,
+              scopeIdentifier: resolvedBinding.scopeIdentifier,
+              reason: error instanceof Error ? error.message : String(error),
+            });
+            return null;
+          }
+        };
       } catch (error) {
         if (error instanceof ProviderConfigurationError) {
           throw new PublicApplicationError(error.errorCode, error.message);
@@ -2445,6 +2582,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
             isInteractive: () => true,
           }));
     const runtime = await createApplicationRuntime({
+      ...(missionRuntimePreparer === undefined ? {} : { missionRuntimePreparer }),
         /** G4（2026-11-08 第 287 轮修复）：登记表必须进**装配层选项**（此前错加在门面构造函数选项里）。 */
         ...(options.toolDocumentationRegistry === undefined
           ? {}
@@ -2501,9 +2639,11 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         ? {}
         : { workspaceRootPath: options.workspaceRootPath }),
     });
-    return new AstarrayApplicationFacade(runtime, {      ...(options.gitIntegration === undefined
+    return new AstarrayApplicationFacade(runtime, {
+      ...(options.gitIntegration === undefined
         ? {}
         : { gitIntegration: options.gitIntegration }),
+      modelCandidates: modelCandidatesForFacade,
           toolDocumentationRegistry: options.toolDocumentationRegistry,
       statusPollIntervalMilliseconds: options.statusPollIntervalMilliseconds ?? 25,
       stateDirectory: options.stateDirectory,
@@ -2550,6 +2690,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 
   /** G1（第 245 轮）：Git 集成配置（null ⇒ 未启用）。 */
   private readonly gitIntegration: { repositoryPath: string; targetBranchName: string } | null;
+  private readonly modelCandidates: Array<{ providerId: string; modelIdentifier: string }>;
 
   constructor(
 
@@ -2567,6 +2708,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       permissionAskDefaultLifetimeSeconds?: number | null;
       /** G1（第 245 轮）：Git 集成配置。 */
       gitIntegration?: { repositoryPath: string; targetBranchName: string };
+      modelCandidates?: Array<{ providerId: string; modelIdentifier: string }>;
   /**
    * G4（2026-11-08 第 281 轮）：**工具公开用法登记**（缺省空 ⇒ 不注入任何说明）。
    *
@@ -2579,6 +2721,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.statusPollIntervalMilliseconds =
       options.statusPollIntervalMilliseconds ?? 25;
     this.stateDirectory = options.stateDirectory ?? null;
+    this.modelCandidates = options.modelCandidates ?? [];
     this.gitIntegration = options.gitIntegration ?? null;
     this.crossProjectResourceIo = options.crossProjectResourceIo ?? null;
     /**
@@ -2896,6 +3039,53 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return settings;
   }
 
+  /** GUI-03 / 方案 A：当前可切换的模型候选（只含 provider/model，不含凭据）。 */
+  async queryAgentModelCandidates(): Promise<
+    Array<{ providerId: string; modelIdentifier: string }>
+  > {
+    this.assertOpen();
+    return this.modelCandidates.map((candidate) => ({ ...candidate }));
+  }
+  /** GUI-03 / 方案 A：读取模型绑定（只读）。 */
+  async queryAgentModelBindings(): Promise<ModelBindingDocument> {
+    this.assertOpen();
+    return this.runtime.agentModelBindingStore.read();
+  }
+
+  /** GUI-03 / 方案 A：设置某个作用域的模型绑定。 */
+  async setAgentModelBinding(input: {
+    scope: ModelBindingScope;
+    scopeIdentifier: string;
+    providerId: string;
+    modelIdentifier: string;
+    expectedRevision: number;
+  }): Promise<ModelBindingDocument> {
+    this.assertOpen();
+    return this.runtime.agentModelBindingStore.setBinding({
+      ...input,
+      updatedByUserId: "authenticated-user",
+    });
+  }
+
+  /** GUI-03 / 方案 A：清除某个作用域的绑定（恢复继承）。 */
+  async clearAgentModelBinding(input: {
+    scope: ModelBindingScope;
+    scopeIdentifier: string;
+    expectedRevision: number;
+  }): Promise<ModelBindingDocument> {
+    this.assertOpen();
+    return this.runtime.agentModelBindingStore.clearBinding(input);
+  }
+
+  /** GUI-03 / 方案 A：解析有效模型绑定；null 表示继续使用当前 Provider 配置。 */
+  async resolveAgentModelBinding(input: {
+    projectIdentifier: string | null;
+    sessionIdentifier: string | null;
+    agentInstanceId: string | null;
+  }): Promise<ResolvedModelBinding | null> {
+    this.assertOpen();
+    return this.runtime.agentModelBindingStore.resolve(input);
+  }
   /** GUI-03-02：读取项目/会话覆盖（只读，不含继承合并）。 */
   async queryScopedSettings(): Promise<ScopedSettingsDocument> {
     this.assertOpen();
@@ -2953,6 +3143,35 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *   「现在是否真在跑」由**租约**判定 —— 租约**属于本进程实例**且活跃才算运行中，
    *   否则（含进程重启后）呈现为 `interrupted-needs-reconciliation`，**不会**显示成运行中。
    */
+  /** GUI-03-06：任务成果记录（仅投影任务链已有的 resultLocation，不扫描项目树）。 */
+  async queryMissionArtifacts(missionId: string): Promise<
+    Array<{
+      artifactIdentifier: string;
+      taskIdentifier: string;
+      description: string;
+      status: string;
+      location: string;
+      source: "task-result-location";
+    }>
+  > {
+    this.assertOpen();
+    const status = await this.runtime.controller.queryMissionStatus(missionId);
+    if (status.taskChain === null) return [];
+    return status.taskChain.tasks
+      .filter(
+        (task) =>
+          typeof task.resultLocation === "string" &&
+          task.resultLocation.trim() !== "",
+      )
+      .map((task) => ({
+        artifactIdentifier: "task-result:" + task.id,
+        taskIdentifier: task.id,
+        description: task.description,
+        status: task.status,
+        location: task.resultLocation ?? "",
+        source: "task-result-location" as const,
+      }));
+  }
   async queryMissionHistory(input?: {
     pageSize?: number;
     pageIndex?: number;
@@ -5126,19 +5345,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     try {
       missionIdentifier = await this.runtime.controller.handleUserMessage(
         input.prompt,
-        input.projectIdentifier === undefined && input.workspaceRootPath === undefined
-          ? undefined
-          : {
-              ...(input.projectIdentifier === undefined
-                ? {}
-                : { projectIdentifier: input.projectIdentifier }),
-              ...(input.workspaceRootPath === undefined
-                ? {}
-                : { workspaceRootPath: input.workspaceRootPath }),
-              ...(input.targetAgentInstanceIdentifier === undefined
-                ? {}
-                : { targetAgentInstanceIdentifier: input.targetAgentInstanceIdentifier }),
-            },
+        {
+          sessionIdentifier: input.sessionId,
+          ...(input.projectIdentifier === undefined
+            ? {}
+            : { projectIdentifier: input.projectIdentifier }),
+          ...(input.workspaceRootPath === undefined
+            ? {}
+            : { workspaceRootPath: input.workspaceRootPath }),
+          ...(input.targetAgentInstanceIdentifier === undefined
+            ? {}
+            : { targetAgentInstanceIdentifier: input.targetAgentInstanceIdentifier }),
+        },
       );
     } catch (error) {
       throw new PublicApplicationError(
@@ -5373,6 +5591,22 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.runtime.sessionElevationStore.listRecords(sessionId);
   }
 
+  /** GUI-03-03：创建会话临时权限提升（capability 等权威字段由 controller 从当前 profile 派生）。 */
+  async createSessionElevation(input: {
+    sessionId: string;
+    agentInstanceId: string | null;
+    capabilityId: string;
+    resourceScope: string;
+    elevatedDecision: "allow" | "ask";
+    expiresAtIso: string | null;
+  }): Promise<{ elevationId: string; originalDecision: string; elevatedDecision: string }> {
+    this.assertOpen();
+    return this.runtime.controller.createSessionElevation({
+      ...input,
+      userDecisionReference: "authenticated-user",
+      currentSessionPermissionRevision: 1,
+    });
+  }
   /** GUI-03-03：撤销单条会话临时权限提升。 */
   async revokeSessionElevation(input: {
     sessionId: string;
@@ -5380,6 +5614,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }): Promise<boolean> {
     this.assertOpen();
     return this.runtime.sessionElevationController.revokeElevation(input);
+  }
+  /** GUI-03-03：把排队指令手动移到队首（仅在排队队列内重排）。 */
+  async prioritizeQueuedInstruction(input: {
+    sessionId: string;
+    instructionIdentifier: string;
+  }): Promise<{ moved: boolean; detail: string }> {
+    this.assertOpen();
+    this.requireSession(input.sessionId);
+    return (await this.getInstructionWindowStore()).moveQueuedInstructionToFront(
+      input.instructionIdentifier,
+    );
   }
   /** GUI-03-03：更新指令窗口容量；降低容量只排队，不丢弃已接收指令。 */
   async updateInstructionWindowCapacity(capacity: number): Promise<InstructionWindowSnapshot> {
@@ -6263,6 +6508,24 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

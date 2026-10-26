@@ -112,6 +112,8 @@ import { CrossAgentContextAttachmentController } from "../orchestration/cross-ag
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
 import { ScopedSettingsStore } from "../orchestration/scoped-settings-store.js";
+import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
+import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
 import { ContextClosureCapsuleStore } from "../orchestration/context-closure-capsule-store.js";
 import {
   HumanVerificationController,
@@ -177,6 +179,8 @@ export interface ApplicationRuntime {
   /** T09A-R1-02：全局上下文预算策略（CLI/GUI 共用同一权威存储）。 */
   globalContextBudgetStore: GlobalContextBudgetStore;
   scopedSettingsStore: ScopedSettingsStore;
+  agentModelBindingStore: AgentModelBindingStore;
+  missionRuntimeRegistry: MissionRuntimeRegistry;
   /** T09A-R1-04：真实装配事件（指标复算与"下一请求生效"证据）。 */
   contextRuntimeEventStore: ContextRuntimeEventStore;
   /** GUIDE-01-04：运行中指导控制队列（公共入口/CLI 提交与查看状态）。 */
@@ -223,6 +227,12 @@ export interface ApplicationRuntime {
 }
 
 export interface ApplicationRuntimeOptions {
+  missionRuntimePreparer?: (input: {
+    missionId: string;
+    projectIdentifier: string | null;
+    sessionIdentifier: string | null;
+    agentInstanceId: string | null;
+  }) => Promise<import("../orchestration/mission-runtime-registry.js").MissionRuntimeLease | null>;
   mode: "ponder" | "assist" | "devolve";
   stateDirectory: string;
   concurrency: number;
@@ -707,6 +717,8 @@ export async function createApplicationRuntime(
     baseDirectory: stateDirectory,
   });
   await scopedSettingsStore.read();
+  const agentModelBindingStore = new AgentModelBindingStore({ baseDirectory: stateDirectory });
+  const missionRuntimeRegistry = new MissionRuntimeRegistry();
   // T09A-R1-03：任务完成后的节点收口（节点 → 验证 → 关闭/等待 → 胶囊 → 核验任务）。
   const contextClosureCapsuleStore = new ContextClosureCapsuleStore({
     baseDirectory: stateDirectory,
@@ -1301,6 +1313,8 @@ export async function createApplicationRuntime(
           },
         }),
     modeMachine,
+    missionRuntimeRegistry,
+    missionRuntimePreparer: options.missionRuntimePreparer,
     sessionManager,
     taskStore,
     missionManager,
@@ -1513,6 +1527,8 @@ export async function createApplicationRuntime(
     readMissionResultSummaries,
     globalContextBudgetStore,
     scopedSettingsStore,
+    agentModelBindingStore,
+    missionRuntimeRegistry,
     contextRuntimeEventStore,
     guidanceControlQueue,
     longToolCheckpointController,
@@ -1555,6 +1571,10 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
+
+
+
 
 
 

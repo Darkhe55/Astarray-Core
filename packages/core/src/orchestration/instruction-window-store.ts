@@ -481,6 +481,22 @@ export class InstructionWindowStore {
     await this.enqueuePersist();
   }
 
+  /** GUI-03-03：手动把一条排队指令移到队首；只影响排队，不改变容量/授权。 */
+  async moveQueuedInstructionToFront(instructionIdentifier: string): Promise<{
+    moved: boolean;
+    detail: string;
+  }> {
+    await this.loadFromDisk();
+    if (!this.queuedOrder.includes(instructionIdentifier)) {
+      return { moved: false, detail: "指令不在排队队列中。" };
+    }
+    this.queuedOrder = [
+      instructionIdentifier,
+      ...this.queuedOrder.filter((identifier) => identifier !== instructionIdentifier),
+    ];
+    await this.persist();
+    return { moved: true, detail: "已移到队首。" };
+  }
   /** 窗口快照（活动/排队/终态；活动数即槽位占用数）。 */
   async snapshot(): Promise<InstructionWindowSnapshot> {
     await this.loadFromDisk();
@@ -498,5 +514,6 @@ export class InstructionWindowStore {
     return this.processedReceiptKeys.size;
   }
 }
+
 
 
