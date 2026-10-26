@@ -115,6 +115,8 @@ import { ScopedSettingsStore } from "../orchestration/scoped-settings-store.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
 import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
+import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
+import { ExperimentSettingsStore } from "../orchestration/experiment-catalog.js";
 import { ToolPackageLifecycleService } from "../toolkit/tool-package-lifecycle-service.js";
 import { ToolPackageZipInstaller } from "../toolkit/tool-package-zip-installer.js";
 import { ContextClosureCapsuleStore } from "../orchestration/context-closure-capsule-store.js";
@@ -185,6 +187,8 @@ export interface ApplicationRuntime {
   agentModelBindingStore: AgentModelBindingStore;
   missionRuntimeRegistry: MissionRuntimeRegistry;
   artifactRecordStore: ArtifactRecordStore;
+  projectWorkWindowStore: ProjectWorkWindowStore;
+  experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
   toolPackageZipInstaller: ToolPackageZipInstaller;
   /** T09A-R1-04：真实装配事件（指标复算与"下一请求生效"证据）。 */
@@ -726,6 +730,8 @@ export async function createApplicationRuntime(
   const agentModelBindingStore = new AgentModelBindingStore({ baseDirectory: stateDirectory });
   const missionRuntimeRegistry = new MissionRuntimeRegistry();
   const artifactRecordStore = new ArtifactRecordStore({ baseDirectory: stateDirectory });
+  const projectWorkWindowStore = new ProjectWorkWindowStore({ baseDirectory: stateDirectory });
+  const experimentSettingsStore = new ExperimentSettingsStore({ baseDirectory: stateDirectory });
   const toolPackageLifecycleService = new ToolPackageLifecycleService({ baseDirectory: stateDirectory });
   const toolPackageZipInstaller = new ToolPackageZipInstaller({ baseDirectory: stateDirectory });
   // T09A-R1-03：任务完成后的节点收口（节点 → 验证 → 关闭/等待 → 胶囊 → 核验任务）。
@@ -1559,6 +1565,8 @@ export async function createApplicationRuntime(
     agentModelBindingStore,
     missionRuntimeRegistry,
     artifactRecordStore,
+    projectWorkWindowStore,
+    experimentSettingsStore,
     toolPackageLifecycleService,
     toolPackageZipInstaller,
     contextRuntimeEventStore,
@@ -1603,6 +1611,8 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
+
 
 
 
