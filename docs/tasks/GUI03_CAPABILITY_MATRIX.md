@@ -8,7 +8,7 @@
 | F02 | 实验功能 | 设置→工作流与工具 | `/settings/experiments` | ExperimentSettingsStore + 目录 | experiments JSON | FOLD/EXPLORE/CURATE 运行时 | 部分：目录/默认关闭只读；无消费者不可启用 |
 | F03 | 工具包写操作 | 设置→工作流与工具 | lifecycle + preview/install zip | LifecycleService + ZipInstaller | lifecycle JSON + packages | 工具注册 | 已接：安装/启停/升级/回退；真实 zip 冒烟通过；未执行包内容 |
 | F04 | 项目权限覆盖 | 设置→项目权限 | `/settings/scoped`、`/commands/scoped-permission` | ScopedSettingsStore | 项目覆盖 JSON | 任务工具 PolicyWrapper | 已接（按项目在任务端口创建时选择覆盖 profile） |
-| F05 | 项目工作时段 | 设置→工作流与工具 | `/settings/work-window` | ProjectWorkWindowStore + WorkWindowGate | work-window JSON | 部分：项目作用域 + dispatch/model/tool 门禁；在途收尾未接 |
+| F05 | 项目工作时段 | 设置→工作流与工具 | `/settings/work-window` | ProjectWorkWindowStore + WorkWindowGate | work-window JSON | 部分：项目作用域 + dispatch/resume/model/tool 门禁；在途收尾未接 |
 | F06 | 项目上下文覆盖 | 设置→项目上下文 | `/settings/scoped`、`/commands/scoped-context-budget` | ScopedSettingsStore | 项目覆盖 JSON | 提示词装配 | 已接装配（按 mission 摘要解析项目） |
 | F07 | 指令队列 | 设置→指令队列 | `/state`、`/commands/instruction-window-capacity`、`/commands/prioritize-instruction` | InstructionWindowStore | instruction-window JSON | 指令排队 | 已接：FIFO、容量、手动置顶；无 mode |
 | F08 | 会话模型切换 | 设置→当前模型 | `/settings/model-bindings`、`/settings/model-candidates`、`/commands/model-binding` | ModelRuntimePool + binding + mission preparer + 多账户配置 | 模型绑定 JSON | 下一次任务 runtime | 已接：多账户、候选下拉、会话/应用绑定、任务边界切换、applied/failed 状态；fake-runtime 端到端通过 |
@@ -31,6 +31,7 @@
 - 仅路由存在不等于接线；仅写配置无消费者不算接好。
 - F01–F12 中大部分仍是设置占位，不能据本表宣称已实现。
 - 本表随 GUI-03 各检查点推进更新。
+
 
 
 
