@@ -1047,11 +1047,13 @@ export async function createApplicationRuntime(
         input.missionIdentifier === undefined
           ? undefined
           : async () => {
-              const workWindow = await projectWorkWindowStore.read();
+              const workWindowRules = await projectWorkWindowStore.readRules(
+                input.projectIdentifier ?? undefined,
+              );
               const decision = evaluateWorkWindowGate({
                 gatePoint: "tool-execution",
                 nowIso: new Date().toISOString(),
-                rules: workWindow.rules,
+                rules: workWindowRules,
                 pauseReasonState: createPauseReasonState(),
               });
               return decision.kind === "allow"
@@ -1364,11 +1366,13 @@ export async function createApplicationRuntime(
     missionRuntimeRegistry,
     artifactRecordStore,
     workWindowGateDecisionProvider: async (input) => {
-      const workWindow = await projectWorkWindowStore.read();
+      const workWindowRules = await projectWorkWindowStore.readRules(
+        input.projectIdentifier ?? undefined,
+      );
       const decision = evaluateWorkWindowGate({
         gatePoint: "dispatch",
         nowIso: input.nowIso,
-        rules: workWindow.rules,
+        rules: workWindowRules,
         pauseReasonState: createPauseReasonState(),
       });
       return decision.kind === "allow"
@@ -1644,6 +1648,7 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
+
 
 
 

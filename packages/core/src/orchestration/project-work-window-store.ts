@@ -1,5 +1,5 @@
 /**
- * GUI-03-05：项目工作时段配置存储。
+ * GUI-03-05：项目工作时段配置存储（按项目隔离）。
  *
  * 只负责持久化/版本校验；判定复用 work-window-contract / work-window-gate。
  */
@@ -17,8 +17,10 @@ import type { WorkWindowRule } from "../orchestration/work-window-contract.js";
 export interface ProjectWorkWindowDocument {
   readonly schemaVersion: 1;
   readonly revision: number;
-  readonly rules: WorkWindowRule[];
+  readonly projects: Record<string, WorkWindowRule[]>;
 }
+
+const DEFAULT_PROJECT_IDENTIFIER = "default";
 
 function validateRule(rule: WorkWindowRule): void {
   if (
@@ -52,30 +54,47 @@ export class ProjectWorkWindowStore {
     this.backupFilePath = path.join(directory, "config.json.bak");
   }
 
-  async read(): Promise<ProjectWorkWindowDocument> {
+  async read(projectIdentifier?: string): Promise<ProjectWorkWindowDocument> {
     const readResult = await readJsonWithBackupRecovery(
       this.filePath,
       this.backupFilePath,
     );
     if (readResult === null) {
-      return { schemaVersion: 1, revision: 1, rules: [] };
+      return { schemaVersion: 1, revision: 1, projects: {} };
     }
-    const content = readResult.content as Partial<ProjectWorkWindowDocument>;
-    if (content.schemaVersion !== 1 || !Array.isArray(content.rules)) {
+    const content = readResult.content as Partial<ProjectWorkWindowDocument> & {
+      rules?: WorkWindowRule[];
+    };
+    if (content.schemaVersion !== 1) {
       throw new DomainError("journal-corrupted", "工作时段配置非法。");
     }
+    const projects =
+      content.projects !== undefined && typeof content.projects === "object"
+        ? content.projects
+        : content.rules === undefined
+          ? {}
+          : { [DEFAULT_PROJECT_IDENTIFIER]: content.rules };
     return {
       schemaVersion: 1,
       revision: typeof content.revision === "number" ? content.revision : 1,
-      rules: content.rules,
+      projects,
     };
   }
 
+  /** 返回指定项目的规则；未知项目返回空规则（默认全天可工作）。 */
+  async readRules(projectIdentifier?: string): Promise<WorkWindowRule[]> {
+    const document = await this.read();
+    const key = projectIdentifier ?? DEFAULT_PROJECT_IDENTIFIER;
+    return document.projects[key] ?? document.projects[DEFAULT_PROJECT_IDENTIFIER] ?? [];
+  }
+
   async update(input: {
+    projectIdentifier?: string;
     rules: WorkWindowRule[];
     expectedRevision: number;
   }): Promise<ProjectWorkWindowDocument> {
     for (const rule of input.rules) validateRule(rule);
+    const key = input.projectIdentifier ?? DEFAULT_PROJECT_IDENTIFIER;
     return this.lock.runExclusive(async () => {
       const current = await this.read();
       if (current.revision !== input.expectedRevision) {
@@ -84,7 +103,10 @@ export class ProjectWorkWindowStore {
       const next: ProjectWorkWindowDocument = {
         schemaVersion: 1,
         revision: current.revision + 1,
-        rules: input.rules.map((rule) => ({ ...rule })),
+        projects: {
+          ...current.projects,
+          [key]: input.rules.map((rule) => ({ ...rule })),
+        },
       };
       await writeAtomicJson(this.filePath, next);
       await backupExistingFile(this.filePath, this.backupFilePath);
@@ -92,3 +114,4 @@ export class ProjectWorkWindowStore {
     });
   }
 }
+
