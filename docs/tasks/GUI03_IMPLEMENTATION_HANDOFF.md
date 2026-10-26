@@ -29,7 +29,7 @@
 | F07 指令队列 | implemented-unverified | FIFO/容量/手动置顶已接；无 queue/guidance/smart 模式（用户确认不需要） |
 | F08 会话模型切换 | implemented-unverified | 多账户/candidate/pool/binding/applied-failed + session id 传播；fake-runtime 端到端通过 |
 | F09 会话临时权限 | implemented-unverified | 列表/创建/撤销已接；真实创建未人工验收 |
-| F11 任务成果记录 | partial | 独立记录查询/UI + mission 完成自动登记 + resultLocation 回退；工具级登记未接 |
+| F11 任务成果记录 | partial | 独立记录/UI + mission 自动登记；BuiltinTool 结果只有 outputText，无结构化产物路径，工具级登记不能安全推断 |
 | F12 参数授权编辑 | implemented-unverified | 规则明细、GUI 编辑、CAS 写入、放宽二次确认、HTTP 路由已接；真实点击未验收 |
 
 ## 3. 修改文件
@@ -57,6 +57,7 @@
 ## 6. 结论
 
 不能标记 GUI-03 完成。R01–R04 与 F01 已编码；其余能力受核心公共门面缺失阻塞。后续应先补作用域配置、会话控制、工作时段、工具生命周期与产物查询的受控公共 API，再继续 GUI 接线。
+
 
 
 
