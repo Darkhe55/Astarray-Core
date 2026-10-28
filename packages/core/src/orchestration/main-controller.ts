@@ -74,6 +74,15 @@ import {
   parseAndValidateTaskDecomposition,
 } from "./task-decomposition-contract.js";
 import type { TaskDecompositionDraftProvider } from "./model-task-decomposition-planner.js";
+import {
+  decideTaskGroupInsertion,
+  computeInsertionRequestFingerprint,
+  parseRuntimeTaskInsertionRequest,
+} from "./task-group-insertion-contract.js";
+import type {
+  RuntimeTaskInsertionRequest,
+  TaskGroupInsertionOutcome,
+} from "./task-group-insertion-contract.js";
 import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
 import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
 import {
@@ -383,6 +392,18 @@ export interface MainControllerOptions {
    */
   taskSequenceManageController?: TaskSequenceManageController | null;
   /**
+   * ALIGN-02-06（2026-10-28）：运行中插入的**安全点注入端口**（可选）。
+   *
+   * 实现方必须保证：只在安全上下文边界注入、不改写已发出的工具调用、
+   * 不重复运行组内已完成任务。缺省 ⇒ 即使判定为 `insert-now` 也保守地
+   * 保留到下一组（不硬塞），并在返回结果里说明原因。
+   */
+  taskGroupInsertionPort?: (input: {
+    readonly missionIdentifier: string;
+    readonly request: RuntimeTaskInsertionRequest;
+    readonly groupIdentifier: string;
+  }) => Promise<boolean>;
+  /**
    * ALIGN-02-02（2026-10-28）：**分解候选稿**生产器（模型背书，可选）。
    *
    * 提供时：先用它拿到候选稿，再经本地契约校验（白名单/节点数/依赖环/验收要求/
@@ -458,10 +479,13 @@ export class MainController {
     {
       readonly taskSequenceIdentifier: string;
       readonly taskIdentifier: string;
-      readonly sequenceRevision: number;
+      readonly ownerAgentInstanceIdentifier: string;
+      sequenceRevision: number;
       readonly isSequenceCreated: boolean;
     }
   >();
+  /** ALIGN-02-06：插入请求幂等键 → 内容指纹（进程内；重启后按序列任务 id 幂等）。 */
+  private readonly insertionRequestFingerprints = new Map<string, string>();
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -484,6 +508,7 @@ export class MainController {
   getMissionTaskSequence(missionId: string): {
     readonly taskSequenceIdentifier: string;
     readonly taskIdentifier: string;
+    readonly ownerAgentInstanceIdentifier: string;
     readonly sequenceRevision: number;
     readonly isSequenceCreated: boolean;
   } | null {
@@ -1057,10 +1082,139 @@ export class MainController {
     this.missionTaskSequences.set(input.missionId, {
       taskSequenceIdentifier: registration.document.sequenceId,
       taskIdentifier: registration.taskIdentifier,
+      ownerAgentInstanceIdentifier: input.secondaryAgentInstanceId,
       sequenceRevision: registration.document.revision,
       isSequenceCreated: registration.isSequenceCreated,
     });
     return {
+      taskSequenceIdentifier: registration.document.sequenceId,
+      taskIdentifier: registration.taskIdentifier,
+    };
+  }
+
+  /**
+   * ALIGN-02-06（2026-10-28）：**运行中插入**任务（本地判定 + 安全分支）。
+   *
+   * 分支语义：
+   * - 能进入当前组（`insert-now`）且装配了注入端口 ⇒ 交由端口在安全点注入；
+   * - 否则（组已关闭 / 锚点后已有工具调用 / **尚未装配注入端口**）⇒ 把任务登记进
+   *   同一权威序列等待下一组，并如实返回原因；
+   * - 幂等键重复 ⇒ 复用；revision 过期或锚点非法 ⇒ 拒绝（要求重新读取状态）。
+   *
+   * 不提供"立即改写正在运行的任务链"的入口 —— 已发出的工具调用不可能被安全改写。
+   */
+  async requestRuntimeTaskInsertion(payload: unknown): Promise<{
+    readonly outcome: TaskGroupInsertionOutcome | "inserted" | "deferred-to-sequence";
+    readonly reason: string;
+    readonly taskSequenceIdentifier: string | null;
+    readonly taskIdentifier: string | null;
+  }> {
+    const request = parseRuntimeTaskInsertionRequest(payload);
+    const sequenceMapping = this.missionTaskSequences.get(request.missionIdentifier);
+    const sequenceController = this.options.taskSequenceManageController;
+    if (sequenceMapping === undefined || sequenceController === null || sequenceController === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "该 mission 没有权威任务序列投影，无法登记运行中插入（拒绝静默丢弃）。",
+      );
+    }
+    const missionStatus = await this.options.missionManager.getMissionStatus(
+      request.missionIdentifier,
+    );
+    const taskStates: Record<string, string> = {};
+    for (const task of missionStatus.taskChain?.tasks ?? []) {
+      taskStates[task.id] = task.status;
+    }
+    const decision = decideTaskGroupInsertion({
+      request,
+      group: {
+        groupIdentifier: sequenceMapping.taskSequenceIdentifier,
+        revision: sequenceMapping.sequenceRevision,
+        isClosed:
+          missionStatus.summary === null || missionStatus.summary.status !== "running",
+        taskStates,
+        /**
+         * 只要组内还有 `running` 任务，就视为"锚点之后已有已发出的工具调用"：
+         * 无法判断它是否已进入工具调用，按**保守**处理（等待下一组）。
+         */
+        hasIssuedToolCallsAfterAnchor: Object.values(taskStates).some(
+          (status) => status === "running",
+        ),
+      },
+      existingRequestFingerprint:
+        this.insertionRequestFingerprints.get(request.requestIdentifier) ?? null,
+    });
+
+    if (decision.outcome === "duplicate") {
+      return {
+        outcome: "duplicate",
+        reason: decision.reason,
+        taskSequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
+        taskIdentifier: null,
+      };
+    }
+    if (decision.outcome === "idempotency-conflict") {
+      throw new DomainError("task-priority-denied", decision.reason);
+    }
+    if (decision.outcome === "stale-revision-rejected") {
+      throw new DomainError("stale-revision", decision.reason);
+    }
+    if (decision.outcome === "invalid-anchor-rejected") {
+      throw new DomainError("dependency-not-found", decision.reason);
+    }
+
+    const insertionPort = this.options.taskGroupInsertionPort;
+    if (decision.outcome === "insert-now" && insertionPort !== undefined) {
+      const isInserted = await insertionPort({
+        missionIdentifier: request.missionIdentifier,
+        request,
+        groupIdentifier: sequenceMapping.taskSequenceIdentifier,
+      });
+      if (isInserted) {
+        this.insertionRequestFingerprints.set(
+          request.requestIdentifier,
+          computeInsertionRequestFingerprint(request),
+        );
+        return {
+          outcome: "inserted",
+          reason: "已在安全上下文边界注入当前组",
+          taskSequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
+          taskIdentifier: null,
+        };
+      }
+    }
+
+    /**
+     * 推迟到下一组：登记进同一序列。锚点在 mission 任务链里（如 `T-001`）时
+     * 序列中并不存在，故以前序用户任务作为锚点（保证偏序合法、不丢任务）。
+     */
+    const deferredTaskIdentifier = `task-insert-${createHash("sha256")
+      .update(request.requestIdentifier)
+      .digest("hex")
+      .slice(0, 12)}`;
+    const registration = await sequenceController.publishOrInsertTask({
+      ownerAgentInstanceId: sequenceMapping.ownerAgentInstanceIdentifier,
+      actor: { sourceKind: "agent", actorId: sequenceMapping.ownerAgentInstanceIdentifier },
+      sequenceId: sequenceMapping.taskSequenceIdentifier,
+      task: {
+        taskId: deferredTaskIdentifier,
+        title: request.title,
+        priorityTier: null,
+        externalReference: `insert-request:${request.requestIdentifier}`,
+      },
+      anchor: { predecessorTaskIds: [sequenceMapping.taskIdentifier], successorTaskIds: [] },
+    });
+    sequenceMapping.sequenceRevision = registration.document.revision;
+    this.insertionRequestFingerprints.set(
+      request.requestIdentifier,
+      computeInsertionRequestFingerprint(request),
+    );
+    return {
+      outcome: "deferred-to-sequence",
+      reason:
+        decision.outcome === "deferred-to-next-group"
+          ? decision.reason
+          : `${decision.reason}；但编排器尚未装配组内注入端口，已保留到下一组`,
       taskSequenceIdentifier: registration.document.sequenceId,
       taskIdentifier: registration.taskIdentifier,
     };
