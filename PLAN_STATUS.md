@@ -110,8 +110,17 @@
 > **没有生产注入端口**（`DagScheduler`/`MissionOrchestrator` 都没有图插入能力）⇒
 > 目前每个请求都**登记进同一序列等待下一组**并如实给原因。
 >
-> **⑮ 下一步**：ALIGN-02-07（持续调度由就绪/完成/依赖解锁/时段恢复/资源释放事件唤醒；
-> 无进展有界退避；无工作不忙轮询；失败不形成无限重派）。
+> **⑮ ALIGN-02-07 部分交付**：`waitForNextWake` 现在返回 `{reason, waitedMilliseconds}`
+> （六类唤醒原因 + timeout），新增 `notifySchedulingEvent`；`getRecommendedWaitMilliseconds`
+> 给出**有界退避**（无工作 30s 空闲 / 有进展 1s / 连续无进展 250ms×2^n 封顶 30s）；
+> 同一任务连续派发失败 **3 次即停手**并在 `skippedReasons` 说明，成功清零，可显式重置。
+> 事件源只接了 mission 级两个（启动 `task-ready`、终态 `task-finished`）。
+> **ALIGN-02 至此 7 个检查点全部推进过，但只有 02-01 是完整交付**：02–03、05–07 都卡在
+> 同一结构性问题 —— **权威序列与 mission 任务链是两套记账**，而 orchestrator 没有
+> "按 taskId 领取/派发/插入"的公开接口。
+>
+> **⑯ 下一步**：ALIGN-03-01（次级任命执行与测试/审查的下级；同一执行任务的自报不能代替
+> 独立审查结论）。若后续用户要求先补 ALIGN-02 的结构性缺口（合并两套记账），应优先于 03。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

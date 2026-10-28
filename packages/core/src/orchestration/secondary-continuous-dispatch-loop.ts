@@ -61,9 +61,38 @@ export interface ContinuousDispatchLoopResult {
   skippedReasons: Record<string, string>;
   /** 整轮无法调度的原因（如未注册派发处理器）。 */
   blockedReason: string | null;
+  /** ALIGN-02-07：截至本轮**连续无进展**的轮数（有派发即清零）。 */
+  consecutiveNoProgressRoundCount: number;
+  /** ALIGN-02-07：建议下一次唤醒前的等待（有界退避；无工作 ⇒ 空闲等待）。 */
+  recommendedWaitMilliseconds: number;
+}
+
+/** ALIGN-02-07：调度唤醒来源（事件驱动，不靠忙轮询）。 */
+export type SchedulingWakeReason =
+  | "external"
+  | "task-ready"
+  | "task-finished"
+  | "dependency-unlocked"
+  | "work-window-resumed"
+  | "resource-released";
+
+export interface SchedulingWakeReport {
+  /** 实际唤醒原因；超时（有界等待到期）时为 `timeout`。 */
+  readonly reason: SchedulingWakeReason | "timeout";
+  readonly waitedMilliseconds: number;
 }
 
 export class SecondaryContinuousDispatchLoop {
+  /** ALIGN-02-07：同一任务连续派发失败的自动重派上限（超过即停手，等状态变化）。 */
+  static readonly MAXIMUM_DISPATCH_ATTEMPTS_PER_TASK = 3;
+  /** ALIGN-02-07：无进展退避的下界/上界（有界，不无限退避也不忙轮询）。 */
+  static readonly MINIMUM_BACKOFF_MILLISECONDS = 250;
+  static readonly MAXIMUM_BACKOFF_MILLISECONDS = 30_000;
+  /** ALIGN-02-07：完全没有工作时的空闲等待（避免忙轮询）。 */
+  static readonly IDLE_WAIT_MILLISECONDS = 30_000;
+  /** ALIGN-02-07：有进展时的短暂等待（尽快继续下一组）。 */
+  static readonly PROGRESS_WAIT_MILLISECONDS = 1_000;
+
   private readonly registry: UnboundedAgentInstanceRegistry;
   private readonly defaultDispatchChain:
     | ((chain: DispatchChainInput) => Promise<boolean>)
@@ -71,8 +100,14 @@ export class SecondaryContinuousDispatchLoop {
   private readonly currentOccupiedSlots: () => number;
   private readonly maxDispatchPerRound: number;
   private readonly missionPorts = new Map<string, MissionDispatchPorts>();
-  private wakeResolve: (() => void) | null = null;
+  private wakeResolve: ((report: SchedulingWakeReport) => void) | null = null;
   private stopped = false;
+  /** ALIGN-02-07：连续无进展轮数（派发成功即清零）。 */
+  private consecutiveNoProgressRoundCount = 0;
+  /** ALIGN-02-07：上一轮是否有可执行任务（决定空闲等待 vs 退避）。 */
+  private lastRoundHadReadyWork = false;
+  /** ALIGN-02-07：逐任务派发失败次数（成功即清零；达上限停手）。 */
+  private readonly dispatchFailureCountByTaskId = new Map<string, number>();
 
   constructor(options: ContinuousDispatchLoopOptions) {
     this.registry = options.registry;
@@ -92,17 +127,28 @@ export class SecondaryContinuousDispatchLoop {
     this.missionPorts.delete(missionIdentifier);
   }
 
-  /** 唤醒调度（任务/反馈/权限/资源/Git 基线变化时调用）。 */
-  wake(): void {
+  /**
+   * ALIGN-02-07：**事件驱动唤醒**。就绪、完成、依赖解锁、时段恢复、资源释放都应调用它，
+   * 由事件决定何时重算，而不是固定周期忙轮询。
+   */
+  notifySchedulingEvent(reason: SchedulingWakeReason): void {
+    this.wake(reason);
+  }
+
+  /** 唤醒调度（保留旧名；等价于 `notifySchedulingEvent("external")`）。 */
+  wake(reason: SchedulingWakeReason = "external"): void {
     const resolver = this.wakeResolve;
     this.wakeResolve = null;
-    resolver?.();
+    resolver?.({
+      reason,
+      waitedMilliseconds: 0,
+    });
   }
 
   /** 停止调度（会话关闭时）。 */
   stop(): void {
     this.stopped = true;
-    this.wake();
+    this.wake("external");
   }
 
   /**
@@ -120,6 +166,8 @@ export class SecondaryContinuousDispatchLoop {
       occupiedSlotsAtRoundStart: this.currentOccupiedSlots(),
       skippedReasons: {},
       blockedReason: null,
+      consecutiveNoProgressRoundCount: this.consecutiveNoProgressRoundCount,
+      recommendedWaitMilliseconds: this.getRecommendedWaitMilliseconds(),
     };
     if (this.stopped) {
       result.blockedReason = "loop-stopped";
@@ -147,6 +195,20 @@ export class SecondaryContinuousDispatchLoop {
       }
       const node = partialOrder.getNode(taskId);
       if (node === undefined) {
+        continue;
+      }
+      /**
+       * ALIGN-02-07：**失败不形成无限重派**。同一任务连续派发失败达到上限即停手，
+       * 原因写进 `skippedReasons`；外部状态变化后可调用
+       * `resetDispatchFailureCounts()` 重新允许。
+       */
+      const previousFailureCount = this.dispatchFailureCountByTaskId.get(taskId) ?? 0;
+      if (
+        previousFailureCount >=
+        SecondaryContinuousDispatchLoop.MAXIMUM_DISPATCH_ATTEMPTS_PER_TASK
+      ) {
+        result.skippedReasons[taskId] =
+          `已连续派发失败 ${previousFailureCount} 次：停止自动重派，等待状态变化或人工介入`;
         continue;
       }
       /**
@@ -191,33 +253,99 @@ export class SecondaryContinuousDispatchLoop {
         if (accepted) {
           result.dispatchedTaskIds.push(taskId);
           dispatchCount += 1;
+          this.dispatchFailureCountByTaskId.delete(taskId);
           continue;
         }
         await this.releaseQuietly(ports, taskId, "dispatch-rejected");
         this.releaseAdmissionQuietly(instanceRecord.agentInstanceId);
+        this.recordDispatchFailure(taskId);
         result.skippedReasons[taskId] = "派发被拒绝：已释放领取";
       } catch (error) {
         const failureReason = `dispatch-error: ${(error as Error).message}`;
         await this.releaseQuietly(ports, taskId, failureReason);
         this.releaseAdmissionQuietly(instanceRecord.agentInstanceId);
+        this.recordDispatchFailure(taskId);
         result.skippedReasons[taskId] = failureReason;
       }
     }
+    /**
+     * ALIGN-02-07：进展统计与有界退避。
+     * 有派发 ⇒ 清零；否则累加（未注册处理器不算"无进展"，那是配置问题）。
+     */
+    if (result.dispatchedTaskIds.length > 0) {
+      this.consecutiveNoProgressRoundCount = 0;
+    } else {
+      this.consecutiveNoProgressRoundCount += 1;
+    }
+    this.lastRoundHadReadyWork = readyTaskIds.length > 0;
+    result.consecutiveNoProgressRoundCount = this.consecutiveNoProgressRoundCount;
+    result.recommendedWaitMilliseconds = this.getRecommendedWaitMilliseconds();
     return result;
   }
 
-  /** 等待下一次唤醒（有界；测试注入时钟）。 */
-  async waitForNextWake(maximumWaitMilliseconds: number): Promise<void> {
+  /** ALIGN-02-07：记一次派发失败（达到上限后由 `runRound` 停手）。 */
+  private recordDispatchFailure(taskId: string): void {
+    const previousCount = this.dispatchFailureCountByTaskId.get(taskId) ?? 0;
+    this.dispatchFailureCountByTaskId.set(taskId, previousCount + 1);
+  }
+
+  /** 等待下一次唤醒（有界；返回**为什么醒**，超时也如实报告）。 */
+  async waitForNextWake(
+    maximumWaitMilliseconds: number,
+  ): Promise<SchedulingWakeReport> {
     if (this.stopped) {
-      return;
+      return { reason: "timeout", waitedMilliseconds: 0 };
     }
-    await new Promise<void>((resolve) => {
-      this.wakeResolve = resolve;
-      setTimeout(() => {
+    const startedAtMilliseconds = Date.now();
+    return new Promise<SchedulingWakeReport>((resolve) => {
+      const timeoutHandle = setTimeout(() => {
         this.wakeResolve = null;
-        resolve();
+        resolve({
+          reason: "timeout",
+          waitedMilliseconds: Date.now() - startedAtMilliseconds,
+        });
       }, maximumWaitMilliseconds);
+      this.wakeResolve = (report: SchedulingWakeReport) => {
+        clearTimeout(timeoutHandle);
+        resolve({
+          reason: report.reason,
+          waitedMilliseconds: Date.now() - startedAtMilliseconds,
+        });
+      };
     });
+  }
+
+  /**
+   * ALIGN-02-07：建议下一次等待时长（**有界退避**）。
+   *
+   * - 上一轮完全没有可执行任务 ⇒ 空闲等待（不忙轮询）；
+   * - 有进展 ⇒ 短暂等待（尽快继续）；
+   * - 连续无进展 ⇒ 指数退避，封顶 `MAXIMUM_BACKOFF_MILLISECONDS`。
+   */
+  getRecommendedWaitMilliseconds(): number {
+    if (!this.lastRoundHadReadyWork) {
+      return SecondaryContinuousDispatchLoop.IDLE_WAIT_MILLISECONDS;
+    }
+    if (this.consecutiveNoProgressRoundCount === 0) {
+      return SecondaryContinuousDispatchLoop.PROGRESS_WAIT_MILLISECONDS;
+    }
+    const backoffMilliseconds =
+      SecondaryContinuousDispatchLoop.MINIMUM_BACKOFF_MILLISECONDS *
+      2 ** Math.min(this.consecutiveNoProgressRoundCount - 1, 7);
+    return Math.min(
+      backoffMilliseconds,
+      SecondaryContinuousDispatchLoop.MAXIMUM_BACKOFF_MILLISECONDS,
+    );
+  }
+
+  /** ALIGN-02-07：外部状态变化（如人工裁决/时段恢复）后重新允许自动重派。 */
+  resetDispatchFailureCounts(): void {
+    this.dispatchFailureCountByTaskId.clear();
+  }
+
+  /** ALIGN-02-07：连续无进展轮数（只读诊断）。 */
+  getConsecutiveNoProgressRoundCount(): number {
+    return this.consecutiveNoProgressRoundCount;
   }
 
   /** 校验：并发槽位不足只排队/暂停（不拒绝创建）。 */
