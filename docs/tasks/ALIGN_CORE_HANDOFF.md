@@ -214,3 +214,26 @@ ConversationIdentityStore.resolveOrOpen… → MissionManager.createMission → 
   （开启权从"认证用户"变成"构建期 + 认证用户"），需产品确认。
 
 详见 [GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29](../reports/GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29.md)。
+
+## 13. 窗口总结与隐私自检（2026-10-29，第 58 轮）
+
+**一句话指路**：本窗口（60 轮目标，已执行至第 58 轮）的完整交付、规模与未闭合项见
+[WINDOW_SUMMARY_2026-10-29](../reports/WINDOW_SUMMARY_2026-10-29.md)。
+
+关键数字：**39 个提交**（第 22–58 轮）、ADR **0001–0091**（新增 25 份，编号连续）、
+8 张卡共 **39 个检查点**、**运行证据 = 0**、**7 张 in_progress + 1 张 blocked（REMOTE-01）**、
+**没有任何卡被标 done**。
+
+**隐私自检（对本窗口全部提交 `199c9bfb..HEAD` 的 diff 扫描）**：
+
+| 模式 | 命中 | 结论 |
+|---|---|---|
+| `C:\Users\...` 本机路径 | 0 | 无 |
+| 内网 IP（10./192.168./172.16-31.） | 0 | 无 |
+| 手机号 | 0 | 无 |
+| 真实邮箱 | 0（唯一命中为 `db.example.invalid` 的假连接串） | 无 |
+| `AKIA` / `ghp_` / JWT / PEM 私钥 | 命中均为**夹具里的显式假值**（含 `FAKE`）或**正则定义本身** | 无真实凭据 |
+| `sk-` | 73 处命中绝大多数是 `task-sequence`/`task-ledger` 等**子串误匹配**；唯一形如 key 的是 `sk-ant-FAKE…` 假值 | 无真实凭据 |
+
+结论：**本窗口改动不含真实凭据、本机路径、内网 IP、真实邮箱或手机号**；
+假值均带 `FAKE` 或使用 `.invalid` 域名。
