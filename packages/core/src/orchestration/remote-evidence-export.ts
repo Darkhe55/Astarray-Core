@@ -20,6 +20,11 @@ import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 import type { EvidenceSnapshot, EvidenceSnapshotRequest } from "./remote-evidence-snapshot.js";
+import { attemptRemoteDelivery } from "./remote-delivery-outbox.js";
+import type {
+  RemoteDeliveryOutbox,
+  RemoteDeliveryTransportPort,
+} from "./remote-delivery-outbox.js";
 
 /** 允许导出的记录类别（窄范围；不包含"任意历史"）。 */
 export type RemoteExportRecordKind =
@@ -39,6 +44,8 @@ export interface RemoteIdentityBinding {
   readonly authenticatedUserId: string;
   readonly authorizedProjectIdentifiers: readonly string[];
   readonly authorizedRecordKinds: readonly RemoteExportRecordKind[];
+  /** 授权 revision：授权范围变化即递增（投递 operation 绑定它，旧授权不得复用）。 */
+  readonly authorizationRevision: number;
   readonly expiresAtIso: string;
   readonly createdAtIso: string;
   /** 撤销时间；非 null 即不可再用。 */
@@ -339,6 +346,13 @@ export class RemoteEvidenceExportService {
         request: EvidenceSnapshotRequest,
       ) => Promise<EvidenceSnapshot>;
       readonly deliveryPort: RemoteEvidenceDeliveryPort;
+      /**
+       * REMOTE-01-03：幂等 outbox 与回执读取端口。
+       * 两者都提供时，投递走 outbox（先读回执、unknown 语义、不自动换目标）；
+       * 缺省则退回旧的"直接调 deliveryPort"路径（仅供旧调用方）。
+       */
+      readonly outbox?: RemoteDeliveryOutbox | null;
+      readonly transport?: RemoteDeliveryTransportPort | null;
       readonly nowIso?: () => string;
     },
   ) {}
@@ -409,6 +423,8 @@ export class RemoteEvidenceExportService {
     readonly targetDeviceIdentifier: string | null;
   }): Promise<
     | { readonly status: "sent" | "already-sent" }
+    | { readonly status: "unknown"; readonly reason: string }
+    | { readonly status: "requires-explicit-resend"; readonly reason: string }
     | { readonly status: "refused"; readonly reason: string }
   > {
     const binding = await this.options.bindingStore.findByIdentifier(
@@ -442,6 +458,49 @@ export class RemoteEvidenceExportService {
             : `投递时发现超出预授权：${scopeDecision.reasons.join("；")}`,
       };
     }
+    /**
+     * REMOTE-01-03：装配了 outbox + 回执端口时，走幂等投递路径
+     * （先读回执、unknown 语义、目标不可变）；否则保留旧的直接投递路径。
+     */
+    const outbox = this.options.outbox ?? null;
+    const transport = this.options.transport ?? null;
+    if (outbox !== null && transport !== null) {
+      const nowIso = this.now();
+      await outbox.enqueue({
+        operationIdentifier: input.preparedExport.exportIdentifier,
+        interactionRevision: input.preparedExport.snapshot.snapshotRevision,
+        exportIdentifier: input.preparedExport.exportIdentifier,
+        bindingIdentifier: binding.bindingIdentifier,
+        targetAccountIdentifier: input.targetAccountIdentifier,
+        targetDeviceIdentifier: input.targetDeviceIdentifier,
+        contentHash: input.preparedExport.snapshot.contentHash,
+        authorizationRevision: binding.authorizationRevision,
+        recordKindCount: input.preparedExport.snapshot.entries.length,
+        createdAtIso: nowIso,
+      });
+      const attemptOutcome = await attemptRemoteDelivery({
+        outbox,
+        transport,
+        operationIdentifier: input.preparedExport.exportIdentifier,
+        text: input.preparedExport.renderedText,
+        nowIso,
+      });
+      switch (attemptOutcome.kind) {
+        case "sent":
+          return { status: "sent" };
+        case "already-sent":
+          return { status: "already-sent" };
+        case "unknown":
+          return { status: "unknown", reason: attemptOutcome.reason };
+        case "requires-explicit-resend":
+          return {
+            status: "requires-explicit-resend",
+            reason: attemptOutcome.reason,
+          };
+        case "refused":
+          return { status: "refused", reason: attemptOutcome.reason };
+      }
+    }
     const sendResult = await this.options.deliveryPort.send({
       exportIdentifier: input.preparedExport.exportIdentifier,
       targetAccountIdentifier: input.targetAccountIdentifier,
@@ -457,8 +516,7 @@ export class RemoteEvidenceExportService {
     return {
       status: sendResult.status === "already-sent" ? "already-sent" : "sent",
     };
-  }
-}
+  }}
 
 /** 来源类别 → 导出记录类别（用于投递前的范围复核）。 */
 export function mapSourceKindToRecordKind(
