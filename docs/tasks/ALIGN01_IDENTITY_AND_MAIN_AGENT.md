@@ -54,3 +54,22 @@ ponder 每次生成 `main:ponder:<随机>`；`missionId`/进程内 Map 同时充
 **仍未完成**：02 ponder 个体复用；03 主 Agent 只读主干的提案控制面；04 提案字段与
 "小型任务显式直投"；05 180 秒预算与释放等待；06 报告索引来源注入；07 旧身份迁移规则。
 （03–07 的生产接线均未开始，本卡不得标 done。）
+
+### 02 ponder 复用既有主个体——implemented-unverified（2026-10-28）
+
+**旧行为（实测基线）**：`respondInPonderMode` 每次 `main:ponder:<8hex>` ⇒ 同一会话连续追问
+换三个"个体"，个体记忆/读取抑制账本/汇报来源无法归属。
+
+**改法**（`packages/core/src/orchestration/main-controller.ts`）：
+1. `handleUserMessage` **先解析项目归属**再分模式（此前 ponder 完全拿不到项目）；
+2. ponder 走与 mission 相同的 `resolveConversationIdentityForMission`：命中会话 ⇒ 用
+   **登记过的主个体**；无映射但装配层有稳定 `mainAgentInstanceId` ⇒ 用它；两者都无才退回临时 id；
+3. 每次调用登记一条**无 mission 的 run**（run 与 mission 正交），因此"持续追问"是
+   同一会话/同一主个体/多条 run；
+4. `resolveConversationIdentityForMission` 返回值扩展为
+   `{ conversationIdentifier, mainAgentInstanceIdentifier }`，mission 分支行为不变。
+
+**有意不做的**：不按角色名/模型名匹配历史个体（卡内禁止猜测）；不给已关闭会话"续命"。
+
+**验证状态**：未编写/未运行测试、未人工验收；`npm run typecheck` exit 0、
+`npx eslint main-controller.ts` exit 0。⇒ **implemented-unverified**。
