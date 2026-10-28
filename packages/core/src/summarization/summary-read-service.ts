@@ -24,6 +24,10 @@ import type {
   SummaryIndexStore,
   SummarySourceKey,
 } from "./summary-index-store.js";
+import {
+  buildReadSideContentScanLabel,
+  type ReadSideContentScanLabel,
+} from "../tools/read-side-content-scan.js";
 
 /**
  * 原文访问观察端口：读取路径**不得调用**。仅作为可观测证据，
@@ -48,6 +52,11 @@ export interface SummaryReadView {
   returnedUnitCount: number;
   /** 本次读取触碰原文的次数（读取路径恒为 0，实测断言）。 */
   sourceAccessCount: number;
+  /**
+   * SEC-02-06 通道 12：**读取时**的扫描标注（可选；只标注、不改内容、不阻断）。
+   * 旧调用方忽略该字段即可保持行为不变。
+   */
+  contentScan?: ReadSideContentScanLabel;
 }
 
 export interface SummarySectionView {
@@ -62,6 +71,8 @@ export interface SummarySectionView {
   evidencePointers: SummaryEvidencePointer[];
   manifestRevision: number;
   sourceAccessCount: number;
+  /** SEC-02-06 通道 12：读取时的扫描标注（只标注，不阻断）。 */
+  contentScan?: ReadSideContentScanLabel;
 }
 
 export interface EvidenceLocatorResult {
@@ -129,6 +140,9 @@ export async function readSummaryDefaultView(input: {
     isReturnBounded: page.isReturnBounded,
     returnedUnitCount: page.returnedUnitCount,
     sourceAccessCount: 0,
+    contentScan: buildReadSideContentScanLabel(
+      page.chunks.map((chunk) => chunk.summaryText).join("\n"),
+    ),
   };
 }
 

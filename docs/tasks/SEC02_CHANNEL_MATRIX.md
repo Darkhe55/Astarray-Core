@@ -21,7 +21,7 @@
 | 9 | 文档转换 / OCR | `document-view-adapter` / `read-format/*` | 无敏感引用（检索 `sensitive|redact|dlp` 0 命中） | 转换文本若经 readFile 则受通道 1 覆盖；**其他转换入口未核** | ❌ 未覆盖（除 readFile 路径） |
 | 10 | 归档解析 | — | — | — | — 无"把归档内容返回模型"的工具 |
 | 11 | 缓存命中 | 缓存模块（`infra/cache`） | 无敏感引用 | 缓存只存计算/工具结果元数据 | ❌ 未核 |
-| 12 | 恢复记录 / 汇报 / 摘要 / 长期记忆 | `summarization/*` → `evaluateSummaryPublishability`（ADR-0086）；`context-prompt-assembler` / `agent-individual-memory` 仍无检查 | 摘要片段：四态 DLP（**写入侧**）；提示词注入：无（**且当前没有摘要注入点**） | 非 clean 片段**不落盘**并计数 | 🟡 **写入侧三块已加闸**（摘要/长期记忆/三级汇报，ADR-0086/0087）；提示词注入与读取侧仍无检查 |
+| 12 | 恢复记录 / 汇报 / 摘要 / 长期记忆 | `summarization/*` → `evaluateSummaryPublishability`（ADR-0086）；`context-prompt-assembler` / `agent-individual-memory` 仍无检查 | 摘要片段：四态 DLP（**写入侧**）；提示词注入：无（**且当前没有摘要注入点**） | 非 clean 片段**不落盘**并计数 | 🟡 **写入侧三块已加闸**（摘要/长期记忆/三级汇报，ADR-0086/0087）；提示词注入仍无检查；**摘要/报告读取侧已加标注**（ADR-0088），记忆读取无标注 |
 | 13 | 模型请求最终装配出口 | provider runtime 组消息 | 无 | 发往模型 | ❌ 未覆盖（最后一道闸不存在） |
 | 14 | 日志 / 诊断导出 | `infra/redaction.ts`（`Redactor`） | 掩码规则（同一目录） | 掩码后写日志/导出 | 🟡 掩码已接；**换行注入与完整导出口径未核** |
 | 15 | 授权范围外发 | `outbound-content-gate`（SEC-02-04） | 四态扫描结果 + 授权绑定 | **尚无调用方** | ❌ 契约存在、未接线 |

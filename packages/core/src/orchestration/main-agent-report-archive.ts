@@ -14,6 +14,10 @@ import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
 import { evaluateContentPublishability } from "../tools/content-publishability.js";
+import {
+  buildReadSideContentScanLabel,
+  type ReadSideContentScanLabel,
+} from "../tools/read-side-content-scan.js";
 import { sanitizePathSegment } from "./work-archive-store.js";
 
 export interface TertiaryTerminalReport {
@@ -274,5 +278,28 @@ export class MainAgentReportReader {
       usedTokens += estimatedTokens;
     }
     return selected;
+  }
+
+  /**
+   * SEC-02-06 通道 12（2026-10-28）：**带读取侧扫描标注**的选择。
+   *
+   * 与 `selectReports` 同一过滤/预算逻辑；额外返回每条报告的扫描标注
+   * （结论、规则版本、时间），**只标注、不改内容、不阻断**。
+   */
+  async selectReportsWithScanLabels(input: {
+    missionId: string;
+    taskBundleIdFilter: string | null;
+    maxReports: number;
+  }): Promise<
+    Array<{
+      readonly report: TertiaryTerminalReport;
+      readonly contentScan: ReadSideContentScanLabel;
+    }>
+  > {
+    const reports = await this.selectReports(input);
+    return reports.map((report) => ({
+      report,
+      contentScan: buildReadSideContentScanLabel(JSON.stringify(report)),
+    }));
   }
 }
