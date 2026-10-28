@@ -70,6 +70,8 @@ import type { ConversationTaskInsertionController } from "./conversation-task-in
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import type { TaskSequenceManageController } from "./task-sequence-controllers.js";
 import type { MissionRelationIndexStore } from "./mission-relation-index.js";
+import { evaluateWorkWindowResume } from "./work-window-resume.js";
+import type { WorkWindowResumeDecision } from "./work-window-resume.js";
 import {
   buildSingleNodeDecomposition,
   parseAndValidateTaskDecomposition,
@@ -781,6 +783,15 @@ export class MainController {
    * 读取持久化任务链中的未完成任务，按原 mode 重新调度；无未完成任务则幂等返回。
    */
   async resumeMission(missionId: string): Promise<void> {
+    /**
+     * ALIGN-04-04（2026-10-28）：同一 mission 已有活动调度器 ⇒ **幂等跳过**。
+     *
+     * 工作时段恢复/重复唤醒/timer 抖动都可能重复调用本方法；同进程内重复调度
+     * 会让同一任务跑两遍（重复副作用）。这里以"是否有活动编排器"为准，不再启动第二个。
+     */
+    if (this.activeOrchestrators.has(missionId)) {
+      return;
+    }
     /**
      * ALIGN-04-02（2026-10-28）：**恢复前先过只读对账门禁**。
      *
@@ -1498,6 +1509,61 @@ export class MainController {
       restoredConversationCount,
       unresolvedConversationCount,
     };
+  }
+
+  /**
+   * ALIGN-04-04（2026-10-28）：**工作时段恢复的同一入口**。
+   *
+   * 判定由 `evaluateWorkWindowResume`（既有纯函数）给出；只有 `resume-once` 才调用
+   * **同一个** `resumeMission`（不新建队列/不建第二套恢复逻辑）。
+   * - `pauseKind: "manual"` ⇒ 按"手动取消"抑制（人工暂停不因时段变化而复活）；
+   * - `pauseKind: "rest"` ⇒ 只有 rest→working 变化才恢复一次；
+   * - 已在运行/已被拒 ⇒ 如实返回 `didResume:false` 与原因。
+   */
+  async handleWorkWindowResume(input: {
+    readonly missionIdentifier: string;
+    readonly previousState: "working" | "resting";
+    readonly currentState: "working" | "resting";
+    readonly hasPendingResume: boolean;
+    readonly isManuallyCancelled: boolean;
+    readonly hasResumedSinceWake: boolean;
+    /** 暂停来源：人工暂停不会被时段恢复唤醒；休息暂停才允许恢复。 */
+    readonly pauseKind: "manual" | "rest";
+  }): Promise<{
+    readonly decision: WorkWindowResumeDecision["kind"] | "already-running" | "resume-rejected";
+    readonly reason: string;
+    readonly didResume: boolean;
+  }> {
+    const decision = evaluateWorkWindowResume({
+      previousState: input.previousState,
+      currentState: input.currentState,
+      hasPendingResume: input.hasPendingResume,
+      /** 人工暂停优先于一切：即使调用方没把 flag 置真，也按手动取消处理。 */
+      isManuallyCancelled: input.isManuallyCancelled || input.pauseKind === "manual",
+      hasResumedSinceWake: input.hasResumedSinceWake,
+    });
+    if (decision.kind !== "resume-once") {
+      return { decision: decision.kind, reason: decision.reason, didResume: false };
+    }
+    if (this.activeOrchestrators.has(input.missionIdentifier)) {
+      this.options.secondaryDispatchLoop?.notifySchedulingEvent("work-window-resumed");
+      return {
+        decision: "already-running",
+        reason: "该 mission 已有活动调度器：不重复调度（同一任务不跑两遍）。",
+        didResume: false,
+      };
+    }
+    try {
+      await this.resumeMission(input.missionIdentifier);
+    } catch (error) {
+      return {
+        decision: "resume-rejected",
+        reason: `恢复未执行（保持不可用状态）: ${(error as Error).message}`,
+        didResume: false,
+      };
+    }
+    this.options.secondaryDispatchLoop?.notifySchedulingEvent("work-window-resumed");
+    return { decision: "resume-once", reason: decision.reason, didResume: true };
   }
 
   /**
@@ -2514,6 +2580,11 @@ export class MainController {
     void scheduler.start()
       .then(() => {
         this.options.missionRuntimeRegistry?.release(missionId);
+        /**
+         * ALIGN-04-04：调度器结束后清掉"活动编排器"记录。
+         * 否则 `resumeMission` 的幂等守卫会永远把该 mission 当成"仍在运行"。
+         */
+        this.activeOrchestrators.delete(missionId);
       })
       .catch((error: Error) => {
         this.options.missionRuntimeRegistry?.release(missionId);
