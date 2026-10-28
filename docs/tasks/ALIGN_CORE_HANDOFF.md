@@ -201,4 +201,4 @@ ConversationIdentityStore.resolveOrOpen… → MissionManager.createMission → 
 默认开关复核另发现两处缺口（记录未修复，见
 [DEFAULT_SWITCHES_AUDIT_2026-10-29](../reports/DEFAULT_SWITCHES_AUDIT_2026-10-29.md)）：
 `GOAL_MODE_DEFAULT_ENABLED` 是**死常量**（全仓仅定义处 1 次）、
-`isReviewRequiredForMerge` **无法从产品装配打开**（**第 54 轮已修复为可达，默认仍关**，ADR-0090）。
+`isReviewRequiredForMerge` **无法从产品装配打开**（**第 54 轮已修复为可达，默认仍关**，ADR-0090）；同源硬编码 `allowedPathsByTaskType: {}` / `integrationTestCommands: []` **第 55 轮已改为可配置（缺省仍空）**，ADR-0091。

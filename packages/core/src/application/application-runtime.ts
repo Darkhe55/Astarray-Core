@@ -381,6 +381,19 @@ export interface ApplicationRuntimeOptions {
      * 导致"合并前要求审查者"在产品装配里**不可达**。现在可达，但**默认仍关**。
      */
     isReviewRequiredForMerge?: boolean;
+    /**
+     * 收尾第 6 步（2026-10-29）：**任务类型 → 允许修改路径**（仓库相对路径）。
+     *
+     * 此前运行时把它写死为 `{}`（⇒ 任何任务类型都不做 Git 分流）。
+     * 现在可配置；**缺省仍为 `{}`**，行为不变。未列出的任务类型不做 Git 分流。
+     */
+    allowedPathsByTaskType?: Record<string, string[]>;
+    /**
+     * 收尾第 6 步：**集成测试命令**（在仓库目录以 shell 执行，同时作为贡献的测试证据）。
+     *
+     * 此前写死为 `[]`（⇒ 不跑任何集成测试）。现在可配置；**缺省仍为 `[]`**。
+     */
+    integrationTestCommands?: string[];
   };
   /**
    * G4（2026-11-08 第 281 轮）：**工具公开用法登记**（缺省空 ⇒ 不注入任何说明）。
@@ -1695,8 +1708,11 @@ export async function createApplicationRuntime(
             }),
             repositoryPath: options.gitIntegration.repositoryPath,
             targetBranchName: options.gitIntegration.targetBranchName,
-            allowedPathsByTaskType: {},
-            integrationTestCommands: [],
+            /** 收尾第 6 步：可配置；缺省保持空值（行为不变）。 */
+            allowedPathsByTaskType:
+              options.gitIntegration.allowedPathsByTaskType ?? {},
+            integrationTestCommands:
+              options.gitIntegration.integrationTestCommands ?? [],
           },
         }),
     modeMachine,
