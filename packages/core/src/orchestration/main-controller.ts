@@ -153,6 +153,11 @@ export interface MainControllerOptions {
   resolveToolDescriptors?: (task: TaskDependencyNode) => ToolDescriptor[];
   /** T07D-R2-03：Provider 运行时强制要求本地完成控制事件。 */
   requireCompletionControlEvent?: boolean;
+  /**
+   * ALIGN-03-03（2026-10-28）：是否要求 **Worker 完成收据** 才判 `done`（缺省 false）。
+   * 打开后：`success` 但收据缺失/矛盾 ⇒ 任务置 blocked 并升级，**不伪造 done**。
+   */
+  isCompletionReceiptRequired?: boolean;
   /** 显式对话模式（GUI 聊天）。 */
   isConversationMode?: boolean;
   /**
@@ -1880,6 +1885,10 @@ export class MainController {
       secondaryAgentInstanceId: this.resolveSecondaryAgentInstanceIdentifier(missionId),
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
+      /** ALIGN-03-03：完成收据门禁（缺省关；开启后 success 无收据不判 done）。 */
+      ...(this.options.isCompletionReceiptRequired === true
+        ? { isCompletionReceiptRequired: true }
+        : {}),
       onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
@@ -2037,6 +2046,10 @@ export class MainController {
         `scheduler:${missionId}`,
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
+      /** ALIGN-03-03：完成收据门禁（缺省关；开启后 success 无收据不判 done）。 */
+      ...(this.options.isCompletionReceiptRequired === true
+        ? { isCompletionReceiptRequired: true }
+        : {}),
       onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
