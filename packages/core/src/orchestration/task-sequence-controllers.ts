@@ -224,6 +224,105 @@ export class TaskSequenceManageController {
     };
   }
 
+  /**
+   * ALIGN-02-05（2026-10-28）：**原子领取**待执行任务（`pending → running`）。
+   *
+   * 用序列 revision 做乐观并发：读到的 revision 在写入时已被推进 ⇒ `stale-revision`
+   * ⇒ 返回 `false`（**不重试、不抢占**）；状态不是 `pending` ⇒ `false`
+   * （已被领走 ⇒ 同一任务不会被派发两次）。
+   *
+   * 领取不写审计（调用方在派发成功后统一记 `status-change`），
+   * 因此这里**不改任务内容**，只做状态迁移与 revision 推进。
+   */
+  async claimTask(input: {
+    ownerAgentInstanceId: string;
+    sequenceId: string;
+    taskId: string;
+  }): Promise<boolean> {
+    const current = await this.store.readSequence(
+      input.ownerAgentInstanceId,
+      input.sequenceId,
+    );
+    if (current === null) {
+      return false;
+    }
+    const node = current.nodes.find((candidate) => candidate.taskId === input.taskId);
+    if (node === undefined || node.status !== "pending") {
+      return false;
+    }
+    try {
+      await this.store.updateSequence(
+        input.ownerAgentInstanceId,
+        input.sequenceId,
+        current.revision,
+        (document) => {
+          const sequence = this.requireSequence(document);
+          const partialOrder = new TaskSequencePartialOrder(sequence.nodes);
+          partialOrder.transitionStatus(input.taskId, "running", ["pending"]);
+          return this.withNextRevision(sequence, partialOrder.getNodes());
+        },
+      );
+      return true;
+    } catch (error) {
+      if (
+        error instanceof DomainError &&
+        (error.errorCode === "stale-revision" ||
+          error.errorCode === "invalid-task-chain")
+      ) {
+        /** 竞态输家 / 状态已被别人改：如实返回"没领到"，不抛。 */
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * ALIGN-02-05：**释放领取**（`running → pending`）。
+   *
+   * 派发失败/被拒绝时调用，保证任务回到可执行集合 —— 既不会丢任务，
+   * 也不会留下一个"看起来在跑其实没人跑"的假槽位。
+   */
+  async releaseClaim(input: {
+    ownerAgentInstanceId: string;
+    sequenceId: string;
+    taskId: string;
+  }): Promise<boolean> {
+    const current = await this.store.readSequence(
+      input.ownerAgentInstanceId,
+      input.sequenceId,
+    );
+    if (current === null) {
+      return false;
+    }
+    const node = current.nodes.find((candidate) => candidate.taskId === input.taskId);
+    if (node === undefined || node.status !== "running") {
+      return false;
+    }
+    try {
+      await this.store.updateSequence(
+        input.ownerAgentInstanceId,
+        input.sequenceId,
+        current.revision,
+        (document) => {
+          const sequence = this.requireSequence(document);
+          const partialOrder = new TaskSequencePartialOrder(sequence.nodes);
+          partialOrder.transitionStatus(input.taskId, "pending", ["running"]);
+          return this.withNextRevision(sequence, partialOrder.getNodes());
+        },
+      );
+      return true;
+    } catch (error) {
+      if (
+        error instanceof DomainError &&
+        (error.errorCode === "stale-revision" ||
+          error.errorCode === "invalid-task-chain")
+      ) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
   /** 插入新任务：可指定直接前驱/后继锚点；环与未知锚点被拒绝。 */
   async insertTask(input: InsertTaskInput): Promise<AgentTaskSequenceDocument> {
     if (input.task.contextPack !== undefined) {

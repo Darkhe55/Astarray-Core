@@ -55,7 +55,12 @@ export class UnboundedAgentInstanceRegistry {
   constructor(options: UnboundedAgentInstanceRegistryOptions) {
     this.maxConcurrentSlots = options.maxConcurrentSlots;
     this.maxQueueLength = options.maxQueueLength;
-    this.currentOccupiedSlots = options.currentOccupiedSlots ?? (() => 0);
+    /**
+     * ALIGN-02-05（2026-10-28）：**缺省用真实占用**（running 实例数），
+     * 不再默认 `() => 0` —— 恒 0 会让并发准入永远放行，等于没有资源约束。
+     */
+    this.currentOccupiedSlots =
+      options.currentOccupiedSlots ?? (() => this.getOccupiedSlotCount());
     this.canRecycle = options.canRecycle ?? (() => false);
   }
 
@@ -153,6 +158,38 @@ export class UnboundedAgentInstanceRegistry {
   getLiveInstanceCount(): number {
     return [...this.records.values()].filter(
       (record) => record.state !== "recycled",
+    ).length;
+  }
+
+  /**
+   * ALIGN-02-05：**释放准入**（running/queued/paused → created）。
+   *
+   * 用于"领取失败 / 派发失败"时的簿记回退：真实占用要立刻回落，
+   * 否则会留下一个"看起来在跑其实没人跑"的假槽位。
+   * 这不是受控回收（不置 `recycled`、不要求 `canRecycle` 权限）。
+   */
+  releaseAdmission(agentInstanceId: string): void {
+    const record = this.records.get(agentInstanceId);
+    if (record === undefined || record.state === "recycled") {
+      return;
+    }
+    record.state = "created";
+  }
+
+  /** 并发槽上限（资源限制值；只读）。 */
+  getMaximumConcurrentSlots(): number {
+    return this.maxConcurrentSlots;
+  }
+
+  /**
+   * ALIGN-02-05：**真实资源占用** = 状态为 `running` 的实例数。
+   *
+   * 与 `getLiveInstanceCount` 的区别：排队/暂停/已创建的实例**不占**并发槽，
+   * 把它们的数量当占用会虚报槽位（与"占用恒 0"正好相反的错误）。
+   */
+  getOccupiedSlotCount(): number {
+    return [...this.records.values()].filter(
+      (record) => record.state === "running",
     ).length;
   }
 }
