@@ -1,6 +1,6 @@
 # ALIGN-03：下级执行、次级审查集成与报告闭环
 
-日期：2026-10-27。状态：in_progress（01–06 部分交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–07 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -146,5 +146,24 @@ reviewDecision/executedChecks`（本轮又加审查者），但 `finalizeIntegra
 **未做（如实）**：补送**无上限/无退避**（每次心跳重试，可能长期占用 IPC）；积压条数无可观测消费；
 损坏 outbox 文件无清理策略；未跑"失败→保留→补送→只入库一次""同键异内容→拒绝"任何一条，
 也未做子进程崩溃恢复实测。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 07 三级收口：真实生命周期钩子——**部分交付**（2026-10-28）
+
+**审查发现**：`TertiaryAgentLifecycleController` 在生产装配里是**空 hooks** 构造；
+`runPhase` 在 hook 缺失时记为 `none` 并继续 ⇒ 收口"看起来成功"但**没存档案、没写移交、
+没处理 Git 资源**。且 hook 不带个体标识、控制器是共享实例 ⇒ 接线方只能猜"关的是谁"。
+另：`shutdown()` 在生产代码**没有任何调用方**（只有 getter 暴露）。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| hook 带上个体 | `tertiary-lifecycle.ts` | 每个 hook 收到 `agentInstanceId`（无参写法仍兼容） |
+| 真实钩子 | `packages/core/src/orchestration/tertiary-lifecycle-hooks.ts` | 检查点读**自己的**档案 revision（无档案 ⇒ `no-archive`；损坏照常抛错）；移交文件只含**选定**附件哈希 + `doesMergeSiblingMemory:false`；Git 资源如实报 `no-git-allocation`；其余阶段返回明确 `no-*`/`in-process-worker` |
+| 装配 | `application-runtime.ts` | 先建记忆存储 → 构造 hooks → 再用 hooks 构造控制器 |
+
+**未做（如实）**：**没有生产调用方驱动 `shutdown()`**（Worker 是进程内异步任务，编排层不调控制器）；
+Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/接手**未实现；未跑过任何一次真实收口。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。

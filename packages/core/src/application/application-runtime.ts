@@ -116,6 +116,7 @@ import {
   TertiaryAgentLifecycleController,
 } from "../orchestration/tertiary-lifecycle.js";
 import { AgentIndividualMemoryStore } from "../orchestration/agent-individual-memory.js";
+import { buildTertiaryLifecycleHooks } from "../orchestration/tertiary-lifecycle-hooks.js";
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
@@ -660,14 +661,23 @@ export async function createApplicationRuntime(
   });
   // B6R-09：三级生命周期控制器（阶段持久化 + 幂等收口；hooks 由编排层注入）
   const tertiaryLifecyclePhaseStore = new FileTertiaryLifecyclePhaseStore(stateDirectory);
-  const tertiaryLifecycleController = new TertiaryAgentLifecycleController(
-    {},
-    { phaseStore: tertiaryLifecyclePhaseStore },
-  );
   // B6R-09：个体记忆域 + 跨 Agent 附件控制器（Worker 运行时组件；生产装配）
   const agentIndividualMemoryStore = new AgentIndividualMemoryStore({
     baseDirectory: stateDirectory,
   });
+  /**
+   * ALIGN-03-07（2026-10-28）：**真实收口钩子**（此前是空 hooks ⇒ 每阶段静默记为 `none`）。
+   *
+   * 先读个体档案（`persisting-checkpoint`）→ 写只含选定附件的移交文件（`writing-handoff`）
+   * → Git 资源如实报告（`handling-git-resources`）→ 进程内 Worker 无进程可杀。
+   */
+  const tertiaryLifecycleController = new TertiaryAgentLifecycleController(
+    buildTertiaryLifecycleHooks({
+      individualMemoryStore: agentIndividualMemoryStore,
+      handoffDirectoryPath: path.join(stateDirectory, "agent-handoffs"),
+    }),
+    { phaseStore: tertiaryLifecyclePhaseStore },
+  );
   const crossAgentAttachmentController = new CrossAgentContextAttachmentController();
   const tertiaryRuntimeComponents = {
     individualMemoryStore: agentIndividualMemoryStore,
