@@ -21,6 +21,10 @@ import type { AgentTaskSequenceStore } from "./agent-task-sequence-store.js";
 import { TaskBundlePlanner } from "./task-bundle-planner.js";
 import { TaskPriorityPolicy } from "./task-priority-policy.js";
 import { TaskSequencePartialOrder } from "./task-sequence-partial-order.js";
+import {
+  selectReadyTaskUnits,
+  type ReadyTaskGroupSelection,
+} from "./ready-task-group-selection.js";
 import { assertContextPackValid, type ContextPack } from "./context-pack.js";
 
 export interface ActorIdentity {
@@ -579,6 +583,45 @@ export class TaskSequenceStatusController {
       bundles: sequence.bundles.map((bundle) => ({ ...bundle })),
       orderExplanations: partialOrder.explainOrder(),
     };
+  }
+
+  /**
+   * ALIGN-02-03（2026-10-28）：只读选出"这一轮该派的工作单元"。
+   *
+   * 与 `getSnapshot` 同一条鉴权口径（用户或序列 owner）；只读，不改 revision。
+   * 选择规则见 `ready-task-group-selection.ts`：只从 ready set 取、按有效优先级
+   * 排序、任务包整包参与且不拆包。**本方法不派发**——派发接线在 ALIGN-02-05。
+   */
+  async selectNextTaskGroup(input: {
+    ownerAgentInstanceId: string;
+    sequenceId: string;
+    viewer: ActorIdentity;
+    maximumUnitCount: number;
+  }): Promise<ReadyTaskGroupSelection> {
+    if (
+      input.viewer.sourceKind !== "user" &&
+      input.viewer.actorId !== input.ownerAgentInstanceId
+    ) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        `${input.viewer.sourceKind} ${input.viewer.actorId} 无权读取序列 ${input.ownerAgentInstanceId}`,
+      );
+    }
+    const sequence = await this.store.readSequence(
+      input.ownerAgentInstanceId,
+      input.sequenceId,
+    );
+    if (sequence === null) {
+      throw new DomainError(
+        "task-sequence-not-found",
+        `序列不存在: ${input.sequenceId}`,
+      );
+    }
+    return selectReadyTaskUnits({
+      nodes: sequence.nodes,
+      bundles: sequence.bundles,
+      maximumUnitCount: input.maximumUnitCount,
+    });
   }
 }
 
