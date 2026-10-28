@@ -331,6 +331,13 @@ export interface TaskDependencyNode {
   status: TaskDependencyNodeStatus;
   resultLocation: string | null;
   /**
+   * ALIGN-02-02（2026-10-28）：该执行节点的**验收要求**（本地规划产物或降级节点可为空）。
+   *
+   * 语义：这是"做到什么算完成"的声明，**不是**完成证明；完成仍由完成门禁/
+   * 产物登记判定。旧任务链文档没有该字段 ⇒ 读取方按"未声明"处理。
+   */
+  acceptanceCriteria?: string;
+  /**
    * COMM-01-02（2026-10-25）：**本任务的发布者信箱**。
    *
    * 用户澄清："反馈…**每条任务的反馈路径默认走任务发布者的反向通道**"。

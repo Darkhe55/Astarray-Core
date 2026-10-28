@@ -132,6 +132,8 @@ export const taskDependencyNodeSchema = z.object({
   assignedAgentId: z.string().min(1).nullable(),
   status: taskStatusSchema,
   resultLocation: z.string().min(1).nullable(),
+  /** ALIGN-02-02：执行节点的验收要求（可选；旧文档没有该字段）。 */
+  acceptanceCriteria: z.string().min(1).optional(),
 });
 
 export const taskChainSchema = z.object({

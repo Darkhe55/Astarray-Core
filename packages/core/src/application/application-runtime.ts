@@ -34,6 +34,10 @@ import { TaskCallBudgetLedger } from "../infra/task-call-budget-ledger.js";
 import { RunHistoryStore } from "../orchestration/run-history-store.js";
 import { ConversationIdentityStore } from "../orchestration/conversation-identity-store.js";
 import { MAIN_AGENT_TURN_BUDGET_MILLISECONDS } from "../orchestration/main-agent-turn-budget.js";
+import {
+  buildPlannerTaskPlaceholder,
+  createModelBackedTaskDecompositionProvider,
+} from "../orchestration/model-task-decomposition-planner.js";
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import {
   ToolDocumentationRecallInjector,
@@ -297,6 +301,15 @@ export interface ApplicationRuntimeOptions {
    * 超期即中止本轮并落库记账，明确回报"待补信息/待继续"。
    */
   mainAgentTurnBudgetMilliseconds?: number;
+  /**
+   * ALIGN-02-02（2026-10-28）：是否启用**模型背书的任务分解**（缺省 false）。
+   *
+   * 打开后：assist 收到用户消息时先让规划运行时产出分解候选稿，经本地契约校验后
+   * 才写入任务链；校验/规划失败 ⇒ 显式降级为单节点并在摘要标 `single-node-fallback`。
+   * **缺省关**：该路径会真实调用模型，而本卡交付口径不运行模型验证，
+   * 因此默认保持旧行为（摘要标 `legacy-single-node`）。
+   */
+  isModelTaskPlanningEnabled?: boolean;
   /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
@@ -1339,6 +1352,24 @@ export async function createApplicationRuntime(
       ? null
       : new ConversationIdentityStore({ baseDirectory: stateDirectory });
 
+  /**
+   * ALIGN-02-02：模型背书的分解候选稿生产器（**默认不启用**）。
+   *
+   * 需要真实 worker 运行时；未配置时保持旧行为（单节点 + 摘要如实标注）。
+   */
+  const planningWorkerRuntimeFactory = options.workerRuntimeFactory;
+  const taskDecompositionDraftProvider =
+    options.isModelTaskPlanningEnabled === true &&
+    planningWorkerRuntimeFactory !== undefined
+      ? createModelBackedTaskDecompositionProvider({
+          runtimeFactory: (plannerAgentInstanceIdentifier) =>
+            planningWorkerRuntimeFactory(
+              plannerAgentInstanceIdentifier,
+              buildPlannerTaskPlaceholder(),
+            ),
+        })
+      : undefined;
+
   const controller = new MainController({
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
@@ -1362,6 +1393,10 @@ export async function createApplicationRuntime(
      * 复用已装配的 `sequenceManageController`，不另建第二套序列。
      */
     taskSequenceManageController: sequenceManageController,
+    /** ALIGN-02-02：模型分解（缺省不传 ⇒ 单节点旧行为，摘要标 legacy-single-node）。 */
+    ...(taskDecompositionDraftProvider === undefined
+      ? {}
+      : { taskDecompositionDraftProvider }),
     /**
      * ALIGN-01-05（2026-10-28）：主 Agent 单条处理预算（默认 180 秒）+ 超期落库。
      *

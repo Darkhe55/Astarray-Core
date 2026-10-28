@@ -1,6 +1,6 @@
 # ALIGN-02：统一偏序集、任务组和次级持续调度
 
-日期：2026-10-27。状态：in_progress（01 已交付 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01 已交付；02 部分交付；均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -40,3 +40,24 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 
 **验证状态**：未编写/未运行测试、未人工验收；`npm run typecheck` exit 0、
 `npx eslint <本批文件>` exit 0、`npm run build` 成功。⇒ **implemented-unverified**。
+
+### 02 任务分解：本地强制校验 + 显式降级——**部分交付**（2026-10-28）
+
+**审查发现**：`decomposePromptForScriptedRun` 固定生成 T-001 单节点，等于"没有规划"。
+
+**交付**：
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 校验契约 | `packages/core/src/orchestration/task-decomposition-contract.ts` | 严格白名单字段、节点 1..12、id 唯一合法、描述与验收非空、依赖存在且无环（报完整环路）、工具子集；产出节点恒 pending / assignedAgentId null |
+| 候选稿生产器 | `model-task-decomposition-planner.ts` | 单轮规划提示词 + 120s 预算 + JSON 抽取；拿不到 JSON 即失败，不编造 |
+| 三种结果 | `main-controller.ts` `planTaskDecomposition` | `model` / `single-node-fallback`（含原因 + `[规划降级]` 提示）/ `legacy-single-node` |
+| 落盘 | `mission-manager.ts` `taskPlanningOutcome` + `taskPlanningFallbackReason` | 降级不得伪装成"已规划" |
+| 装配 | `application-runtime.ts` | `isModelTaskPlanningEnabled` **默认 false**；开启且存在 worker 运行时才构造 |
+
+**为什么只是部分交付**：默认关闭 ⇒ 默认路径仍是单节点（摘要如实标 `legacy-single-node`）。
+开启后才会真正规划；而本卡口径**禁止运行模型验证**，默认开启等于把未验证行为推给所有任务，
+故不做。项目摘要来源（`projectSummaryProvider`）也尚未装配。
+
+**未做**：真实模型验证、项目摘要接线、复用既有分解、调度消费分解结果（02-03/05）。
+
+**验证状态**：未编写/未运行测试、未调用真实模型；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
