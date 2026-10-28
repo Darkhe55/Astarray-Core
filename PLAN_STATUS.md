@@ -348,9 +348,23 @@
 > **无首次绑定流程**（谁有权写绑定未约束）、**无独立短授权通道**、运行时未接线、
 > 投递幂等仅靠端口承诺（属 03）。
 >
-> **㊷ 下一步**：REMOTE-01-03（幂等 outbox 与 unknown 语义：稳定 operation id + interaction revision，
-> 重试读回执；必填字段/格式/长度/内容 hash/目标账户设备/授权 revision 不完整不发送；
-> 没有明确回执一律 unknown；不自动换目标、直接尝试其它账户/公开链接/邮件）。
+> **㊷ REMOTE-01-03 部分交付**：此前投递只有"端口必须幂等"的注释 —— **没有稳定 operation id、
+> 没有回执读取、没有 unknown 状态、没有目标不可改约束**（平台受理但未送达会被当成"已送达"）。
+> 新增 `remote-delivery-outbox.ts`：稳定 `operationIdentifier + interactionRevision + contentHash +
+> authorizationRevision`；**不完整不发送**（必填/格式/长度/哈希/授权 revision）；
+> **入队幂等**（同 id 不同内容 ⇒ 拒绝）；**先读回执**（明确 ack ⇒ sent；受理后无回执 ⇒ **unknown**）；
+> **unknown 不自动重发**（需显式 `isResendAfterUnknown`）；**目标不可变**（拒绝自动换目标）；
+> outbox 落盘 `<state>/remote-delivery/outbox.json`。已接入 `deliverEvidenceExport`。
+> **未做**：**无真实传输适配器**（IM 未接）、无定时重试/退避、无 unknown 处置入口（CLI/UI）、
+> `authorizationRevision` 递增语义未固化、运行时未构造 outbox/transport。
+>
+> **㊸ REMOTE-01 整卡结论**：3 个检查点**全部部分交付**，整卡**未闭合**。硬缺口：
+> ①无 IM 平台适配器（验签/发送/回执都只有契约）；②无首次绑定确认流程与独立授权通道；
+> ③无 unknown 处置入口；④全部行为无运行证据。
+>
+> **㊹ 下一步**：转入 **GOAL-02**（有界目标稳定性：边界达成前保持活跃但每轮推进、
+> 不因困难/漫长跳做无关任务、可暂停/补充预算/重定向，把"受限/未知/不可用/待授权"
+> 与缺陷分开，持久策略不被异常永久覆盖）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
