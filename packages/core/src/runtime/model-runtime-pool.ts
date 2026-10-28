@@ -8,10 +8,7 @@
  * - 缓存只保存已解析配置，不保存对话、权限、用量或当前 Agent。
  */
 import type { AgentRuntime } from "../core/types.js";
-import type {
-  ProviderRuntimeDescriptor,
-  ResolvedProviderRuntime,
-} from "./provider-runtime-registry.js";
+import type { ResolvedProviderRuntime } from "./provider-runtime-registry.js";
 
 export interface ModelRuntimeConfiguration {
   readonly configurationKey: string;
