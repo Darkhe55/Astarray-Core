@@ -546,9 +546,17 @@
 > 连续多次 `git push` 失败（`Could not read from remote repository` / `send-pack: unexpected disconnect`）。
 > 按纪律：本阶段跳过推送并记录原因，**下一阶段合并后再试**；远端未改写。
 >
-> **62 下一步**：给**记忆读取**补同款标注（最小改动：新增 `readMemoryArchiveWithScanLabel`
-> 或可选字段），使通道 12 的三块派生内容在**读写两侧**都有结论；随后进入收尾阶段
-> （复核台账、更新交接文档、明确 60 轮未闭合项）。
+> **62 通道 12 记忆读取标注（部分，通道 12 读写两侧收口）**：新增
+> `readMemoryArchiveWithScanLabel`（与 `readMemoryArchive` **同一读取/校验**；
+> 返回 `{archive, contentScan}`，不存在 ⇒ 两者都 null；标注由全部观察 summary 拼接计算，
+> **只标注、不改内容、不阻断**），`readMemoryArchive` **不变**、**不改 archive schema**。
+> 矩阵通道 12 更新为"摘要/报告/**记忆**读取侧已加标注"。
+> **未做**：**注入侧仍无路径**（没有任何地方把带标注的派生内容注入提示词）、无 UI、
+> 标注不阻断、**无分条标注**（只给整份记忆一个结论）、未跑任何一条。
+>
+> **63 下一步**：进入**收尾阶段**第 1 步 —— 更新 [ALIGN_CORE_HANDOFF](astarray/docs/tasks/ALIGN_CORE_HANDOFF.md)：
+> 把本轮窗口新增的 12 个 ADR（0078–0089）按"接口/组件/生产接线/代码完成/运行证据"五层
+> 补进交接表，并刷新 §3 结构性问题与 §6 接线清单（标注已接线项与仍悬空项）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
