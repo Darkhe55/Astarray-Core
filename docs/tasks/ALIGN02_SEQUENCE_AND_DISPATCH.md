@@ -1,6 +1,6 @@
 # ALIGN-02：统一偏序集、任务组和次级持续调度
 
-日期：2026-10-27。状态：in_progress（01 已交付；02–03、05 部分交付；均 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01 已交付；02–03、05–06 部分交付；均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -103,5 +103,26 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 用 `reassignTask` 当派发是错语义），`registerMissionPorts` 无生产调用方；
 权威序列的 `task-<missionId>` 与 mission 任务链**仍是两套记账**（序列任务会停在 pending）；
 未做"领取 → 失败 → 释放 → 再领取"实测与并发竞态实测。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 06 运行中插入：本地判定 + 安全推迟——**部分交付**（2026-10-28）
+
+**审查发现**：`InstructionWindowStore` 只管指令准入/排队/回执，**没有任务组插入**；
+`DagScheduler` 没有插入能力（只有 finish/release/block/cancel/reassign/unblock）；
+`MissionOrchestrator` 无对外插入入口 ⇒ "插进正在跑的组"没有安全执行面。
+
+**交付**：
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 判定契约 | `packages/core/src/orchestration/task-group-insertion-contract.ts` | 严格白名单解析；固定判定顺序（幂等 → revision → 锚点 → 组关闭 → 工具调用）；四类结果 |
+| 入口 | `main-controller.ts` `requestRuntimeTaskInsertion` | 组状态取自 mission 摘要+任务链；`insert-now` 且有端口才注入，否则**登记进同一序列等待下一组**并给原因 |
+
+**关键不变量**：不改写已发出的工具调用（组内有 running 任务即按保守处理）、
+不重跑已完成任务、revision 不符拒绝（要求重读）、推迟不丢任务、幂等键防重复。
+
+**未做（如实）**：**没有生产注入端口**（编排器/DAG 无插入能力）⇒ 目前每个请求都推迟到
+下一组；幂等指纹只在进程内；`acceptanceCriteria` 未落序列节点；锚点统一退化为"用户任务前驱"；
+未做端到端与并发实测。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
