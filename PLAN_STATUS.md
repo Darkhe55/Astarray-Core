@@ -455,9 +455,22 @@
 > 遍历"因休息被暂停"的 mission 那一步没做，也没有 mission 清单来源）；CLI/TUI 未接；
 > 真实时钟下的跨天边界/时区/时钟跳变未验证。
 >
-> **53 下一步**：清单第 ⑤ 项 —— REMOTE-01 的**传输适配器缺口**处置：先核实仓库里是否存在
-> 任何 IM/Webhook 发送实现（含 `astarray-ui` 私有仓边界），若不存在则把 REMOTE-01 明确标为
-> **平台阻塞**（记录"缺什么平台能力、需要什么凭据/权限、解除条件"），不假装已实现投递。
+> **53 清单第 ⑤ 项：REMOTE-01 标为平台阻塞（不做假投递）**：新增
+> [REMOTE01_PLATFORM_BLOCK_2026-10-28.md](astarray/docs/reports/REMOTE01_PLATFORM_BLOCK_2026-10-28.md)。
+> **检索证据**：公开仓 `webhook|feishu|dingtalk|slack|telegram|wecom|nodemailer|smtp` **0 命中**；
+> 私有仓同模式 + `RemoteEvidenceExportService|RemoteDeliveryTransportPort` **0 命中**；
+> core 网络出口只有注入的 `fetchImpl`/transport 端口（`fetch(|http.request|undici` 0 命中）；
+> UI 的 46 处 `fetch(`/`http.request` **全部指向本地 GUI server 或集成测试**。
+> ⇒ `RemoteDeliveryTransportPort` **只有接口没有实现**，投递面是**平台阻塞**，不是代码缺陷；
+> REMOTE-01 卡状态改为 **blocked（平台阻塞）**，并列出 6 条**可验收解除条件**
+> （测试租户 / 签名测试向量 / 回执查询 / sent·unknown·refused 三态演练 / 凭据只经本地注入 /
+> 明确限流重试语义）。
+> **连带结论**：SEC-02-04 外发门禁同样无生产调用方（没有投递链路可挂）——
+> 外发门禁接线应排在平台接入**之后**。
+>
+> **54 下一步**：清单第 ⑥ 项 —— 目标模式接进派发与恢复：先做**只读接线**（把
+> `GoalDispatchGate.assertDispatchAllowed` 作为 `launchMissionOrThrow` 前的可选前置检查，
+> 开关默认关；只记录判定不改变派发），把"门禁未接线"变成"门禁可被观察到"。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
