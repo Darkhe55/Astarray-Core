@@ -446,7 +446,7 @@ export class MissionOrchestrator {
       agentInstanceId: this.options.secondaryAgentInstanceId,
       claimantDescription: "mission-orchestrator-run-session",
     });
-    if (outcome.status !== "acquired") {
+    if (outcome.status !== "acquired" && outcome.status !== "acquired-reentrant") {
       throw new DomainError(
         "mission-locked",
         `mission 存在其他进程的${outcome.status === "locked-stale" ? "过期待接管" : "活动"}租约（属主 ${outcome.lease.processInstanceId}）: ${this.options.missionId}`,

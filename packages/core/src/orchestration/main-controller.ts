@@ -802,6 +802,24 @@ export class MainController {
     if (missionStatus.taskChain === null) {
       throw new DomainError("mission-not-found", `任务不存在: ${missionId}`);
     }
+    /**
+     * ALIGN-04-03（2026-10-28）：**未完成 ≠ 可以自动重跑**。
+     *
+     * 运行中（崩溃时在途，副作用未知）、阻塞（等待裁决）、已产出未回执这三类任务
+     * 必须先对账/裁决；存在任何一类就**拒绝自动恢复**并列出具体任务。
+     */
+    const resumeReadiness = this.projectMissionResumeReadiness(missionStatus.taskChain);
+    if (!resumeReadiness.isAutoResumable) {
+      throw new DomainError(
+        "mission-locked",
+        `不自动恢复（需先对账/裁决）: ${resumeReadiness.blockedReasons.join("；")}`,
+      );
+    }
+    /**
+     * ALIGN-04-03：**恢复租约幂等领取**。过期租约按 revision 乐观接管；
+     * 别的进程仍持活动租约 ⇒ 拒绝接管（不抢正在跑的 mission）。
+     */
+    await this.prepareResumeLease(missionId);
     const resumeWorkWindowDecision = await this.options.workWindowGateDecisionProvider?.({
       missionId,
       projectIdentifier: this.missionProjectIdentifiers.get(missionId) ?? null,
@@ -1480,6 +1498,150 @@ export class MainController {
       restoredConversationCount,
       unresolvedConversationCount,
     };
+  }
+
+  /**
+   * ALIGN-04-03（2026-10-28）：只读的"恢复就绪"投影（对账用，**不启动任务**）。
+   *
+   * 与 `resumeMission` 用同一份判定逻辑，供 UI/CLI 在恢复前展示：
+   * 哪些已完成、哪些 ready、哪些等依赖、哪些副作用未知/待裁决/已产出未回执。
+   */
+  async inspectMissionResumeReadiness(missionId: string): Promise<{
+    readonly missionIdentifier: string;
+    readonly isAutoResumable: boolean;
+    readonly readyPendingTaskIdentifiers: readonly string[];
+    readonly waitingDependencyTaskIdentifiers: readonly string[];
+    readonly uncertainSideEffectTaskIdentifiers: readonly string[];
+    readonly blockedAwaitingDecisionTaskIdentifiers: readonly string[];
+    readonly producedButUnacknowledgedTaskIdentifiers: readonly string[];
+    readonly blockedReasons: readonly string[];
+  }> {
+    const missionStatus = await this.options.missionManager.getMissionStatus(missionId);
+    if (missionStatus.taskChain === null) {
+      return {
+        missionIdentifier: missionId,
+        isAutoResumable: false,
+        readyPendingTaskIdentifiers: [],
+        waitingDependencyTaskIdentifiers: [],
+        uncertainSideEffectTaskIdentifiers: [],
+        blockedAwaitingDecisionTaskIdentifiers: [],
+        producedButUnacknowledgedTaskIdentifiers: [],
+        blockedReasons: ["mission 任务链不存在"],
+      };
+    }
+    return {
+      missionIdentifier: missionId,
+      ...this.projectMissionResumeReadiness(missionStatus.taskChain),
+    };
+  }
+
+  /** ALIGN-04-03：判定"能不能自动恢复"，并分类列出原因（纯函数式，只读输入）。 */
+  private projectMissionResumeReadiness(taskChain: TaskChainDocument): {
+    isAutoResumable: boolean;
+    readyPendingTaskIdentifiers: string[];
+    waitingDependencyTaskIdentifiers: string[];
+    uncertainSideEffectTaskIdentifiers: string[];
+    blockedAwaitingDecisionTaskIdentifiers: string[];
+    producedButUnacknowledgedTaskIdentifiers: string[];
+    blockedReasons: string[];
+  } {
+    const completedTaskIdentifiers = new Set(
+      taskChain.tasks.filter((task) => task.status === "done").map((task) => task.id),
+    );
+    const readyPendingTaskIdentifiers: string[] = [];
+    const waitingDependencyTaskIdentifiers: string[] = [];
+    const uncertainSideEffectTaskIdentifiers: string[] = [];
+    const blockedAwaitingDecisionTaskIdentifiers: string[] = [];
+    const producedButUnacknowledgedTaskIdentifiers: string[] = [];
+    for (const task of taskChain.tasks) {
+      if (task.status === "done") {
+        continue;
+      }
+      /**
+       * 崩溃时处于 `running` ⇒ 可能已产生副作用但无回执：**不自动重跑**。
+       * `blocked` ⇒ 等待裁决（不确定副作用/等待授权）：同样不自动放行。
+       */
+      if (task.status === "running") {
+        uncertainSideEffectTaskIdentifiers.push(task.id);
+        continue;
+      }
+      if (task.status === "blocked") {
+        blockedAwaitingDecisionTaskIdentifiers.push(task.id);
+        continue;
+      }
+      /** 已产出（有 resultLocation）但尚未 done ⇒ 先对账，不盲目重跑。 */
+      if (task.resultLocation !== null && task.resultLocation !== "") {
+        producedButUnacknowledgedTaskIdentifiers.push(task.id);
+        continue;
+      }
+      if (task.status === "pending") {
+        const isReady = task.dependsOn.every((dependencyId) =>
+          completedTaskIdentifiers.has(dependencyId),
+        );
+        (isReady ? readyPendingTaskIdentifiers : waitingDependencyTaskIdentifiers).push(
+          task.id,
+        );
+      }
+    }
+    const blockedReasons: string[] = [];
+    if (uncertainSideEffectTaskIdentifiers.length > 0) {
+      blockedReasons.push(
+        `运行中任务副作用未知，需先对账: ${uncertainSideEffectTaskIdentifiers.join(", ")}`,
+      );
+    }
+    if (blockedAwaitingDecisionTaskIdentifiers.length > 0) {
+      blockedReasons.push(
+        `阻塞任务等待裁决: ${blockedAwaitingDecisionTaskIdentifiers.join(", ")}`,
+      );
+    }
+    if (producedButUnacknowledgedTaskIdentifiers.length > 0) {
+      blockedReasons.push(
+        `任务已产出但未回执，需先对账: ${producedButUnacknowledgedTaskIdentifiers.join(", ")}`,
+      );
+    }
+    return {
+      isAutoResumable: blockedReasons.length === 0,
+      readyPendingTaskIdentifiers,
+      waitingDependencyTaskIdentifiers,
+      uncertainSideEffectTaskIdentifiers,
+      blockedAwaitingDecisionTaskIdentifiers,
+      producedButUnacknowledgedTaskIdentifiers,
+      blockedReasons,
+    };
+  }
+
+  /**
+   * ALIGN-04-03：恢复前的**租约幂等领取**。
+   *
+   * - 无租约 ⇒ 交给编排器正常领取；
+   * - 别的进程持有**活动**租约 ⇒ 拒绝（不抢正在跑的 mission）；
+   * - 过期租约（原进程已死） ⇒ 按 revision 乐观接管，重试幂等；
+   * - 本进程已持有 ⇒ 什么都不做（`tryAcquire` 会返回 `acquired-reentrant`）。
+   */
+  private async prepareResumeLease(missionId: string): Promise<void> {
+    const leaseStore = this.options.missionLeaseStore;
+    const processInstanceId = this.options.processInstanceId;
+    if (leaseStore === null || leaseStore === undefined || processInstanceId === undefined) {
+      return;
+    }
+    const leaseSummary = await leaseStore.readLeaseSummary(missionId, processInstanceId);
+    if (!leaseSummary.exists) {
+      return;
+    }
+    if (leaseSummary.isActive && !leaseSummary.isOwnedByCurrentProcess) {
+      throw new DomainError(
+        "mission-locked",
+        `另一个进程持有活动租约（属主 ${leaseSummary.ownerProcessInstanceId ?? "未知"}）：不接管正在运行的 mission。`,
+      );
+    }
+    if (!leaseSummary.isActive && leaseSummary.leaseRevision !== null) {
+      await leaseStore.takeOverExpiredLease(missionId, leaseSummary.leaseRevision, {
+        missionId,
+        processInstanceId,
+        purpose: "run",
+        claimantDescription: "main-controller-resume",
+      });
+    }
   }
 
   /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */

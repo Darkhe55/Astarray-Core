@@ -1,6 +1,6 @@
 # ALIGN-04：主干重启恢复与完成状态纠偏
 
-日期：2026-10-27。状态：in_progress（01–02 部分交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–03 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -60,5 +60,27 @@
 **未做（如实）**：门禁**默认关闭**；只拦不代劳（不执行 Git/worktree/人工改动对账）；
 租约冲突未纳入判定；`reauthorizationRequiredTypes` 未被消费；未跑"损坏 ⇒ 拒绝""需对账 ⇒ 拒绝"
 "正常 ⇒ 续接"任何一条。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 03 就绪分类 / 已产出待对账 / 租约幂等领取——**部分交付**（2026-10-28）
+
+**审查发现**：`resumeMission` 把**所有非 done 任务**整体重跑 —— 包括崩溃时 `running`（副作用未知）、
+`blocked`（等待裁决）、以及**已写 `resultLocation` 却未回执**的任务。租约 `tryAcquire`
+对**同进程重入**也返回 `locked-active`（恢复把自己挡在门外）；`takeOverExpiredLease` **零调用方**，
+编排器遇到 `locked-stale` 只抛"过期待接管"。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 就绪分类 | `main-controller.ts` `projectMissionResumeReadiness` | running ⇒ 副作用未知；blocked ⇒ 等待裁决；resultLocation 非空未 done ⇒ 已产出未回执；任一类存在 ⇒ `isAutoResumable=false` |
+| 只读投影 | `inspectMissionResumeReadiness(missionId)` | 同分类 + ready/等待依赖分开；**查看不启动任务** |
+| 恢复拒绝 | `resumeMission` | 不可自动恢复 ⇒ `mission-locked` + 具体任务清单 |
+| 租约幂等 | `infra/mission-lease-store.ts` `tryAcquire` | 同 `processInstanceId` 重入 ⇒ `acquired-reentrant`；编排器同时接受两种 acquired |
+| 租约接管 | `main-controller.ts` `prepareResumeLease` | 别的进程活动租约 ⇒ 拒绝；**过期租约**按 revision CAS 接管；本进程持有则跳过 |
+
+**未做（如实）**：**没有对账动作**（不会把 running/blocked/已产出任务放回 pending 或记录对账结论）；
+已产出核对只看"有没有 resultLocation"；租约接管只处理**已过期**（不探测"属主进程已死但未过期"）；
+未跑"崩溃 running ⇒ 拒绝恢复""过期租约 ⇒ 接管成功"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
