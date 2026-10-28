@@ -532,9 +532,19 @@
 > **读取侧无检查**、拒绝没有专门的用户提示（表现为普通领域错误）、无计数/诊断入口、
 > 可能让含命中文本的历史汇报写入失败（fail-closed 代价）。
 >
-> **60 下一步**：接入**读取侧标注**（最小改动）：在 `summary-read-service` 的视图与
-> `MainAgentReportReader` 的返回里加"扫描结论/规则版本"字段（只标注、不改内容、
-> 不阻断现有读取），让"这份派生内容是否被检查过"在被使用前可见。
+> **60 通道 12 读取侧标注（部分）**：写入侧已加闸，但读取方**无法知道**手上的摘要/报告
+> "是否被检查过、结论是什么"。新增 `tools/read-side-content-scan.ts`
+> `buildReadSideContentScanLabel`（四态结论 + 规则版本 + 命中规则 + 时间 +
+> `isEvaluatedAtReadTime: true` + `isClean`，**不含正文**）：**只标注、不改内容、不阻断**。
+> 接入：`readSummaryOverview` / `expandSummarySection` 的视图新增**可选** `contentScan`
+> （旧调用方忽略即可）；报告侧新增 `selectReportsWithScanLabels`（**不改** `selectReports`
+> 返回形状、不改持久化 schema）。矩阵通道 12 更新为"摘要/报告读取侧已加标注"。
+> **未做**：**记忆读取无标注**（`readMemoryArchive` 原样返回）、**注入侧仍无路径**、
+> 无 UI、**标注不是阻断**（`isClean:false` 时调用方仍可能使用）、每次读取重扫（有界）。
+>
+> **61 下一步**：给**记忆读取**补同款标注（最小改动：新增 `readMemoryArchiveWithScanLabel`
+> 或可选字段），使通道 12 的三块派生内容在**读写两侧**都有结论；随后进入收尾阶段
+> （复核台账、更新交接文档、明确 60 轮未闭合项）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
