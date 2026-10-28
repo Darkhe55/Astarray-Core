@@ -1121,6 +1121,8 @@ export async function createApplicationRuntime(
       requestingAgentInstanceId: input.agentInstanceId,
       protectedStoragePolicy,
       sensitiveContentAccessPolicy,
+      /** SEC-02-03（2026-10-28）：生产装配要求敏感策略存在，缺失即拒绝读取。 */
+      requireSensitiveContentPolicy: true,
       readSuppressionLedger,
       localToolPolicyEngine,
       ponderGitRepositoryPath: taskWorkspaceBoundary.getWorkspaceRoot(),

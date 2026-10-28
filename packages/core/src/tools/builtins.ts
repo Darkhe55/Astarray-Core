@@ -61,10 +61,20 @@ export interface BuiltinToolExecutionContext {
   /** T06B：Ponder 只读 git 视图的工作仓库目录（通常为工作区根）。 */
   ponderGitRepositoryPath?: string | null;
   /**
-   * T06C：全模式敏感内容禁读策略（所有模式、所有读通道执行前检查；
-   * 未装配时跳过策略——由装配方保证注入）。
+   * T06C：全模式敏感内容禁读策略（所有模式、所有读通道执行前检查）。
+   *
+   * SEC-02-03（2026-10-28）：**未装配时的行为由 `requireSensitiveContentPolicy` 决定** ——
+   * 生产装配要求策略存在，缺失即拒绝读取（不静默放行）。
    */
   sensitiveContentAccessPolicy?: SensitiveContentAccessPolicy | null;
+  /**
+   * SEC-02-03（2026-10-28）：**生产装配必须要求敏感策略存在**。
+   *
+   * 为 true 且策略缺失 ⇒ 读取类操作直接拒绝（`sensitive-content-read-denied`），
+   * **不静默放行**。缺省 false 只为兼容既有测试替身；生产装配由
+   * `policy-wrapper` 透传 `true`。
+   */
+  requireSensitiveContentPolicy?: boolean;
   /**
    * T07B：反自指读取账本（同源重复读取未变化内容时抑制；
    * 敏感内容禁读优先于时间锁）。
@@ -465,8 +475,8 @@ export async function executeBuiltinTool(
             .includes(entryName),
         );
       // T06C：过滤敏感条目（.env/凭据/私钥等），不泄露敏感名称
-      const sensitivePolicy = executionContext.sensitiveContentAccessPolicy;
-      if (sensitivePolicy !== null && sensitivePolicy !== undefined) {
+      const sensitivePolicy = resolveSensitiveContentPolicy(executionContext, "列出目录");
+      if (sensitivePolicy !== null) {
         visibleEntries = sensitivePolicy.filterSensitiveDirectoryEntries(
           resolvedPath,
           visibleEntries,
@@ -686,11 +696,16 @@ export async function executeBuiltinTool(
         )!,
         argumentsJson,
       });
+      /** SEC-02-03：检索同样受"生产必须装配敏感策略"约束（缺失即拒绝，不静默放行）。 */
+      const searchSensitivePolicy = resolveSensitiveContentPolicy(
+        executionContext,
+        "检索项目文本",
+      );
       const matches = await searchProjectText(
         executionContext.workspaceBoundary.getWorkspaceRoot(),
         pattern,
         localEngine,
-        executionContext.sensitiveContentAccessPolicy ?? null,
+        searchSensitivePolicy,
       );
       return { outputText: matches, isSideEffectFree: true };
     }
@@ -727,8 +742,11 @@ export async function executeBuiltinTool(
       const outputText =
         result.stdoutText.trim() === "" ? "（无输出）" : result.stdoutText;
       // T06C：git 视图输出做 DLP 扫描（固定视图无正文，防御未来视图扩展）
-      const sensitivePolicy = executionContext.sensitiveContentAccessPolicy;
-      if (sensitivePolicy !== null && sensitivePolicy !== undefined) {
+      const sensitivePolicy = resolveSensitiveContentPolicy(
+        executionContext,
+        "返回 Git 视图输出",
+      );
+      if (sensitivePolicy !== null) {
         await sensitivePolicy.assertSensitiveContentReadAllowed({
           canonicalPath: repositoryPath,
           content: outputText,
@@ -1026,21 +1044,50 @@ async function resolveAndAssertAccess(
 
 /**
  * T06C：全模式敏感内容禁读检查（路径身份 + 可选内容 DLP）。
- * 未装配策略时放行（装配方负责注入）；命中抛 sensitive-content-read-denied。
+ * 命中抛 sensitive-content-read-denied。
+ *
+ * SEC-02-03：策略未装配时的行为见 `resolveSensitiveContentPolicy` ——
+ * 生产（`requireSensitiveContentPolicy`）缺失即拒绝，测试替身才回退旧行为。
  */
 async function assertSensitiveContentAllowed(
   executionContext: BuiltinToolExecutionContext,
   canonicalPath: string,
   content: string | null,
 ): Promise<void> {
-  const sensitivePolicy = executionContext.sensitiveContentAccessPolicy;
-  if (sensitivePolicy === null || sensitivePolicy === undefined) {
+  const sensitivePolicy = resolveSensitiveContentPolicy(executionContext, "读取内容");
+  if (sensitivePolicy === null) {
     return;
   }
   await sensitivePolicy.assertSensitiveContentReadAllowed({
     canonicalPath,
     content: content ?? undefined,
   });
+}
+
+/**
+ * SEC-02-03（2026-10-28）：解析敏感策略，**缺装配时按需 fail-closed**。
+ *
+ * 旧实现在策略缺失时直接 `return`（静默放行）。现在：
+ * - 装配了 ⇒ 返回策略；
+ * - 未装配且 `requireSensitiveContentPolicy === true` ⇒ 抛
+ *   `sensitive-content-read-denied`（生产装配走这条）；
+ * - 未装配且未要求（既有测试替身）⇒ 返回 null（显式隔离，由调用方继续旧行为）。
+ */
+function resolveSensitiveContentPolicy(
+  executionContext: BuiltinToolExecutionContext,
+  operationDescription: string,
+): SensitiveContentAccessPolicy | null {
+  const sensitivePolicy = executionContext.sensitiveContentAccessPolicy;
+  if (sensitivePolicy !== null && sensitivePolicy !== undefined) {
+    return sensitivePolicy;
+  }
+  if (executionContext.requireSensitiveContentPolicy === true) {
+    throw new DomainError(
+      "sensitive-content-read-denied",
+      `敏感内容策略未装配：拒绝${operationDescription}（不静默放行）。`,
+    );
+  }
+  return null;
 }
 
 /**

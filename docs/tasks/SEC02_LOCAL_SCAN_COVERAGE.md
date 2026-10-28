@@ -1,5 +1,5 @@
 # SEC-02：本地敏感扫描完整性与外发边界
-日期：2026-10-28。状态：in_progress（01–02 部分交付，implemented-unverified；03–07 未开始）。
+日期：2026-10-28。状态：in_progress（01–03 部分交付，implemented-unverified；04–07 未开始）。
 
 执行规则：每轮只做一个编号检查点，超过三小时拆分；先核对当前代码和在途改动，已有能力复用。覆盖、删减前由工具备份；不覆盖他人工作。必须更新本卡状态和交付记录；共享台账存在并行冲突时提交独立状态补丁，不以未授权为由跳过状态记录。本卡不授权安装、真实付费模型调用、外发消息、提交推送或自动启用实验功能。需要依赖时先询问已有资源。沿用用户此前不要求编写/运行测试的交付口径，本卡列出验收条件但不自行执行测试或宣称通过；代码完成只能标 implemented-unverified。变量名必须可读，时间单位明确。公共核心只放通用契约，不复制私有界面实现或设计。
 
@@ -118,5 +118,26 @@
 **未做（如实）**：**覆盖表（05）未写**、通道矩阵（06）未做、高熵信号未使用、
 无稳定前缀厂商（智谱/云知声）未登记、日志换行注入防护未做；未用人工假凭据跑过任何规则，
 也没有"两视图覆盖差异"的自动化守卫。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 03 生产入口 fail-closed + 硬链接身份——**部分交付**（2026-10-28）
+
+**审查发现**：`builtins.ts` 三处敏感策略调用全是**条件式**（缺失即放行），
+`assertSensitiveContentAllowed` 在策略缺失时**直接 return**；`searchProjectText` 也把
+`policy ?? null` 传下去 ⇒ **装配漏注入 = 静默放行**，且无启动期检查。
+身份侧：`SensitiveResourceIdentity` 已有 `deviceInode`，但 `matchSensitivePath` 只比三种**路径视图**，
+**硬链接别名识别不了**。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| fail-closed 装配 | `builtins.ts` `resolveSensitiveContentPolicy` | 新增 `requireSensitiveContentPolicy`；为 true 且策略缺失 ⇒ `sensitive-content-read-denied`（覆盖 readFile/listDirectory/gitReadonlyView/searchProjectText） |
+| 生产恒要求 | `policy-wrapper.ts` + `application-runtime.ts` | 透传并在生产 wrapper 置 `true`；测试替身不设该标志才保留旧行为 |
+| 硬链接身份 | `sensitive-content-access-policy.ts` | 管理员扩展路径建 `dev+inode` 缓存；路径视图不匹配但 inode 命中 ⇒ `admin-extended-identity`；解析失败记为未知（不作安全结论） |
+| 入口清单 | `docs/adr/0069-…md` | 只登记**已核实**的 4 个入口；文档转换/OCR、插件/MCP、子进程输出、缓存、报告导出、模型最终出口标 **未覆盖**（附检索依据） |
+
+**未做（如实）**：**TOCTOU 未解决**（无句柄读取/读取后复核）；硬链接身份只覆盖管理员扩展路径；
+未覆盖通道仍未取证据；未跑"缺策略 ⇒ 拒绝""硬链接别名 ⇒ 拒绝"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
