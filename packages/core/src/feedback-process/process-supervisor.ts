@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
+import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 import type { FeedbackIpcMessage } from "./ipc-protocol.js";
 import type { FeedbackMessage } from "../core/types.js";
 import { ForkFeedbackClient } from "./transport.js";
@@ -136,7 +137,17 @@ export class FeedbackProcessSupervisor {
     // 反馈进程一旦继承 stdout 就会污染机器可读输出。
     const childProcess = fork(this.modulePath, [], {
       stdio: ["ignore", "pipe", "inherit", "ipc"],
-      env: { ...process.env, ASTARRAY_FEEDBACK_CHILD: "1" },
+      /**
+       * SEC-02-07（2026-10-28）：**不再整体继承宿主环境**。
+       *
+       * 反馈子进程只需要运行必需的变量；宿主凭据（`*_API_KEY`/`*_TOKEN`/
+       * `SSH_AUTH_SOCK` 等）一律不进入。`ASTARRAY_FEEDBACK_CHILD` 是显式的非秘密标记。
+       */
+      env: {
+        ...buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
+          .environment,
+        ASTARRAY_FEEDBACK_CHILD: "1",
+      },
     });
     childProcess.stdout?.on("data", (chunk: Buffer | string) => {
       process.stderr.write(String(chunk));

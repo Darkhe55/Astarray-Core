@@ -22,6 +22,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { DomainError } from "../core/errors.js";
+import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 import { ToolPackageLifecycleService } from "../toolkit/tool-package-lifecycle-service.js";
 
 const MANIFEST_FILE_NAME = "astarray-tool-package.json";
@@ -144,11 +145,21 @@ function extractZip(zipPath: string, destination: string): void {
                 "' -Force",
             ].join("; "),
           ],
-          { encoding: "utf8", windowsHide: true, timeout: 120_000 },
+          {
+            encoding: "utf8",
+            windowsHide: true,
+            timeout: 120_000,
+            /** SEC-02-07：解压子进程不继承宿主凭据环境。 */
+            env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
+              .environment,
+          },
         )
       : spawnSync("unzip", ["-q", zipPath, "-d", destination], {
           encoding: "utf8",
           timeout: 120_000,
+          /** SEC-02-07：解压子进程不继承宿主凭据环境。 */
+          env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
+            .environment,
         });
   if (result.status !== 0) {
     throw new DomainError(

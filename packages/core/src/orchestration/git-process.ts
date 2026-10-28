@@ -6,6 +6,7 @@
  * 本层不开放任意参数透传。
  */
 import { spawn } from "node:child_process";
+import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 
 export interface GitProcessOptions {
   /** 单条命令超时（秒），默认 60。 */
@@ -80,7 +81,14 @@ export class GitProcess {
            */
           detached: process.platform !== "win32",
           env: {
-            ...process.env,
+            /**
+             * SEC-02-07（2026-10-28）：**不再整体继承宿主环境**。
+             *
+             * 只带运行必需变量（PATH/HOME/临时目录等）；凭据类变量（`*_TOKEN`/
+             * `*_API_KEY`/`SSH_AUTH_SOCK` 等）不进入 git 子进程。
+             */
+            ...buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
+              .environment,
             GIT_TERMINAL_PROMPT: "0",
             GIT_ASKPASS: "echo",
             GIT_CONFIG_NOSYSTEM: "1",

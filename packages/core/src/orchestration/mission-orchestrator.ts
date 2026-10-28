@@ -53,6 +53,7 @@ import type { ContextNodeLifecyclePort } from "./worker-agent.js";
 import type { AgentWorkArchiveStore } from "./work-archive-store.js";
 import { DomainError } from "../core/errors.js";
 import type { MissionLeaseStore } from "../infra/mission-lease-store.js";
+import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 import { DagScheduler } from "./dag-scheduler.js";
 import type { ScheduleAction } from "./dag-scheduler.js";
 import { ToolFailureCounter } from "./failure-counter.js";
@@ -1372,6 +1373,9 @@ export class MissionOrchestrator {
       windowsHide: true,
       timeout: 300_000,
       encoding: "utf8",
+      /** SEC-02-07：证据命令不继承宿主凭据环境（只带运行必需变量）。 */
+      env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
+        .environment,
     });
     return result.status === 0;
   }
