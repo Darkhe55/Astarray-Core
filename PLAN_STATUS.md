@@ -41,8 +41,14 @@
 > ponder 工具面此前只看 `PONDER_READONLY_TOOL_NAMES`、**不看只读投影**，现将投影定为
 > 单一权威（装配期子集校验 + 运行时过滤）。
 >
-> **⑥ 下一步**：ALIGN-01-04（提案字段补齐 + 小型任务显式直投）→ 01-05（180 秒预算/释放等待）
-> → 01-06（报告索引来源）→ 01-07（旧身份迁移）→ ALIGN-02（统一偏序调度主干）。
+> **⑥ ALIGN-01-04 部分交付**：`requiredArtifactIdentifiers`（所需产物）已贯通
+> 提案 → 插入控制面 → 任务节点（schema 有界 50 项、拒绝重复；语义是"声明要产出什么"，
+> 不证明已产出）。**直投接线被证据阻塞**：`DirectDispatchController` 已实现用户显式路由，
+> 但 CLI 未注册 `executeDirectDispatchCommand`、SDK 未暴露直投，且全仓无任何生产代码调用
+> `publishSequence` ⇒ 直投会以 `task-sequence-not-found` 失败。留到 ALIGN-02-01 一起接。
+>
+> **⑦ 下一步**：ALIGN-01-05（主 Agent 单次处理 180 秒预算与"交付提案即释放等待"）
+> → 01-06（报告索引来源）→ 01-07（旧身份迁移）→ ALIGN-02（统一偏序调度主干 + 直投消费者）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
