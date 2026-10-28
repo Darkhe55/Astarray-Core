@@ -17,6 +17,10 @@ import { randomUUID } from "node:crypto";
 
 import { DomainError } from "../core/errors.js";
 import { evaluateContentPublishability } from "../tools/content-publishability.js";
+import {
+  buildReadSideContentScanLabel,
+  type ReadSideContentScanLabel,
+} from "../tools/read-side-content-scan.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { z } from "zod";
 import { sanitizePathSegment } from "./work-archive-store.js";
@@ -159,6 +163,31 @@ export class AgentIndividualMemoryStore {
       documentOwnerAgentInstanceId: parsed.data.ownerAgentInstanceId,
     });
     return parsed.data;
+  }
+
+  /**
+   * SEC-02-06 通道 12（2026-10-28）：**带读取侧扫描标注**的记忆读取。
+   *
+   * 与 `readMemoryArchive` 同一读取与校验逻辑；额外返回全部观察记录的扫描标注
+   * （结论、规则版本、时间），**只标注、不改内容、不阻断**。
+   * 不存在 ⇒ `archive: null` 且 `contentScan: null`。
+   */
+  async readMemoryArchiveWithScanLabel(
+    runtimeAgentInstanceId: string,
+  ): Promise<{
+    readonly archive: AgentMemoryArchiveDocument | null;
+    readonly contentScan: ReadSideContentScanLabel | null;
+  }> {
+    const archive = await this.readMemoryArchive(runtimeAgentInstanceId);
+    if (archive === null) {
+      return { archive: null, contentScan: null };
+    }
+    return {
+      archive,
+      contentScan: buildReadSideContentScanLabel(
+        archive.observations.map((observation) => observation.summary).join("\n"),
+      ),
+    };
   }
 
   /** 追加观察记录（接收方保留原始来源与附件哈希；不得去除来源冒充自身记忆）。 */
