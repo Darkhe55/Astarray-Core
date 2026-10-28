@@ -4,7 +4,8 @@
  *       每轮调度后原子更新 task chain。
  */
 import { TASK_CHAIN_SCHEMA_VERSION } from "../core/types.js";
-import type { TaskChainDocument } from "../core/types.js";
+import { DomainError } from "../core/errors.js";
+import type { TaskChainDocument, TaskDependencyNode } from "../core/types.js";
 import type { TaskStorePort } from "../core/types.js";
 import { TaskGraph } from "../core/task-graph.js";
 
@@ -183,6 +184,28 @@ export class DagScheduler {
         actions.push({ action: "block-task", taskId, reason: "上游任务失败" });
       }
     }
+  }
+
+  /**
+   * 清单第 ① 项下半场（2026-10-28）：**安全点注入**。
+   *
+   * 只在没有在途任务时允许（否则调用方必须推迟到下一组）：
+   * 追加到内存图 → 原子写回任务链（revision +1）。
+   * 依赖必须已存在；重复 ID 直接拒绝。
+   */
+  async injectTask(node: TaskDependencyNode): Promise<void> {
+    if (this.claimedTaskIds.size > 0) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "有在途任务：当前不是安全点，不能在此时注入（应推迟到下一组）。",
+      );
+    }
+    this.graph.addNode(node);
+    await this.persistChain();
+  }
+
+  isAtSafePointForInjection(): boolean {
+    return this.claimedTaskIds.size === 0;
   }
 
   private async persistChain(): Promise<void> {
