@@ -371,7 +371,17 @@ export interface ApplicationRuntimeOptions {
    * G1（2026-11-08 第 255 轮）：**Git 集成**（缺省不启用）。
    * 传入即构造四件套并交给控制器补全（worktree 端口带身份；永不自动合并）。
    */
-  gitIntegration?: { repositoryPath: string; targetBranchName: string };
+  gitIntegration?: {
+    repositoryPath: string;
+    targetBranchName: string;
+    /**
+     * 收尾第 5 步（2026-10-29）：**合并前是否要求已指定审查者**（缺省 false）。
+     *
+     * 此前该开关只存在于 `GitIntegrationCoordinatorOptions`，运行时构造协调器时**未透传**，
+     * 导致"合并前要求审查者"在产品装配里**不可达**。现在可达，但**默认仍关**。
+     */
+    isReviewRequiredForMerge?: boolean;
+  };
   /**
    * G4（2026-11-08 第 281 轮）：**工具公开用法登记**（缺省空 ⇒ 不注入任何说明）。
    * 产品**默认不内置**登记内容（examples/limitations 无法从描述符推导，禁止编造）。
@@ -1678,6 +1688,10 @@ export async function createApplicationRuntime(
               verifier: new GitContributionVerifier(),
               reportStore: new GitIntegrationReportStore({ baseDirectory: options.stateDirectory }),
               recoveryPointService: new GitRecoveryPointService({ baseDirectory: options.stateDirectory }),
+              /** 收尾第 5 步：透传"合并前要求审查者"（缺省 false，行为不变）。 */
+              ...(options.gitIntegration.isReviewRequiredForMerge === true
+                ? { isReviewRequiredForMerge: true }
+                : {}),
             }),
             repositoryPath: options.gitIntegration.repositoryPath,
             targetBranchName: options.gitIntegration.targetBranchName,

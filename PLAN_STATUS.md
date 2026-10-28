@@ -597,9 +597,19 @@
 > 已写入 `ALIGN_CORE_HANDOFF.md` §11。
 > **未做**：两处缺口**只记录、未修复**（属新检查点；改常量语义需产品确认）、未运行验证、共享总表未同步。
 >
-> **67 下一步**：收尾第 5 步 —— 修 **`isReviewRequiredForMerge` 的装配缺口**（最小改动：
-> 给 `application-runtime` 的 `gitIntegration` 选项加 `isReviewRequiredForMerge?` 并透传到
-> `GitIntegrationCoordinator`，缺省仍 false），使"合并前要求审查者"**可达**而不是**可用**（默认仍关）。
+> **67 收尾第 5 步：修 `isReviewRequiredForMerge` 装配缺口（完成）**：`application-runtime` 的
+> `gitIntegration` 选项新增 `isReviewRequiredForMerge?`，构造 `GitIntegrationCoordinator` 时
+> 按 `=== true` 透传（**缺省不传 ⇒ 行为逐字不变**）；协调器默认仍 false、既有检查语义未改。
+> 结果：该开关从"**不可达**"变为"**可达但默认关**"。ADR-0090 已记录；同步更新
+> `DEFAULT_SWITCHES_AUDIT`（改为 ✅ 已可达）与交接 §11。
+> **未做**：**没有运行验证**（未跑"开关关 ⇒ 允许 / 开关开 ⇒ 拒绝"）；
+> **同批硬编码仍未处理** —— 协调器构造时 `allowedPathsByTaskType: {}` 与
+> `integrationTestCommands: []` 仍是**写死的空值**（产品装配不可配置，属下一个同源缺口）；
+> 审查者注册目录是否注入未核实。
+>
+> **68 下一步**：收尾第 6 步 —— 修**同源硬编码**：把 `allowedPathsByTaskType` 与
+> `integrationTestCommands` 也变成可配置（运行时选项 + 透传，**缺省保持空值**），
+> 使"按任务类型的允许路径/集成测试命令"**可达**而不改变默认行为。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
