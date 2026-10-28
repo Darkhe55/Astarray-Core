@@ -93,6 +93,16 @@ export type DomainErrorCode =
    * 默认只有用户本人持有；Agent 须经显式授予（**可向下级逐层分发、不得放大**）。
    */
   | "tool-package-upgrade-not-authorized"
+  /**
+   * ALIGN-01-01（2026-10-28）：会话身份持久映射的稳定错误码。
+   *
+   * 语义：`not-found` 未登记的会话；`closed` 已关闭会话不得继续追加运行
+   * （必须显式开新会话 → 新个体，不得静默复用）；`conflict` 同一
+   * `conversationIdentifier` 绑定了不同项目/不同主个体（不得按名字猜测改绑）。
+   */
+  | "conversation-identity-not-found"
+  | "conversation-identity-closed"
+  | "conversation-identity-conflict"
   | "unknown";
 
 export class DomainError extends Error {
