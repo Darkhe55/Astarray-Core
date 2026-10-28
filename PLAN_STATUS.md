@@ -55,8 +55,17 @@
 > `<state>/main-agent-turns/`，并向用户输出 `[需要继续] …`。assist 侧"建 mission 即返回、
 > 不 await 下级"经核实已是既有行为。**超期路径未用真实慢模型触发过，不宣称一定生效。**
 >
-> **⑧ 下一步**：ALIGN-01-06（下级报告进入主 Agent 只读索引并带来源）
-> → 01-07（旧身份迁移规则）→ ALIGN-02（统一偏序调度主干 + 序列生命周期 + 直投消费者）。
+> **⑧ ALIGN-01-06 交付**：报告索引此前是"组件齐备但零生产者零调用方"（`ingestTertiaryTerminalReport`
+> 无人调用、`TertiaryTerminalReport` 无生产者、次级主体在正常流程从未登记 ⇒ 来源认证必拒）。
+> 现在 assist 启动时登记次级来源，mission 终态（done/cancelled/blocked）写只读索引
+> （`reportId` 含摘要短哈希保证幂等；`executedChecks` 无真实命令时留空，不编造）；
+> `devolve` 无下级 ⇒ **不登记、不写**。读取只有两个显式入口
+> （`listReportIndex` / `selectRelevantReports`，后者带 token 预算），
+> `context-prompt-assembler` 检索 `report` **0 命中** ⇒ 确认无自动注入。
+> **未**用真实 mission 跑通"终态 → 索引文件 → 读回"。
+>
+> **⑨ 下一步**：ALIGN-01-07（旧身份映射迁移规则）→ 收口 ALIGN-01 后进入 ALIGN-02
+> （统一偏序调度主干：替换 `dispatchChain` 恒 false / 占用恒 0，接序列生命周期与直投消费者）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
