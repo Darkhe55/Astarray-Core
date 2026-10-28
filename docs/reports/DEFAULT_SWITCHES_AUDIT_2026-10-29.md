@@ -10,7 +10,7 @@
 | `isConversationIdentityEnabled` | `application-runtime.ts:318` | **on**（`=== false` 才关） | `application-runtime.ts:1481` 构造 `ConversationIdentityStore` | ✅ 可达 |
 | `isModelTaskPlanningEnabled` | `application-runtime.ts:332` | **off**（`=== true` 才开，且需 `workerRuntimeFactory`） | `application-runtime.ts:1492` 构造分解候选稿生产器 | ✅ 可达（需同时注入 worker 运行时） |
 | `isCompletionReceiptRequired` | `application-runtime.ts:339` + `main-controller.ts:195` | **off**（`=== true` 才透传） | `main-controller.ts` `projectMissionCompletionGate` | ✅ 可达 |
-| `isReviewRequiredForMerge` | `git-integration-coordinator.ts:70` | **off**（`=== true` 才 `requiresReviewer`） | `git-integration-coordinator.ts:387` | ❌ **不可达**：运行时构造 `GitIntegrationCoordinator` 时**没有传**该字段（`application-runtime.ts:1676`） |
+| `isReviewRequiredForMerge` | `git-integration-coordinator.ts:70` | **off**（`=== true` 才 `requiresReviewer`） | `git-integration-coordinator.ts:387` | ✅ **已可达**：运行时选项 `gitIntegration.isReviewRequiredForMerge` 已透传（第 54 轮修复，ADR-0090；默认仍关） |
 | `isMissionRecoveryGateEnabled` | `application-runtime.ts:346` | **off**（`=== true` 才开） | `application-runtime.ts:1519` 构造 `RecoveryCenterController` | ✅ 可达 |
 | `GOAL_MODE_DEFAULT_ENABLED` | `goal-contract.ts:274` | `false`（**常量**） | **无任何引用**（全仓仅 1 处，定义自身） | ❌ **不可达**：常量只是声明，`resolveGoalModeActivation` 用的是入参，不读它 |
 
