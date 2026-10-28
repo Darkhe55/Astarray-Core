@@ -642,13 +642,23 @@ export async function createApplicationRuntime(
     },
   });
   // 任务序列管理面（发布/插入/状态流转）：装配一次，供提案控制面与只读查询复用。
-  const sequenceManageController = new (await import(
-    "../orchestration/task-sequence-controllers.js"
-  )).TaskSequenceManageController(
-    new (await import(
-      "../orchestration/agent-task-sequence-store.js"
-    )).AgentTaskSequenceStore({ baseDirectory: stateDirectory }),
+  const sequenceStoreModule = await import(
+    "../orchestration/agent-task-sequence-store.js"
   );
+  const sequenceControllerModule = await import(
+    "../orchestration/task-sequence-controllers.js"
+  );
+  const agentTaskSequenceStore = new sequenceStoreModule.AgentTaskSequenceStore({
+    baseDirectory: stateDirectory,
+  });
+  const sequenceManageController =
+    new sequenceControllerModule.TaskSequenceManageController(agentTaskSequenceStore);
+  /**
+   * 接线缺口第 ① 项（2026-10-28）：状态控制面与管里面**共享同一个 store 实例**，
+   * 使"两套记账对照"读到同一份序列文件。
+   */
+  const sequenceStatusController =
+    new sequenceControllerModule.TaskSequenceStatusController(agentTaskSequenceStore);
   const conversationTaskInsertionController = new ConversationTaskInsertionController({
     manageController: sequenceManageController,
     authenticatedUserId,
@@ -1500,6 +1510,8 @@ export async function createApplicationRuntime(
      * 复用已装配的 `sequenceManageController`，不另建第二套序列。
      */
     taskSequenceManageController: sequenceManageController,
+    /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
+    taskSequenceStatusController: sequenceStatusController,
     /** ALIGN-02-02：模型分解（缺省不传 ⇒ 单节点旧行为，摘要标 legacy-single-node）。 */
     ...(taskDecompositionDraftProvider === undefined
       ? {}

@@ -411,9 +411,19 @@
 > ②把独立裁决 + 完成收据接进完成门禁；③模型最终出口加总扫描；④接时段检测器与 `shutdown()`；
 > ⑤REMOTE-01 真实传输适配器或标平台阻塞；⑥目标模式接进派发与恢复。
 >
-> **㊾ 下一步**：按清单第 ① 项做**结构性推进的第一步**：给 `MissionOrchestrator` 增加
-> "按 taskId 领取/派发/插入"的最小公开 API 骨架（先只读查询 + 显式拒绝未支持操作，
-> 让两套记账的差距**可被代码表达**），并在 ADR 中记录 `DagScheduler` 图变更的真实边界。
+> **㊾ 接线缺口第 ① 项·第一步**：新增 `task-ledger-bridge.ts` —— **两套记账的只读对照**
+> （只在序列/只在 mission 的任务、状态不一致、ready 集合、可读 `divergences`），
+> 并在报告里**如实登记四项能力恒为 false**（claim/dispatch-by-taskId/insert-during-run/graph-mutate）；
+> `requestDispatchByTaskIdentifier` / `requestInsertionByTaskIdentifier` 返回
+> **`refused-unsupported` + 缺失能力清单**，**不伪造派发、不静默 no-op**。
+> 经 `MainController.inspectTaskLedgerAlignment` 暴露；运行时把 `AgentTaskSequenceStore`
+> 抽成共享实例，manage/status 两个控制器共用（否则对照读不到同一份序列）。
+> **未做**：派发/插入仍未实现（`DagScheduler` 图变更、单任务领取、序列→mission 写回都缺）；
+> 对照**不自动修正**任何一边；无 UI/CLI；mission↔序列对应关系无持久索引。
+>
+> **㊿ 下一步**：按清单第 ② 项 —— 把**独立裁决 + 完成收据接进完成门禁**：
+> 先只读核对当前 `onReportToMain` 的完成判定链路（哪些分支直接判 done、有没有经过裁决/收据），
+> 再以"缺门禁即 blocked 且列出缺口"的最小改动接上（开关仍默认关，行为可回退）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
