@@ -210,8 +210,18 @@
 > **未做**：门禁**默认关闭**；只拦**不代替对账**（不执行 Git/worktree/人工改动对账）；
 > 租约冲突未纳入；`reauthorizationRequiredTypes` 未被消费；未跑任何一条拒绝/通过路径。
 >
-> **㉗ 下一步**：ALIGN-04-03（获得现有合法恢复许可后，从未完成且 ready 的节点恢复；
-> 执行恢复租约幂等领取；已产出未回执先对账不盲目重跑；不确定副作用保持待裁决）。
+> **㉗ ALIGN-04-03 部分交付**：`resumeMission` 此前把**所有非 done 任务**整体重跑
+> （含崩溃时 `running`、`blocked`、**已写 `resultLocation` 却未回执**的任务）；
+> 租约对**同进程重入**也报 `locked-active`，`takeOverExpiredLease` 零调用方。
+> 现在：①`projectMissionResumeReadiness` 把 running/blocked/已产出未回执判为
+> **不可自动恢复**并列出任务 id；②只读投影 `inspectMissionResumeReadiness`（查看不启动任务，
+> ready 与等待依赖分开）；③`tryAcquire` 同进程重入返回 `acquired-reentrant`（编排器接受）；
+> ④`prepareResumeLease`：别的进程活动租约拒绝、**过期租约按 revision CAS 接管**。
+> **未做**：**没有对账动作**（不会把这三类任务放回 pending 或记录对账结论）；
+> 已产出核对只看有无 `resultLocation`；租约接管只处理已过期（不探测属主已死）。
+>
+> **㉘ 下一步**：ALIGN-04-04（工作时段到期恢复复用同一调度入口；区分人工暂停与休息暂停；
+> 只唤醒有恢复资格的任务；不得引入另一份自动恢复队列）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
