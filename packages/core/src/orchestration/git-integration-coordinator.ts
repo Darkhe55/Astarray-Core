@@ -22,6 +22,7 @@ import { GitProcess } from "./git-process.js";
 import type { GitRecoveryPointService } from "./git-recovery-point-service.js";
 import { GitWorktreeAllocator, decodeGitRefSegment } from "./git-worktree-allocator.js";
 import { evaluateContributionReviewEvidence } from "./git-review-evidence.js";
+import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 
 export interface StartIntegrationSessionInput {
   missionId: string;
@@ -529,6 +530,9 @@ export class GitIntegrationCoordinator {
       windowsHide: true,
       timeout: this.integrationTestTimeoutSeconds * 1000,
       encoding: "utf8",
+      /** SEC-02-07：集成测试命令不继承宿主凭据环境（只带运行必需变量）。 */
+      env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
+        .environment,
     });
     return result.status === 0;
   }
