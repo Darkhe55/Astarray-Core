@@ -34,6 +34,7 @@ ALIGN-01 要求：默认用户对话进入**主 Agent 交流与高层评估**；
 | `predecessorTaskIdentifiers` / `successorTaskIdentifiers` | 否 | 字符串数组；同一任务不得同时是前驱与后继 |
 | `userTaskReference` | 是 | **必须等于**本次用户消息引用（harness 注入） |
 | `priorityTier` | 否 | 必须 ≥ 1（Agent 来源不得进用户层级 0） |
+| `requiredArtifactIdentifiers` | 否 | 字符串数组，≤ 50 项且不得重复；**只声明"要产出什么"，不证明已产出** |
 
 **拒绝规则**（全部 fail-closed，不做"尽力猜测"）：
 
@@ -82,9 +83,13 @@ ALIGN-01 要求：默认用户对话进入**主 Agent 交流与高层评估**；
 - **默认对话 → 主 Agent 高层评估**的生产接线尚未完成：当前 Assist 仍直接
   `decomposePromptForScriptedRun`（固定 T-001）建 mission。这需要 ALIGN-02-02 的规划与
   权威任务序列，本 ADR 只交付"提案一旦产出就安全落库"的边界。
-- **所需产物字段**（`requiredArtifactIdentifiers`）属 ALIGN-01-04：当前**不在白名单**，
-  提交即报"不支持的字段"，不会静默丢弃。
-- **小型任务显式直投**（01-04）与**报告索引来源注入**（01-06）未接。
+- **所需产物**已按 ALIGN-01-04 落进任务节点（`AgentTaskNode.requiredArtifactIdentifiers`，
+  schema 有界 50 项），但**只是声明**：产物是否真实存在仍由产物登记与完成门禁判定。
+- **小型任务显式直投**（01-04 后半）**未接线**：`DirectDispatchController` 与
+  `executeDirectDispatchCommand` 均存在，但 ①CLI 未注册该子命令、②公开 SDK 未暴露直投、
+  ③`insertTask` 要求目标序列已发布而全仓**没有任何生产代码调用 `publishSequence`**。
+  ⇒ 直投消费者留待 ALIGN-02-01（权威任务序列生命周期）建立后再接，避免在此另造一套序列创建语义。
+- **报告索引来源注入**（01-06）未接。
 - 提案接受后的用户可见回执/报告尚未实现（提案成功只返回标识，不宣称任务已执行）。
 
 ## 6. 验证状态

@@ -1,6 +1,6 @@
 # ALIGN-01：稳定个体身份与只读主 Agent 主干
 
-日期：2026-10-27。状态：in_progress（01–03 已交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–03 已交付、04 部分交付，均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -100,3 +100,26 @@ ponder 每次生成 `main:ponder:<随机>`；`missionId`/进程内 Map 同时充
 
 **验证状态**：未编写/未运行测试、未人工验收；`npm run typecheck` exit 0、
 `npx eslint <本批文件>` exit 0、`npm run build` 成功。⇒ **implemented-unverified**。
+
+### 04 提案字段：所需产物 + 直投路径审计——**部分交付**（2026-10-28）
+
+**已交付：所需产物进入任务序列**
+- `AgentTaskNode.requiredArtifactIdentifiers?: string[]`（`core/types.ts`，schema 有界 50 项）；
+- `InsertTaskInput` / `TaskInsertionProposal` / `MainAgentTaskProposalContract` 三层透传；
+- 校验：非字符串数组、>50 项、重复项一律拒绝；**语义明确为"声明要产出什么"，不证明已产出**
+  （完成判定仍走产物登记/完成门禁，不得用本字段谎报 done）。
+
+**审计结论（直投路径，未接线，附证据）**：
+1. `DirectDispatchController.dispatchDirectTask` 已实现"用户显式路由 + 保持 user 来源/层级 0 +
+   不调用主 Agent 模型"，`t08cRoutingFacade` 也已装配；
+2. 但 `executeDirectDispatchCommand`（`packages/tui/src/cli/commands.ts:2176`）**未在 `cli.tsx` 注册**
+   —— 全文件检索 `direct-dispatch` 命中 0；
+3. 公开 SDK 检索 `directDispatch|dispatchDirectTask` 命中 0 ⇒ 没有任何产品入口能调用它；
+4. 且 `insertTask` 要求目标序列已发布，而全仓**只有 `publishSequence` 定义、没有任何生产调用方**
+   ⇒ 即使接上命令行，直投也会以 `task-sequence-not-found` 失败。
+
+⇒ 直投的消费者**刻意留到 ALIGN-02-01**（权威任务序列与持续调度）一起接，避免在这里
+另造一套序列创建/生命周期语义。本检查点**不标 04 完成**。
+
+**验证状态**：未编写/未运行测试、未人工验收；`npm run typecheck` exit 0、
+`npx eslint <本批文件>` exit 0、`npm run build` 成功。
