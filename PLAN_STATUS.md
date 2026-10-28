@@ -190,8 +190,19 @@
 > 审查证据绑定、生命周期收口都没有自动触发点）。这不是新发现，而是 ALIGN-00 基线里
 > "接线缺口"主题的延续；下一步进入 ALIGN-04（恢复与状态纠偏），它正好需要这些持久关系。
 >
-> **㉖ 下一步**：ALIGN-04-01（持久化 project/conversation/agent/sequence/group/mission 的显式关联，
-> 不只存在 `MainController` 的 Map；重启从权威记录恢复映射，不按昵称或路径字符串猜归属）。
+> **㉕ ALIGN-04-01 部分交付**：project/conversation/sequence/agent 映射此前**只在
+> `MainController` 的进程内 Map**，重启即丢、且没有任何恢复路径。新增
+> `mission-relation-index.ts`：一 mission 一文件 `<state>/mission-relations/<id>.json`
+> （原子写 + `.bak` + revision，合并登记、数组取并集、损坏即抛错）；
+> mission 创建后由 `recordMissionRelation` 登记 project/conversation/主个体/序列/序列 owner/参与个体；
+> `createApplicationRuntime` 启动即 `hydratePersistedMissionRelations()`，**只恢复记录写过的字段**，
+> 会话与身份存储核对查不到就**不恢复**并计入 `unresolvedConversationCount`；序列 revision 置 0（未知），
+> 运行中插入遇到未知 revision 直接 `stale-revision` 要求重读 —— **不按名字/路径猜**。
+> **未做**：group（任务包）未写入（`createTaskBundle` 无生产调用方）；三级 Worker 个体未补登记；
+> 旧 mission 无关系文件；未跑"写入→重启→恢复→插入被拒"完整链路。
+>
+> **㉖ 下一步**：ALIGN-04-02（恢复先**只读对账**：哪些已完成、哪些租约失效、哪些副作用未知、
+> 哪些等待授权；用户可查看历史但**查看不启动任务**；旧授权不可仅凭恢复档案重用）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

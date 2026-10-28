@@ -69,6 +69,7 @@ import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import type { TaskSequenceManageController } from "./task-sequence-controllers.js";
+import type { MissionRelationIndexStore } from "./mission-relation-index.js";
 import {
   buildSingleNodeDecomposition,
   parseAndValidateTaskDecomposition,
@@ -402,6 +403,15 @@ export interface MainControllerOptions {
    */
   taskSequenceManageController?: TaskSequenceManageController | null;
   /**
+   * ALIGN-04-01（2026-10-28）：**mission 关系索引**（显式关联的权威落盘）。
+   *
+   * 启用后：mission 创建时把 project/conversation/主个体/任务序列/任务包/参与个体
+   * 写进 `<state>/mission-relations/<missionId>.json`；重启时由
+   * `hydratePersistedMissionRelations()` 读回映射（**不按昵称/路径猜**）。
+   * 缺省 ⇒ 只存在内存 Map（旧行为，重启即丢）。
+   */
+  missionRelationIndexStore?: MissionRelationIndexStore | null;
+  /**
    * ALIGN-02-06（2026-10-28）：运行中插入的**安全点注入端口**（可选）。
    *
    * 实现方必须保证：只在安全上下文边界注入、不改写已发出的工具调用、
@@ -697,6 +707,20 @@ export class MainController {
        */
       this.rememberUserMessageReference(null);
     }
+    /**
+     * ALIGN-04-01（2026-10-28）：把本次执行的**显式关联**落盘。
+     *
+     * 写失败不静默：通过流式输出如实告知（mission 已在运行，不能因索引失败回退），
+     * 重启时该 mission 会缺映射 —— 但不会被"猜"出来。
+     */
+    await this.recordMissionRelation({
+      missionId,
+      projectIdentifier,
+      conversationIdentity,
+      userTaskSequence,
+      targetAgentInstanceIdentifier: requestedTargetAgentInstanceIdentifier,
+      mode,
+    });
     const requestedWorkspaceRootPath = options?.workspaceRootPath?.trim();
     if (
       requestedWorkspaceRootPath !== undefined &&
@@ -1138,6 +1162,16 @@ export class MainController {
     const missionStatus = await this.options.missionManager.getMissionStatus(
       request.missionIdentifier,
     );
+    if (sequenceMapping.sequenceRevision === 0) {
+      /**
+       * ALIGN-04-01：关系索引不保存序列 revision ⇒ 重启恢复后为"未知"。
+       * 不能拿 0 去比对（那会把一切都判成过期），要求调用方重新读取后再插入。
+       */
+      throw new DomainError(
+        "stale-revision",
+        "任务序列 revision 未知（重启恢复后需重新读取序列）——拒绝凭旧值插入。",
+      );
+    }
     const taskStates: Record<string, string> = {};
     for (const task of missionStatus.taskChain?.tasks ?? []) {
       taskStates[task.id] = task.status;
@@ -1284,6 +1318,141 @@ export class MainController {
       registeredAgentDirectory: this.options.registeredAgentDirectory ?? null,
     });
     return this.independentReviewGateInstance;
+  }
+
+  /**
+   * ALIGN-04-01（2026-10-28）：登记 mission 的显式关联。
+   *
+   * 只写"本次确实知道"的字段；缺失就留空（不按名字/路径补）。写失败通过流式输出
+   * 如实告知，不让调用方误以为索引已落盘。
+   */
+  private async recordMissionRelation(input: {
+    readonly missionId: string;
+    readonly projectIdentifier: string | undefined;
+    readonly conversationIdentity: {
+      readonly conversationIdentifier: string;
+      readonly mainAgentInstanceIdentifier: string;
+    } | null;
+    readonly userTaskSequence: {
+      readonly taskSequenceIdentifier: string;
+      readonly taskIdentifier: string;
+    } | null;
+    readonly targetAgentInstanceIdentifier: string | undefined;
+    readonly mode: AgentMode;
+  }): Promise<void> {
+    const store = this.options.missionRelationIndexStore;
+    if (store === null || store === undefined) {
+      return;
+    }
+    const sequenceMapping = this.missionTaskSequences.get(input.missionId);
+    const agentInstanceIdentifiers = [
+      ...(input.conversationIdentity === null
+        ? []
+        : [input.conversationIdentity.mainAgentInstanceIdentifier]),
+      ...(sequenceMapping === undefined
+        ? []
+        : [sequenceMapping.ownerAgentInstanceIdentifier]),
+      ...(input.targetAgentInstanceIdentifier === undefined ||
+      input.targetAgentInstanceIdentifier === ""
+        ? []
+        : [input.targetAgentInstanceIdentifier]),
+    ];
+    try {
+      await store.upsert({
+        missionIdentifier: input.missionId,
+        projectIdentifier: input.projectIdentifier ?? null,
+        conversationIdentifier:
+          input.conversationIdentity?.conversationIdentifier ?? null,
+        mainAgentInstanceIdentifier:
+          input.conversationIdentity?.mainAgentInstanceIdentifier ?? null,
+        taskSequenceIdentifier:
+          input.userTaskSequence?.taskSequenceIdentifier ?? null,
+        taskIdentifier: input.userTaskSequence?.taskIdentifier ?? null,
+        sequenceOwnerAgentInstanceIdentifier:
+          sequenceMapping?.ownerAgentInstanceIdentifier ?? null,
+        agentInstanceIdentifiers,
+      });
+    } catch (error) {
+      this.options.streamOutput(
+        input.missionId,
+        `[关系索引] 写入失败（重启后该任务将缺少映射，不会按名字猜测）: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * ALIGN-04-01（2026-10-28）：**从权威关系索引恢复** mission 映射。
+   *
+   * 只在"记录里明确写过"时恢复；会话标识会与身份存储核对，对不上就**不恢复**
+   * 并计入 `unresolvedConversationCount`（绝不按昵称/路径猜归属）。
+   * 序列 revision 不从关系索引推断：恢复后置 0（未知），要求调用方重新读取。
+   */
+  async hydratePersistedMissionRelations(): Promise<{
+    readonly restoredMissionCount: number;
+    readonly restoredConversationCount: number;
+    readonly unresolvedConversationCount: number;
+  }> {
+    const store = this.options.missionRelationIndexStore;
+    if (store === null || store === undefined) {
+      return {
+        restoredMissionCount: 0,
+        restoredConversationCount: 0,
+        unresolvedConversationCount: 0,
+      };
+    }
+    const records = await store.listAll();
+    const conversationStore = this.options.conversationIdentityStore ?? null;
+    let restoredMissionCount = 0;
+    let restoredConversationCount = 0;
+    let unresolvedConversationCount = 0;
+    for (const record of records) {
+      let conversationIdentifier = record.conversationIdentifier;
+      if (conversationIdentifier !== null) {
+        const conversationRecord =
+          conversationStore === null
+            ? null
+            : await conversationStore.getConversation(conversationIdentifier);
+        if (conversationRecord === null) {
+          /** 记录里有、身份存储里查不到 ⇒ 不恢复（也不改写成别的会话）。 */
+          unresolvedConversationCount += 1;
+          conversationIdentifier = null;
+        } else {
+          restoredConversationCount += 1;
+        }
+      }
+      if (record.projectIdentifier !== null) {
+        this.missionProjectIdentifiers.set(
+          record.missionIdentifier,
+          record.projectIdentifier,
+        );
+      }
+      if (conversationIdentifier !== null) {
+        this.missionConversationIdentifiers.set(
+          record.missionIdentifier,
+          conversationIdentifier,
+        );
+      }
+      if (
+        record.taskSequenceIdentifier !== null &&
+        record.taskIdentifier !== null &&
+        record.sequenceOwnerAgentInstanceIdentifier !== null
+      ) {
+        this.missionTaskSequences.set(record.missionIdentifier, {
+          taskSequenceIdentifier: record.taskSequenceIdentifier,
+          taskIdentifier: record.taskIdentifier,
+          ownerAgentInstanceIdentifier: record.sequenceOwnerAgentInstanceIdentifier,
+          /** 关系索引不保存序列 revision ⇒ 标记为未知（0），插入前必须重新读取。 */
+          sequenceRevision: 0,
+          isSequenceCreated: false,
+        });
+      }
+      restoredMissionCount += 1;
+    }
+    return {
+      restoredMissionCount,
+      restoredConversationCount,
+      unresolvedConversationCount,
+    };
   }
 
   /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */
