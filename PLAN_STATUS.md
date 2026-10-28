@@ -576,9 +576,19 @@
 > **遗留（如实）**："已交付"的定义仍无机器可检标记（缺自动校验脚本）、
 > ALIGN-02 无 04 号检查点（非遗漏但易误读）、共享总表 §11 未同步（需人工集成）。
 >
-> **65 下一步**：收尾第 3 步 —— 复核**ADR 索引完整性**：确认 `docs/adr/` 下 0044…0089
-> 共 46 份文件**连续无缺号**、每份都有"未完成"与"验证状态"两节，并把缺失的索引条目
-> 补进 `docs/adr/README.md`（若无 README 则新建一份只读索引）。
+> **65 收尾第 3 步：ADR 索引完整性复核（完成）**：脚本核对 `docs/adr/0*.md`：
+> **89 份、编号 0001–0089 连续无缺号、无重复**；**0044–0089（46 份）全部具备
+> "未完成"与"验证状态"两节**；0001–0043（43 份）早于约定、两节均无（**历史不追改**）。
+> 新建 [docs/adr/README.md](astarray/docs/adr/README.md) **只读索引**（脚本生成，逐行列出
+> 编号/文件/标题/两节有无），并在开头写明"运行证据=0、`implemented-unverified` 不代表验收"。
+> 审计记录：[ADR_INDEX_AUDIT_2026-10-29.md](astarray/docs/reports/ADR_INDEX_AUDIT_2026-10-29.md)。
+> **未做**：索引**不校验内容质量**、**生成脚本未入库**（一次性）、**无 CI 守卫**
+> （编号连续性/两节完整性无自动检查）、0001–0043 未补两节。
+>
+> **66 下一步**：收尾第 4 步 —— 复核**默认开关与阻塞项清单**是否与代码一致
+> （`isConversationIdentityEnabled`/`isModelTaskPlanningEnabled`/`isCompletionReceiptRequired`/
+> `isReviewRequiredForMerge`/`isMissionRecoveryGateEnabled`/`GOAL_MODE_DEFAULT_ENABLED`
+> 六项的当前缺省值与影响），并把"REMOTE-01 平台阻塞"作为**唯一** blocked 卡写进交接尾部。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
