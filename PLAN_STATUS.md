@@ -585,10 +585,21 @@
 > **未做**：索引**不校验内容质量**、**生成脚本未入库**（一次性）、**无 CI 守卫**
 > （编号连续性/两节完整性无自动检查）、0001–0043 未补两节。
 >
-> **66 下一步**：收尾第 4 步 —— 复核**默认开关与阻塞项清单**是否与代码一致
-> （`isConversationIdentityEnabled`/`isModelTaskPlanningEnabled`/`isCompletionReceiptRequired`/
-> `isReviewRequiredForMerge`/`isMissionRecoveryGateEnabled`/`GOAL_MODE_DEFAULT_ENABLED`
-> 六项的当前缺省值与影响），并把"REMOTE-01 平台阻塞"作为**唯一** blocked 卡写进交接尾部。
+> **66 收尾第 4 步：默认开关与阻塞项复核（完成）**：静态核对六项开关的缺省值/消费点/可达性，
+> 交付 [DEFAULT_SWITCHES_AUDIT_2026-10-29.md](astarray/docs/reports/DEFAULT_SWITCHES_AUDIT_2026-10-29.md)。
+> **发现两处真实缺口**：①`GOAL_MODE_DEFAULT_ENABLED` 是**死常量**（全仓仅定义处 1 次；
+> `resolveGoalModeActivation` 不读它，"默认关闭"实际靠调用方传参）；②`isReviewRequiredForMerge`
+> **无法从产品装配打开**（`application-runtime:1676` 构造 `GitIntegrationCoordinator` 时未传该字段，
+> 也无运行时选项）⇒ "合并前要求审查者"**当前不可用**。
+> 其余四项可达：身份默认 **on**、模型分解默认 **off**（且需 worker 运行时）、完成收据默认 **off**
+> （打开会阻断所有 done）、恢复门禁默认 **off**。
+> **阻塞项**：**当前唯一 blocked 卡 = REMOTE-01（平台阻塞）**，其余七卡 `in_progress`；
+> 已写入 `ALIGN_CORE_HANDOFF.md` §11。
+> **未做**：两处缺口**只记录、未修复**（属新检查点；改常量语义需产品确认）、未运行验证、共享总表未同步。
+>
+> **67 下一步**：收尾第 5 步 —— 修 **`isReviewRequiredForMerge` 的装配缺口**（最小改动：
+> 给 `application-runtime` 的 `gitIntegration` 选项加 `isReviewRequiredForMerge?` 并透传到
+> `GitIntegrationCoordinator`，缺省仍 false），使"合并前要求审查者"**可达**而不是**可用**（默认仍关）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

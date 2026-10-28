@@ -188,3 +188,17 @@ ConversationIdentityStore.resolveOrOpen… → MissionManager.createMission → 
 - 平台阻塞：`docs/reports/REMOTE01_PLATFORM_BLOCK_2026-10-28.md`
 - 覆盖表：`docs/tasks/SEC02_CREDENTIAL_COVERAGE.md`、`SEC02_CHANNEL_MATRIX.md`
 - 契约文档：`docs/adr/0067` … `docs/adr/0089`（23 份）
+
+## 11. 阻塞项（2026-10-29 复核）
+
+**当前唯一 blocked 卡：REMOTE-01（平台阻塞）** —— 两个仓库均无 IM/Webhook/邮件发送实现，
+`RemoteDeliveryTransportPort` 只有接口；解除条件见
+[REMOTE01_PLATFORM_BLOCK](../reports/REMOTE01_PLATFORM_BLOCK_2026-10-28.md)。
+
+其余七张卡（ALIGN-00/01/02/03/04、SEC-02、GOAL-02）均为 `in_progress`，全部
+`implemented-unverified`；**没有第二张 blocked 卡**。
+
+默认开关复核另发现两处缺口（记录未修复，见
+[DEFAULT_SWITCHES_AUDIT_2026-10-29](../reports/DEFAULT_SWITCHES_AUDIT_2026-10-29.md)）：
+`GOAL_MODE_DEFAULT_ENABLED` 是**死常量**（全仓仅定义处 1 次）、
+`isReviewRequiredForMerge` **无法从产品装配打开**。
