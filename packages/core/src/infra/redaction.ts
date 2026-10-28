@@ -1,7 +1,12 @@
 /**
  * 敏感信息脱敏层（T02）。
  * 用于日志、错误消息、快照与交付报告；API key、Authorization 和用户 secret 一律替换为占位符。
+ *
+ * SEC-02-02（2026-10-28）：默认规则改为从**凭据检测器注册表**的"日志掩码"视图生成
+ * （`credential-detector-registry.ts`）。规则只维护一份；掩码策略**不构成**
+ * "内容可以给模型看"的许可 —— 模型读取由独立的阻断策略判定。
  */
+import { selectCredentialMaskingRules } from "../tools/credential-detector-registry.js";
 
 export interface RedactionRule {
   name: string;
@@ -12,36 +17,11 @@ export interface RedactionRule {
 export const REDACTED_PLACEHOLDER = "[REDACTED]";
 
 export function createDefaultRedactionRules(): RedactionRule[] {
-  return [
-    {
-      name: "authorization-header",
-      pattern:
-        /(Authorization[ \t]*:[ \t]*(?:Bearer|Basic)[ \t]+)[A-Za-z0-9._~+/=:-]+/gi,
-      replacement: `$1${REDACTED_PLACEHOLDER}`,
-    },
-    {
-      name: "openai-style-api-key",
-      pattern: /\b(sk-[A-Za-z0-9_-]{8,})\b/g,
-      replacement: REDACTED_PLACEHOLDER,
-    },
-    {
-      name: "aws-access-key-id",
-      pattern: /\b(AKIA[0-9A-Z]{16})\b/g,
-      replacement: REDACTED_PLACEHOLDER,
-    },
-    {
-      name: "json-credential-field",
-      pattern:
-        /("(?:api[_-]?key|apikey|secret|token|password|access[_-]?key)"?\s*[:=]\s*"?)[^"\s,}]+/gi,
-      replacement: `$1${REDACTED_PLACEHOLDER}`,
-    },
-    {
-      name: "generic-credential-assignment",
-      pattern:
-        /((?:api[_-]?key|apikey|secret|token|password|access[_-]?key)\s*=\s*)[A-Za-z0-9._~+/=-]{8,}/gi,
-      replacement: `$1${REDACTED_PLACEHOLDER}`,
-    },
-  ];
+  return selectCredentialMaskingRules().map((rule) => ({
+    name: rule.name,
+    pattern: rule.pattern,
+    replacement: rule.replacement,
+  }));
 }
 
 export class Redactor {

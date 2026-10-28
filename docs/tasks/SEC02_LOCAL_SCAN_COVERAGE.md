@@ -1,5 +1,5 @@
 # SEC-02：本地敏感扫描完整性与外发边界
-日期：2026-10-28。状态：in_progress（01 部分交付，implemented-unverified；02–07 未开始）。
+日期：2026-10-28。状态：in_progress（01–02 部分交付，implemented-unverified；03–07 未开始）。
 
 执行规则：每轮只做一个编号检查点，超过三小时拆分；先核对当前代码和在途改动，已有能力复用。覆盖、删减前由工具备份；不覆盖他人工作。必须更新本卡状态和交付记录；共享台账存在并行冲突时提交独立状态补丁，不以未授权为由跳过状态记录。本卡不授权安装、真实付费模型调用、外发消息、提交推送或自动启用实验功能。需要依赖时先询问已有资源。沿用用户此前不要求编写/运行测试的交付口径，本卡列出验收条件但不自行执行测试或宣称通过；代码完成只能标 implemented-unverified。变量名必须可读，时间单位明确。公共核心只放通用契约，不复制私有界面实现或设计。
 
@@ -97,5 +97,26 @@
 
 **未做（如实）**：规则覆盖仍最小集（02/05 未做；**裸 `sk-` 与 redaction 规则差异未消除**）；
 通道矩阵（06）、外发门禁（04）、**流式有界隔离缓冲**均未做；未跑任何一条扫描路径。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 02 版本化检测器注册表（阻断 / 掩码两套出口）——**部分交付**（2026-10-28）
+
+**审查发现**：规则此前**两套各维护**（policy 的 DLP 列表 vs `redaction.ts` 的脱敏列表）⇒
+**裸 `sk-` 只有掩码层有、DLP 层没有**；私钥加密头、GitHub 细粒度、npm/GitLab token、JWT、
+敏感 Cookie 覆盖不全，两层漂移无法核对。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 单一目录 | `packages/core/src/tools/credential-detector-registry.ts` | 每条规则定义一次；`CREDENTIAL_DETECTOR_CATALOG_VERSION` |
+| 阻断视图 | 同文件 `selectDetectorRulesForModelRead()` | 非全局新正则（避免 test lastIndex 污染） |
+| 掩码视图 | 同文件 `selectCredentialMaskingRules()` | 全局新正则 + 替换；**掩码不等于放行** |
+| 覆盖类别 | 同文件 | 厂商 key（Anthropic/OpenAI 兼容裸 sk-/Moonshot）、GitHub 经典+细粒度、GitLab、npm、AWS（AKIA/ASIA + secret 字段）、Authorization Bearer/Basic、敏感 Cookie、JWT、PEM 含加密头、连接串、结构化字段/赋值 |
+| 接入 | `sensitive-content-scan-contract.ts` / `infra/redaction.ts` | 扫描默认规则与脱敏默认规则都从该目录派生 |
+
+**未做（如实）**：**覆盖表（05）未写**、通道矩阵（06）未做、高熵信号未使用、
+无稳定前缀厂商（智谱/云知声）未登记、日志换行注入防护未做；未用人工假凭据跑过任何规则，
+也没有"两视图覆盖差异"的自动化守卫。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
