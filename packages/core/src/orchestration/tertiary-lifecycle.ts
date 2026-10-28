@@ -271,15 +271,21 @@ function sanitizeLifecycleAgentId(agentInstanceId: string): string {
 }
 
 export interface TertiaryLifecycleHookSet {
-  stopDispatch?: () => Promise<unknown>;
-  drainUnconfirmedCalls?: () => Promise<unknown>;
-  persistCheckpoint?: () => Promise<unknown>;
-  writeHandoff?: () => Promise<unknown>;
-  confirmFeedback?: () => Promise<unknown>;
-  revokePermissionLease?: () => Promise<unknown>;
-  unregisterMailbox?: () => Promise<unknown>;
-  handleGitResources?: () => Promise<unknown>;
-  terminateProcess?: () => Promise<unknown>;
+  /**
+   * ALIGN-03-07（2026-10-28）：所有 hook 都收到**当前收口的个体标识**。
+   *
+   * 之前 hook 无参数、控制器又是长生命周期共享实例 ⇒ 接线方只能猜"现在关的是谁"。
+   * 现在由控制器在 `runPhase` 里显式传入；既有"无参 hook"写法仍兼容。
+   */
+  stopDispatch?: (agentInstanceId: string) => Promise<unknown>;
+  drainUnconfirmedCalls?: (agentInstanceId: string) => Promise<unknown>;
+  persistCheckpoint?: (agentInstanceId: string) => Promise<unknown>;
+  writeHandoff?: (agentInstanceId: string) => Promise<unknown>;
+  confirmFeedback?: (agentInstanceId: string) => Promise<unknown>;
+  revokePermissionLease?: (agentInstanceId: string) => Promise<unknown>;
+  unregisterMailbox?: (agentInstanceId: string) => Promise<unknown>;
+  handleGitResources?: (agentInstanceId: string) => Promise<unknown>;
+  terminateProcess?: (agentInstanceId: string) => Promise<unknown>;
 }
 
 export interface TertiaryLifecycleState {
@@ -434,7 +440,8 @@ export class TertiaryAgentLifecycleController {
       const hook = hookKey === undefined ? undefined : this.hooks[hookKey];
       let result = "none";
       if (hook !== undefined) {
-        const hookResult = await hook();
+        /** ALIGN-03-07：把当前个体标识显式传给 hook（不再让接线方猜）。 */
+        const hookResult = await hook(this.state.agentInstanceId);
         if (typeof hookResult === "string") {
           result = hookResult;
         }
