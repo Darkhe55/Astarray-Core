@@ -34,6 +34,7 @@ async function createWorkspace(): Promise<{ root: string; state: string }> {
 describe("写工具产物", () => {
   it("① createProjectFile 成功时返回 producedArtifacts 且文件存在", async () => {
     const { root, state } = await createWorkspace();
+    const capturedArtifacts: Array<{ path: string; artifactType: string }> = [];
     const modeMachine = new ModeMachine("devolve");
     const registry = new ToolRegistry();
     const descriptor = BUILTIN_TOOL_DESCRIPTORS.find(
@@ -53,6 +54,9 @@ describe("写工具产物", () => {
       nowUnixSeconds: () => Math.floor(Date.now() / 1000),
       getCurrentMode: () => modeMachine.getCurrentMode(),
       requestingAgentInstanceId: "agent-test",
+      onProducedArtifacts: (artifacts) => {
+        capturedArtifacts.push(...artifacts);
+      },
       protectedStoragePolicy: new ProtectedStoragePolicy({ stateDirectoryPath: state }),
     });
     const result = await wrapper.execute(
@@ -65,11 +69,13 @@ describe("写工具产物", () => {
     if (result.kind === "success") {
       expect(result.producedArtifacts?.[0]?.artifactType).toBe("project-file");
     }
+    expect(capturedArtifacts[0]?.artifactType).toBe("project-file");
     await expect(fs.readFile(path.join(root, "artifact.txt"), "utf8")).resolves.toBe(
       "ARTIFACT",
     );
   });
 });
+
 
 
 
