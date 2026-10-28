@@ -30,6 +30,7 @@ import { DiagnosticEventStore } from "../orchestration/diagnostic-event-store.js
 import { LocalProgressAndCycleGuard } from "../tools/local-progress-and-cycle-guard.js";
 import { TaskCallBudgetLedger } from "../infra/task-call-budget-ledger.js";
 import { RunHistoryStore } from "../orchestration/run-history-store.js";
+import { ConversationIdentityStore } from "../orchestration/conversation-identity-store.js";
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import {
   ToolDocumentationRecallInjector,
@@ -114,6 +115,7 @@ import { GlobalContextBudgetStore } from "../orchestration/global-context-budget
 import { ScopedSettingsStore } from "../orchestration/scoped-settings-store.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
+import type { MissionRuntimeLease } from "../orchestration/mission-runtime-registry.js";
 import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
@@ -244,7 +246,7 @@ export interface ApplicationRuntimeOptions {
     projectIdentifier: string | null;
     sessionIdentifier: string | null;
     agentInstanceId: string | null;
-  }) => Promise<import("../orchestration/mission-runtime-registry.js").MissionRuntimeLease | null>;
+  }) => Promise<MissionRuntimeLease | null>;
   mode: "ponder" | "assist" | "devolve";
   stateDirectory: string;
   concurrency: number;
@@ -278,6 +280,15 @@ export interface ApplicationRuntimeOptions {
   /** G2（第 162 轮）：任务链总调用预算（缺省 undefined ⇒ 200，**默认行为不变**）。 */
   progressGuardTaskTotalCallBudget?: number;
   /** G3（第 133 轮）：高严谨性强制事实验证开关。**缺省 false**（不擅自改默认行为）。 */
+  /**
+   * ALIGN-01-01（2026-10-28）：**稳定会话身份映射**（缺省启用）。
+   *
+   * 启用后：带项目标识的用户消息会把 mission 归到该项目的稳定会话与固定主个体，
+   * 并把 mission 登记为该会话下的一次运行（`<state>/conversation-identity/`）。
+   * 这是 ALIGN 主干的前置（重启恢复、报告归属都依赖它），故**默认开启**；
+   * 传 `false` 可回到"不落任何身份映射"的旧行为（无项目标识时两条路径等效）。
+   */
+  isConversationIdentityEnabled?: boolean;
   /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
@@ -1295,6 +1306,16 @@ export async function createApplicationRuntime(
           journal: new EventIncidentJournal({ stateDirectory: options.stateDirectory }),
         });
 
+  /**
+   * ALIGN-01-01（2026-10-28）：稳定会话身份映射（**默认启用**，`false` 可关）。
+   *
+   * 只构造存储对象，不建目录：首次"带项目标识的用户消息"才落盘。
+   */
+  const conversationIdentityStore =
+    options.isConversationIdentityEnabled === false
+      ? null
+      : new ConversationIdentityStore({ baseDirectory: stateDirectory });
+
   const controller = new MainController({
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
@@ -1303,6 +1324,16 @@ export async function createApplicationRuntime(
        * 也不与其它特性耦合（此前误放进工具说明的三元里，已移出）。
        */
       runHistoryStore: new RunHistoryStore({ baseDirectory: options.stateDirectory }),
+    /**
+     * ALIGN-01-01（2026-10-28）：稳定会话 → 主个体 → 运行 的持久映射。
+     *
+     * 惰性落盘：只有"带项目标识的用户消息"才会创建
+     * `<stateDirectory>/conversation-identity/conversations.json`。
+     * 关闭开关 ⇒ 不构造、不落盘（旧行为）。
+     */
+    ...(conversationIdentityStore === null
+      ? {}
+      : { conversationIdentityStore, mainAgentInstanceId }),
     ...(eventControlBridge === null
       ? {}
       : {
