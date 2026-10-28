@@ -39,6 +39,11 @@ export class RegisteredAgentDirectory {
     });
   }
 
+  /** 是否已登记（恢复/重入时不重复登记，也不覆盖既有身份）。 */
+  hasAgent(agentInstanceId: string): boolean {
+    return this.entriesByAgentId.has(agentInstanceId);
+  }
+
   /** 登记校验（Agent 与所属/mission/任务包匹配）。 */
   verifyReportSource(input: {
     reportingAgentInstanceId: string;

@@ -4,7 +4,7 @@
  * Assist 召唤次级调度后立即回到输入循环、Devolve 直接调度、
  * 权限询问转达用户并记录会话授权。
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
@@ -64,6 +64,7 @@ import type { SessionShutdownCoordinator } from "../tools/session-shutdown-and-e
 import type { CurrentPermissionConfigurationExporter } from "../tools/session-shutdown-and-export.js";
 import type { RegisteredAgentDirectory } from "./registered-agent-directory.js";
 import type { MainAgentReportArchiveIngestor } from "./main-agent-report-archive.js";
+import { MainAgentReportReader } from "./main-agent-report-archive.js";
 import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
@@ -1164,6 +1165,100 @@ export class MainController {
     return ingestor.readIndex(missionId);
   }
 
+  /**
+   * ALIGN-01-06（2026-10-28）：**按需**读取相关报告（不自动注入主上下文）。
+   *
+   * 只读、token 预算有界、来源保留；调用方必须显式请求（例如用户后续
+   * 提到该任务时），主 Agent 的每轮提示词**不会**自动带上全部报告。
+   */
+  async selectRelevantReports(input: {
+    readonly missionId: string;
+    readonly maxReports: number;
+    readonly tokenBudgetTokens: number;
+  }): Promise<TertiaryTerminalReport[]> {
+    const ingestor = this.options.reportArchiveIngestor;
+    if (ingestor === null || ingestor === undefined) {
+      return [];
+    }
+    const reader = new MainAgentReportReader(ingestor, input.tokenBudgetTokens);
+    return reader.selectReports({
+      missionId: input.missionId,
+      taskBundleIdFilter: null,
+      maxReports: input.maxReports,
+    });
+  }
+
+  /**
+   * ALIGN-01-06：把**次级主体的终态**写入主 Agent 只读报告索引（带来源）。
+   *
+   * 关键边界：
+   * - 来源必须是**已登记**的次级个体（`RegisteredAgentDirectory` 认证；
+   *   未登记 ⇒ 报告层拒绝，不会因为"字符串非空"就当真）；
+   * - 只写索引：不唤醒主 Agent 模型、不注入当前上下文、不打断用户输入；
+   * - `executedChecks` 如实留空 —— 任务组终态没有可核对的命令/退出码时，
+   *   不得编造"检查已通过"。
+   *
+   * 幂等：同一 mission/终态/摘要内容 → 同一 reportId（重复收口不重复写）；
+   * 摘要变化（例如 blocked 后又 done）会生成第二条报告，如实保留两个终态事件。
+   */
+  private async ingestMissionTerminalReport(
+    missionId: string,
+    status: "done" | "cancelled" | "blocked",
+  ): Promise<void> {
+    const ingestor = this.options.reportArchiveIngestor;
+    if (ingestor === null || ingestor === undefined) {
+      return;
+    }
+    const reportingAgentInstanceId = this.resolveSecondaryAgentInstanceIdentifier(missionId);
+    const missionStatus = await this.options.missionManager.getMissionStatus(missionId);
+    const tasks = missionStatus.taskChain?.tasks ?? [];
+    const completedTaskCount = tasks.filter((task) => task.status === "done").length;
+    const reportKind: TertiaryTerminalReport["reportKind"] =
+      status === "done" ? "completed" : status === "blocked" ? "blocked" : "terminated";
+    const summary =
+      `任务组终态 ${status}：任务 ${tasks.length} 个，已完成 ${completedTaskCount}，` +
+      `未完成 ${tasks.length - completedTaskCount}。`;
+    const summaryDigest = createHash("sha256").update(summary).digest("hex").slice(0, 8);
+    await ingestor.ingestReport({
+      reportId: `mission-report-${missionId}-${reportKind}-${summaryDigest}`,
+      missionId,
+      /** 任务组终态没有具体任务包 ⇒ 用 mission 作用域标识（来源认证按 mission 判定）。 */
+      taskBundleId: "mission-scope",
+      reportingAgentInstanceId,
+      reportKind,
+      summary,
+      executedChecks: [],
+      createdAtIso: new Date().toISOString(),
+      contentHash: "",
+    });
+  }
+
+  /**
+   * ALIGN-01-06：mission 的次级主体标识（与调度器同源，不按角色名猜）。
+   * 同时负责**登记**该主体，使报告来源认证有可信依据。
+   */
+  private resolveSecondaryAgentInstanceIdentifier(missionId: string): string {
+    const agentInstanceId =
+      this.options.secondaryAgentInstanceIdFactory?.(missionId) ??
+      `scheduler:${missionId}`;
+    const directory = this.options.registeredAgentDirectory;
+    if (
+      directory !== null &&
+      directory !== undefined &&
+      !directory.hasAgent(agentInstanceId)
+    ) {
+      directory.registerAgent({
+        agentInstanceId,
+        agentRole: "secondary",
+        missionId,
+        owningSecondaryAgentInstanceId: null,
+        boundTaskBundleId: null,
+        registeredAtIso: new Date().toISOString(),
+      });
+    }
+    return agentInstanceId;
+  }
+
   /** 次级持续调度循环（生产装配可达性 + 编排接入点）。 */
   getSecondaryDispatchLoop(): SecondaryContinuousDispatchLoop | null {
     return this.options.secondaryDispatchLoop ?? null;
@@ -1421,9 +1516,7 @@ export class MainController {
       feedbackTransport: this.options.feedbackTransport,
       feedbackTransportFactory: async () => this.options.feedbackTransport,
       workArchiveStore: this.options.workArchiveStore ?? null,
-      secondaryAgentInstanceId:
-        this.options.secondaryAgentInstanceIdFactory?.(missionId) ??
-        `scheduler:${missionId}`,
+      secondaryAgentInstanceId: this.resolveSecondaryAgentInstanceIdentifier(missionId),
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
       onMissionGateBlocked: (failureReason) => {
@@ -1431,6 +1524,14 @@ export class MainController {
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
         void this.options.missionManager
           .updateMissionStatus(missionId, "blocked")
+          .then(async () => {
+            /** ALIGN-01-06：阻塞终态同样入索引（不注入上下文）。 */
+            try {
+              await this.ingestMissionTerminalReport(missionId, "blocked");
+            } catch {
+              // 索引失败不改变已确认的 blocked 终态
+            }
+          })
           .catch(() => {});
       },
       ...(this.options.isConversationMode === true ? { isConversationMode: true } : {}),
@@ -1514,7 +1615,19 @@ export class MainController {
             : "cancelled";
           this.options.onMissionFinished?.(missionId, status);
           void this.registerMissionArtifacts(missionId);
-          return this.options.missionManager.updateMissionStatus(missionId, status);
+          return this.options.missionManager
+            .updateMissionStatus(missionId, status)
+            .then(async () => {
+              /**
+               * ALIGN-01-06：终态写入报告索引（只读索引，不注入上下文）。
+               * 索引失败**不改变**任务终态 —— 状态以 mission 摘要为准。
+               */
+              try {
+                await this.ingestMissionTerminalReport(missionId, status);
+              } catch {
+                // 报告索引是辅助观测；失败不覆盖已确认的终态
+              }
+            });
         }
         this.options.streamOutput(missionId, `[需要用户] ${message.payload.instructionText}`);
       },
@@ -1551,6 +1664,11 @@ export class MainController {
       maxLoopIterations: this.options.maxLoopIterations,
       feedbackTransportFactory: async () => this.options.feedbackTransport,
       workArchiveStore: this.options.workArchiveStore ?? null,
+      /**
+       * ALIGN-01-06：devolve 模式**没有下级报告**（主 Agent 直接调度），
+       * 因此这里只保留身份字符串，不登记为"次级"、也不往报告索引里写
+       * "下级报告" —— 否则就是把主 Agent 自己的调度记成了下级的汇报。
+       */
       secondaryAgentInstanceId:
         this.options.secondaryAgentInstanceIdFactory?.(missionId) ??
         `scheduler:${missionId}`,
@@ -1620,6 +1738,10 @@ export class MainController {
           : { diagnosticEventPort: this.options.diagnosticEventPort }),
       },
       onMissionFinished: (status) => {
+        /**
+         * ALIGN-01-06：devolve 没有下级报告 ⇒ 只更新 mission 终态，
+         * 不往"主 Agent 只读报告索引"写一条伪下级报告。
+         */
         void this.options.missionManager.updateMissionStatus(missionId, status);
         this.options.onMissionFinished?.(missionId, status);
       },
