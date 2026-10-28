@@ -1,6 +1,6 @@
 # ALIGN-02：统一偏序集、任务组和次级持续调度
 
-日期：2026-10-27。状态：in_progress（01 已交付；02 部分交付；均 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01 已交付；02–03 部分交付；均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -61,3 +61,23 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 **未做**：真实模型验证、项目摘要接线、复用既有分解、调度消费分解结果（02-03/05）。
 
 **验证状态**：未编写/未运行测试、未调用真实模型；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 03 ready set 工作单元选择——**部分交付**（2026-10-28）
+
+**审查发现**：`getReadyTaskIds()` 只按 `(priorityTier, sequenceOrdinal)` 排序，
+而 `explainOrder()` 声称"必要前驱可先行"——**没有任何代码实现该选择**；
+任务包也从未被当作派发单位挑选过。
+
+**交付**：
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 选择契约 | `packages/core/src/orchestration/ready-task-group-selection.ts` | 只从 ready set 取；有效优先级 = min(自身, 可达后继)；包整包参与、不拆包；预算按单元；三级稳定排序 |
+| 只读入口 | `task-sequence-controllers.ts` `TaskSequenceStatusController.selectNextTaskGroup` | 与 `getSnapshot` 同口径鉴权；不改 revision |
+
+**关键不变量**：未满足依赖的任务**永不**进入结果（置顶/提权/包内顺序都不能绕过）；
+包内任一任务非 pending 或首任务未就绪 ⇒ **整包推迟**并给原因。
+
+**未做（如实）**：**没有派发消费者**（`dispatchChain` 恒 false、占用恒 0 属 02-05）；
+未接执行者容量/租约；`createTaskBundle` 仍无生产调用方；未做 DAG+包+阻塞的端到端实测。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
