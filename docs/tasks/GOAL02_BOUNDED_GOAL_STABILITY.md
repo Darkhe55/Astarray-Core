@@ -1,5 +1,5 @@
 # GOAL-02：实验性目标模式与有界进展约束
-日期：2026-10-28。状态：in_progress（01–02 部分交付，implemented-unverified；03 未开始）。
+日期：2026-10-28。状态：in_progress（01–03 全部部分交付，implemented-unverified；整卡未闭合）。
 
 执行规则：每轮只做一个编号检查点，超过三小时拆分；先核对当前代码和在途改动，已有能力复用。覆盖、删减前由工具备份；不覆盖他人工作。必须更新本卡状态和交付记录；共享台账存在并行冲突时提交独立状态补丁，不以未授权为由跳过状态记录。本卡不授权安装、真实付费模型调用、外发消息、提交推送或自动启用实验功能。需要依赖时先询问已有资源。沿用用户此前不要求编写/运行测试的交付口径，本卡列出验收条件但不自行执行测试或宣称通过；代码完成只能标 implemented-unverified。变量名必须可读，时间单位明确。公共核心只放通用契约，不复制私有界面实现或设计。
 
@@ -74,5 +74,27 @@
 **未持久化**（计数/暂停原因/证据缺口在内存，重启归零，属 03）；无 UI/CLI；
 预算边界只是目标级、未与既有调度预算做统一"取更严"计算；`pauseConditions` 未评估；
 未跑"三组不降 ⇒ 暂停/调查组不罚/模型伪造被拒/证据失效 ⇒ 暂停且权重不变"任何一条。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 03 恢复、可观察性与实验退出——**部分交付**（2026-10-28）
+
+**审查发现**：01/02 的状态都在内存：重启后累计预算、暂停原因、当前组、V 依据全部丢失；
+也没有"关闭实验"的安全语义；恢复时若直接重跑可能重复副作用。
+
+**交付**（`packages/core/src/orchestration/goal-mode-store.ts`）：
+| 要点 | 说明 |
+|---|---|
+| 持久化 | `<state>/goal-mode/<goal>.json`：目标/契约版本/owner/原始要求引用、**V 逐项依据**、last-known V、当前组、累计工具调用/成本、暂停原因、证据缺口、`requiresReplanning`、实验关闭标记、门禁快照 |
+| 恢复先对账 | `evaluateResume`：在途组 ⇒ **`reconcile-first`**（禁止直接重跑）；暂停/需重规划/已关闭 ⇒ `stay-paused`；否则 `resume`（只带 last-known V，不重算、不宣称稳定） |
+| 版本不串 | `contractRevision`/`sourceRequestReference` 不一致 ⇒ 直接拒绝 |
+| 实验退出 | `closeExperiment` 只置标记+时间+暂停原因；**保留**任务/历史/限制/已执行结果 |
+| 状态视图 | `describeStatus` 返回状态/缺口数/资源消耗/下一检查点；`stabilityGuarantee` **恒为 `"none"`** |
+| 原子性 | 原子写 + 互斥 + 备份恢复；损坏按"无状态"处理，不伪造历史 |
+
+**未做（如实）**：**未接进恢复流程**（`resumeMission` 不调用 `evaluateResume`）；
+**未接进派发**（"关闭实验 ⇒ 停新增派发"目前只是数据标记，无执行侧保障）；无 UI/CLI；
+`consumedCostUnits` 无计价来源；`beginTaskGroup` 与真实副作用非同一事务（崩溃后只能提示对账）；
+未跑"在途组 ⇒ reconcile-first/版本不一致 ⇒ 拒绝/关闭后不恢复且历史保留/状态视图无稳定性保证"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
