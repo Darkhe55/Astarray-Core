@@ -70,6 +70,12 @@ import type { ConversationTaskInsertionController } from "./conversation-task-in
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import type { TaskSequenceManageController } from "./task-sequence-controllers.js";
 import type { MissionRelationIndexStore } from "./mission-relation-index.js";
+import { buildEvidenceSnapshot } from "./remote-evidence-snapshot.js";
+import type {
+  EvidenceSnapshot,
+  EvidenceSnapshotCandidateEntry,
+  EvidenceSnapshotRequest,
+} from "./remote-evidence-snapshot.js";
 import type { ContextRecallController } from "./context-recall-controller.js";
 import type { ContextRecallResult } from "./context-recall-controller.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
@@ -533,6 +539,8 @@ export class MainController {
   private readonly insertionRequestFingerprints = new Map<string, string>();
   /** ALIGN-03-01：独立审查门禁（惰性装配；缺四层路由控制面时拒绝）。 */
   private independentReviewGateInstance: IndependentReviewGate | null = null;
+  /** REMOTE-01-01：每个 requestIdentifier 的快照 revision 计数（进程内；持久化属 01-02）。 */
+  private readonly evidenceSnapshotRevisions = new Map<string, number>();
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -1753,6 +1761,152 @@ export class MainController {
         claimantDescription: "main-controller-resume",
       });
     }
+  }
+
+  /**
+   * REMOTE-01-01（2026-10-28）：**项目持有者出具只读运行记录快照**。
+   *
+   * 只读、只取**已保存可展示记录**（mission 摘要/任务链、运行历史、产物登记、报告索引），
+   * 不读取模型隐藏思维链；来源类型逐条标注；遗漏/截断/脱敏显式记账；
+   * `isRealtime` 恒 false（本地快照是 last-known）。
+   *
+   * 未提供/不可用的来源不伪造：缺失原因进 `omissions.reasonCodes`。
+   * 快照 revision 目前只在进程内递增（持久化与不可变存储属检查点 02）。
+   */
+  async requestRunEvidence(
+    request: EvidenceSnapshotRequest,
+  ): Promise<EvidenceSnapshot> {
+    const candidateEntries: EvidenceSnapshotCandidateEntry[] = [];
+    const additionalReasonCodes: string[] = [];
+    const missionIdentifiers = [...request.missionIdentifiers];
+    for (const missionIdentifier of missionIdentifiers) {
+      const missionStatus = await this.options.missionManager
+        .getMissionStatus(missionIdentifier)
+        .catch(() => null);
+      if (missionStatus === null) {
+        additionalReasonCodes.push("mission-unavailable");
+        continue;
+      }
+      if (missionStatus.summary !== null) {
+        candidateEntries.push({
+          entryIdentifier: `user-message:${missionIdentifier}`,
+          sourceKind: "user-message",
+          sourceAgentInstanceIdentifier: null,
+          recordedAtIso: missionStatus.summary.createdAtIso,
+          recordReference: `missions/${missionIdentifier}/summary.json`,
+          excerptText: missionStatus.summary.prompt,
+        });
+      }
+      for (const task of missionStatus.taskChain?.tasks ?? []) {
+        if (task.status === "pending") {
+          continue;
+        }
+        candidateEntries.push({
+          entryIdentifier: `task-status:${missionIdentifier}:${task.id}`,
+          sourceKind: "unknown",
+          sourceAgentInstanceIdentifier: task.publishedByRecipientId ?? null,
+          /**
+           * 任务节点没有独立时间戳 ⇒ 取 mission 创建时间，并在摘录里注明，
+           * 不假装是"状态变更时间"。
+           */
+          recordedAtIso:
+            missionStatus.summary?.createdAtIso ?? new Date().toISOString(),
+          recordReference: `missions/${missionIdentifier}/task-chain.json#${task.id}`,
+          excerptText:
+            `任务 ${task.id} 状态=${task.status}；结果位置=${task.resultLocation ?? "无"}；` +
+            "（时间取 mission 创建时间，任务节点无独立时间戳）",
+        });
+      }
+      const runHistoryStore = this.options.runHistoryStore;
+      if (runHistoryStore === null || runHistoryStore === undefined) {
+        additionalReasonCodes.push("run-history-unavailable");
+      } else {
+        const runHistory = await runHistoryStore
+          .read(missionIdentifier)
+          .catch(() => null);
+        if (runHistory !== null && runHistory.kind === "valid") {
+          for (const segment of runHistory.document.segments) {
+            for (const event of segment.events) {
+              const sourceKind: EvidenceSnapshotCandidateEntry["sourceKind"] =
+                event.kind === "tool-call"
+                  ? "tool-call"
+                  : event.kind === "tool-failure"
+                    ? "tool-result"
+                    : event.kind === "model-note"
+                      ? "model-claim"
+                      : "unknown";
+              candidateEntries.push({
+                entryIdentifier: `run-event:${missionIdentifier}:${event.eventIdentifier}`,
+                sourceKind,
+                sourceAgentInstanceIdentifier: null,
+                recordedAtIso: event.recordedAtIso,
+                recordReference:
+                  `run-history/${missionIdentifier}#${event.eventIdentifier}`,
+                excerptText: event.payloadJson,
+                /** 原文保留（默认原文摘录）；脱敏发生在投递侧并由外发门禁复核。 */
+                isRedacted: false,
+              });
+            }
+          }
+        } else if (runHistory !== null && runHistory.kind === "invalid") {
+          additionalReasonCodes.push("run-history-invalid");
+        }
+      }
+      const reportIngestor = this.options.reportArchiveIngestor;
+      if (reportIngestor === null || reportIngestor === undefined) {
+        additionalReasonCodes.push("report-index-unavailable");
+      } else {
+        const indexEntries = await reportIngestor
+          .readIndex(missionIdentifier)
+          .catch(() => []);
+        for (const indexEntry of indexEntries) {
+          candidateEntries.push({
+            entryIdentifier: `review:${indexEntry.reportId}`,
+            sourceKind: "review-conclusion",
+            sourceAgentInstanceIdentifier:
+              indexEntry.reportingAgentInstanceId,
+            recordedAtIso: indexEntry.recordedAtIso,
+            recordReference:
+              `main-agent-reports/${missionIdentifier}/${indexEntry.reportId}`,
+            excerptText: indexEntry.summaryPreview,
+          });
+        }
+      }
+    }
+    const artifactRecordStore = this.options.artifactRecordStore;
+    if (artifactRecordStore === undefined) {
+      additionalReasonCodes.push("artifact-store-unavailable");
+    } else {
+      const artifactDocument = await artifactRecordStore.read();
+      for (const record of artifactDocument.records) {
+        if (!missionIdentifiers.includes(record.missionIdentifier)) {
+          continue;
+        }
+        candidateEntries.push({
+          entryIdentifier: `artifact:${record.artifactIdentifier}`,
+          sourceKind: "artifact-registration",
+          sourceAgentInstanceIdentifier: record.sourceAgentInstanceId,
+          recordedAtIso: record.createdAtIso,
+          recordReference: `artifacts/records.json#${record.artifactIdentifier}`,
+          excerptText:
+            `产物 ${record.displayName}（${record.artifactType}）位置=${record.location}；` +
+            `校验状态=${record.verificationStatus}`,
+        });
+      }
+    }
+    const snapshotRevision =
+      (this.evidenceSnapshotRevisions.get(request.requestIdentifier) ?? 0) + 1;
+    this.evidenceSnapshotRevisions.set(
+      request.requestIdentifier,
+      snapshotRevision,
+    );
+    return buildEvidenceSnapshot({
+      request,
+      candidateEntries,
+      snapshotRevision,
+      capturedAtIso: new Date().toISOString(),
+      additionalReasonCodes: [...new Set(additionalReasonCodes)],
+    });
   }
 
   /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */
