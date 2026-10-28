@@ -399,9 +399,21 @@
 > ②无 UI/CLI（开启/暂停/继续/重定向/补预算/关闭都无入口）；③全部行为无运行证据；
 > ④**不声称稳定性**（`stabilityGuarantee: "none"` 是刻意设计，不是遗漏）。
 >
-> **㊼ 下一步**：ALIGN/SEC/REMOTE/GOAL 四张卡全部推进过一轮。转入 **PLAN_STATUS 未闭合项**：
-> 先做一次**跨卡接线缺口复核**（把 5 个默认开关、无调用方的组件、未运行证据汇成可执行清单），
-> 作为后续窗口的入口；若用户希望先解 ALIGN 的"两套记账"结构性问题，应优先。
+> **㊽ 跨卡接线复核（状态补丁）**：新增
+> [docs/reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md](astarray/docs/reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md)
+> —— 不覆盖共享总表，待人工集成。静态检索确认：本窗口 9 个公开 API（`requestRunEvidence`、
+> `handleWorkWindowResume`、`recallClosedContext`、`inspectMissionResumeReadiness`、
+> `evaluateOutboundContentGate`、`GoalDispatchGate`、`GoalModeStateStore`、
+> `RemoteEvidenceExportService`、`CredentialBroker`）在**定义文件之外调用方 = 0**；
+> 6 个默认开关（5 个运行时选项 + `GOAL_MODE_DEFAULT_ENABLED` 常量）语义逐一登记；
+> 12 张卡约 30 个检查点的**运行证据 = 0**。
+> **按收益排序的接线清单**：①合并两套记账（orchestrator 增 taskId 领取/派发/插入 API）；
+> ②把独立裁决 + 完成收据接进完成门禁；③模型最终出口加总扫描；④接时段检测器与 `shutdown()`；
+> ⑤REMOTE-01 真实传输适配器或标平台阻塞；⑥目标模式接进派发与恢复。
+>
+> **㊾ 下一步**：按清单第 ① 项做**结构性推进的第一步**：给 `MissionOrchestrator` 增加
+> "按 taskId 领取/派发/插入"的最小公开 API 骨架（先只读查询 + 显式拒绝未支持操作，
+> 让两套记账的差距**可被代码表达**），并在 ADR 中记录 `DagScheduler` 图变更的真实边界。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
