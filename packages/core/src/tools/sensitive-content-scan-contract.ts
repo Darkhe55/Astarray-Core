@@ -18,9 +18,15 @@
  *    保证跨块的多行私钥/长 token 不会被块边界切断；carry 有明确上限（不是随意重叠）。
  */
 import { DomainError } from "../core/errors.js";
+import {
+  CREDENTIAL_DETECTOR_CATALOG_VERSION,
+  selectDetectorRulesForModelRead,
+} from "./credential-detector-registry.js";
 
-/** 规则集版本（规则变动即递增；结果里必须带版本）。 */
-export const SENSITIVE_SCAN_RULE_SET_VERSION = 1;
+/**
+ * 规则集版本（SEC-02-02 起与凭据检测器目录版本一致；规则变动即递增）。
+ */
+export const SENSITIVE_SCAN_RULE_SET_VERSION = CREDENTIAL_DETECTOR_CATALOG_VERSION;
 
 export type SensitiveScanOutcome = "clean" | "sensitive" | "incomplete" | "error";
 
@@ -66,30 +72,14 @@ export const DEFAULT_SENSITIVE_SCAN_LIMITS: Required<SensitiveScanLimits> = {
 };
 
 /**
- * 默认本地检测规则（与既有 DLP 规则同源；此处集中管理以便版本化）。
+ * 默认本地检测规则：**直接取自凭据检测器注册表的"阻断模型读取"视图**。
  *
- * 注意：本检查点只做**契约与扫描器**；更完整的凭据类型覆盖与日志脱敏策略是 SEC-02-02/05。
+ * 单一来源：规则只在 `credential-detector-registry.ts` 定义一次；
+ * 这里不再维护第二份列表（旧实现曾在 DLP 与 redaction 各维护一套、覆盖不一致）。
+ * 更完整的凭据类型覆盖与日志掩码策略见 SEC-02-02/05。
  */
-export const DEFAULT_SENSITIVE_SCAN_RULES: readonly SensitiveScanRule[] = [
-  {
-    identifier: "dlp:api-key",
-    pattern:
-      /["']?(api[_-]?key|access[_-]?key|token|secret)["']?\s*[=:]\s*["']?[A-Za-z0-9_\-./]{16,}/i,
-  },
-  { identifier: "dlp:aws-credential", pattern: /AKIA[0-9A-Z]{16}/ },
-  {
-    identifier: "dlp:private-key",
-    pattern: /BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY|BEGIN PGP PRIVATE KEY BLOCK/,
-  },
-  {
-    identifier: "dlp:github-token",
-    pattern: /(ghp|gho|ghu|ghs)_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9]{16,}/,
-  },
-  {
-    identifier: "dlp:connection-string",
-    pattern: /(postgres|mysql|mongodb|redis|amqp)\+?s?:\/\/[^\s:@]+:[^\s:@]+@/,
-  },
-];
+export const DEFAULT_SENSITIVE_SCAN_RULES: readonly SensitiveScanRule[] =
+  selectDetectorRulesForModelRead();
 
 export interface ScanSensitiveContentInput {
   readonly content: string;

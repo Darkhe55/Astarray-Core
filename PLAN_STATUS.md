@@ -263,9 +263,19 @@
 > **未做**：规则覆盖仍最小集（**裸 `sk-` 与 redaction 差异未消除**）、通道矩阵、外发门禁、
 > 流式有界隔离缓冲；未跑任何扫描路径。
 >
-> **㉞ 下一步**：SEC-02-02（版本化检测器注册表：**阻断模型读取**与**日志掩码**两套策略分开；
-> 覆盖厂商格式/Authorization/Cookie/GitHub 新旧 token/多行与加密私钥/连接串/结构化敏感字段；
-> 只用人工构造假凭据）。
+> **㉞ SEC-02-02 部分交付**：规则此前**两套各维护**（policy 的 DLP 列表 vs `redaction.ts` 的脱敏
+> 列表）⇒ **裸 `sk-` 只有掩码层有、DLP 层没有**，私钥加密头/GitHub 细粒度/npm/GitLab/JWT/
+> 敏感 Cookie 覆盖不全。新增 `credential-detector-registry.ts` 单一目录（版本化）：
+> `selectDetectorRulesForModelRead()`（**阻断**，非全局新正则）与
+> `selectCredentialMaskingRules()`（**日志掩码**）两套出口，**掩码不等于放行**。
+> 覆盖：厂商 key、GitHub 经典+细粒度、GitLab、npm、AWS（AKIA/ASIA + secret 字段）、
+> Authorization Bearer/Basic、敏感 Cookie、JWT、PEM 含加密头、连接串、结构化字段/赋值。
+> 扫描默认规则与 `redaction` 默认规则都改为从该目录派生。
+> **未做**：覆盖表（05）、通道矩阵（06）、高熵信号、无前缀厂商（智谱/云知声）、
+> 日志换行注入防护；未用假凭据跑任何规则。
+>
+> **㉟ 下一步**：SEC-02-03（生产入口与资源身份：梳理 read/search/git/文档转换/子进程输出等各入口，
+> 分别登记路径检查、内容检查、脱敏消费者与未支持范围；装配缺策略即拒绝；硬链接身份与 TOCTOU）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
