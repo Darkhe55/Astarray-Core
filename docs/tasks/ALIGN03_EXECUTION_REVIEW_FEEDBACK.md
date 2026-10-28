@@ -1,6 +1,6 @@
 # ALIGN-03：下级执行、次级审查集成与报告闭环
 
-日期：2026-10-27。状态：in_progress（01–02 部分交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–03 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -62,5 +62,25 @@
 **未做（如实）**：**执行侧不消费**（orchestrator/worker 派发仍用原工具端口与提示词，
 信包停在数据层）；`createTaskBundle` 仍无生产调用方；`deniedToolNames` 只上报不升级；
 工具说明协议未改动（只引用 revision）；未跑求交/禁止字段/六项缺失任何一条路径。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 03 完成收据与编排层完成门禁——**部分交付**（2026-10-28）
+
+**审查发现**：`LocalCompletionVerifier`（八条本地条件）**零调用方**，从未在生产路径执行；
+Worker 自己检查完成事件/写工具/产物，但**编排层只看到 `outcome: "success"` 就 `finishTask(done)`**，
+中间没有任何可核对的收据跨边界传递。G5 早停续跑（≤2 次）与"失败只报原因"已存在，本轮未改。
+
+**交付**：
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 收据契约 | `packages/core/src/orchestration/completion-receipt.ts` | 字段全部取自本地真实状态（完成事件是否校验、工具调用数、落盘产物路径）；缺失即不足、不补默认收据；矛盾（要求事件却未声明/空产物路径/计数非法）即不足 |
+| 收据生成 | `worker-agent.ts` 成功分支 | `outcome.success.completionReceipt` |
+| 编排门禁 | `mission-orchestrator.ts` success 分支 | `isCompletionReceiptRequired` 开启且收据不足 ⇒ **blocked + 升级**，不判 done |
+| 开关透传 | `main-controller.ts` + `application-runtime.ts` | 缺省 **false**（未实测的收口变更不默认推送） |
+
+**未做（如实）**：默认关闭（生产仍"success 即 done"）；**`LocalCompletionVerifier` 仍未调用**
+（需把解析后的 `TaskCompletionEventV1` 从 Worker 传到编排层，是 03-03 后半）；
+收据不含权限待决/反馈未确认/revision/活锁预算；未接产物验收门禁；未跑任何一条路径。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。

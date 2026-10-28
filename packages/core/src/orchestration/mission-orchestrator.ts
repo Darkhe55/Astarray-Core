@@ -28,6 +28,7 @@ import type { ToolDescriptor } from "../core/types.js";
 import type { ContextPromptProvider } from "./context-prompt-assembler.js";
 // COMM-01-02（2026-10-26）：发布任务时登记自己的信箱 ⇒ 反馈走发布者反向通道。
 import { resolvePublisherRecipientIdForTask } from "./task-publisher-feedback-route.js";
+import { evaluateCompletionReceipt } from "./completion-receipt.js";
 import type { GuidanceControlQueue } from "../runtime-guidance/guidance-control-queue.js";
 
 /**
@@ -210,6 +211,13 @@ export interface MissionOrchestratorOptions {
   requireCompletionControlEvent?: boolean;
   /** 完成门禁失败时由宿主如实迁移 mission 状态（不结束 mission，保留续跑/重试）。 */
   onMissionGateBlocked?: (failureReason: string) => void;
+  /**
+   * ALIGN-03-03（2026-10-28）：是否要求 **Worker 完成收据** 才能判 `done`（缺省 false）。
+   *
+   * 打开后：`outcome === "success"` 但没有可核对收据（或收据与要求矛盾）⇒
+   * **不判 done**，把任务置 blocked 并升级原因。默认关闭是为了不在未实测前改变所有任务收口。
+   */
+  isCompletionReceiptRequired?: boolean;
   /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
   isConversationMode?: boolean;
   /**
@@ -1159,6 +1167,25 @@ export class MissionOrchestrator {
     }
     switch (outcome.outcome) {
       case "success": {
+        /**
+         * ALIGN-03-03：**完成收据门禁**（默认关闭）。没有可核对收据时，
+         * `success` 只是"Worker 认为成功"，不足以判 done —— 置 blocked 并如实升级，
+         * 绝不补一个默认收据。
+         */
+        if (this.options.isCompletionReceiptRequired === true) {
+          const receiptEvaluation = evaluateCompletionReceipt({
+            receipt: outcome.completionReceipt ?? null,
+            requiresCompletionControlEvent:
+              this.options.requireCompletionControlEvent === true,
+          });
+          if (!receiptEvaluation.isSufficient) {
+            await this.dagScheduler.blockTaskForHumanDecision(taskId).catch(() => null);
+            this.options.onUserEscalation(
+              `任务 ${taskId} 的完成收据不足，未判 done: ${receiptEvaluation.reasons.join("；")}`,
+            );
+            break;
+          }
+        }
         // T05B：写入型任务先提交并审查，审查通过才标记 done
         const gitIntegration = this.options.gitIntegration;
         const allocation = this.gitAllocations.get(taskId) ?? null;

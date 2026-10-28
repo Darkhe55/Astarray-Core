@@ -311,6 +311,13 @@ export interface ApplicationRuntimeOptions {
    */
   isModelTaskPlanningEnabled?: boolean;
   /**
+   * ALIGN-03-03（2026-10-28）：是否要求 **Worker 完成收据** 才判 `done`（缺省 false）。
+   *
+   * 打开后：`success` 但收据缺失/矛盾 ⇒ 任务置 blocked 并升级原因，不伪造 done。
+   * 缺省关：该路径尚未实测，改变默认收口行为会把未验证的判断推给所有任务。
+   */
+  isCompletionReceiptRequired?: boolean;
+  /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
    */
@@ -1522,6 +1529,10 @@ export async function createApplicationRuntime(
      * ⇒ 控制器永远收到 `undefined` ⇒ 编排器 `enabled=false`（探针实测）。
      */
     ...(options.isCheckpointResumeEnabled === true ? { isCheckpointResumeEnabled: true } : {}),
+    /** ALIGN-03-03：完成收据门禁（缺省关）。 */
+    ...(options.isCompletionReceiptRequired === true
+      ? { isCompletionReceiptRequired: true }
+      : {}),
     backupVault,
     backupDeletionController,
     workArchiveStore,
