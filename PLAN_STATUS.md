@@ -421,9 +421,20 @@
 > **未做**：派发/插入仍未实现（`DagScheduler` 图变更、单任务领取、序列→mission 写回都缺）；
 > 对照**不自动修正**任何一边；无 UI/CLI；mission↔序列对应关系无持久索引。
 >
-> **㊿ 下一步**：按清单第 ② 项 —— 把**独立裁决 + 完成收据接进完成门禁**：
-> 先只读核对当前 `onReportToMain` 的完成判定链路（哪些分支直接判 done、有没有经过裁决/收据），
-> 再以"缺门禁即 blocked 且列出缺口"的最小改动接上（开关仍默认关，行为可回退）。
+> **㊿ 接线缺口第 ② 项：完成门禁接上（部分）**：`onReportToMain` 完成分支此前**只要文本带
+> "done" 就把 mission 标 done**（即使任务链还有 pending/running/blocked），完成收据与独立裁决
+> **根本没被调用**。现在：①**始终**检查任务链是否全 `done`（否则 blocked + 列出
+> `taskId(status)`）；②`isCompletionReceiptRequired` 为真时额外要求**每个 done 任务收据足够**
+> + **已接受的独立裁决**（新增 `completionReceiptReader` / `completionVerdictReader` 端口，
+> 缺省 ⇒ 视为缺失）；③不放行 ⇒ mission 置 `blocked` + 流式原因，**绝不标 done**；
+> ④`projectMissionCompletionGate` 为只读投影，供回调与 UI 共用；⑤取消分支不变。
+> **未做**：**没有收据/裁决的生产方**（打开严格开关会阻断所有 done —— fail-closed，故默认关）；
+> **只接了 assist 路径**，`devolve`（次级独立运行）完成**未受约束**；无 UI；
+> 完成裁决与合并裁决的"接受"语义未统一。
+>
+> **51 下一步**：清单第 ③ 项 —— **模型最终出口加一次总扫描**（SEC-02-06 通道 13）：
+> 先定位 provider 消息装配点，再以"可开关、缺省仅记录不拦截"的最小改动接入
+> `assertModelVisiblePayloadHasNoCredential`，并如实登记"拦截模式需要实测误报率"。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

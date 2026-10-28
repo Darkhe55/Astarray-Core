@@ -81,6 +81,8 @@ import type { ContextRecallResult } from "./context-recall-controller.js";
 import type { ActorIdentity, TaskSequenceStatusController } from "./task-sequence-controllers.js";
 import { TaskLedgerBridge } from "./task-ledger-bridge.js";
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
+import { evaluateCompletionReceipt } from "./completion-receipt.js";
+import type { CompletionReceipt } from "./completion-receipt.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
 import type { WorkWindowResumeDecision } from "./work-window-resume.js";
 import {
@@ -445,6 +447,24 @@ export interface MainControllerOptions {
   contextRecallControllerFactory?: (
     callerAgentInstanceId: string,
   ) => ContextRecallController;
+  /**
+   * 接线缺口第 ② 项（2026-10-28）：**完成收据读取端口**。
+   *
+   * 收据必须来自真实本地状态；缺省为 null ⇒ 视为"没有收据"（**不补默认收据**）。
+   */
+  completionReceiptReader?: (
+    missionIdentifier: string,
+    taskIdentifier: string,
+  ) => Promise<CompletionReceipt | null>;
+  /**
+   * 接线缺口第 ② 项：**独立完成裁决读取端口**。
+   *
+   * 缺省 null ⇒ 在要求收据的模式下视为"缺少独立裁决"（不确认即阻断）。
+   */
+  completionVerdictReader?: (missionIdentifier: string) => Promise<{
+    readonly isAccepted: boolean;
+    readonly reasons: readonly string[];
+  } | null>;
   /**
    * 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面。
    *
@@ -1951,6 +1971,70 @@ export class MainController {
     return bridge.inspectAlignment(input);
   }
 
+  /**
+   * 接线缺口第 ② 项（2026-10-28）：**完成门禁投影（只读）**。
+   *
+   * 两条规则：
+   * 1. **始终**：任务链里所有任务必须 `done`（有 pending/running/blocked ⇒ 不得判 done）；
+   * 2. `isCompletionReceiptRequired` 为真时：每个已 done 任务必须有**足够收据**，
+   *    且要有**已接受的独立裁决**；缺任何一项 ⇒ 阻断（**不补默认收据、不伪造裁决**）。
+   *
+   * 只读：不启动/停止任务，不改状态；供 `onReportToMain` 与 UI 共用。
+   */
+  async projectMissionCompletionGate(missionId: string): Promise<{
+    readonly isAllowed: boolean;
+    readonly blockedReasons: readonly string[];
+    readonly incompleteTaskIdentifiers: readonly string[];
+  }> {
+    const missionStatus = await this.options.missionManager.getMissionStatus(missionId);
+    const tasks = missionStatus.taskChain?.tasks ?? [];
+    const incompleteTaskIdentifiers = tasks
+      .filter((task) => task.status !== "done")
+      .map((task) => `${task.id}(${task.status})`);
+    const blockedReasons: string[] = [];
+    if (incompleteTaskIdentifiers.length > 0) {
+      blockedReasons.push(
+        `任务链仍有未完成任务: ${incompleteTaskIdentifiers.join(", ")}`,
+      );
+    }
+    if (this.options.isCompletionReceiptRequired === true) {
+      const receiptReader = this.options.completionReceiptReader;
+      const insufficientReceipts: string[] = [];
+      for (const task of tasks.filter((candidate) => candidate.status === "done")) {
+        const receipt =
+          receiptReader === undefined
+            ? null
+            : await receiptReader(missionId, task.id).catch(() => null);
+        const evaluation = evaluateCompletionReceipt({
+          receipt: receipt ?? null,
+          requiresCompletionControlEvent:
+            this.options.requireCompletionControlEvent === true,
+        });
+        if (!evaluation.isSufficient) {
+          insufficientReceipts.push(`${task.id}: ${evaluation.reasons.join("；")}`);
+        }
+      }
+      if (insufficientReceipts.length > 0) {
+        blockedReasons.push(`完成收据不足: ${insufficientReceipts.join(" | ")}`);
+      }
+      const verdictReader = this.options.completionVerdictReader;
+      const verdict =
+        verdictReader === undefined
+          ? null
+          : await verdictReader(missionId).catch(() => null);
+      if (verdict === null || !verdict.isAccepted) {
+        blockedReasons.push(
+          `缺少已接受的独立完成裁决${verdict === null ? "" : `：${verdict.reasons.join("；")}`}`,
+        );
+      }
+    }
+    return {
+      isAllowed: blockedReasons.length === 0,
+      blockedReasons,
+      incompleteTaskIdentifiers,
+    };
+  }
+
   /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */
   private rememberUserMessageReference(conversationIdentifier: string | null): string {    const userMessageReference = `user-message-${randomUUID()}`;
     this.latestUserMessageReferences.set(
@@ -2644,10 +2728,45 @@ export class MainController {
           return;
         }
         if (message.payload.instructionText.startsWith("任务完成状态:")) {
-          this.options.missionRuntimeRegistry?.release(missionId);
           const status = message.payload.instructionText.includes("done")
             ? "done"
             : "cancelled";
+          /**
+           * 接线缺口第 ② 项（2026-10-28）：**先过完成门禁，再判 done**。
+           *
+           * 旧行为：文本里带 "done" 就直接把 mission 标 done —— 即使任务链还有
+           * pending/running/blocked。现在：未完成/缺收据/缺裁决 ⇒ 一律 blocked 并列出原因。
+           */
+          if (status === "done") {
+            void (async () => {
+              const completionGate = await this.projectMissionCompletionGate(missionId);
+              if (!completionGate.isAllowed) {
+                this.options.missionRuntimeRegistry?.release(missionId);
+                this.options.streamOutput(
+                  missionId,
+                  `[完成门禁] 拒绝标记 done：${completionGate.blockedReasons.join("；")}`,
+                );
+                void this.options.missionManager.updateMissionStatus(
+                  missionId,
+                  "blocked",
+                );
+                return;
+              }
+              this.options.missionRuntimeRegistry?.release(missionId);
+              this.options.onMissionFinished?.(missionId, status);
+              void this.registerMissionArtifacts(missionId);
+              /** ALIGN-02-07：任务收口 ⇒ 事件唤醒（让依赖解锁/补位不再靠轮询）。 */
+              this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
+              await this.options.missionManager.updateMissionStatus(missionId, status);
+              try {
+                await this.ingestMissionTerminalReport(missionId, status);
+              } catch {
+                // 报告索引是辅助观测；失败不覆盖已确认的终态
+              }
+            })();
+            return;
+          }
+          this.options.missionRuntimeRegistry?.release(missionId);
           this.options.onMissionFinished?.(missionId, status);
           void this.registerMissionArtifacts(missionId);
           /** ALIGN-02-07：任务收口 ⇒ 事件唤醒（让依赖解锁/补位不再靠轮询）。 */
