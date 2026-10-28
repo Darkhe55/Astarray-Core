@@ -5,6 +5,12 @@
  * API key 绝不进入日志/错误/事件：错误消息仅含稳定领域信息。
  */
 import { DomainError } from "../core/errors.js";
+import {
+  applyProviderEgressScan,
+  type ProviderEgressScanMode,
+  type ProviderEgressScanOptions,
+  type ProviderEgressScanRecord,
+} from "./provider-egress-scan.js";
 import type { AgentEvent } from "../core/events.js";
 import type {
   AgentRunInput,
@@ -36,6 +42,12 @@ export interface OpenAiCompatibleRuntimeOptions {
    * 缺省 = 不上报：显式表示本装配不采集用量，不冒充已采集。
    */
   providerRequestUsageObserver?: ProviderRequestUsageObserverPort;
+  /**
+   * 接线缺口第 ③ 项（2026-10-28）：模型请求最终出口扫描模式。
+   * 缺省 `record`（命中只记录不拦截）；`block` 需要用户显式开启。
+   */
+  egressScanMode?: ProviderEgressScanMode;
+  egressAuditSink?: (record: ProviderEgressScanRecord) => void;
 }
 
 interface OpenAiToolCallDelta {
@@ -74,11 +86,19 @@ function readNonNegativeTokenCount(value: unknown): number | null {
 
 export class OpenAiCompatibleRuntime implements AgentRuntime {
   private readonly fetchImpl: typeof fetch;
+  /** 出口扫描选项（缺省 record：命中记录但不拦截）。 */
+  private readonly egressScanOptions: ProviderEgressScanOptions;
   /** 每个实例对应一个具体 Agent；实例内递增即可区分该 Agent 的每次真实请求。 */
   private requestSequence = 0;
 
   constructor(private readonly options: OpenAiCompatibleRuntimeOptions) {
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.egressScanOptions = {
+      mode: options.egressScanMode ?? "record",
+      ...(options.egressAuditSink === undefined
+        ? {}
+        : { auditSink: options.egressAuditSink }),
+    };
   }
 
   async *run(
@@ -151,6 +171,15 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
     cancellationSignal.addEventListener("abort", cancellationListener);
     try {
       let response: Response;
+      /**
+       * 接线缺口第 ③ 项（2026-10-28）：**模型请求最终出口扫描**。
+       * 只扫请求体；缺省 `record`（命中记录但发送）；`block` 由用户显式开启。
+       */
+      applyProviderEgressScan({
+        providerIdentifier: this.options.providerIdentifier ?? "openai-compatible",
+        requestBodyJson: serializedRequestBody,
+        options: this.egressScanOptions,
+      });
       try {
         response = await this.fetchImpl(this.options.baseUrl, {
           method: "POST",

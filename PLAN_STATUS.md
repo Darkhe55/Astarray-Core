@@ -432,9 +432,22 @@
 > **只接了 assist 路径**，`devolve`（次级独立运行）完成**未受约束**；无 UI；
 > 完成裁决与合并裁决的"接受"语义未统一。
 >
-> **51 下一步**：清单第 ③ 项 —— **模型最终出口加一次总扫描**（SEC-02-06 通道 13）：
-> 先定位 provider 消息装配点，再以"可开关、缺省仅记录不拦截"的最小改动接入
-> `assertModelVisiblePayloadHasNoCredential`，并如实登记"拦截模式需要实测误报率"。
+> **51 接线缺口第 ③ 项：模型最终出口扫描（部分）**：通道 13 此前**完全没有扫描**；
+> 实测两个 runtime 都在 `fetchImpl(..., { body: JSON.stringify(requestBody) })` 前构造
+> `serializedRequestBody`——这是请求体离开本机前唯一必经位置。新增 `provider-egress-scan.ts`
+> （三档：`off` / **`record` 缺省** / `block`；只扫**请求体不扫请求头**，因为
+> `Authorization`/`x-api-key` 是协议要求；记录只含 provider/时间/结论/规则版本/命中规则/
+> 字节数，**不含请求体内容**），并接入 `AnthropicMessagesRuntime` 与 `OpenAiCompatibleRuntime`；
+> 诊断读取 `readProviderEgressScanRecords()`（进程内 100 条环形缓冲）。
+> **为什么缺省不拦截**：提示词里的 `token=`/`password=` 可能只是正常文本，误拦会让请求直接失败；
+> **拦截需要实测误报率后由用户显式开启**（模式不可由模型切换）。
+> **未做**：azure/bedrock/gemini 适配器**未接**（是否也走这两个 runtime 未核实）、
+> 记录**无 CLU/UI 展示与持久化告警**、误报率未知、不覆盖响应侧。
+>
+> **52 下一步**：清单第 ④ 项 —— 接**时段变化检测器**与 `shutdown()` 调用点：
+> 先定位现有 timer/调度循环里"能安全调用时段判定"的位置，再以"检测到 rest→working 才调用
+> `handleWorkWindowResume`、且只在 mission 结束/进程退出时调用生命周期 `shutdown()`"
+> 的最小改动接入；不新增轮询进程。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
