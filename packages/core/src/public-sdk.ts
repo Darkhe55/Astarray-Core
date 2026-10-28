@@ -1148,6 +1148,8 @@ export {
   type WorkWindowRule,
   type WorkWindowState,
 } from "./orchestration/work-window-contract.js";
+import type { WorkWindowRule } from "./orchestration/work-window-contract.js";
+import type { MissionRuntimeLease } from "./orchestration/mission-runtime-registry.js";
 /**
  * WORKWINDOW-01-02 统一门禁：派发/模型/工具执行前同一套判定，暂停原因不互相覆盖。
  */
@@ -2395,7 +2397,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           projectIdentifier: string | null;
           sessionIdentifier: string | null;
           agentInstanceId: string | null;
-        }) => Promise<import("./orchestration/mission-runtime-registry.js").MissionRuntimeLease | null>)
+        }) => Promise<MissionRuntimeLease | null>)
       | undefined;
     if (runtimeKind === "provider") {
       const registry = options.providerRuntimeRegistry;
@@ -3125,7 +3127,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 
   async updateWorkWindowConfig(input: {
     projectIdentifier?: string;
-    rules: import("./orchestration/work-window-contract.js").WorkWindowRule[];
+    rules: WorkWindowRule[];
     expectedRevision: number;
   }) {
     this.assertOpen();

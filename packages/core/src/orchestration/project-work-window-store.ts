@@ -54,7 +54,13 @@ export class ProjectWorkWindowStore {
     this.backupFilePath = path.join(directory, "config.json.bak");
   }
 
-  async read(projectIdentifier?: string): Promise<ProjectWorkWindowDocument> {
+  /**
+   * 读取整份配置。
+   *
+   * 形参 `_projectIdentifier` 保留只为兼容既有调用方：本方法返回**全部项目**
+   * 的规则，按项目取规则请用 `readRules(projectIdentifier)`。
+   */
+  async read(_projectIdentifier?: string): Promise<ProjectWorkWindowDocument> {
     const readResult = await readJsonWithBackupRecovery(
       this.filePath,
       this.backupFilePath,
