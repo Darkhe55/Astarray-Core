@@ -230,6 +230,11 @@ export class FeedbackProcessSupervisor {
         return;
       }
       activeClient.sendHeartbeat();
+      /**
+       * ALIGN-03-06：心跳顺带补送本地 outbox（发送失败/子进程崩溃遗留的消息）。
+       * 失败不抛出、不影响心跳：下一次心跳继续尝试；幂等由子进程按下键去重。
+       */
+      void activeClient.flushPendingOutbox().catch(() => undefined);
     }, this.heartbeatIntervalMilliseconds);
   }
 

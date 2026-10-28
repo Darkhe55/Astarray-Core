@@ -92,6 +92,16 @@ export class MailboxJournal {
     return this.runExclusive(() => this.enqueueExclusive(message));
   }
 
+  /**
+   * ALIGN-03-06（2026-10-28）：**幂等入库**。
+   *
+   * 同一 `idempotencyKey` 重放（补送/重连重发）**不会再追加一条**：
+   * - 内容一致 ⇒ 返回既有条目的序列号（不重复投递）；
+   * - 内容不一致 ⇒ `operation-not-idempotent`（拒绝覆盖，也不静默丢弃）。
+   *
+   * "内容"比较刻意排除 `messageId` 与 `createdAtIso`：重发可能带新 id/时间戳，
+   * 只比较来源、目标、优先级与 payload —— 那才是"同一条消息"的实质。
+   */
   private async enqueueExclusive(message: FeedbackMessage): Promise<number> {
     const recipientId = message.recipientId;
     const document = (await this.loadDocument(recipientId)) ?? {
@@ -100,6 +110,23 @@ export class MailboxJournal {
       nextSequence: 1,
       messages: [],
     };
+    const existingMessage = document.messages.find(
+      (candidate) => candidate.idempotencyKey === message.idempotencyKey,
+    );
+    if (existingMessage !== undefined) {
+      if (
+        JSON.stringify(existingMessage.source) !== JSON.stringify(message.source) ||
+        existingMessage.recipientId !== message.recipientId ||
+        existingMessage.priority !== message.priority ||
+        JSON.stringify(existingMessage.payload) !== JSON.stringify(message.payload)
+      ) {
+        throw new DomainError(
+          "operation-not-idempotent",
+          `同幂等键异内容，拒绝入库: ${message.idempotencyKey}`,
+        );
+      }
+      return existingMessage.enqueuedSequence;
+    }
     const journaledMessage: JournaledMessage = {
       ...message,
       enqueuedSequence: document.nextSequence,
