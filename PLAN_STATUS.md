@@ -229,8 +229,19 @@
 > **未做**：**没有时段变化检测器**（谁触发入口未接线）；`hasResumedSinceWake` 未持久化；
 > `pauseKind` 无权威标记；未跑任何判定路径。
 >
-> **㉙ 下一步**：ALIGN-04-05（保留原始上下文与个体档案，按节点关闭/回访重建必要上下文；
-> 不把全局摘要当完整历史、不拼接全部角色日志恢复）。
+> **㉙ ALIGN-04-05 部分交付**：节点收口完整（`ContextNodeLifecycleController` →
+> `ContextClosureCapsuleStore`，胶囊不可变 + contentHash + owner/mission/node），但
+> **`ContextRecallController` 从未被构造** ⇒ 胶囊**只写不读**，"按节点关闭/回访重建"不可达。
+> 现在：`contextRecallControllerFactory`**按调用者**构造（各自独立账本，冷却/预算互不干扰），
+> 入口 `recallClosedContext({callerAgentInstanceId, request})`；输入面只有节点/revision/
+> 原因码/token 上限 —— **没有**"全部 Agent / 全局摘要当历史"字段，越权组合结构上不可表达。
+> 顺带核对：重试档案附加按 `taskId` 过滤且按属主分别生成附件，**没有**拼接全部角色日志，
+> 也没有把全局摘要当完整历史。
+> **未做**：**未注入提示词装配**（只能显式调用）；`nodeIndexProvider`/`fullFragmentProvider`
+> 未接管（无胶囊 ⇒ `not-found`）；敏感判定未接 SEC-02 DLP。
+>
+> **㉚ 下一步**：ALIGN-04-06（按调用链修正核心计划状态：接口存在/组件存在/生产接线/代码完成/
+> 运行证据分别登记；空回调、硬编码假值、未持久化关联列为未完成）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
