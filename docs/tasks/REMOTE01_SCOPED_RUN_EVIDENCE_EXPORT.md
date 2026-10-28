@@ -1,5 +1,5 @@
 # REMOTE-01：受控运行记录导出与远程投递契约
-日期：2026-10-28。状态：in_progress（01–03 全部部分交付，implemented-unverified；整卡未闭合）。
+日期：2026-10-28。状态：**blocked（平台阻塞）** —— 01–03 契约部分交付（implemented-unverified）；投递面缺平台能力，见 [REMOTE01_PLATFORM_BLOCK](../reports/REMOTE01_PLATFORM_BLOCK_2026-10-28.md)。
 
 执行规则：每轮只做一个编号检查点，超过三小时拆分；先核对当前代码和在途改动，已有能力复用。覆盖、删减前由工具备份；不覆盖他人工作。必须更新本卡状态和交付记录；共享台账存在并行冲突时提交独立状态补丁，不以未授权为由跳过状态记录。本卡不授权安装、真实付费模型调用、外发消息、提交推送或自动启用实验功能。需要依赖时先询问已有资源。沿用用户此前不要求编写/运行测试的交付口径，本卡列出验收条件但不自行执行测试或宣称通过；代码完成只能标 implemented-unverified。变量名必须可读，时间单位明确。公共核心只放通用契约，不复制私有界面实现或设计。
 
@@ -91,3 +91,20 @@
 未跑"重复入队/同 id 换内容被拒/受理后无回执 ⇒ unknown/unknown 不自动重发/换目标被拒"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 04 平台阻塞登记（2026-10-28）
+
+**检索证据**：公开仓 `packages/**/*.ts` 中 `webhook|feishu|dingtalk|slack|telegram|wecom|nodemailer|smtp` **0 命中**；
+私有仓 `**/*.{ts,tsx}` 同模式 + `RemoteEvidenceExportService|RemoteDeliveryTransportPort` **0 命中**；
+core 网络出口只有注入的 `fetchImpl`/transport 端口（`fetch(|http.request|undici` 0 命中）；
+UI 的 46 处 `fetch(`/`http.request` **全部指向本地 GUI server 或集成测试**。
+
+**结论**：两个仓库都**不存在任何 IM/Webhook/邮件发送实现** ⇒ `RemoteDeliveryTransportPort`
+只有接口没有实现。投递面是**平台阻塞**，不是代码缺陷。
+
+**解除条件**（逐条验收）：选定平台测试租户 → 能按平台签名算法验证示例请求（有测试向量）→
+能查询单条回执（成功/失败/未知可分）→ 端到端演练 `sent`/`unknown`/`refused` 各一次 →
+凭据只经本地注入（仓库零真实凭据）→ 明确平台限流/重试语义。
+
+**影响**：SEC-02-04 外发门禁同样无生产调用方，原因一致（无投递链路可挂）；
+外发门禁接线应排在平台接入之后。
