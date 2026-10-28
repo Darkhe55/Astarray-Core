@@ -21,6 +21,7 @@ import type { GitIntegrationReportStore } from "./git-integration-report-store.j
 import { GitProcess } from "./git-process.js";
 import type { GitRecoveryPointService } from "./git-recovery-point-service.js";
 import { GitWorktreeAllocator, decodeGitRefSegment } from "./git-worktree-allocator.js";
+import { evaluateContributionReviewEvidence } from "./git-review-evidence.js";
 
 export interface StartIntegrationSessionInput {
   missionId: string;
@@ -59,6 +60,13 @@ export interface GitIntegrationCoordinatorOptions {
   reportStore: GitIntegrationReportStore;
   recoveryPointService: GitRecoveryPointService;
   gitProcess?: GitProcess;
+  /**
+   * ALIGN-03-05（2026-10-28）：合并前是否**要求审查者**已指定（缺省 false）。
+   *
+   * 无论开关如何，"accepted 的贡献其 headCommit 必须在集成分支历史里"这一条**始终**生效
+   * —— 它拦的是"审的和合的不是同一份产物"（过期/不匹配证据）。
+   */
+  isReviewRequiredForMerge?: boolean;
 }
 
 export class GitIntegrationCoordinator {
@@ -301,6 +309,34 @@ export class GitIntegrationCoordinator {
   }
 
   /**
+   * ALIGN-03-05：只读探测某个 commit 是否为分支祖先。
+   *
+   * `git merge-base --is-ancestor` 在"不是祖先"时以非零退出 ⇒ `GitProcess.run` 抛错
+   * ⇒ 这里如实返回 `false`（不把"探测失败"当成"通过"）。
+   */
+  private async isCommitInBranchHistory(input: {
+    repositoryPath: string;
+    commit: string;
+    branchName: string;
+  }): Promise<boolean> {
+    try {
+      await this.gitProcess.run(
+        input.repositoryPath,
+        [
+          "merge-base",
+          "--is-ancestor",
+          input.commit,
+          `refs/heads/${input.branchName}`,
+        ],
+        `探测 ${input.commit} 是否在 ${input.branchName} 历史中`,
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * 全部 worker 集成后：运行集成测试与质量门禁 → 门禁通过且模式/用户授权
    * 允许时把集成分支合入目标分支。未授权时报告保留，目标分支不动。
    */
@@ -322,6 +358,45 @@ export class GitIntegrationCoordinator {
         "invalid-task-chain",
         "集成分支尚无合并提交，不能收尾",
       );
+    }
+    /**
+     * ALIGN-03-05（2026-10-28）：**合并前逐条核对审查证据是否仍匹配**。
+     *
+     * 对每条 `accepted` 贡献：
+     * - headCommit 必须真的在集成分支历史里（否则审的与要合的不是同一份产物）；
+     * - 条目绑定的任务必须与记录一致、base/head 不得为空或相同；
+     * - 若要求审查者：必须存在且不等于贡献者（未指定 ≠ 已审查）。
+     *
+     * 任一条不满足 ⇒ 写进 `unresolvedRisks` 并**直接返回**（不合入目标分支）。
+     */
+    const reviewEvidenceReasons: string[] = [];
+    for (const contribution of report.reviewedContributions) {
+      if (contribution.reviewDecision !== "accepted") {
+        continue;
+      }
+      const isHeadCommitInIntegrationHistory = await this.isCommitInBranchHistory({
+        repositoryPath: input.repositoryPath,
+        commit: contribution.headCommit,
+        branchName: report.integrationBranchName,
+      });
+      const evidenceEvaluation = evaluateContributionReviewEvidence({
+        record: contribution,
+        expectedTaskIdentifier: contribution.taskId,
+        isHeadCommitInIntegrationHistory,
+        requiresReviewer: this.options.isReviewRequiredForMerge === true,
+      });
+      if (!evidenceEvaluation.isAcceptable) {
+        reviewEvidenceReasons.push(
+          `任务 ${contribution.taskId}: ${evidenceEvaluation.reasons.join("；")}`,
+        );
+      }
+    }
+    if (reviewEvidenceReasons.length > 0) {
+      report.unresolvedRisks.push(
+        `审查证据与产物不匹配，未合入目标分支：${reviewEvidenceReasons.join(" | ")}`,
+      );
+      await this.options.reportStore.saveReport(report);
+      return report;
     }
     // 集成测试（命令由会话配置，在仓库目录以 shell 执行，全部必须成功）
     for (const testCommand of input.integrationTestCommands) {
