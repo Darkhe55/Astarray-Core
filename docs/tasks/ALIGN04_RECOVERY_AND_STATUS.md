@@ -1,6 +1,6 @@
 # ALIGN-04：主干重启恢复与完成状态纠偏
 
-日期：2026-10-27。状态：in_progress（01–03 部分交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–04 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -82,5 +82,26 @@
 **未做（如实）**：**没有对账动作**（不会把 running/blocked/已产出任务放回 pending 或记录对账结论）；
 已产出核对只看"有没有 resultLocation"；租约接管只处理**已过期**（不探测"属主进程已死但未过期"）；
 未跑"崩溃 running ⇒ 拒绝恢复""过期租约 ⇒ 接管成功"任何一条。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 04 工作时段恢复：同一入口 + 暂停来源区分——**部分交付**（2026-10-28）
+
+**审查发现**：`evaluateWorkWindowResume`（rest→working 只恢复一次、手动取消不复活、休息中不发请求）
+**已实现但零调用方**；`resumeMission` 也**没有"是否已在运行"的幂等守卫**
+（重复恢复会启动第二个调度器 ⇒ 同一任务跑两遍）。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 同一入口 | `main-controller.ts` `handleWorkWindowResume` | 只有 `resume-once` 才调 **`resumeMission`**（复用 04-02 门禁 / 04-03 就绪分类 / 租约），**不新建队列** |
+| 暂停来源 | 同上 | `pauseKind:"manual"` 按手动取消抑制；`"rest"` 才允许 rest→working 恢复一次；人工暂停优先于入参 |
+| 最多一次 | 同上 | `hasResumedSinceWake` ⇒ `already-resumed`，不动作 |
+| 运行中防重 | `resumeMission` 开头 + `handleWorkWindowResume` | `activeOrchestrators` 已存在 ⇒ `already-running`；调度器结束后 `.then` 清理该记录 |
+| 如实返回 | 同上 | 被拒 ⇒ `resume-rejected` + 原因、`didResume:false` |
+| 事件唤醒 | 同上 | 恢复成功 ⇒ `notifySchedulingEvent("work-window-resumed")` |
+
+**未做（如实）**：**没有时段变化检测器**（谁在 rest→working 时调用入口未接线）；`hasResumedSinceWake`
+由调用方维护、未持久化；`pauseKind` 无权威标记（不由暂停原因存储推导）；未跑任何一条判定路径。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
