@@ -66,6 +66,7 @@ import type { RegisteredAgentDirectory } from "./registered-agent-directory.js";
 import type { MainAgentReportArchiveIngestor } from "./main-agent-report-archive.js";
 import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
+import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import type { TaskInsertionProposal } from "./conversation-task-insertion-controller.js";
 import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dispatch-loop.js";
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
@@ -326,6 +327,21 @@ export interface MainControllerOptions {
   reportArchiveIngestor?: MainAgentReportArchiveIngestor | null;
   /** B6R-09：对话任务插入控制面（主 Agent 提案；本地验证来源/优先级/锚点）。 */
   conversationTaskInsertionController?: ConversationTaskInsertionController | null;
+  /**
+   * ALIGN-01-01（2026-10-28）：**稳定会话 → 主个体 → 运行**的持久映射。
+   *
+   * 缺省 ⇒ 不启用（历史行为逐字不变，不落任何新文件）。启用后：
+   * 每条用户消息仍新建 mission，但 mission 会归到**同一会话**的**同一主个体**；
+   * 运行标识与 mission 标识分开登记。会话/个体标识由存储层生成，
+   * **不由本控制器按 `mission-*` 或进程 ID 派生**。
+   */
+  conversationIdentityStore?: ConversationIdentityStore | null;
+  /**
+   * ALIGN-01-01：本进程可信的**主 Agent 个体标识**（装配层给出，如
+   * `application-runtime` 的 state-dir 派生 id）。仅在启用
+   * `conversationIdentityStore` 时作为该会话的主个体写入映射；缺省则由存储生成。
+   */
+  mainAgentInstanceId?: string;
   /** B6R-09：次级持续调度循环（生产装配；ready set 派发）。 */
   secondaryDispatchLoop?: SecondaryContinuousDispatchLoop | null;
   /** B6R-09：三级生命周期控制器（阶段持久化/幂等收口）。 */
@@ -368,12 +384,19 @@ export class MainController {
   /** mission → 所属项目（文件夹授权按项目查询）。 */
   private readonly missionProjectIdentifiers = new Map<string, string>();
   private readonly missionSessionIdentifiers = new Map<string, string>();
+  /** ALIGN-01-01：mission → 稳定会话（只在启用 `conversationIdentityStore` 时写入）。 */
+  private readonly missionConversationIdentifiers = new Map<string, string>();
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
   /** GUI-03-02：按 mission 解析所属项目（只读；未知返回 null）。 */
   getMissionProjectIdentifier(missionId: string): string | null {
     return this.missionProjectIdentifiers.get(missionId) ?? null;
+  }
+
+  /** ALIGN-01-01：按 mission 解析其稳定会话（只读；未启用或未知返回 null）。 */
+  getMissionConversationIdentifier(missionId: string): string | null {
+    return this.missionConversationIdentifiers.get(missionId) ?? null;
   }
 
   constructor(private readonly options: MainControllerOptions) {}
@@ -411,6 +434,13 @@ export class MainController {
       /** 可选：指定执行该任务的 Agent 实例。 */
       readonly targetAgentInstanceIdentifier?: string;
       readonly sessionIdentifier?: string;
+      /**
+       * ALIGN-01-01：显式指定的**稳定会话**标识。
+       *
+       * 缺省 ⇒ 复用该项目最近活跃会话（首次则开新会话）。绝不按
+       * `missionId` / 进程 ID / 角色名推导会话身份。
+       */
+      readonly conversationIdentifier?: string;
     },
   ): Promise<string> {
     const mode = this.options.modeMachine.getCurrentMode();
@@ -430,6 +460,19 @@ export class MainController {
       requestedProjectIdentifier !== undefined && requestedProjectIdentifier !== ""
         ? requestedProjectIdentifier
         : this.options.registeredProjectRoots?.[0]?.projectIdentifier;
+    const requestedTargetAgentInstanceIdentifier =
+      options?.targetAgentInstanceIdentifier?.trim();
+    /**
+     * ALIGN-01-01：**先解析会话身份，再落 mission**。
+     *
+     * 会话/个体标识是权威持久映射；mission 只是本次执行投影。解析失败
+     * （会话已关闭、同 id 异项目/异个体）**直接失败**，不静默改绑、不自动
+     * 换一个新会话把问题藏起来。
+     */
+    const conversationIdentity =
+      await this.resolveConversationIdentityForMission(projectIdentifier, {
+        requestedConversationIdentifier: options?.conversationIdentifier,
+      });
     const workWindowDecision = await this.options.workWindowGateDecisionProvider?.({
       missionId,
       projectIdentifier: projectIdentifier ?? null,
@@ -444,7 +487,30 @@ export class MainController {
       prompt: message,
       taskNodes,
       ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
+      ...(conversationIdentity === null
+        ? {}
+        : { conversationIdentifier: conversationIdentity.conversationIdentifier }),
     });
+    /**
+     * ALIGN-01-01：把本次执行登记成该会话下的一次**运行**。
+     *
+     * 顺序刻意放在 mission 落盘之后：运行记录指向已存在的 mission（不会出现
+     * "运行指向一个没建成的 mission"）。登记失败即抛出 —— 调用方看到失败，
+     * 不静默留下"有 mission 没身份"的孤儿。
+     */
+    if (conversationIdentity !== null) {
+      await this.options.conversationIdentityStore?.beginRun({
+        conversationIdentifier: conversationIdentity.conversationIdentifier,
+        ...(requestedTargetAgentInstanceIdentifier === undefined
+          ? {}
+          : { agentInstanceIdentifier: requestedTargetAgentInstanceIdentifier }),
+        missionIdentifier: missionId,
+      });
+      this.missionConversationIdentifiers.set(
+        missionId,
+        conversationIdentity.conversationIdentifier,
+      );
+    }
     const requestedWorkspaceRootPath = options?.workspaceRootPath?.trim();
     if (
       requestedWorkspaceRootPath !== undefined &&
@@ -458,8 +524,6 @@ export class MainController {
     if (options?.sessionIdentifier !== undefined && options.sessionIdentifier.trim() !== "") {
       this.missionSessionIdentifiers.set(missionId, options.sessionIdentifier);
     }
-    const requestedTargetAgentInstanceIdentifier =
-      options?.targetAgentInstanceIdentifier?.trim();
     if (
       requestedTargetAgentInstanceIdentifier !== undefined &&
       requestedTargetAgentInstanceIdentifier !== ""
@@ -1002,6 +1066,35 @@ export class MainController {
         idempotencyKey: `main-instruction:${missionId}:${Date.now()}`,
       payload: { kind: "instruction", instructionText },
     });
+  }
+
+  private async resolveConversationIdentityForMission(
+    projectIdentifier: string | undefined,
+    input: { readonly requestedConversationIdentifier?: string },
+  ): Promise<{ readonly conversationIdentifier: string } | null> {
+    const store = this.options.conversationIdentityStore;
+    if (store === null || store === undefined) {
+      return null;
+    }
+    /**
+     * 没有项目归属 ⇒ 不写会话映射。
+     *
+     * 卡内要求"不臆造归属"：把无项目的消息挂到某个默认项目上，会让
+     * 重启恢复和历史视图把任务归错项目。这里宁可**不记录**会话。
+     */
+    if (projectIdentifier === undefined || projectIdentifier.trim() === "") {
+      return null;
+    }
+    const record = await store.resolveOrOpenConversationForProject({
+      projectIdentifier,
+      ...(input.requestedConversationIdentifier === undefined
+        ? {}
+        : { conversationIdentifier: input.requestedConversationIdentifier }),
+      ...(this.options.mainAgentInstanceId === undefined
+        ? {}
+        : { mainAgentInstanceIdentifier: this.options.mainAgentInstanceId }),
+    });
+    return { conversationIdentifier: record.conversationIdentifier };
   }
 
   private async respondInPonderMode(message: string): Promise<void> {

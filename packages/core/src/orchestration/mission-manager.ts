@@ -29,6 +29,14 @@ export interface MissionSummary {
    * 读取方必须把它当作「**没有项目信息**」（`null`），**不得伪造**。
    */
   projectIdentifier?: string;
+  /**
+   * ALIGN-01-01（2026-10-28）：该 mission 所属的**稳定会话**。
+   *
+   * 与 `missionId` 分工：mission 是"一次执行投影"，会话是跨消息、跨重启
+   * 稳定存在的实体（其下挂着固定的主个体）。历史遗留摘要没有该字段 ⇒
+   * 读取方必须当作"未知会话"，**不得用 missionId 顶替**。
+   */
+  conversationIdentifier?: string;
 }
 
 export interface MissionStatus {
@@ -56,6 +64,8 @@ export interface CreateMissionInput {
   taskNodes: TaskChainDocument["tasks"];
   /** GUI-02-03：所属项目标识（可选；缺省则摘要里不写该项目字段）。 */
   projectIdentifier?: string;
+  /** ALIGN-01-01：所属稳定会话标识（可选；缺省则摘要里不写该会话字段）。 */
+  conversationIdentifier?: string;
 }
 
 export class MissionManager {
@@ -105,6 +115,14 @@ export class MissionManager {
       ...(typeof input.projectIdentifier === "string" &&
       input.projectIdentifier.trim().length > 0
         ? { projectIdentifier: input.projectIdentifier.trim() }
+        : {}),
+      /**
+       * ALIGN-01-01：同项目字段纪律 —— 只在确有非空会话标识时写入，
+       * 绝不拿 missionId 凑一个"看起来像会话"的值。
+       */
+      ...(typeof input.conversationIdentifier === "string" &&
+      input.conversationIdentifier.trim().length > 0
+        ? { conversationIdentifier: input.conversationIdentifier.trim() }
         : {}),
     };
     await this.summaryWriteMutex.runExclusive(() =>
