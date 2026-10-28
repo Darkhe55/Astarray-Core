@@ -80,6 +80,10 @@ import type { ContextRecallController } from "./context-recall-controller.js";
 import type { ContextRecallResult } from "./context-recall-controller.js";
 import type { ActorIdentity, TaskSequenceStatusController } from "./task-sequence-controllers.js";
 import { TaskLedgerBridge } from "./task-ledger-bridge.js";
+import {
+  buildTaskLedgerDivergenceEntry,
+  type TaskLedgerDivergenceJournal,
+} from "./task-ledger-divergence-journal.js";
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
@@ -459,6 +463,13 @@ export interface MainControllerOptions {
    * 回访内容只来自该调用者可见的**关闭胶囊**，**不读全局摘要当完整历史**、
    * **不拼接全部角色日志**（由 `ContextRecallController` 的作用域与预算约束保证）。
    */
+  /**
+   * 清单第 ① 项收尾（2026-10-28）：**两套记账差异历史**（只读诊断）。
+   *
+   * 装配后：运行中插入（注入/推迟）完成时记录一条差异快照；
+   * **只记录、不修复**任何一边；记录失败不影响插入结果。
+   */
+  taskLedgerDivergenceJournal?: TaskLedgerDivergenceJournal | null;
   contextRecallControllerFactory?: (
     callerAgentInstanceId: string,
   ) => ContextRecallController;
@@ -1364,6 +1375,16 @@ export class MainController {
           request.requestIdentifier,
           computeInsertionRequestFingerprint(request),
         );
+        /**
+         * 清单第 ① 项收尾（2026-10-28）：注入后记录一次**差异快照**（只读诊断）。
+         * 记录失败不影响插入结果。
+         */
+        await this.recordTaskLedgerDivergenceSnapshot({
+          missionIdentifier: request.missionIdentifier,
+          ownerAgentInstanceIdentifier: sequenceMapping.ownerAgentInstanceIdentifier,
+          sequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
+          trigger: "runtime-insert-injected",
+        });
         return {
           outcome: "inserted",
           reason: "已在安全上下文边界注入当前组",
@@ -1398,6 +1419,13 @@ export class MainController {
       request.requestIdentifier,
       computeInsertionRequestFingerprint(request),
     );
+    /** 清单第 ① 项收尾：推迟路径同样记录差异快照（只读诊断）。 */
+    await this.recordTaskLedgerDivergenceSnapshot({
+      missionIdentifier: request.missionIdentifier,
+      ownerAgentInstanceIdentifier: sequenceMapping.ownerAgentInstanceIdentifier,
+      sequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
+      trigger: "runtime-insert-deferred",
+    });
     return {
       outcome: "deferred-to-sequence",
       reason:
@@ -2001,6 +2029,41 @@ export class MainController {
       },
     });
     return bridge.inspectAlignment(input);
+  }
+
+  /**
+   * 清单第 ① 项收尾（2026-10-28）：记录一次差异快照（只读；失败不阻断业务）。
+   */
+  private async recordTaskLedgerDivergenceSnapshot(input: {
+    readonly missionIdentifier: string;
+    readonly ownerAgentInstanceIdentifier: string;
+    readonly sequenceIdentifier: string;
+    readonly trigger: string;
+  }): Promise<void> {
+    const journal = this.options.taskLedgerDivergenceJournal;
+    if (journal === null || journal === undefined) {
+      return;
+    }
+    try {
+      const report = await this.inspectTaskLedgerAlignment({
+        missionIdentifier: input.missionIdentifier,
+        ownerAgentInstanceId: input.ownerAgentInstanceIdentifier,
+        sequenceId: input.sequenceIdentifier,
+        viewer: {
+          sourceKind: "agent",
+          actorId: input.ownerAgentInstanceIdentifier,
+        },
+      });
+      await journal.append(
+        buildTaskLedgerDivergenceEntry({
+          report,
+          recordedAtIso: new Date().toISOString(),
+          trigger: input.trigger,
+        }),
+      );
+    } catch {
+      /** 诊断是辅助观测：失败不改变插入结果，也不静默改写任何记账。 */
+    }
   }
 
   /**
