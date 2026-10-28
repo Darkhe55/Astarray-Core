@@ -136,8 +136,17 @@
 > 信包随 `TaskBundleRecord.dispatchEnvelope` 落盘（schema 校验），快照可读。
 > **执行侧尚未消费**（orchestrator/worker 派发仍用原工具端口），`createTaskBundle` 仍无生产调用方。
 >
-> **⑱ 下一步**：ALIGN-03-03（真实工具结果/产物记录/完成标识进入本地完成门禁；失败/中断只报原因，
-> 不伪造 done；早停从检查点有界续跑，不拿下一组掩盖未完成组）。
+> **⑱ ALIGN-03-03 部分交付**：`LocalCompletionVerifier`（八条本地条件）**零调用方**，
+> 而编排层只要 `outcome: "success"` 就直接判 `done`。新增**Worker 完成收据**
+> （`completion-receipt.ts`：完成事件是否校验、真实工具调用数、落盘产物路径全部取自本地状态），
+> 编排层新增 `isCompletionReceiptRequired`：收据缺失/矛盾 ⇒ **blocked + 升级，不判 done**，
+> 且**不补默认收据**。开关**缺省 false**（未实测的收口变更不默认推送）。
+> 早停有界续跑（G5 ≤2 次）与"失败只报原因"经核对已存在，未改动。
+> **验证器本身仍未调用**（需把 `TaskCompletionEventV1` 从 Worker 传到编排层）。
+>
+> **⑲ 下一步**：ALIGN-03-04（涉及 Git 的任务由次级创建隔离工作区/分支、指定审查者、
+> 判定返修或合并；三级只提交自己的分支、不直接合入目标分支；不覆盖人工并行修改、
+> 不自动 stash/reset）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

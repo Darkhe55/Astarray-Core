@@ -21,6 +21,9 @@ import {
   verifyArtifactExistence,
 } from "./artifact-verification.js";
 import { DomainError } from "../core/errors.js";
+// ALIGN-03-03（2026-10-28）：完成收据（真实工具调用数/落盘产物/完成事件校验结果）。
+import { buildCompletionReceipt } from "./completion-receipt.js";
+import type { CompletionReceipt } from "./completion-receipt.js";
 // COMM-01-02（2026-10-25）：反馈默认走**任务发布者的反向通道**（不再按上下级/硬编码推断）。
 import { resolveFeedbackRecipient } from "./task-publisher-feedback-route.js";
 import type { ContextPromptProvider } from "./context-prompt-assembler.js";
@@ -47,7 +50,13 @@ import type {
 import type { ToolFailureCounter } from "./failure-counter.js";
 
 export type WorkerOutcome =
-  | { outcome: "success"; summary: string; resultLocation: string | null }
+  | {
+      outcome: "success";
+      summary: string;
+      resultLocation: string | null;
+      /** ALIGN-03-03：可核对的本地完成收据（字段全部来自真实状态）。 */
+      completionReceipt?: CompletionReceipt;
+    }
   | {
       outcome: "failure";
       toolName: string | null;
@@ -719,6 +728,21 @@ export class WorkerAgent {
                 outcome: "success",
                 summary: summarize(this.outputTextChunks),
                 resultLocation: null,
+                /**
+                 * ALIGN-03-03：收据字段全部取自**本地真实状态**：
+                 * 是否校验过完成事件、实际工具调用数、实际落盘产物路径。
+                 * 走到这里的前提是 `completionGateFailure === null`
+                 * 且没有未成功的写工具调用。
+                 */
+                completionReceipt: buildCompletionReceipt({
+                  missionIdentifier: this.options.missionId,
+                  taskIdentifier: this.options.task.id,
+                  hasVerifiedCompletionControlEvent:
+                    this.options.requireCompletionEvent === true,
+                  toolCallCount: this.toolCallsByCallId.size,
+                  artifactPaths: [...this.persistedArtifactPaths],
+                  recordedAtIso: new Date().toISOString(),
+                }),
               };
             }
           } else if (event.reason === "ambiguous") {
