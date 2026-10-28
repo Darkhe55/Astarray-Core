@@ -1,6 +1,6 @@
 # ALIGN-02：统一偏序集、任务组和次级持续调度
 
-日期：2026-10-27。状态：in_progress（01 已交付；02–03 部分交付；均 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01 已交付；02–03、05 部分交付；均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -79,5 +79,29 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 
 **未做（如实）**：**没有派发消费者**（`dispatchChain` 恒 false、占用恒 0 属 02-05）；
 未接执行者容量/租约；`createTaskBundle` 仍无生产调用方；未做 DAG+包+阻塞的端到端实测。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 05 派发循环去假值 + 原子领取——**部分交付**（2026-10-28）
+
+**审查发现（实测）**：装配层写死了 `dispatchChain: async () => false` 与
+`currentOccupiedSlots: () => 0`；而且 `runRound` **从未被任何生产代码调用** ——
+真正的执行由 `MissionOrchestrator` 内部的 `dagScheduler.scheduleRound()` 驱动。
+即：这个"持续调度循环"目前是**第二套调度器**。
+
+**已交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 真实占用 | `unbounded-agent-registry.ts` `getOccupiedSlotCount()` | 缺省占用 = `running` 实例数；不再默认 0 |
+| 准入单一来源 | `secondary-continuous-dispatch-loop.ts` | 排队/暂停只由注册表判定，删除循环内二次短路 |
+| 按 mission 端口 | 同文件 `registerMissionPorts` | 未注册 ⇒ `blockedReason: "dispatch-handler-missing"`，不领取、不假装 |
+| 原子领取 | `task-sequence-controllers.ts` `claimTask` / `releaseClaim` | revision 乐观并发；竞态返回 false（不抢占、不重复派发） |
+| 失败释放 | 循环 | 派发被拒/抛错 ⇒ `releaseTask` + `releaseAdmission`，逐任务 `skippedReasons` |
+| 实例归属 | `DispatchChainInput.agentInstanceId` | 执行方收口后必须回收，否则真实占用不回落 |
+
+**未完成（如实）**：**没有真实派发端点**（orchestrator 无"按 taskId 领取并派发"的公开 API，
+用 `reassignTask` 当派发是错语义），`registerMissionPorts` 无生产调用方；
+权威序列的 `task-<missionId>` 与 mission 任务链**仍是两套记账**（序列任务会停在 pending）；
+未做"领取 → 失败 → 释放 → 再领取"实测与并发竞态实测。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。

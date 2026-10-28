@@ -634,16 +634,22 @@ export async function createApplicationRuntime(
     manageController: sequenceManageController,
     authenticatedUserId,
   });
-  // B6R-09：次级持续调度循环（生产装配；派发链回调由编排层注入）
+  // B6R-09：次级持续调度循环（生产装配）
   const dispatchRegistry = new UnboundedAgentInstanceRegistry({
     maxConcurrentSlots: 4,
     maxQueueLength: 32,
-    currentOccupiedSlots: () => 0,
+    /**
+     * ALIGN-02-05（2026-10-28）：**不再注入 `() => 0`**。
+     * 缺省占用取注册表真实 `running` 实例数（恒 0 = 并发准入永远放行 = 没有资源约束）。
+     */
   });
   const secondaryDispatchLoop = new SecondaryContinuousDispatchLoop({
     registry: dispatchRegistry,
-    dispatchChain: async () => false,
-    currentOccupiedSlots: () => 0,
+    /**
+     * ALIGN-02-05：**不再注册 `async () => false` 的桩**。
+     * 真实派发端口由 mission 启动方按 mission 注册；未注册时 `runRound`
+     * 明确返回 `dispatch-handler-missing`，不伪装成"派发被拒"。
+     */
   });
   // B6R-09：三级生命周期控制器（阶段持久化 + 幂等收口；hooks 由编排层注入）
   const tertiaryLifecyclePhaseStore = new FileTertiaryLifecyclePhaseStore(stateDirectory);
