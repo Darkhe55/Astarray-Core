@@ -6,6 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 
 import { resolveHostUserIdentifier } from "../core/host-user-context.js";
+import { DomainError } from "../core/errors.js";
 import { EventControlChannel } from "../orchestration/event-control-channel.js";
 import { EventIncidentJournal } from "../orchestration/event-incident-journal.js";
 import { EventSourceBridge } from "../orchestration/event-source-bridge.js";
@@ -565,6 +566,21 @@ export async function createApplicationRuntime(
   });
   // B6R-06：主 Agent 永久只读投影 + 会话提升控制面 + 关闭协调器
   const mainAgentReadonlyProjection = new MainAgentReadonlyToolProjection();
+  /**
+   * ALIGN-01-03（2026-10-28）：主 Agent 工具面的**单一权威**是只读投影。
+   *
+   * ponder 白名单是它的一部分；若两处漂移（有人在 ponder 名单里加了非只读工具），
+   * 装配期直接失败，而不是等模型真的调到写工具才发现。
+   */
+  const ponderToolNamesOutsideProjection = PONDER_READONLY_TOOL_NAMES.filter(
+    (toolName) => !mainAgentReadonlyProjection.isMainAgentToolAllowed(toolName),
+  );
+  if (ponderToolNamesOutsideProjection.length > 0) {
+    throw new DomainError(
+      "invalid-task-chain",
+      `主 Agent 只读投影缺少 ponder 白名单条目（装配拒绝启动）: ${ponderToolNamesOutsideProjection.join(", ")}`,
+    );
+  }
   const sessionElevationStore = new SessionPermissionElevationStore({
     baseDirectory: stateDirectory,
   });
@@ -1513,9 +1529,15 @@ export async function createApplicationRuntime(
     // T06B/ADR-0014：思索模式本地只读白名单（查看项目文件、检索文本和查询只读任务状态）。
     // 只暴露白名单工具描述符；权限裁决与策略引擎在派发与真实执行两个时点 fail-closed。
     ponderReadonlyToolingFactory: (agentInstanceId: string) => {
+      /**
+       * ALIGN-01-03：过滤条件是"已注册 **且** 在只读投影内"。
+       * 第二项此前缺失 —— 工具面只看 ponder 自己的常量，投影再严格也管不到它。
+       */
       const allowedToolNames = new Set(
         PONDER_READONLY_TOOL_NAMES.filter(
-          (toolName) => registry.getDescriptor(toolName) !== undefined,
+          (toolName) =>
+            registry.getDescriptor(toolName) !== undefined &&
+            mainAgentReadonlyProjection.isMainAgentToolAllowed(toolName),
         ),
       );
       const toolDescriptors = [...allowedToolNames]

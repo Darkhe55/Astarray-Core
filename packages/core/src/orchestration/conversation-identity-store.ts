@@ -50,6 +50,14 @@ export interface ConversationRunRecord {
   readonly missionIdentifier: string | null;
   /** 实际执行该运行的个体（记忆/读取抑制/汇报都按它定位）。 */
   readonly agentInstanceIdentifier: string;
+  /**
+   * ALIGN-01-03：触发本次运行的**用户消息引用**（harness 生成）。
+   *
+   * 主 Agent 的提案必须引用一次真实的用户任务；把引用持久化在运行记录上，
+   * 才能在不信任模型输入的前提下校验"这条提案确实是针对那条用户消息"。
+   * 历史记录没有该字段 ⇒ 读取方按 `null`（未知）处理，不得用 missionId 顶替。
+   */
+  readonly userMessageReference: string | null;
   readonly startedAtIso: string;
 }
 
@@ -103,6 +111,8 @@ export interface BeginRunInput {
   agentInstanceIdentifier?: string;
   /** 该运行对应的 mission（纯问答无 mission ⇒ 省略）。 */
   missionIdentifier?: string;
+  /** ALIGN-01-03：触发本次运行的用户消息引用（harness 生成）。 */
+  userMessageReference?: string;
 }
 
 /**
@@ -340,6 +350,7 @@ export class ConversationIdentityStore {
         runIdentifier: this.generateRunIdentifier(),
         missionIdentifier: input.missionIdentifier ?? null,
         agentInstanceIdentifier,
+        userMessageReference: input.userMessageReference?.trim() || null,
         startedAtIso: this.nowIso(),
       };
       const appendedRuns = [...record.runs, runRecord];
