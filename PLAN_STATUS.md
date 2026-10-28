@@ -468,9 +468,21 @@
 > **连带结论**：SEC-02-04 外发门禁同样无生产调用方（没有投递链路可挂）——
 > 外发门禁接线应排在平台接入**之后**。
 >
-> **54 下一步**：清单第 ⑥ 项 —— 目标模式接进派发与恢复：先做**只读接线**（把
-> `GoalDispatchGate.assertDispatchAllowed` 作为 `launchMissionOrThrow` 前的可选前置检查，
-> 开关默认关；只记录判定不改变派发），把"门禁未接线"变成"门禁可被观察到"。
+> **54 清单第 ⑥ 项：目标门禁只读接线（部分）**：门禁早已能判定 paused/replanning/revision/
+> scope/deadline/budget，但**没有任何派发路径调用它**。现在 `launchAssistMission` 与
+> `launchDevolveMission` 都会先调 `observeGoalDispatchGate`：
+> ①未提供 `goalDispatchGateResolver` ⇒ 行为**逐字不变**；②解析到门禁后调
+> `assertMissionDispatchAllowed`（mission 级：只比项目 scope，不因工具白名单误拦）；
+> ③`isGoalModeEnforcementEnabled !== true` ⇒ **只观察**（记录 + 流式输出，派发照旧）；
+> ④为 true 且不放行 ⇒ mission 置 `blocked` 且**不建调度器**；
+> ⑤`onGoalDispatchVerdict` 上报结构化记录（含**是否真的阻断**）；运行时已透传三个选项。
+> **未做**：**宿主未提供 resolver**（选项通了但无生产装配 ⇒ 生产上仍不产生判定）；
+> `GoalModeStateStore` 与门禁**未连**（"按 mission 找契约+快照"的 owner 未实现）；
+> `resumeMission` 路径未接目标门禁；无 UI。
+>
+> **55 下一步**：清单第 ① 项**下半场** —— 给 `MissionOrchestrator` 增加"运行中按 taskId 插入"
+> 的最小**安全点注入**：复用已有 `taskGroupInsertionPort` 语义，把 `requestRuntimeTaskInsertion`
+> 从"只能推迟到下一组"推进到"有安全点时真的注入"，并保持"没有安全点就推迟"的如实语义。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

@@ -131,6 +131,8 @@ import { ProjectWorkWindowStore } from "../orchestration/project-work-window-sto
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
 import { evaluateWorkWindowState } from "../orchestration/work-window-contract.js";
+import type { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
+import type { GoalDispatchVerdictRecord } from "../orchestration/main-controller.js";
 import {
   createWorkWindowTransitionMonitor,
   type WorkWindowTransitionMonitor,
@@ -348,6 +350,15 @@ export interface ApplicationRuntimeOptions {
   isWorkWindowResumeMonitorEnabled?: boolean;
   /** 时段 rest → working 时的宿主回调（收到观测时间；是否恢复由宿主决定）。 */
   onWorkWindowRestToWorking?: (observedAtIso: string) => void | Promise<void>;
+  /**
+   * 清单第 ⑥ 项（2026-10-28）：目标门禁解析器透传（缺省不参与派发）。
+   *
+   * 由宿主按 mission 提供 `GoalDispatchGate`；`isGoalModeEnforcementEnabled` 缺省 false ⇒
+   * 只观察记录，不改变派发。
+   */
+  goalDispatchGateResolver?: (missionIdentifier: string) => GoalDispatchGate | null;
+  isGoalModeEnforcementEnabled?: boolean;
+  onGoalDispatchVerdict?: (record: GoalDispatchVerdictRecord) => void;
   /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
@@ -1562,6 +1573,16 @@ export async function createApplicationRuntime(
     taskSequenceManageController: sequenceManageController,
     /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
     taskSequenceStatusController: sequenceStatusController,
+    /** 清单第 ⑥ 项：目标门禁（缺省不参与；只观察/可选强制）。 */
+    ...(options.goalDispatchGateResolver === undefined
+      ? {}
+      : { goalDispatchGateResolver: options.goalDispatchGateResolver }),
+    ...(options.isGoalModeEnforcementEnabled === true
+      ? { isGoalModeEnforcementEnabled: true }
+      : {}),
+    ...(options.onGoalDispatchVerdict === undefined
+      ? {}
+      : { onGoalDispatchVerdict: options.onGoalDispatchVerdict }),
     /** ALIGN-02-02：模型分解（缺省不传 ⇒ 单节点旧行为，摘要标 legacy-single-node）。 */
     ...(taskDecompositionDraftProvider === undefined
       ? {}
