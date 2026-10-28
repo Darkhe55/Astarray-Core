@@ -67,6 +67,8 @@ import type { MainAgentReportArchiveIngestor } from "./main-agent-report-archive
 import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
+import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
+import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
 import type { TaskInsertionProposal } from "./conversation-task-insertion-controller.js";
 import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dispatch-loop.js";
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
@@ -386,6 +388,14 @@ export class MainController {
   private readonly missionSessionIdentifiers = new Map<string, string>();
   /** ALIGN-01-01：mission → 稳定会话（只在启用 `conversationIdentityStore` 时写入）。 */
   private readonly missionConversationIdentifiers = new Map<string, string>();
+  /**
+   * ALIGN-01-03：会话 → 最近一次**用户消息引用**。
+   *
+   * 主 Agent 的提案必须引用一次真实的用户任务；引用由 harness 在收到消息时生成，
+   * 模型无法凭空发明（提案里的引用与这里不一致 ⇒ 拒绝）。
+   */
+  private readonly latestUserMessageReferences = new Map<string, string>();
+  private readonly mainAgentProposalContract = new MainAgentTaskProposalContract();
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -505,17 +515,28 @@ export class MainController {
      * 不静默留下"有 mission 没身份"的孤儿。
      */
     if (conversationIdentity !== null) {
+      const userMessageReference = this.rememberUserMessageReference(
+        conversationIdentity.conversationIdentifier,
+      );
       await this.options.conversationIdentityStore?.beginRun({
         conversationIdentifier: conversationIdentity.conversationIdentifier,
         ...(requestedTargetAgentInstanceIdentifier === undefined
           ? {}
           : { agentInstanceIdentifier: requestedTargetAgentInstanceIdentifier }),
         missionIdentifier: missionId,
+        userMessageReference,
       });
       this.missionConversationIdentifiers.set(
         missionId,
         conversationIdentity.conversationIdentifier,
       );
+    } else {
+      /**
+       * 没有会话映射（未启用或没有项目）时也要生成引用：提案通道不能因为
+       * 身份存储被关掉就允许"无来源提案"。引用只存在本进程内，重启即失效 ——
+       * 这比伪造一个持久引用更诚实。
+       */
+      this.rememberUserMessageReference(null);
     }
     const requestedWorkspaceRootPath = options?.workspaceRootPath?.trim();
     if (
@@ -815,6 +836,96 @@ export class MainController {
     }
     return projection.projectTools(
       this.options.registry.getPreviewDescriptors().map((descriptor) => descriptor.name),
+    );
+  }
+
+  /**
+   * ALIGN-01-03：**主 Agent 提交任务提案的本地入口**（不是模型可调用的工具）。
+   *
+   * 分工：
+   * - 模型只产出"做什么"的结构化 JSON；
+   * - 来源（恒 `agent`）、来源个体、认证用户、用户任务引用**全部由 harness 注入**；
+   * - revision/锚点/优先级仍由既有 `ConversationTaskInsertionController` 判定。
+   *
+   * 失败一律抛出，不返回"看起来成功"的空结果（模型不得把自己的提案当成已分发）。
+   */
+  async submitMainAgentTaskProposal(
+    payload: unknown,
+    options?: { readonly conversationIdentifier?: string },
+  ): Promise<MainAgentTaskProposalSubmissionResult> {
+    const insertionController = this.options.conversationTaskInsertionController;
+    if (insertionController === null || insertionController === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "本地提案控制面未装配：主 Agent 提案无法提交（不得假装已登记）。",
+      );
+    }
+    const requestedConversationIdentifier = options?.conversationIdentifier?.trim();
+    const conversationIdentifier =
+      requestedConversationIdentifier !== undefined &&
+      requestedConversationIdentifier !== ""
+        ? requestedConversationIdentifier
+        : this.resolveLatestUserMessageConversationIdentifier();
+    const originalUserTaskReference = this.latestUserMessageReferences.get(
+      conversationIdentifier ?? "",
+    );
+    if (originalUserTaskReference === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "提案必须引用一次用户原始任务；该会话没有已登记的用户消息。",
+      );
+    }
+    const sourceActorIdentifier =
+      await this.resolveMainAgentInstanceIdentifier(conversationIdentifier);
+    return this.mainAgentProposalContract.submit(
+      payload,
+      {
+        sourceActorIdentifier,
+        authenticatedUserId: this.options.authenticatedUserId ?? null,
+        originalUserTaskReference,
+        conversationIdentifier: conversationIdentifier ?? null,
+      },
+      insertionController,
+    );
+  }
+
+  /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */
+  private rememberUserMessageReference(conversationIdentifier: string | null): string {
+    const userMessageReference = `user-message-${randomUUID()}`;
+    this.latestUserMessageReferences.set(
+      conversationIdentifier ?? "",
+      userMessageReference,
+    );
+    return userMessageReference;
+  }
+
+  /** 最近一次用户消息所属会话（没有 ⇒ null；空串表示"无会话映射"）。 */
+  private resolveLatestUserMessageConversationIdentifier(): string | null {
+    let latestIdentifier: string | null = null;
+    for (const conversationIdentifier of this.latestUserMessageReferences.keys()) {
+      latestIdentifier = conversationIdentifier;
+    }
+    return latestIdentifier === "" ? null : latestIdentifier;
+  }
+
+  /** 提案来源个体：优先会话登记的主个体，其次装配层稳定 id；都没有即拒绝。 */
+  private async resolveMainAgentInstanceIdentifier(
+    conversationIdentifier: string | null,
+  ): Promise<string> {
+    const store = this.options.conversationIdentityStore;
+    if (store !== null && store !== undefined && conversationIdentifier !== null) {
+      const record = await store.getConversation(conversationIdentifier);
+      if (record !== null) {
+        return record.mainAgentInstanceIdentifier;
+      }
+    }
+    const configuredIdentifier = this.options.mainAgentInstanceId?.trim();
+    if (configuredIdentifier !== undefined && configuredIdentifier !== "") {
+      return configuredIdentifier;
+    }
+    throw new DomainError(
+      "task-sequence-permission-denied",
+      "无法确定主 Agent 个体：拒绝以匿名来源提交提案。",
     );
   }
 
@@ -1136,10 +1247,14 @@ export class MainController {
       conversationIdentity?.mainAgentInstanceIdentifier ??
       this.options.mainAgentInstanceId ??
       `main:ponder:${randomUUID().slice(0, 8)}`;
+    const userMessageReference = this.rememberUserMessageReference(
+      conversationIdentity?.conversationIdentifier ?? null,
+    );
     if (conversationIdentity !== null) {
       await this.options.conversationIdentityStore?.beginRun({
         conversationIdentifier: conversationIdentity.conversationIdentifier,
         agentInstanceIdentifier: agentInstanceId,
+        userMessageReference,
       });
     }
     const runtime = this.options.mainRuntimeFactory(agentInstanceId);
