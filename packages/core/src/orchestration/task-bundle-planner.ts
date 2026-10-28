@@ -13,6 +13,7 @@ import { DomainError } from "../core/errors.js";
 import type {
   AgentTaskNode,
   AgentTaskSequenceDocument,
+  TaskBundleDispatchEnvelopeRecord,
   TaskBundleRecord,
 } from "../core/types.js";
 
@@ -22,6 +23,8 @@ export interface TaskBundlePlanInput {
   boundAgentInstanceId: string;
   /** 打包方要求的优先级层级（必须与包内节点一致）。 */
   requestedPriorityTier: number | null;
+  /** ALIGN-03-02：派发信包（已与上级权限求交；可选）。 */
+  dispatchEnvelope?: TaskBundleDispatchEnvelopeRecord;
 }
 
 export class TaskBundlePlanner {
@@ -103,6 +106,9 @@ export class TaskBundlePlanner {
       taskIds: [...input.taskIds],
       status: "prepared",
       createdAtIso: new Date().toISOString(),
+      ...(input.dispatchEnvelope === undefined
+        ? {}
+        : { dispatchEnvelope: input.dispatchEnvelope }),
     };
   }
 }
