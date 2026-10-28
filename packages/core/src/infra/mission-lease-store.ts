@@ -58,10 +58,19 @@ export interface MissionLeaseSummary {
   ownerProcessInstanceId: string | null;
   purpose: MissionLeasePurpose | null;
   renewsUntilIso: string | null;
+  /** ALIGN-04-03：租约 revision（接管过期租约时用于乐观并发校验）。 */
+  leaseRevision: number | null;
 }
 
 export type MissionLeaseAcquireOutcome =
   | { status: "acquired"; lease: MissionLeaseDocument }
+  /**
+   * ALIGN-04-03（2026-10-28）：**同进程重入**。
+   *
+   * 同一 `processInstanceId` 已持有活动租约时再次领取 ⇒ 幂等返回既有租约，
+   * 不再报 `locked-active`（否则恢复/重试会把自己挡在门外）。
+   */
+  | { status: "acquired-reentrant"; lease: MissionLeaseDocument }
   | { status: "locked-active"; lease: MissionLeaseDocument }
   | { status: "locked-stale"; lease: MissionLeaseDocument };
 
@@ -109,9 +118,14 @@ export class MissionLeaseStore {
       if (this.isErrorCode(error, "EEXIST")) {
         const existing = await this.readLeaseInternal(claim.missionId);
         if (existing !== null) {
-          return this.isExpired(existing)
-            ? { status: "locked-stale", lease: existing }
-            : { status: "locked-active", lease: existing };
+          if (this.isExpired(existing)) {
+            return { status: "locked-stale", lease: existing };
+          }
+          /** ALIGN-04-03：同进程重入是幂等的（恢复/重试不再被自己挡住）。 */
+          if (existing.processInstanceId === claim.processInstanceId) {
+            return { status: "acquired-reentrant", lease: existing };
+          }
+          return { status: "locked-active", lease: existing };
         }
         // 排他创建失败但文件随后消失（释放竞态）：返回已取得并补建。
         return this.tryAcquire(claim);
@@ -276,6 +290,7 @@ export class MissionLeaseStore {
         ownerProcessInstanceId: null,
         purpose: null,
         renewsUntilIso: null,
+        leaseRevision: null,
       };
     }
     return {
@@ -287,6 +302,7 @@ export class MissionLeaseStore {
       ownerProcessInstanceId: lease.processInstanceId,
       purpose: lease.purpose,
       renewsUntilIso: lease.renewsUntilIso,
+      leaseRevision: lease.leaseRevision,
     };
   }
 
