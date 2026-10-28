@@ -1,6 +1,6 @@
 # ALIGN-03：下级执行、次级审查集成与报告闭环
 
-日期：2026-10-27。状态：in_progress（01–05 部分交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–06 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -125,5 +125,26 @@ reviewDecision/executedChecks`（本轮又加审查者），但 `finalizeIntegra
 **未做（如实）**：审查者要求**默认关闭**（旧报告/测试无该字段，默认强制会让历史集成立刻不可收尾，
 需产品决策）；只绑 commit，未绑序列 revision/证据哈希，也未校验 `changedPaths` 与当前 diff 一致；
 与 `AcceptanceVerdictGate` 仍是两条独立证据链；未跑任何一条拒绝/通过路径。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 06 反馈幂等入库与本地补送——**部分交付**（2026-10-28）
+
+**审查发现**：独立进程路径已存在（supervisor fork + IPC + 子进程 MailboxJournal/DeliveryWorker）。
+两处缺口：①`MailboxJournal.enqueue` **不按 `idempotencyKey` 去重** ⇒ 重发会入库/投递两次；
+②客户端 `enqueue` 只在内存发一次，子进程崩溃/超时即拒绝 ⇒ **消息丢失**（journal 只覆盖已入库后的重放）。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 客户端 outbox | `feedback-process/transport.ts` | **先原子落盘**（`<state>/feedback-client-outbox/<sha256(key)>.json`）→ 发 IPC → ack 后删除；失败保留文件 |
+| 补送 | 同文件 `flushPendingOutbox` | 逐条重发、单条失败不影响其余；损坏文件**保留不删**、不计成功 |
+| 补送触发 | `process-supervisor.ts` 心跳 | 每次心跳顺带 `flushPendingOutbox()`（失败不抛、不影响心跳） |
+| 幂等入库 | `feedback-process/mailbox-journal.ts` | 同键同内容 ⇒ 返回既有序列号不追加；同键异内容 ⇒ `operation-not-idempotent`；比较口径排除 messageId/createdAtIso |
+| 摘要引用/不自动注入 | — | ALIGN-01-06 已实现（索引只读、prompt 装配无报告引用），本轮未改 |
+
+**未做（如实）**：补送**无上限/无退避**（每次心跳重试，可能长期占用 IPC）；积压条数无可观测消费；
+损坏 outbox 文件无清理策略；未跑"失败→保留→补送→只入库一次""同键异内容→拒绝"任何一条，
+也未做子进程崩溃恢复实测。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
