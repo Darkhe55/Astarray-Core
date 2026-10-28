@@ -1,6 +1,6 @@
 # ALIGN-01：稳定个体身份与只读主 Agent 主干
 
-日期：2026-10-27。状态：in_progress（01–03、05 已交付、04 部分交付，均 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–03、05–06 已交付、04 部分交付，均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -147,3 +147,26 @@ ponder 每次生成 `main:ponder:<随机>`；`missionId`/进程内 Map 同时充
 **超期路径没有用真实慢模型触发过 ⇒ 不宣称"超时一定生效"。**
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 06 下级报告入只读索引（带来源、按需读取）——implemented-unverified（2026-10-28）
+
+**审查发现（实测）**：`MainAgentReportArchiveIngestor` 与 `MainAgentReportReader` 都齐备、
+装配也接了来源认证端口，但 `ingestTertiaryTerminalReport` **零调用方**、
+`TertiaryTerminalReport` **零生产者** ⇒ 索引永远为空；且正常流程里次级主体**从未登记**，
+来源认证会一律拒绝（只有 CLI 两个合成场景硬编码登记）。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 来源登记 | `main-controller.ts` `resolveSecondaryAgentInstanceIdentifier` | 与调度器同一标识登记 `secondary` + missionId；`RegisteredAgentDirectory.hasAgent` 防重复 |
+| 终态写入 | `ingestMissionTerminalReport`（assist 的 `onReportToMain` 与 `onMissionGateBlocked`） | done→completed / cancelled→terminated / blocked→blocked；**索引失败不回滚终态** |
+| 不编造证据 | 同上 | `executedChecks` 无真实命令/退出码时**留空**；摘要只写计数 |
+| 幂等 | 同上 | `reportId` 含摘要短哈希；同内容不重复写，状态变化生成新报告 |
+| 按需读取 | `selectRelevantReports` / `listReportIndex` | token 预算 + maxReports；**无任何自动注入路径**（prompt 装配不含报告） |
+| devolve 边界 | `launchDevolveMission` | 无下级 ⇒ **不登记、不写报告**（不伪造来源） |
+
+**证据**：全仓检索 `listReportIndex|selectRelevantReports|MainAgentReportReader` 只命中
+定义与这两个公开入口；`context-prompt-assembler.ts` 检索 `report` **0 命中** ⇒ 不存在自动注入。
+
+**未做（如实）**：三级任务包级报告（属 ALIGN-03）、提醒推送、保留策略、UI 展示；
+token 预算仍是"JSON 长度/4"的粗估。**没有**用真实 mission 跑通"终态 → 索引文件 → 读回"。
