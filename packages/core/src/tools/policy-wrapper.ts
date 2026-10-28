@@ -68,6 +68,11 @@ export interface PolicyWrapperOptions {
    */
   sensitiveContentAccessPolicy?: SensitiveContentAccessPolicy | null;
   /**
+   * SEC-02-03（2026-10-28）：生产装配必须要求敏感策略存在（缺失即拒绝读取）。
+   * 缺省 false 只为兼容既有测试替身。
+   */
+  requireSensitiveContentPolicy?: boolean;
+  /**
    * T07B / ADR-0017：重复读取时间锁账本。装配后同源重复读取未变化资源被拒；
    * **未装配即不登记也不抑制**，因此生产装配必须注入。
    */
@@ -382,6 +387,9 @@ export class PolicyWrapper implements ToolPort {
             this.options.taskSequenceStatusController ?? null,
           sensitiveContentAccessPolicy:
             this.options.sensitiveContentAccessPolicy ?? null,
+          /** SEC-02-03：把"生产必须要求策略"透传给内置工具执行上下文。 */
+          requireSensitiveContentPolicy:
+            this.options.requireSensitiveContentPolicy === true,
           readSuppressionLedger: this.options.readSuppressionLedger ?? null,
           localToolPolicyEngine: this.options.localToolPolicyEngine ?? null,
           ponderGitRepositoryPath: this.options.ponderGitRepositoryPath ?? null,

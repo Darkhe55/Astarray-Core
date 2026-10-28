@@ -213,7 +213,53 @@ export class SensitiveContentAccessPolicy {
     if (match !== null) {
       return { category: match, identity };
     }
+    /**
+     * SEC-02-03（2026-10-28）：**硬链接别名**。
+     *
+     * 路径/realpath 比较拦不住硬链接（同一 inode 的不同路径）。这里对
+     * **管理员扩展的受保护路径**建立"dev+inode 身份"，命中即视为敏感。
+     * 默认名称规则没有具体路径，无法做身份比较 —— 这是已知边界（见 ADR-0069）。
+     */
+    if (await this.matchesAdditionalSensitiveIdentity(identity)) {
+      return { category: "admin-extended-identity", identity };
+    }
     return null;
+  }
+
+  /** 扩展受保护路径的 dev+inode 身份缓存（按路径缓存一次；解析失败记 null）。 */
+  private readonly additionalSensitiveDeviceInodeCache = new Map<string, string | null>();
+
+  private async matchesAdditionalSensitiveIdentity(
+    identity: SensitiveResourceIdentity,
+  ): Promise<boolean> {
+    if (identity.deviceInode === null || this.additionalSensitivePaths.length === 0) {
+      return false;
+    }
+    const resolver = new SensitiveResourceIdentityResolver({
+      fileSystemCaseSensitivity: this.caseSensitivity,
+    });
+    for (const sensitivePath of this.additionalSensitivePaths) {
+      const cachedDeviceInode = this.additionalSensitiveDeviceInodeCache.get(sensitivePath);
+      let sensitiveDeviceInode: string | null;
+      if (cachedDeviceInode === undefined) {
+        try {
+          sensitiveDeviceInode = (await resolver.resolveIdentity(sensitivePath)).deviceInode;
+        } catch {
+          /** 解析失败不作"安全"结论，也不当作命中；如实缓存为未知。 */
+          sensitiveDeviceInode = null;
+        }
+        this.additionalSensitiveDeviceInodeCache.set(sensitivePath, sensitiveDeviceInode);
+      } else {
+        sensitiveDeviceInode = cachedDeviceInode;
+      }
+      if (
+        sensitiveDeviceInode !== null &&
+        sensitiveDeviceInode === identity.deviceInode
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** 只按路径/文件名匹配（不解析文件系统；供目录条目过滤等预检）。 */
