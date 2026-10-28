@@ -103,6 +103,11 @@ export type DomainErrorCode =
   | "conversation-identity-not-found"
   | "conversation-identity-closed"
   | "conversation-identity-conflict"
+  /**
+   * ALIGN-02-02（2026-10-28）：任务分解候选稿未通过本地校验
+   * （节点数/标识/依赖环/验收要求/未注册工具/越权字段）。
+   */
+  | "task-decomposition-invalid"
   | "unknown";
 
 export class DomainError extends Error {

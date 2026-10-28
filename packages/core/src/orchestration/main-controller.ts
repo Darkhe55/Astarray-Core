@@ -69,6 +69,11 @@ import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import type { TaskSequenceManageController } from "./task-sequence-controllers.js";
+import {
+  buildSingleNodeDecomposition,
+  parseAndValidateTaskDecomposition,
+} from "./task-decomposition-contract.js";
+import type { TaskDecompositionDraftProvider } from "./model-task-decomposition-planner.js";
 import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
 import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
 import {
@@ -377,6 +382,22 @@ export interface MainControllerOptions {
    * 缺省 ⇒ 不登记（旧行为），但也就没有权威待办来源。
    */
   taskSequenceManageController?: TaskSequenceManageController | null;
+  /**
+   * ALIGN-02-02（2026-10-28）：**分解候选稿**生产器（模型背书，可选）。
+   *
+   * 提供时：先用它拿到候选稿，再经本地契约校验（白名单/节点数/依赖环/验收要求/
+   * 工具子集）后才写入任务链；校验失败 ⇒ **显式降级**为单节点并记录原因。
+   * 缺省 ⇒ 保持单节点（旧行为），摘要里如实标 `legacy-single-node`。
+   */
+  taskDecompositionDraftProvider?: TaskDecompositionDraftProvider | null;
+  /**
+   * ALIGN-02-02：必要项目摘要提供者（可选；缺省 ⇒ 规划提示词明确"无摘要"）。
+   * 只提供摘要，不提供整份项目内容 —— 规划不读源文件。
+   */
+  projectSummaryProvider?: (input: {
+    readonly projectIdentifier: string | null;
+    readonly conversationIdentifier: string | null;
+  }) => Promise<string | null> | string | null;
   /** B6R-09：次级持续调度循环（生产装配；ready set 派发）。 */
   secondaryDispatchLoop?: SecondaryContinuousDispatchLoop | null;
   /** B6R-09：三级生命周期控制器（阶段持久化/幂等收口）。 */
@@ -535,7 +556,6 @@ export class MainController {
       return "ponder";
     }
     const missionId = `mission-${randomUUID().slice(0, 8)}`;
-    const taskNodes = this.decomposePromptForScriptedRun(message);
     const requestedTargetAgentInstanceIdentifier =
       options?.targetAgentInstanceIdentifier?.trim();
     /**
@@ -557,6 +577,20 @@ export class MainController {
     if (workWindowDecision !== undefined && !workWindowDecision.isAllowed) {
       throw new DomainError("work-window-resting", workWindowDecision.reason);
     }
+    /**
+     * ALIGN-02-02（2026-10-28）：默认执行**不再固定 T-001**。
+     *
+     * 有候选稿生产器 ⇒ 规划 → 本地校验 → 采用；校验/规划失败 ⇒ 显式降级为单节点
+     * 并记录原因（用户可见 + 摘要可查）。没有生产器 ⇒ 旧行为，但摘要标
+     * `legacy-single-node`，不把它说成"已规划"。
+     */
+    const taskPlanning = await this.planTaskDecomposition({
+      missionId,
+      instructionText: message,
+      projectIdentifier: projectIdentifier ?? null,
+      conversationIdentifier: conversationIdentity?.conversationIdentifier ?? null,
+    });
+    const taskNodes = taskPlanning.nodes;
     /**
      * ALIGN-02-01（2026-10-28）：**先把用户任务登记进权威偏序集，再建 mission 投影**。
      *
@@ -590,6 +624,10 @@ export class MainController {
             taskSequenceIdentifier: userTaskSequence.taskSequenceIdentifier,
             originalTaskIdentifier: userTaskSequence.taskIdentifier,
           }),
+      taskPlanningOutcome: taskPlanning.outcome,
+      ...(taskPlanning.fallbackReason === null
+        ? {}
+        : { taskPlanningFallbackReason: taskPlanning.fallbackReason }),
     });
     /**
      * ALIGN-01-01：把本次执行登记成该会话下的一次**运行**。
@@ -2011,22 +2049,72 @@ export class MainController {
     });
   }
 
-  private decomposePromptForScriptedRun(
-    prompt: string,
-  ): TaskDependencyNode[] {    return [
-      {
-        id: "T-001",
-        description: prompt,
-        dependsOn: [],
-        taskType: "data",
-        toolNames: this.options.registry
-          .getFullDescriptors()
-          .map((descriptor) => descriptor.name),
-        assignedAgentId: null,
-        status: "pending",
-        resultLocation: null,
-      },
-    ];
+  /**
+   * ALIGN-02-02（2026-10-28）：规划一次任务分解（可选模型 + 本地强制校验）。
+   *
+   * 三种结果都必须可区分，**不得混为一谈**：
+   * - `model`：候选稿通过本地校验（节点数/标识/依赖环/验收要求/工具子集/无越权字段）；
+   * - `single-node-fallback`：有生产器但规划或校验失败 ⇒ 降级为单节点，
+   *   原因写进摘要并即时告知用户；
+   * - `legacy-single-node`：未装配生产器（旧行为），不声称"已规划"。
+   */
+  private async planTaskDecomposition(input: {
+    readonly missionId: string;
+    readonly instructionText: string;
+    readonly projectIdentifier: string | null;
+    readonly conversationIdentifier: string | null;
+  }): Promise<{
+    readonly nodes: TaskDependencyNode[];
+    readonly outcome: "model" | "single-node-fallback" | "legacy-single-node";
+    readonly fallbackReason: string | null;
+  }> {
+    const availableToolNames = this.options.registry
+      .getFullDescriptors()
+      .map((descriptor) => descriptor.name);
+    const draftProvider = this.options.taskDecompositionDraftProvider;
+    if (draftProvider === null || draftProvider === undefined) {
+      return {
+        ...buildSingleNodeDecomposition({
+          instructionText: input.instructionText,
+          availableToolNames,
+          fallbackReason: null,
+        }),
+        outcome: "legacy-single-node",
+      };
+    }
+    try {
+      const projectSummary =
+        (await this.options.projectSummaryProvider?.({
+          projectIdentifier: input.projectIdentifier,
+          conversationIdentifier: input.conversationIdentifier,
+        })) ?? null;
+      const draft = await draftProvider({
+        missionIdentifier: input.missionId,
+        instructionText: input.instructionText,
+        projectSummary,
+      });
+      const nodes = parseAndValidateTaskDecomposition({ draft, availableToolNames });
+      return { nodes, outcome: "model", fallbackReason: null };
+    } catch (error) {
+      const fallbackReason =
+        error instanceof DomainError ? error.message : (error as Error).message;
+      /**
+       * 降级必须**可见**：既写进摘要，也即时告知用户 —— 否则用户会以为任务
+       * 经过了分解，而实际只是一个单节点执行。
+       */
+      this.options.streamOutput(
+        null,
+        `[规划降级] 任务分解未通过本地校验，已退化为单节点执行（未经过规划）：${fallbackReason}`,
+      );
+      return {
+        ...buildSingleNodeDecomposition({
+          instructionText: input.instructionText,
+          availableToolNames,
+          fallbackReason,
+        }),
+        outcome: "single-node-fallback",
+      };
+    }
   }
 }
 
