@@ -721,6 +721,11 @@ export class MainController {
     } else {
       this.launchDevolveMission(missionId, taskNodes);
     }
+    /**
+     * ALIGN-02-07（2026-10-28）：新任务进入可执行集合 ⇒ **事件唤醒**调度，
+     * 而不是让调度方按固定周期忙轮询。
+     */
+    this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-ready");
     return missionId;
   }
 
@@ -1915,6 +1920,8 @@ export class MainController {
             : "cancelled";
           this.options.onMissionFinished?.(missionId, status);
           void this.registerMissionArtifacts(missionId);
+          /** ALIGN-02-07：任务收口 ⇒ 事件唤醒（让依赖解锁/补位不再靠轮询）。 */
+          this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
           return this.options.missionManager
             .updateMissionStatus(missionId, status)
             .then(async () => {
@@ -2044,6 +2051,8 @@ export class MainController {
          */
         void this.options.missionManager.updateMissionStatus(missionId, status);
         this.options.onMissionFinished?.(missionId, status);
+        /** ALIGN-02-07：终态事件唤醒调度。 */
+        this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
       },
       onUserEscalation: (message) => {
         this.options.streamOutput(missionId, `[需要用户] ${message}`);
