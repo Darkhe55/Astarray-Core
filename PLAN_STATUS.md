@@ -92,8 +92,19 @@
 > 预算按单元计；`(有效优先级, 最小序号, 标识)` 稳定排序。
 > **没有派发消费者**（`dispatchChain` 恒 false、占用恒 0 仍是 02-05），故本条只算部分交付。
 >
-> **⑬ 下一步**：ALIGN-02-05（把 `dispatchChain` 恒 false 与占用数恒 0 换成真实编排器/
-> 资源租约接口，任务领取原子且幂等、失败释放或记录可恢复错误）。
+> **⑬ ALIGN-02-05 部分交付**：删掉装配层两处假值 —— `dispatchChain: async () => false`
+> 与 `currentOccupiedSlots: () => 0`。占用改为注册表真实 `running` 数（新增
+> `getOccupiedSlotCount`/`releaseAdmission`）；派发端口按 mission 注册，未注册时
+> `runRound` 返回 `blockedReason:"dispatch-handler-missing"` 而不是伪装成"被拒"；
+> 新增序列层 `claimTask`/`releaseClaim`（revision 乐观并发、竞态返回 false 不抢占），
+> 派发失败即释放领取与准入，逐任务给 `skippedReasons`。
+> **发现并如实记录**：该循环**从未被生产调用**，真正的执行由 orchestrator 内部
+> `dagScheduler.scheduleRound()` 驱动 ⇒ 它是"第二套调度器"；orchestrator 没有
+> "按 taskId 领取派发"的公开 API，所以真实派发端点仍未接；序列任务与 mission 任务链
+> 仍是两套记账（序列任务停在 pending）。
+>
+> **⑭ 下一步**：ALIGN-02-06（运行中插入：记录目标组/锚点/expectedRevision/幂等键，
+> 本地校验后在安全上下文边界注入尚未执行部分，不重复运行已完成任务）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
