@@ -19,6 +19,7 @@ import {
   type SummarySourceEntry,
 } from "./summary-fact-extractor.js";
 import type { SummaryIndexStore } from "./summary-index-store.js";
+import { evaluateSummaryPublishability } from "./summary-publishability.js";
 
 export interface SummaryNarrativeGeneratorPort {
   generateNarrative(input: {
@@ -52,6 +53,14 @@ export interface AdvanceSummaryGenerationResult {
   publishedManifestRevision: number | null;
   isPendingResumable: boolean;
   factCount: number;
+  /**
+   * SEC-02-06 通道 12（2026-10-28）：写入前检查**拦下的片段数**。
+   *
+   * 非 clean（命中/未完成/失败）的片段**不落盘**；这里只报数量与原因码，
+   * 不回显任何摘要正文（诊断不成为第二次泄漏）。
+   */
+  withheldChunkCount: number;
+  withheldReasons: readonly string[];
 }
 
 function summarizeTextForChunk(fact: SummaryFact): string {
@@ -145,6 +154,8 @@ export async function advanceSummaryGeneration(
           publishedManifestRevision: null,
           isPendingResumable: false,
           factCount: 0,
+          withheldChunkCount: 0,
+          withheldReasons: [],
         };
       }
 
@@ -205,7 +216,19 @@ export async function advanceSummaryGeneration(
       const factsToPublish = pending.facts.filter(
         (fact) => !coveredRevisions.has(fact.sourceRevision),
       );
+      const withheldReasons: string[] = [];
+      let withheldChunkCount = 0;
       for (const fact of factsToPublish) {
+        /**
+         * SEC-02-06 通道 12：摘要片段落盘前做四态扫描。
+         * 非 clean ⇒ **不发布该片段**（不脱敏后继续发布），只计数与记原因。
+         */
+        const publishability = evaluateSummaryPublishability(summarizeTextForChunk(fact));
+        if (!publishability.isPublishable) {
+          withheldChunkCount += 1;
+          withheldReasons.push(`revision ${String(fact.sourceRevision)}: ${publishability.reason}`);
+          continue;
+        }
         nextManifest = appendSummarySource(nextManifest, {
           sourceRevision: fact.sourceRevision,
           contentHash: fact.contentHash,
@@ -233,6 +256,8 @@ export async function advanceSummaryGeneration(
         manifest: published,
         didExtractFacts: newlyExtractedFacts.length > 0,
         didGenerateNarrative: true,
+        withheldChunkCount,
+        withheldReasons,
         publishedManifestRevision: published.manifestRevision,
         isPendingResumable: false,
         factCount: facts.length,
