@@ -13,6 +13,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
+import { evaluateContentPublishability } from "../tools/content-publishability.js";
 import { sanitizePathSegment } from "./work-archive-store.js";
 
 export interface TertiaryTerminalReport {
@@ -92,6 +93,24 @@ export class MainAgentReportArchiveIngestor {
           `报告来源认证失败: ${verification.reason ?? "未知原因"}`,
         );
       }
+    }
+    /**
+     * SEC-02-06 通道 12（2026-10-28）：**三级汇报写入前的内容检查**。
+     *
+     * 对规范化报告文本做四态扫描；非 clean ⇒ 拒绝落盘（不脱敏后继续写）。
+     * 原因只含规则标识，**不回显报告正文**。
+     */
+    const reportPublishability = evaluateContentPublishability(
+      [
+        report.summary,
+        ...report.executedChecks.map((check) => `$ ${check.command}`),
+      ].join("\n"),
+    );
+    if (!reportPublishability.isPublishable) {
+      throw new DomainError(
+        "sensitive-content-read-denied",
+        `拒绝写入三级汇报（规则版本 ${String(reportPublishability.ruleSetVersion)}）：${reportPublishability.reason}`,
+      );
     }
     const { createHash } = await import("node:crypto");
     // 规范化内容（剔除 contentHash 字段后哈希，读回验证口径一致）

@@ -521,9 +521,20 @@
 > **未做**：摘要**仍未接入提示词**（注入点仍是 0）、**读取侧无检查**（`summary-read-service` 无扫描标注）、
 > 长期记忆/三级汇报未覆盖、无 UI/诊断入口。
 >
-> **59 下一步**：把**同一份写入侧检查**接到长期记忆与三级汇报（`agent-individual-memory`、
-> `main-agent-report-archive`）：仍只做"非 clean 不落盘 + 计数"，不改它们的注入路径；
-> 完成后通道 12 的"写入侧"三块就齐了（注入侧仍如实标未覆盖）。
+> **59 通道 12 写入侧补齐（部分）**：长期记忆（`agent-individual-memory.appendObservation`）与
+> 三级汇报（`main-agent-report-archive.ingestReport`）此前**没有任何内容检查**。
+> 新增通用判定 `tools/content-publishability.ts`（四态 + 规则版本，**结果不含正文**），
+> `summary-publishability.ts` 改为它的薄封装；两处写入在**落盘前**检查
+> （记忆：`summary`；汇报：`summary` + `executedChecks[].command`），
+> **非 clean ⇒ 拒绝写入**（`sensitive-content-read-denied`，原因只含规则标识与版本），
+> 失败方向与摘要一致（incomplete/error 同样拒绝）。矩阵通道 12 更新为"写入侧三块已加闸"。
+> **未做**：**注入侧仍未覆盖**（摘要/记忆/汇报进入提示词的路径不存在或未检查）、
+> **读取侧无检查**、拒绝没有专门的用户提示（表现为普通领域错误）、无计数/诊断入口、
+> 可能让含命中文本的历史汇报写入失败（fail-closed 代价）。
+>
+> **60 下一步**：接入**读取侧标注**（最小改动）：在 `summary-read-service` 的视图与
+> `MainAgentReportReader` 的返回里加"扫描结论/规则版本"字段（只标注、不改内容、
+> 不阻断现有读取），让"这份派生内容是否被检查过"在被使用前可见。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
