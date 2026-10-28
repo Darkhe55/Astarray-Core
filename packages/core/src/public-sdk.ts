@@ -654,6 +654,22 @@ import type { BackupDeletionAuthorizationControlPort } from "./core/types.js";
 import type { InstallationGateUserPort } from "./tools/installation-gate-guard.js";
 
 export type { BackupDeletionAuthorizationControlPort, InstallationGateUserPort };
+/**
+ * SEC-02-04（2026-10-28）：**通用外发门禁**（纯判定，不发消息）。
+ *
+ * 调用方在真正发送前用它核对：认证主体、来源项目、内容 revision/hash、目标账户/设备、
+ * 授权范围与规则版本；脱敏改变内容 ⇒ 返回 `reauthorization-required` 与应批准的新 revision。
+ */
+export {
+  computeOutboundContentHash,
+  evaluateOutboundContentGate,
+} from "./tools/outbound-content-gate.js";
+export type {
+  OutboundAuthorizationBinding,
+  OutboundBlockingReasonCode,
+  OutboundContentCandidate,
+  OutboundContentGateDecision,
+} from "./tools/outbound-content-gate.js";
 export type {
   LegacyIdentityAudit,
   LegacyLinkEvidence,
