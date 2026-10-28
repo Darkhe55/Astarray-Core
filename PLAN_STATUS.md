@@ -1,5 +1,38 @@
 # PLAN_STATUS — Astarray 实施状态
 
+> ## 🚩 2026-10-28 本轮进展（ALIGN 起步：60 轮目标窗口第 1 轮）
+>
+> **基线复核（实测，非引用历史）**：`HEAD == origin/main == 8c76499e`；工作树**不干净**
+> （基线时 13 个已修改文档 + 15 个未跟踪新卡/归档，均为上一窗口未提交的文档迁移，本轮**未替用户提交**）。
+> `npm run typecheck` **exit 0**；`npm run lint` **原本 exit 1（5 处红灯，4 个文件）** ⇒ 本轮修好（见下）；
+> `npm run build` **成功**（沙箱内 esbuild `spawn EPERM`，一次性放行后成功）。
+> **测试按任务卡口径未编写/未运行**（ALIGN/SEC/REMOTE/GOAL 系列卡均写明），
+> 因此本轮**不声称任何运行验证通过**，交付一律标 `implemented-unverified`。
+>
+> **① 新任务卡已读并排期**（均 `pending`，此前从未提交）：
+> ALIGN-00/01/02/03/04（身份→偏序调度→审查反馈→恢复）、SEC-02（本地敏感扫描完整性）、
+> REMOTE-01（受控运行记录导出）、GOAL-02（有界目标稳定性）。顺序：ALIGN 为主线，
+> SEC-02 → REMOTE-01 依赖它，GOAL-02 待 ALIGN-01/02 接线后。
+>
+> **② 交付：ALIGN-01-01 稳定身份映射**（`implemented-unverified`）
+> 新增 `packages/core/src/orchestration/conversation-identity-store.ts`
+> （`<state>/conversation-identity/conversations.json`，原子写 + `.bak` 恢复 + revision 单调 + 互斥）、
+> `docs/adr/0044-conversation-individual-and-run-identity.md`（五层标识与四条不变量）、
+> 三个稳定错误码；接线到 `application-runtime`（默认启用，可关）与
+> `MainController.handleUserMessage`（会话解析 → mission → `beginRun`），
+> `MissionSummary.conversationIdentifier` 作历史视图消费者。
+> 强制：不拿 `mission-*`/进程 id 冒充会话；已登记会话不改绑主个体；关闭后必须开新会话（新个体）；无项目不记账。
+>
+> **③ 顺带修掉基线红灯（与本轮改动无关，均为 2026-10-27 提交引入）**：
+> `npm run lint` 报 5 处错误（`project-work-window-store` 未用形参、`public-sdk` 两处 `import()` 类型注解、
+> `model-runtime-pool` 未用导入、`policy-wrapper` `import()` 类型注解）—— 已逐条改为类型导入/`_` 形参，
+> 现有 `lint` **exit 0**。**这与此前台账"六项 verify / check 全绿"的口径不一致**：那条口径不覆盖当前 HEAD，
+> 以本轮实测为准。
+>
+> **④ 下一步**：ALIGN-01-02（ponder 复用既有主个体、新调用只新建 run）→ 01-03/04（只读主 Agent 提案控制面）。
+> 每轮一个检查点，单独提交，按纪律尝试推送。
+
+
 > ## ⚠️ 最新交接（2026-11-08，第 81–95 轮，**请先读这一份**）
 >
 > **`docs/reports/SESSION_HANDOFF_WINDOW_81_95_2026-11-08.md`** —— 本窗口 **16 个提交**的账目、
