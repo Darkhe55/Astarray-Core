@@ -1,6 +1,6 @@
 # ALIGN-01：稳定个体身份与只读主 Agent 主干
 
-日期：2026-10-27。状态：in_progress（01–02 已交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–03 已交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -73,3 +73,30 @@ ponder 每次生成 `main:ponder:<随机>`；`missionId`/进程内 Map 同时充
 
 **验证状态**：未编写/未运行测试、未人工验收；`npm run typecheck` exit 0、
 `npx eslint main-controller.ts` exit 0。⇒ **implemented-unverified**。
+
+### 03 只读工具面 + 本地提案边界——implemented-unverified（2026-10-28）
+
+**审查发现（实测）**：`MainAgentReadonlyToolProjection` 虽已存在并被 `getMainAgentToolProjection`
+使用，但 ponder 的工具面只看 `PONDER_READONLY_TOOL_NAMES`，**不看投影** ⇒ 两处白名单可漂移；
+`ConversationTaskInsertionController` 已校验来源/优先级/锚点，但**没有面向主 Agent 的入口**，
+无法阻止模型在字段里自填来源或授权。
+
+**交付**：
+
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 契约 | `docs/adr/0045-main-agent-task-proposal-boundary.md` | 提案字段白名单 + 六条拒绝规则 + 只读单一权威 |
+| 解析/提交 | `packages/core/src/orchestration/main-agent-proposal-contract.ts` | 严格白名单、禁用身份/授权字段、用户任务引用一致性、层级 ≥1、目标≠自身；委派既有控制面 |
+| 入口 | `main-controller.ts` 的 `submitMainAgentTaskProposal`（**本地控制面，非模型工具**） | 取会话主个体 + 最近用户消息引用，构造 harness 上下文 |
+| 引用持久化 | `conversation-identity-store.ts` 的 `ConversationRunRecord.userMessageReference` | 提案必须对应一次真实用户消息 |
+| 只读权威 | `application-runtime.ts` | 装配期校验 `PONDER_READONLY_TOOL_NAMES ⊆ 投影`（违反即启动失败）；运行时工具名 = 已注册 ∩ 投影 |
+
+**六条拒绝规则**：未知字段拒绝；身份/授权字段拒绝（`task-sequence-permission-denied`）；
+引用不一致拒绝；来源个体无法确定拒绝（不以匿名来源提交）；目标=自身拒绝；层级 0 拒绝。
+
+**未做（如实）**：默认对话 → 主 Agent 高层评估仍缺（依赖 ALIGN-02-02 的规划与权威序列）；
+`requiredArtifactIdentifiers` 属 01-04，当前提交会被"不支持的字段"拒绝；小型任务直投、
+报告索引来源未接。
+
+**验证状态**：未编写/未运行测试、未人工验收；`npm run typecheck` exit 0、
+`npx eslint <本批文件>` exit 0、`npm run build` 成功。⇒ **implemented-unverified**。
