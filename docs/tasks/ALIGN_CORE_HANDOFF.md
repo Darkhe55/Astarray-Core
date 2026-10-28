@@ -202,3 +202,15 @@ ConversationIdentityStore.resolveOrOpen… → MissionManager.createMission → 
 [DEFAULT_SWITCHES_AUDIT_2026-10-29](../reports/DEFAULT_SWITCHES_AUDIT_2026-10-29.md)）：
 `GOAL_MODE_DEFAULT_ENABLED` 是**死常量**（全仓仅定义处 1 次）、
 `isReviewRequiredForMerge` **无法从产品装配打开**（**第 54 轮已修复为可达，默认仍关**，ADR-0090）；同源硬编码 `allowedPathsByTaskType: {}` / `integrationTestCommands: []` **第 55 轮已改为可配置（缺省仍空）**，ADR-0091。
+
+## 12. 待产品决策（2026-10-29，第 56 轮）
+
+`GOAL_MODE_DEFAULT_ENABLED`（`goal-contract.ts:274`）是**死常量**：全仓仅定义处 1 次，
+`resolveGoalModeActivation` 不读它 ⇒ 目标模式"默认关闭"实际靠调用方传参，**常量不构成保护**。
+
+二选一（**本轮只记录，未改代码**）：
+- **A（推荐）**：删除常量，明确"唯一开关是运行时配置"——零行为变化、去掉误导；
+- **B**：让激活函数读取常量作为**额外必要条件**——编译期可关死实验，但属**语义变化**
+  （开启权从"认证用户"变成"构建期 + 认证用户"），需产品确认。
+
+详见 [GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29](../reports/GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29.md)。
