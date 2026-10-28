@@ -83,6 +83,11 @@ import type {
   RuntimeTaskInsertionRequest,
   TaskGroupInsertionOutcome,
 } from "./task-group-insertion-contract.js";
+import { IndependentReviewGate } from "./independent-review-gate.js";
+import type {
+  AppointIndependentReviewInput,
+  RecordIndependentVerdictInput,
+} from "./independent-review-gate.js";
 import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
 import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
 import {
@@ -486,6 +491,8 @@ export class MainController {
   >();
   /** ALIGN-02-06：插入请求幂等键 → 内容指纹（进程内；重启后按序列任务 id 幂等）。 */
   private readonly insertionRequestFingerprints = new Map<string, string>();
+  /** ALIGN-03-01：独立审查门禁（惰性装配；缺四层路由控制面时拒绝）。 */
+  private independentReviewGateInstance: IndependentReviewGate | null = null;
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -1223,6 +1230,55 @@ export class MainController {
       taskSequenceIdentifier: registration.document.sequenceId,
       taskIdentifier: registration.taskIdentifier,
     };
+  }
+
+  /**
+   * ALIGN-03-01（2026-10-28）：任命执行/测试/验收的三级个体（本地控制面，非模型工具）。
+   *
+   * 额外约束：验收者必须是**任命次级**名下已登记的三级个体（不得跨 mission/跨上级借人），
+   * 且任命者本人不得担任验收者。身份隔离规则复用 `AgentAppointmentRegistry`。
+   */
+  appointExecutionAndReview(input: AppointIndependentReviewInput): {
+    readonly appointmentIdentifier: string;
+  } {
+    this.resolveIndependentReviewGate().appoint(input);
+    return { appointmentIdentifier: input.appointmentIdentifier };
+  }
+
+  /**
+   * ALIGN-03-01：记录**独立**验收裁决。
+   *
+   * 拒绝三类情况：裁决者非任命验收者（既有门禁）、裁决者是实现/测试者（纵深防御）、
+   * **证据只有执行者自报**（自报不能代替独立审查结论）。
+   */
+  async recordAcceptanceVerdict(input: RecordIndependentVerdictInput): Promise<void> {
+    await this.resolveIndependentReviewGate().recordVerdict(input);
+  }
+
+  /** ALIGN-03-01：合并就绪评估（委托既有验收门禁）。 */
+  evaluateTaskMergeReadiness(
+    input: Parameters<IndependentReviewGate["evaluateMergeReadiness"]>[0],
+  ) {
+    return this.resolveIndependentReviewGate().evaluateMergeReadiness(input);
+  }
+
+  private resolveIndependentReviewGate(): IndependentReviewGate {
+    if (this.independentReviewGateInstance !== null) {
+      return this.independentReviewGateInstance;
+    }
+    const facade = this.options.t08cRoutingFacade;
+    if (facade === null || facade === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "四层路由控制面未装配：无法任命执行/测试/验收，也无法记录独立审查结论。",
+      );
+    }
+    this.independentReviewGateInstance = new IndependentReviewGate({
+      appointmentRegistry: facade.appointmentRegistry,
+      acceptanceVerdictGate: facade.acceptanceVerdictGate,
+      registeredAgentDirectory: this.options.registeredAgentDirectory ?? null,
+    });
+    return this.independentReviewGateInstance;
   }
 
   /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */
