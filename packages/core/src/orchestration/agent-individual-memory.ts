@@ -16,6 +16,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { DomainError } from "../core/errors.js";
+import { evaluateContentPublishability } from "../tools/content-publishability.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { z } from "zod";
 import { sanitizePathSegment } from "./work-archive-store.js";
@@ -169,6 +170,19 @@ export class AgentIndividualMemoryStore {
     /** B6R-07：expected revision（并发写者陈旧 revision 拒绝；缺省跳过校验）。 */
     expectedRevision?: number;
   }): Promise<AgentMemoryArchiveDocument> {
+    /**
+     * SEC-02-06 通道 12（2026-10-28）：**长期记忆写入前的内容检查**。
+     *
+     * 非 clean（命中/未完成/失败）⇒ 拒绝落盘（不脱敏后继续写）；
+     * 原因只含规则标识与规则版本，**不回显记忆正文**。
+     */
+    const publishability = evaluateContentPublishability(input.summary);
+    if (!publishability.isPublishable) {
+      throw new DomainError(
+        "sensitive-content-read-denied",
+        `拒绝写入长期记忆（规则版本 ${String(publishability.ruleSetVersion)}）：${publishability.reason}`,
+      );
+    }
     return this.getMemoryMutex(input.runtimeAgentInstanceId).runExclusive(async () => {
       const directoryName = sanitizePathSegment(input.runtimeAgentInstanceId);
       if (!this.namespacePolicy.isIndividualNamespaceDirectory(directoryName)) {
