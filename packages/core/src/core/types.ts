@@ -641,6 +641,14 @@ export interface AgentTaskNode {
   externalReference: string | null;
   /** 可选上下文包（上游声明整体性；装配器按 mergePolicy 处理）。 */
   contextPack?: ContextPack;
+  /**
+   * ALIGN-01-04（2026-10-28）：提案声明的**所需产物标识**。
+   *
+   * 语义边界：这是"要求产出什么"的登记，**不代表产物已存在**；
+   * 产物是否真实落盘仍由产物登记/完成门禁判定（不得用本字段谎报完成）。
+   * 历史节点没有该字段 ⇒ 读取方按"未声明"处理。
+   */
+  requiredArtifactIdentifiers?: string[];
   /** 创建序号（同层稳定排序，单调递增）。 */
   sequenceOrdinal: number;
   createdAtIso: string;

@@ -28,6 +28,8 @@ export interface TaskInsertionProposal {
     title: string;
     priorityTier: number | null;
     externalReference: string | null;
+    /** ALIGN-01-04：提案声明的所需产物标识（声明，不代表已产出）。 */
+    requiredArtifactIdentifiers?: string[];
   };
   anchor: {
     predecessorTaskIds: string[];
@@ -96,6 +98,13 @@ export class ConversationTaskInsertionController {
         title: `${proposal.task.title}（验收: ${proposal.acceptanceCriteria.slice(0, 80)}）`,
         priorityTier: proposal.task.priorityTier,
         externalReference: proposal.task.externalReference,
+        ...(proposal.task.requiredArtifactIdentifiers === undefined
+          ? {}
+          : {
+              requiredArtifactIdentifiers: [
+                ...proposal.task.requiredArtifactIdentifiers,
+              ],
+            }),
       },
       anchor: proposal.anchor,
     });

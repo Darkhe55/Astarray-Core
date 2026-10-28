@@ -17,8 +17,8 @@
  * 的提案入口）调用。工具投影侧另有 `MainAgentReadonlyToolProjection` 保证
  * 主 Agent 在全部模式下只有只读工具。
  *
- * 未接入：`requiredArtifactIdentifiers`（所需产物）属于 ALIGN-01-04，
- * 目前**不在白名单内** ⇒ 模型提交该字段会收到"不支持的字段"，不会静默丢弃。
+ * 未接入：`requiredArtifactIdentifiers`（所需产物）已按 ALIGN-01-04 进入白名单并写入
+ * 任务节点，但**只是声明**——产物是否真实存在仍由产物登记与完成门禁判定。
  */
 import { randomUUID } from "node:crypto";
 
@@ -39,6 +39,7 @@ export const MAIN_AGENT_TASK_PROPOSAL_ALLOWED_FIELDS = [
   "successorTaskIdentifiers",
   "userTaskReference",
   "priorityTier",
+  "requiredArtifactIdentifiers",
 ] as const;
 
 /**
@@ -74,6 +75,12 @@ export interface MainAgentTaskProposal {
   readonly userTaskReference: string;
   /** 缺省 null ⇒ 由本地优先级策略按来源（agent）决定；显式值必须 ≥ 1。 */
   readonly priorityTier: number | null;
+  /**
+   * ALIGN-01-04：所需产物标识（声明"要求产出什么"）。
+   *
+   * 本字段**不证明产物已产出**；完成判定仍走产物登记/完成门禁。
+   */
+  readonly requiredArtifactIdentifiers: readonly string[];
 }
 
 export interface MainAgentTaskProposalSubmissionContext {
@@ -94,8 +101,10 @@ export interface MainAgentTaskProposalSubmissionResult {
   readonly conversationIdentifier: string | null;
 }
 
-export interface MainAgentTaskProposalContractOptions {
-  readonly nowIso?: () => string;
+/** 单条提案可登记的所需产物上限（超过多半是模型把产物清单当正文写）。 */
+export const MAXIMUM_REQUIRED_ARTIFACT_COUNT = 50;
+
+export interface MainAgentTaskProposalContractOptions {  readonly nowIso?: () => string;
   readonly generateProposalIdentifier?: () => string;
 }
 
@@ -216,6 +225,27 @@ export class MainAgentTaskProposalContract {
       );
     }
 
+    const requiredArtifactIdentifiers = readStringArray(
+      payload,
+      "requiredArtifactIdentifiers",
+    );
+    if (requiredArtifactIdentifiers.length > MAXIMUM_REQUIRED_ARTIFACT_COUNT) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `所需产物最多登记 ${MAXIMUM_REQUIRED_ARTIFACT_COUNT} 项（当前 ${requiredArtifactIdentifiers.length} 项）。`,
+      );
+    }
+    const duplicatedArtifactIdentifiers = requiredArtifactIdentifiers.filter(
+      (artifactIdentifier, index) =>
+        requiredArtifactIdentifiers.indexOf(artifactIdentifier) !== index,
+    );
+    if (duplicatedArtifactIdentifiers.length > 0) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `所需产物标识重复: ${[...new Set(duplicatedArtifactIdentifiers)].join(", ")}`,
+      );
+    }
+
     return {
       targetSecondaryAgentInstanceIdentifier: readRequiredString(
         payload,
@@ -229,6 +259,7 @@ export class MainAgentTaskProposalContract {
       successorTaskIdentifiers,
       userTaskReference: readRequiredString(payload, "userTaskReference"),
       priorityTier: priorityTierValue === undefined ? null : priorityTierValue,
+      requiredArtifactIdentifiers,
     };
   }
 
@@ -285,6 +316,13 @@ export class MainAgentTaskProposalContract {
         title: proposal.title,
         priorityTier: proposal.priorityTier,
         externalReference: `user-task:${context.originalUserTaskReference}`,
+        ...(proposal.requiredArtifactIdentifiers.length === 0
+          ? {}
+          : {
+              requiredArtifactIdentifiers: [
+                ...proposal.requiredArtifactIdentifiers,
+              ],
+            }),
       },
       anchor: {
         predecessorTaskIds: [...proposal.predecessorTaskIdentifiers],
