@@ -1,6 +1,6 @@
 # ALIGN-03：下级执行、次级审查集成与报告闭环
 
-日期：2026-10-27。状态：in_progress（01–04 部分交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–05 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -104,5 +104,26 @@ Worker 自己检查完成事件/写工具/产物，但**编排层只看到 `outc
 **未做（如实）**：审查者未做**注册/隶属**校验（协调器无注册目录端口）；没有"指定审查者"的
 分配入口；目标分支合并仍恒不可用（人工体验/授权无来源）；人工改动判定只有"干净/脏"，
 未按路径联动 `human-worktree-observer`；未跑任何一条守卫路径。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 05 合并前审查证据绑定校验——**部分交付**（2026-10-28）
+
+**审查发现**：`GitContributionReviewRecord` 已记 `taskId/baseCommit/headCommit/changedPaths/
+reviewDecision/executedChecks`（本轮又加审查者），但 `finalizeIntegration` **从不回看**这些字段：
+只要报告有 `integrationCommit` 就继续跑测试并可能合入目标分支 ⇒ "审的是 A 版本、合并的是 B 版本"
+这种**过期证据拦不住**。（`AcceptanceVerdictGate` 的 revision/commit 失效是另一条链路，未统一。）
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 证据判定 | `packages/core/src/orchestration/git-review-evidence.ts` | 结论必须 accepted；任务绑定一致；base/head 非空且不同；**headCommit 必须在集成分支历史中**；要求审查者时必须存在且 ≠ 贡献者 |
+| 合并前核对 | `git-integration-coordinator.ts` `finalizeIntegration` | 逐条 accepted 贡献探测 `merge-base --is-ancestor`；不匹配 ⇒ 写 `unresolvedRisks` + **直接返回（不合入）** |
+| 只读探测 | 同文件 `isCommitInBranchHistory` | 非零退出 ⇒ false（不把探测失败当通过） |
+| 批准权不变 | — | 人工体验/授权仍由既有五门禁与用户配置决定，本卡只校验证据匹配 |
+
+**未做（如实）**：审查者要求**默认关闭**（旧报告/测试无该字段，默认强制会让历史集成立刻不可收尾，
+需产品决策）；只绑 commit，未绑序列 revision/证据哈希，也未校验 `changedPaths` 与当前 diff 一致；
+与 `AcceptanceVerdictGate` 仍是两条独立证据链；未跑任何一条拒绝/通过路径。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
