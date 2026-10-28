@@ -1,5 +1,5 @@
 # REMOTE-01：受控运行记录导出与远程投递契约
-日期：2026-10-28。状态：in_progress（01–02 部分交付，implemented-unverified；03 未开始）。
+日期：2026-10-28。状态：in_progress（01–03 全部部分交付，implemented-unverified；整卡未闭合）。
 
 执行规则：每轮只做一个编号检查点，超过三小时拆分；先核对当前代码和在途改动，已有能力复用。覆盖、删减前由工具备份；不覆盖他人工作。必须更新本卡状态和交付记录；共享台账存在并行冲突时提交独立状态补丁，不以未授权为由跳过状态记录。本卡不授权安装、真实付费模型调用、外发消息、提交推送或自动启用实验功能。需要依赖时先询问已有资源。沿用用户此前不要求编写/运行测试的交付口径，本卡列出验收条件但不自行执行测试或宣称通过；代码完成只能标 implemented-unverified。变量名必须可读，时间单位明确。公共核心只放通用契约，不复制私有界面实现或设计。
 
@@ -65,5 +65,29 @@
 **未做（如实）**：**无平台适配器**（`platformSignatureValid` 是调用方传入的布尔声明，真正 IM 验签未实现）；
 **无首次绑定流程**（谁有权写绑定未约束）；**无独立短授权通道**（只返回"需要批准"）；
 **运行时未接线**；投递幂等只靠端口承诺（属 03）；未跑任何一条拒绝/放行路径。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 03 幂等 outbox 与 unknown 语义——**部分交付**（2026-10-28）
+
+**审查发现**：此前投递只有一句"端口必须幂等"的注释 —— 没有稳定 operation id、没有回执读取、
+没有 unknown 状态、也没有"目标不可改"约束。**平台受理但未送达时，调用方会把"已受理"当成"已送达"**。
+
+**交付**（`remote-delivery-outbox.ts`）：
+| 要点 | 说明 |
+|---|---|
+| 稳定标识 | `operationIdentifier` + `interactionRevision` + `contentHash` + `authorizationRevision` |
+| 不完整不发送 | 必填/格式/长度/`sha256:<64hex>`/授权 revision 逐项校验，不完整 `enqueue` 直接抛错 |
+| 入队幂等 | 同 id 同内容 ⇒ 返回既有；**同 id 不同内容/目标/修订 ⇒ 拒绝** |
+| 先读回执 | `attemptRemoteDelivery` 先 `readReceipt`；明确 ack ⇒ sent；**受理后无回执 ⇒ unknown** |
+| unknown 语义 | `unknown` 不自动重发，只有**显式** `isResendAfterUnknown` 才重试 |
+| 目标不可变 | `assertRemoteDeliveryTargetUnchanged`；换目标须新 operation + 新授权 |
+| 落盘 | `<state>/remote-delivery/outbox.json`（原子写 + 互斥 + 备份恢复） |
+| 接线 | `deliverEvidenceExport` 装配 outbox+transport 时走该路径，否则保留旧路径 |
+
+**未做（如实）**：**无真实传输适配器**（发送/回执端口只有契约，IM 未接）；
+**无定时重试/退避**；**无 unknown 处置入口**（没有 CLI/UI 读回执/确认重发/取消）；
+`authorizationRevision` 由调用方提供、递增语义未固化；运行时未构造 outbox/transport；
+未跑"重复入队/同 id 换内容被拒/受理后无回执 ⇒ unknown/unknown 不自动重发/换目标被拒"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
