@@ -130,6 +130,11 @@ import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
+import { evaluateWorkWindowState } from "../orchestration/work-window-contract.js";
+import {
+  createWorkWindowTransitionMonitor,
+  type WorkWindowTransitionMonitor,
+} from "../orchestration/work-window-transition-monitor.js";
 import { ExperimentSettingsStore } from "../orchestration/experiment-catalog.js";
 import { ToolPackageLifecycleService } from "../toolkit/tool-package-lifecycle-service.js";
 import { ToolPackageZipInstaller } from "../toolkit/tool-package-zip-installer.js";
@@ -204,6 +209,11 @@ export interface ApplicationRuntime {
   missionRuntimeRegistry: MissionRuntimeRegistry;
   artifactRecordStore: ArtifactRecordStore;
   projectWorkWindowStore: ProjectWorkWindowStore;
+  /**
+   * 接线缺口第 ④ 项（2026-10-28）：时段变化检测器句柄（宿主可 observeNow 或 rely on 定时器）。
+   * 默认不启动；需要 `isWorkWindowResumeMonitorEnabled` 显式开启。
+   */
+  workWindowTransitionMonitor: WorkWindowTransitionMonitor;
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
   toolPackageZipInstaller: ToolPackageZipInstaller;
@@ -329,6 +339,15 @@ export interface ApplicationRuntimeOptions {
    * 检查点声明需对账时**拒绝续接**并给出原因；查看历史不会启动任务。
    */
   isMissionRecoveryGateEnabled?: boolean;
+  /**
+   * 接线缺口第 ④ 项（2026-10-28）：**时段变化检测器开关**（缺省关）。
+   *
+   * 开启后每 300s（下限 60s）读一次时段状态；首次只建基线，只在 rest → working 时
+   * 调用 `onWorkWindowRestToWorking`。**不自动恢复任务**（是否恢复由宿主决定）。
+   */
+  isWorkWindowResumeMonitorEnabled?: boolean;
+  /** 时段 rest → working 时的宿主回调（收到观测时间；是否恢复由宿主决定）。 */
+  onWorkWindowRestToWorking?: (observedAtIso: string) => void | Promise<void>;
   /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
@@ -824,6 +843,37 @@ export async function createApplicationRuntime(
   const missionRuntimeRegistry = new MissionRuntimeRegistry();
   const artifactRecordStore = new ArtifactRecordStore({ baseDirectory: stateDirectory });
   const projectWorkWindowStore = new ProjectWorkWindowStore({ baseDirectory: stateDirectory });
+  /**
+   * 接线缺口第 ④ 项（2026-10-28）：**时段变化检测器**。
+   *
+   * 默认关闭（`isWorkWindowResumeMonitorEnabled !== true` ⇒ 不排定时器）；
+   * 首次观测只建基线；只在 rest → working 时回调一次。
+   * 未提供 `onWorkWindowRestToWorking` 时只记录观察结果，**不偷偷恢复任务**。
+   */
+  const workWindowTransitionMonitor = createWorkWindowTransitionMonitor({
+    timerPort: {
+      setInterval: (callback: () => void, intervalMilliseconds: number) =>
+        setInterval(callback, intervalMilliseconds),
+      clearInterval: (handle: unknown) =>
+        clearInterval(handle as ReturnType<typeof setInterval>),
+    },
+    isEnabled: options.isWorkWindowResumeMonitorEnabled === true,
+    readCurrentState: async (instantIso: string) =>
+      evaluateWorkWindowState({
+        instantIso,
+        rules: await projectWorkWindowStore.readRules(),
+      }).state,
+    ...(options.onWorkWindowRestToWorking === undefined
+      ? {}
+      : {
+          onRestToWorking: (observation: {
+            readonly observedAtIso: string;
+          }): void => {
+            void options.onWorkWindowRestToWorking?.(observation.observedAtIso);
+          },
+        }),
+  });
+  workWindowTransitionMonitor.start();
   const experimentSettingsStore = new ExperimentSettingsStore({ baseDirectory: stateDirectory });
   const toolPackageLifecycleService = new ToolPackageLifecycleService({ baseDirectory: stateDirectory });
   const toolPackageZipInstaller = new ToolPackageZipInstaller({ baseDirectory: stateDirectory });
@@ -1783,6 +1833,8 @@ export async function createApplicationRuntime(
   });
 
   const shutdown = async (): Promise<void> => {
+    /** 接线缺口第 ④ 项：先停时段检测器（幂等；未启动时返回 not-running）。 */
+    workWindowTransitionMonitor.stop();
     // T07D-R1-03：先收敛在途编排（取消并等待 Worker/循环），再释放反馈进程资源。
     await controller.shutdown().catch(() => {});
     // 反馈进程**由 supervisor 独占收口**：`stop()` 内部即 `client.shutdown()` +
@@ -1858,6 +1910,7 @@ export async function createApplicationRuntime(
     missionRuntimeRegistry,
     artifactRecordStore,
     projectWorkWindowStore,
+    workWindowTransitionMonitor,
     experimentSettingsStore,
     toolPackageLifecycleService,
     toolPackageZipInstaller,
