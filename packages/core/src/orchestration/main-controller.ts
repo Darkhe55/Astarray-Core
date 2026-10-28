@@ -69,6 +69,14 @@ import type { ConversationTaskInsertionController } from "./conversation-task-in
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
 import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
+import {
+  MAIN_AGENT_TURN_BUDGET_MILLISECONDS,
+  buildMainAgentTurnProgressRecord,
+} from "./main-agent-turn-budget.js";
+import type {
+  MainAgentTurnOutcome,
+  MainAgentTurnProgressRecord,
+} from "./main-agent-turn-budget.js";
 import type { TaskInsertionProposal } from "./conversation-task-insertion-controller.js";
 import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dispatch-loop.js";
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
@@ -344,6 +352,20 @@ export interface MainControllerOptions {
    * `conversationIdentityStore` 时作为该会话的主个体写入映射；缺省则由存储生成。
    */
   mainAgentInstanceId?: string;
+  /**
+   * ALIGN-01-05（2026-10-28）：主 Agent **单条处理预算**（缺省 180 秒）。
+   *
+   * 只作用于"主 Agent 自己跑模型"的路径（ponder）。耗尽即中止本轮、把已知进展
+   * 落库并明确回报"待补信息/待继续"；**不得伪报已派发**。
+   */
+  mainAgentTurnBudgetMilliseconds?: number;
+  /**
+   * ALIGN-01-05：超期记录落库端口（缺省 ⇒ 仅保存在内存，不落盘）。
+   * 观测/落盘失败不得阻塞对话，也不得掩盖超期这一事实。
+   */
+  mainAgentTurnProgressPort?: (
+    record: MainAgentTurnProgressRecord,
+  ) => Promise<void> | void;
   /** B6R-09：次级持续调度循环（生产装配；ready set 派发）。 */
   secondaryDispatchLoop?: SecondaryContinuousDispatchLoop | null;
   /** B6R-09：三级生命周期控制器（阶段持久化/幂等收口）。 */
@@ -396,6 +418,8 @@ export class MainController {
    */
   private readonly latestUserMessageReferences = new Map<string, string>();
   private readonly mainAgentProposalContract = new MainAgentTaskProposalContract();
+  /** ALIGN-01-05：最近一次主 Agent 轮次的记账（只读给 UI；不含模型隐式状态）。 */
+  private lastMainAgentTurnProgress: MainAgentTurnProgressRecord | null = null;
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -407,6 +431,11 @@ export class MainController {
   /** ALIGN-01-01：按 mission 解析其稳定会话（只读；未启用或未知返回 null）。 */
   getMissionConversationIdentifier(missionId: string): string | null {
     return this.missionConversationIdentifiers.get(missionId) ?? null;
+  }
+
+  /** ALIGN-01-05：最近一次主 Agent 轮次记账（只读；未知返回 null）。 */
+  getLastMainAgentTurnProgress(): MainAgentTurnProgressRecord | null {
+    return this.lastMainAgentTurnProgress;
   }
 
   constructor(private readonly options: MainControllerOptions) {}
@@ -1274,20 +1303,74 @@ export class MainController {
       maxLoopIterations:
         ponderTooling === null ? 1 : Math.max(2, this.options.maxLoopIterations),
     };
+    const budgetMilliseconds =
+      this.options.mainAgentTurnBudgetMilliseconds ??
+      MAIN_AGENT_TURN_BUDGET_MILLISECONDS;
+    const turnIdentifier = `main-agent-turn-${randomUUID()}`;
+    const startedAtMilliseconds = Date.now();
     const cancellationController = new AbortController();
-    const events =
-      ponderTooling === null
-        ? runtime.run(ponderAgentRunInput, cancellationController.signal)
-        : await runToolLoop(ponderAgentRunInput, {
-            runtime,
-            toolPort: ponderTooling.toolPort,
-            maxLoopIterations: ponderAgentRunInput.maxLoopIterations,
-            cancellationSignal: cancellationController.signal,
-          });
-    for await (const event of events) {
-      if (event.kind === "textDelta") {
-        this.options.streamOutput(null, event.deltaText);
+    /**
+     * ALIGN-01-05：预算中止与调用方取消的组合信号。
+     *
+     * 没有这个组合，慢模型/无限重试会一直占住会话 —— 卡内明确禁止。
+     */
+    const deadlineSignal = AbortSignal.timeout(budgetMilliseconds);
+    const combinedSignal = AbortSignal.any([
+      cancellationController.signal,
+      deadlineSignal,
+    ]);
+    let streamedCharacterCount = 0;
+    let outcome: MainAgentTurnOutcome = "completed";
+    try {
+      const events =
+        ponderTooling === null
+          ? runtime.run(ponderAgentRunInput, combinedSignal)
+          : await runToolLoop(ponderAgentRunInput, {
+              runtime,
+              toolPort: ponderTooling.toolPort,
+              maxLoopIterations: ponderAgentRunInput.maxLoopIterations,
+              cancellationSignal: combinedSignal,
+            });
+      for await (const event of events) {
+        if (event.kind === "textDelta") {
+          streamedCharacterCount += event.deltaText.length;
+          this.options.streamOutput(null, event.deltaText);
+        }
       }
+    } catch (error) {
+      if (deadlineSignal.aborted) {
+        outcome = "timed-out";
+      } else if (cancellationController.signal.aborted) {
+        outcome = "cancelled";
+      } else {
+        throw error;
+      }
+    }
+    const endedAtMilliseconds = Date.now();
+    const progressRecord = buildMainAgentTurnProgressRecord({
+      turnIdentifier,
+      conversationIdentifier: conversationIdentity?.conversationIdentifier ?? null,
+      startedAtMilliseconds,
+      endedAtMilliseconds,
+      budgetMilliseconds,
+      outcome,
+      streamedCharacterCount,
+    });
+    this.lastMainAgentTurnProgress = progressRecord;
+    if (outcome === "timed-out") {
+      /**
+       * 超期必须**当场如实回报**：先落库（失败不阻塞），再明确告知"待补信息/待继续"。
+       * 不写"已派发/已完成" —— 本轮确实没有派发任何任务。
+       */
+      try {
+        await this.options.mainAgentTurnProgressPort?.(progressRecord);
+      } catch {
+        // 观测/落盘失败不得阻塞对话，也不掩盖超期事实
+      }
+      this.options.streamOutput(
+        null,
+        `[需要继续] ${progressRecord.nextActionText}`,
+      );
     }
   }
 
