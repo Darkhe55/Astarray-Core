@@ -1,6 +1,6 @@
 # ALIGN-01：稳定个体身份与只读主 Agent 主干
 
-日期：2026-10-27。状态：in_progress（01–03、05–06 已交付、04 部分交付，均 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–03、05–07 已交付、04 部分交付，均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -170,3 +170,22 @@ ponder 每次生成 `main:ponder:<随机>`；`missionId`/进程内 Map 同时充
 
 **未做（如实）**：三级任务包级报告（属 ALIGN-03）、提醒推送、保留策略、UI 展示；
 token 预算仍是"JSON 长度/4"的粗估。**没有**用真实 mission 跑通"终态 → 索引文件 → 读回"。
+
+### 07 旧身份映射：只读迁移判定——implemented-unverified（2026-10-28）
+
+**交付**：
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 判定 | `packages/core/src/orchestration/legacy-identity-migration.ts` | 纯函数 `analyzeLegacyIdentityAssociations`：四条规则、确定性 |
+| 取样 | 同文件 `collectLegacyIdentitySnapshot` | 只读读取会话映射 / mission 摘要 / 个体记忆目录（`decodePathSegment` 反解） |
+| 消费 | `packages/core/src/public-sdk.ts` `auditLegacyIdentityMapping(stateDirectory)` | 公开 SDK 入口；返回 `isMigrationApplied:false` |
+| 契约 | `docs/adr/0048-legacy-identity-migration-audit.md` | 规则与"不迁移"边界 |
+
+**四条规则**：①摘要声明 + 运行记录一致才关联；②恰好一个会话引用才关联；
+③多个会话引用 ⇒ 独立 + 标歧义（不挑最近）；④`main:ponder:*`/`scheduler:*` **永不合并**；
+个体记忆只在恰好一个会话引用时归属，否则独立 + 未知。**声明本身不是证据。**
+
+**未做（如实）**：没有写回/迁移执行（需显式授权入口 + 备份回滚）；没有 CLI 子命令；
+ALIGN-04 尚未消费；**没有在真实旧状态目录上跑过**；run-history/报告索引里的旧身份未纳入。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
