@@ -82,6 +82,7 @@ import type { ActorIdentity, TaskSequenceStatusController } from "./task-sequenc
 import { TaskLedgerBridge } from "./task-ledger-bridge.js";
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
+import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
 import type { CompletionReceipt } from "./completion-receipt.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
 import type { WorkWindowResumeDecision } from "./work-window-resume.js";
@@ -125,6 +126,20 @@ import type { ProjectReconnaissanceController } from "./project-reconnaissance-c
 import type { AgentAppointmentRegistry } from "./agent-appointment-registry.js";
 import type { AcceptanceVerdictGate } from "./acceptance-verdict-gate.js";
 import type { QuaternaryLifecycleController } from "./quaternary-lifecycle-controller.js";
+
+/** 目标门禁判定记录（清单第 ⑥ 项；只读观察用）。 */
+export interface GoalDispatchVerdictRecord {
+  readonly missionIdentifier: string;
+  readonly projectIdentifier: string;
+  readonly contractRevision: number;
+  readonly isAllowed: boolean;
+  readonly reasonCode: string | null;
+  readonly detail: string | null;
+  readonly evidenceGaps: readonly string[];
+  /** 本次判定是否真的阻断了派发（false = 仅观察）。 */
+  readonly isEnforced: boolean;
+  readonly observedAtIso: string;
+}
 
 export interface MainControllerOptions {
   /**
@@ -465,6 +480,23 @@ export interface MainControllerOptions {
     readonly isAccepted: boolean;
     readonly reasons: readonly string[];
   } | null>;
+  /**
+   * 清单第 ⑥ 项（2026-10-28）：**目标门禁解析器**（只读观察）。
+   *
+   * 缺省 ⇒ 目标模式不参与派发（行为逐字不变）。提供后：每次启动/继续 mission 前
+   * 调 `GoalDispatchGate.assertMissionDispatchAllowed`，结果通过
+   * `onGoalDispatchVerdict` 上报；**是否真的阻断**由 `isGoalModeEnforcementEnabled` 决定。
+   */
+  goalDispatchGateResolver?: (missionIdentifier: string) => GoalDispatchGate | null;
+  /**
+   * 目标门禁是否**强制**（缺省 false）。
+   *
+   * false ⇒ **只观察**：判定被记录/流式输出，但派发照旧（不改变行为）；
+   * true ⇒ 判定不放行时把 mission 置 blocked 并不启动调度器。
+   */
+  isGoalModeEnforcementEnabled?: boolean;
+  /** 目标门禁判定上报（观察或强制都会调用；不含任何模型可见副作用）。 */
+  onGoalDispatchVerdict?: (record: GoalDispatchVerdictRecord) => void;
   /**
    * 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面。
    *
@@ -1972,6 +2004,57 @@ export class MainController {
   }
 
   /**
+   * 清单第 ⑥ 项（2026-10-28）：**目标门禁只读观察/可选强制**。
+   *
+   * 未装配 resolver ⇒ 直接返回"未阻断"（行为不变）。
+   * 装配后：判定必记录；只有 `isGoalModeEnforcementEnabled === true` 才真的阻断派发。
+   */
+  private observeGoalDispatchGate(missionId: string): {
+    readonly isBlocked: boolean;
+    readonly detail: string | null;
+  } {
+    const resolver = this.options.goalDispatchGateResolver;
+    if (resolver === undefined) {
+      return { isBlocked: false, detail: null };
+    }
+    const gate = resolver(missionId);
+    if (gate === null) {
+      return { isBlocked: false, detail: null };
+    }
+    const state = gate.getState();
+    const projectIdentifier = this.missionProjectIdentifiers.get(missionId) ?? "";
+    const observedAtIso = new Date().toISOString();
+    const verdict = gate.assertMissionDispatchAllowed({
+      requestedContractRevision: state.contractRevision,
+      projectIdentifier,
+      nowIso: observedAtIso,
+    });
+    const isEnforced = this.options.isGoalModeEnforcementEnabled === true;
+    const record: GoalDispatchVerdictRecord = {
+      missionIdentifier: missionId,
+      projectIdentifier,
+      contractRevision: state.contractRevision,
+      isAllowed: verdict.isAllowed,
+      reasonCode: verdict.isAllowed ? null : verdict.reasonCode,
+      detail: verdict.isAllowed ? null : verdict.detail,
+      evidenceGaps: verdict.isAllowed ? [] : [...verdict.evidenceGaps],
+      isEnforced,
+      observedAtIso,
+    };
+    this.options.onGoalDispatchVerdict?.(record);
+    if (!verdict.isAllowed) {
+      this.options.streamOutput(
+        missionId,
+        `[目标门禁] ${isEnforced ? "阻断派发" : "仅观察（未阻断）"}：${verdict.detail}`,
+      );
+      if (isEnforced) {
+        return { isBlocked: true, detail: verdict.detail };
+      }
+    }
+    return { isBlocked: false, detail: verdict.isAllowed ? null : verdict.detail };
+  }
+
+  /**
    * 接线缺口第 ② 项（2026-10-28）：**完成门禁投影（只读）**。
    *
    * 两条规则：
@@ -2620,6 +2703,13 @@ export class MainController {
     missionId: string,
     taskNodes: TaskChainDocument["tasks"],
   ): void {
+    /**
+     * 清单第 ⑥ 项（2026-10-28）：目标门禁**只读观察**（缺省不参与；强制需显式开关）。
+     */
+    if (this.observeGoalDispatchGate(missionId).isBlocked) {
+      void this.options.missionManager.updateMissionStatus(missionId, "blocked");
+      return;
+    }
     const initialChain = this.buildInitialChain(missionId, taskNodes);
     const scheduler = new AssistScheduler({
       missionId,
@@ -2810,6 +2900,13 @@ export class MainController {
     missionId: string,
     taskNodes: TaskChainDocument["tasks"],
   ): void {
+    /**
+     * 清单第 ⑥ 项（2026-10-28）：目标门禁**只读观察**（缺省不参与；强制需显式开关）。
+     */
+    if (this.observeGoalDispatchGate(missionId).isBlocked) {
+      void this.options.missionManager.updateMissionStatus(missionId, "blocked");
+      return;
+    }
     const initialChain = this.buildInitialChain(missionId, taskNodes);
     const scheduler = new DevolveScheduler({
       missionId,

@@ -16,6 +16,9 @@
 import { DomainError } from "../core/errors.js";
 import type { GoalContract } from "./goal-contract.js";
 
+/** mission 级派发检查用的占位"工具名"（不是真实工具，不参与白名单）。 */
+export const GOAL_MISSION_DISPATCH_PSEUDO_TOOL_NAME = "<mission-launch>";
+
 /** 进展检查间隔：每三个**已结束**任务组检查一次（完成/中断都计组）。 */
 export const GOAL_PROGRESS_CHECK_INTERVAL_TASK_GROUPS = 3;
 
@@ -225,6 +228,7 @@ export class GoalDispatchGate {
     }
     if (
       this.contract.scope.allowedToolNames !== null &&
+      input.toolName !== GOAL_MISSION_DISPATCH_PSEUDO_TOOL_NAME &&
       !this.contract.scope.allowedToolNames.includes(input.toolName)
     ) {
       return {
@@ -267,6 +271,29 @@ export class GoalDispatchGate {
       },
       groupsUntilNextProgressCheck: groupsUntilNextCheck,
     };
+  }
+
+  /**
+   * 清单第 ⑥ 项（2026-10-28）：**mission 级派发检查**（不含工具名）。
+   *
+   * 与 `assertDispatchAllowed` 同源，但用于"启动/继续整个 mission"这个动作：
+   * scope 只比项目，不因 `allowedToolNames` 受限而误拦（工具级检查仍在工具执行前）。
+   */
+  assertMissionDispatchAllowed(input: {
+    readonly requestedContractRevision: number;
+    readonly projectIdentifier: string;
+    readonly nowIso: string;
+  }): GoalDispatchVerdict {
+    return this.assertDispatchAllowed({
+      requestedContractRevision: input.requestedContractRevision,
+      projectIdentifier: input.projectIdentifier,
+      /**
+       * 用一个**显式占位工具名**跳过工具白名单检查：mission 启动不是工具调用；
+       * 这里把"工具名"换成分支判断，避免依赖调用方传魔法字符串。
+       */
+      toolName: GOAL_MISSION_DISPATCH_PSEUDO_TOOL_NAME,
+      nowIso: input.nowIso,
+    });
   }
 
   /** 记录一次真实工具调用消耗（由工具执行层调用，不由模型上报）。 */
