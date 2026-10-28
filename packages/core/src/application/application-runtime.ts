@@ -7,6 +7,7 @@ import path from "node:path";
 
 import { resolveHostUserIdentifier } from "../core/host-user-context.js";
 import { DomainError } from "../core/errors.js";
+import { writeAtomicJson } from "../infra/atomic-json.js";
 import { EventControlChannel } from "../orchestration/event-control-channel.js";
 import { EventIncidentJournal } from "../orchestration/event-incident-journal.js";
 import { EventSourceBridge } from "../orchestration/event-source-bridge.js";
@@ -32,6 +33,7 @@ import { LocalProgressAndCycleGuard } from "../tools/local-progress-and-cycle-gu
 import { TaskCallBudgetLedger } from "../infra/task-call-budget-ledger.js";
 import { RunHistoryStore } from "../orchestration/run-history-store.js";
 import { ConversationIdentityStore } from "../orchestration/conversation-identity-store.js";
+import { MAIN_AGENT_TURN_BUDGET_MILLISECONDS } from "../orchestration/main-agent-turn-budget.js";
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import {
   ToolDocumentationRecallInjector,
@@ -290,6 +292,11 @@ export interface ApplicationRuntimeOptions {
    * 传 `false` 可回到"不落任何身份映射"的旧行为（无项目标识时两条路径等效）。
    */
   isConversationIdentityEnabled?: boolean;
+  /**
+   * ALIGN-01-05（2026-10-28）：主 Agent 单条处理预算（毫秒；缺省 180000）。
+   * 超期即中止本轮并落库记账，明确回报"待补信息/待继续"。
+   */
+  mainAgentTurnBudgetMilliseconds?: number;
   /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
@@ -1350,6 +1357,24 @@ export async function createApplicationRuntime(
     ...(conversationIdentityStore === null
       ? {}
       : { conversationIdentityStore, mainAgentInstanceId }),
+    /**
+     * ALIGN-01-05（2026-10-28）：主 Agent 单条处理预算（默认 180 秒）+ 超期落库。
+     *
+     * 落库位置 `<state>/main-agent-turns/<turnId>.json`：只记"本轮做了什么、
+     * 超没超期、产出了多少字"，**不记**模型隐式状态；`isTaskDispatched` 恒 false。
+     */
+    mainAgentTurnBudgetMilliseconds:
+      options.mainAgentTurnBudgetMilliseconds ?? MAIN_AGENT_TURN_BUDGET_MILLISECONDS,
+    mainAgentTurnProgressPort: async (record) => {
+      await writeAtomicJson(
+        path.join(
+          stateDirectory,
+          "main-agent-turns",
+          `${record.turnIdentifier}.json`,
+        ),
+        record,
+      );
+    },
     ...(eventControlBridge === null
       ? {}
       : {
