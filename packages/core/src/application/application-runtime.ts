@@ -134,6 +134,8 @@ import { ExperimentSettingsStore } from "../orchestration/experiment-catalog.js"
 import { ToolPackageLifecycleService } from "../toolkit/tool-package-lifecycle-service.js";
 import { ToolPackageZipInstaller } from "../toolkit/tool-package-zip-installer.js";
 import { ContextClosureCapsuleStore } from "../orchestration/context-closure-capsule-store.js";
+import { ContextRecallController } from "../orchestration/context-recall-controller.js";
+import { FileContextRecallLedgerStore } from "../orchestration/context-recall-ledger-store.js";
 import {
   HumanVerificationController,
   HumanVerificationPolicyStore,
@@ -819,6 +821,22 @@ export async function createApplicationRuntime(
   const contextClosureCapsuleStore = new ContextClosureCapsuleStore({
     baseDirectory: stateDirectory,
   });
+  /**
+   * ALIGN-04-05（2026-10-28）：**胶囊 → 回访**的真实消费者。
+   *
+   * 此前胶囊只被写入、从未被读回；这里按调用者构造回访控制器（每个调用者独立账本，
+   * 冷却/任务级预算互不干扰），使"按节点关闭/回访重建上下文"可达。
+   */
+  const contextRecallControllerFactory = (
+    callerAgentInstanceId: string,
+  ): ContextRecallController =>
+    new ContextRecallController({
+      capsuleStore: contextClosureCapsuleStore,
+      ledgerPort: new FileContextRecallLedgerStore({
+        baseDirectory: stateDirectory,
+        callerAgentInstanceId,
+      }),
+    });
   const humanVerificationController = new HumanVerificationController({
     baseDirectory: stateDirectory,
     graphStore: contextGraphStore,
@@ -1473,6 +1491,8 @@ export async function createApplicationRuntime(
     missionRelationIndexStore,
     /** ALIGN-04-02：恢复前只读对账门禁（缺省不传 ⇒ 不发生门禁）。 */
     ...(missionRecoveryGate === undefined ? {} : { missionRecoveryGate }),
+    /** ALIGN-04-05：按调用者构造的回访控制器（胶囊 → 节点回访）。 */
+    contextRecallControllerFactory,
     /**
      * ALIGN-02-01（2026-10-28）：权威任务序列控制面（用户任务先入偏序集，再建 mission 投影）。
      * 复用已装配的 `sequenceManageController`，不另建第二套序列。

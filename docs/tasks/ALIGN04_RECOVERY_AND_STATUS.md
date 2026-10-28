@@ -1,6 +1,6 @@
 # ALIGN-04：主干重启恢复与完成状态纠偏
 
-日期：2026-10-27。状态：in_progress（01–04 部分交付，implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–05 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -103,5 +103,26 @@
 
 **未做（如实）**：**没有时段变化检测器**（谁在 rest→working 时调用入口未接线）；`hasResumedSinceWake`
 由调用方维护、未持久化；`pauseKind` 无权威标记（不由暂停原因存储推导）；未跑任何一条判定路径。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 05 胶囊 → 回访：按节点关闭重建上下文——**部分交付**（2026-10-28）
+
+**审查发现**：节点收口链路完整（`ContextNodeLifecycleController` → `ContextClosureCapsuleStore`，
+胶囊不可变 + contentHash + owner/mission/node），但 **`ContextRecallController` 从未被构造**
+⇒ 胶囊**只写不读**，"按节点关闭/回访重建"在产品里不可达。顺带核对两处"看似违规"路径，
+结论是**没有**违规：重试档案附加按 `taskId` 过滤且按属主分别生成附件；没有路径把全局摘要当完整历史。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 回访入口 | `main-controller.ts` `recallClosedContext` | 未装配 ⇒ `context-recall-invalid`（拒绝伪造历史）；空身份直接拒 |
+| 按调用者构造 | `application-runtime.ts` `contextRecallControllerFactory` | 每个调用者独立 `FileContextRecallLedgerStore`（冷却/预算互不干扰） |
+| 内容边界 | `ContextRecallController` | 输入面只有节点/revision/原因码/token 上限 —— **没有**"全部 Agent/全局摘要当历史"字段，越权组合结构上不可表达 |
+| 既有约束 | 未改 | 次数上限活锁拒、冷却 `repeat-receipt`、敏感命中丢弃、token 预算有界 |
+
+**未做（如实）**：**未注入提示词装配**（组装上下文时不会自动回访，只能由上层显式调用）；
+`nodeIndexProvider`/`fullFragmentProvider` 未接管（无胶囊节点 ⇒ `not-found`）；
+敏感判定用默认实现（未接 SEC-02 DLP）；未跑任何一条回访路径。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。

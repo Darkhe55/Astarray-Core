@@ -70,6 +70,8 @@ import type { ConversationTaskInsertionController } from "./conversation-task-in
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import type { TaskSequenceManageController } from "./task-sequence-controllers.js";
 import type { MissionRelationIndexStore } from "./mission-relation-index.js";
+import type { ContextRecallController } from "./context-recall-controller.js";
+import type { ContextRecallResult } from "./context-recall-controller.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
 import type { WorkWindowResumeDecision } from "./work-window-resume.js";
 import {
@@ -424,6 +426,16 @@ export interface MainControllerOptions {
     readonly isAllowedToResume: boolean;
     readonly blockedReasons: readonly string[];
   }>;
+  /**
+   * ALIGN-04-05（2026-10-28）：**按调用者构造的回访控制器**（节点关闭 → 回访重建）。
+   *
+   * 每个调用者（个体）有自己的回执冷却/预算账本，所以按 `callerAgentInstanceId` 构造；
+   * 回访内容只来自该调用者可见的**关闭胶囊**，**不读全局摘要当完整历史**、
+   * **不拼接全部角色日志**（由 `ContextRecallController` 的作用域与预算约束保证）。
+   */
+  contextRecallControllerFactory?: (
+    callerAgentInstanceId: string,
+  ) => ContextRecallController;
   /**
    * ALIGN-02-06（2026-10-28）：运行中插入的**安全点注入端口**（可选）。
    *
@@ -1564,6 +1576,39 @@ export class MainController {
     }
     this.options.secondaryDispatchLoop?.notifySchedulingEvent("work-window-resumed");
     return { decision: "resume-once", reason: decision.reason, didResume: true };
+  }
+
+  /**
+   * ALIGN-04-05（2026-10-28）：**按节点关闭/回访重建必要上下文**（只读，不改任务状态）。
+   *
+   * 只沿 `ContextRecallController.recall` 的既有约束：调用者身份由 harness 注入、
+   * 绑定节点 revision/原因码/token 上限、冷却与任务级预算、敏感内容命中即丢弃。
+   * 内容来源是**该调用者可见的关闭胶囊**；不把全局摘要当完整历史，
+   * 也不拼接其他角色日志（控制器没有这种输入面）。
+   */
+  async recallClosedContext(input: {
+    readonly callerAgentInstanceId: string;
+    readonly request: unknown;
+    readonly nowMilliseconds?: number;
+  }): Promise<ContextRecallResult> {
+    const factory = this.options.contextRecallControllerFactory;
+    if (factory === undefined) {
+      throw new DomainError(
+        "context-recall-invalid",
+        "回访控制器未装配：无法按节点关闭重建上下文（拒绝伪造历史）。",
+      );
+    }
+    if (input.callerAgentInstanceId.trim() === "") {
+      throw new DomainError("context-recall-invalid", "调用者身份缺失（由 harness 注入）。");
+    }
+    const controller = factory(input.callerAgentInstanceId);
+    return controller.recall({
+      callerAgentInstanceId: input.callerAgentInstanceId,
+      request: input.request,
+      ...(input.nowMilliseconds === undefined
+        ? {}
+        : { nowMilliseconds: input.nowMilliseconds }),
+    });
   }
 
   /**
