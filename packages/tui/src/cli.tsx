@@ -18,6 +18,8 @@ import {
   executeObsProcessCommand,
 } from "./cli/observability-command.js";
 import { executeObsPerfRotateCommand } from "./cli/obs-perf-rotate-command.js";
+// 清单第 ① 项出口（2026-10-28）：两套记账的只读对账视图。
+import { executeTaskLedgerStatusCommand } from "./cli/task-ledger-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
   DEFAULT_HISTORY_PAGE_SIZE,
@@ -1029,6 +1031,51 @@ historyCommand
             : {}),
           ...(options.hideToolCalls === true ? { showToolCalls: false } : {}),
         },
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
+/**
+ * `task-ledger`：两套记账的只读对账与差异历史（清单第 ① 项出口，2026-10-28）。
+ *
+ * 只读：不改任务链/序列、不派发、不调模型、不写文件。
+ * 输入全部显式（`--mission/--sequence/--owner`），**不猜测** mission 与序列的映射关系。
+ */
+const taskLedgerCommand = program
+  .command("task-ledger")
+  .description("两套记账对账与差异历史（只读；不改任何一边）");
+
+taskLedgerCommand
+  .command("status")
+  .description("显示 mission 任务链与权威序列的差异，以及最近 N 条差异历史")
+  .option("--mission <mission-id>", "mission 标识")
+  .option("--sequence <sequence-id>", "权威任务序列标识")
+  .option("--owner <agent-instance-id>", "序列 owner（个体标识）")
+  .option("--recent <count>", "最近多少条差异历史", "10")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      mission?: string;
+      sequence?: string;
+      owner?: string;
+      recent?: string;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeTaskLedgerStatusCommand({
+        stateDirectory: defaultStateDirectory(),
+        ...(options.mission === undefined
+          ? {}
+          : { missionIdentifier: options.mission }),
+        ...(options.sequence === undefined
+          ? {}
+          : { sequenceIdentifier: options.sequence }),
+        ...(options.owner === undefined
+          ? {}
+          : { ownerAgentInstanceIdentifier: options.owner }),
+        ...(options.recent === undefined
+          ? {}
+          : { recentCount: Number(options.recent) }),
         isJsonOutput: options.json === true,
       });
     },
