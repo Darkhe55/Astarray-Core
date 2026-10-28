@@ -1,6 +1,6 @@
 # ALIGN-02：统一偏序集、任务组和次级持续调度
 
-日期：2026-10-27。状态：in_progress（01 已交付；02–03、05–06 部分交付；均 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01 已交付；02–03、05–07 部分交付；均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -124,5 +124,25 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 **未做（如实）**：**没有生产注入端口**（编排器/DAG 无插入能力）⇒ 目前每个请求都推迟到
 下一组；幂等指纹只在进程内；`acceptanceCriteria` 未落序列节点；锚点统一退化为"用户任务前驱"；
 未做端到端与并发实测。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 07 事件唤醒 / 有界退避 / 失败重派上限——**部分交付**（2026-10-28）
+
+**审查发现**：`waitForNextWake(max)` 只有固定超时（短超时即忙轮询），`wake()` 不说明原因；
+派发失败后任务回到 `pending`，**下一轮立刻再次领取** ⇒ 失败次数无上限（无限重派）。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 带原因的唤醒 | `SchedulingWakeReason`（external/task-ready/task-finished/dependency-unlocked/work-window-resumed/resource-released） | `waitForNextWake` 返回 `{reason, waitedMilliseconds}`，超时=timeout |
+| 有界退避 | `getRecommendedWaitMilliseconds` | 无工作 30s 空闲；有进展 1s；连续无进展 250ms×2^n 封顶 30s |
+| 失败上限 | `MAXIMUM_DISPATCH_ATTEMPTS_PER_TASK = 3` | 达上限停手并在 `skippedReasons` 说明；成功清零；可 `resetDispatchFailureCounts()` |
+| 进展统计 | `consecutiveNoProgressRoundCount` | 随每轮返回，可观测 |
+| 事件源（已接） | `main-controller.ts` | mission 启动 ⇒ `task-ready`；assist/devolve 终态 ⇒ `task-finished` |
+
+**未做（如实）**：循环仍无真实派发端点（承接 02-05）；**逐任务事件源未接**
+（无 per-task 完成/依赖解锁/时段恢复/资源释放发布点）；退避未与真实时钟/取消联动；
+未跑任何一次真实计时（"连续失败 3 次停手""退避序列""空闲等待"均未实测）。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
