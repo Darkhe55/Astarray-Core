@@ -1358,6 +1358,11 @@ export async function createApplicationRuntime(
       ? {}
       : { conversationIdentityStore, mainAgentInstanceId }),
     /**
+     * ALIGN-02-01（2026-10-28）：权威任务序列控制面（用户任务先入偏序集，再建 mission 投影）。
+     * 复用已装配的 `sequenceManageController`，不另建第二套序列。
+     */
+    taskSequenceManageController: sequenceManageController,
+    /**
      * ALIGN-01-05（2026-10-28）：主 Agent 单条处理预算（默认 180 秒）+ 超期落库。
      *
      * 落库位置 `<state>/main-agent-turns/<turnId>.json`：只记"本轮做了什么、

@@ -158,6 +158,68 @@ export class TaskSequenceManageController {
     return appendedDocument;
   }
 
+  /**
+   * ALIGN-02-01（2026-10-28）：把一条任务登记进目标次级的**版本化偏序集**
+   * —— 序列不存在则发布首任务，已存在则按锚点插入。
+   *
+   * 幂等：同 `taskId` 已在序列里 ⇒ 直接返回现状（不重复插入、不递增 revision）。
+   * 并发下"读后发布"可能撞上"序列已存在"，此处**如实失败**（不静默重试掩盖竞态）。
+   */
+  async publishOrInsertTask(input: {
+    ownerAgentInstanceId: string;
+    actor: ActorIdentity;
+    sequenceId: string;
+    task: InsertTaskInput["task"];
+    anchor: InsertTaskInput["anchor"];
+  }): Promise<{
+    document: AgentTaskSequenceDocument;
+    taskIdentifier: string;
+    isSequenceCreated: boolean;
+  }> {
+    const existingSequence = await this.store.readSequence(
+      input.ownerAgentInstanceId,
+      input.sequenceId,
+    );
+    if (existingSequence === null) {
+      const document = await this.publishSequence({
+        ownerAgentInstanceId: input.ownerAgentInstanceId,
+        actor: input.actor,
+        sequenceId: input.sequenceId,
+        firstTask: {
+          taskId: input.task.taskId,
+          title: input.task.title,
+          priorityTier: input.task.priorityTier,
+          externalReference: input.task.externalReference,
+        },
+      });
+      return {
+        document,
+        taskIdentifier: input.task.taskId,
+        isSequenceCreated: true,
+      };
+    }
+    if (existingSequence.nodes.some((node) => node.taskId === input.task.taskId)) {
+      return {
+        document: existingSequence,
+        taskIdentifier: input.task.taskId,
+        isSequenceCreated: false,
+      };
+    }
+    const document = await this.insertTask({
+      ownerAgentInstanceId: input.ownerAgentInstanceId,
+      actor: input.actor,
+      sequenceId: input.sequenceId,
+      expectedRevision: existingSequence.revision,
+      task: input.task,
+      anchor: input.anchor,
+    });
+    return {
+      document,
+      taskIdentifier: input.task.taskId,
+      isSequenceCreated: false,
+    };
+  }
+
   /** 插入新任务：可指定直接前驱/后继锚点；环与未知锚点被拒绝。 */
   async insertTask(input: InsertTaskInput): Promise<AgentTaskSequenceDocument> {
     if (input.task.contextPack !== undefined) {

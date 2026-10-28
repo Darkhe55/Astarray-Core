@@ -37,6 +37,16 @@ export interface MissionSummary {
    * 读取方必须当作"未知会话"，**不得用 missionId 顶替**。
    */
   conversationIdentifier?: string;
+  /**
+   * ALIGN-02-01（2026-10-28）：该 mission 所投影的**权威任务序列**标识。
+   *
+   * mission 是"一次任务组执行"，不是可独立调序的权威待办；真正的权威是
+   * 目标次级的版本化偏序集（`sequence-<secondaryAgentInstanceId>`）。
+   * 旧摘要没有该字段 ⇒ 读取方按"无序列投影"处理，**不得用 missionId 顶替**。
+   */
+  taskSequenceIdentifier?: string;
+  /** ALIGN-02-01：序列里承载本次用户原始任务的任务标识（`task-<missionId>`）。 */
+  originalTaskIdentifier?: string;
 }
 
 export interface MissionStatus {
@@ -66,6 +76,10 @@ export interface CreateMissionInput {
   projectIdentifier?: string;
   /** ALIGN-01-01：所属稳定会话标识（可选；缺省则摘要里不写该会话字段）。 */
   conversationIdentifier?: string;
+  /** ALIGN-02-01：所投影的权威任务序列标识（可选）。 */
+  taskSequenceIdentifier?: string;
+  /** ALIGN-02-01：序列中承载用户原始任务的任务标识（可选）。 */
+  originalTaskIdentifier?: string;
 }
 
 export class MissionManager {
@@ -123,6 +137,14 @@ export class MissionManager {
       ...(typeof input.conversationIdentifier === "string" &&
       input.conversationIdentifier.trim().length > 0
         ? { conversationIdentifier: input.conversationIdentifier.trim() }
+        : {}),
+      ...(typeof input.taskSequenceIdentifier === "string" &&
+      input.taskSequenceIdentifier.trim().length > 0
+        ? { taskSequenceIdentifier: input.taskSequenceIdentifier.trim() }
+        : {}),
+      ...(typeof input.originalTaskIdentifier === "string" &&
+      input.originalTaskIdentifier.trim().length > 0
+        ? { originalTaskIdentifier: input.originalTaskIdentifier.trim() }
         : {}),
     };
     await this.summaryWriteMutex.runExclusive(() =>

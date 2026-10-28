@@ -68,6 +68,7 @@ import { MainAgentReportReader } from "./main-agent-report-archive.js";
 import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
+import type { TaskSequenceManageController } from "./task-sequence-controllers.js";
 import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
 import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
 import {
@@ -367,6 +368,15 @@ export interface MainControllerOptions {
   mainAgentTurnProgressPort?: (
     record: MainAgentTurnProgressRecord,
   ) => Promise<void> | void;
+  /**
+   * ALIGN-02-01（2026-10-28）：**权威任务序列控制面**。
+   *
+   * 启用后：用户任务先登记进目标次级的版本化偏序集（序列不存在则发布），
+   * 再创建 mission 作为"这一次任务组执行"的投影；mission 摘要记录
+   * `taskSequenceIdentifier` / `originalTaskIdentifier` 映射。
+   * 缺省 ⇒ 不登记（旧行为），但也就没有权威待办来源。
+   */
+  taskSequenceManageController?: TaskSequenceManageController | null;
   /** B6R-09：次级持续调度循环（生产装配；ready set 派发）。 */
   secondaryDispatchLoop?: SecondaryContinuousDispatchLoop | null;
   /** B6R-09：三级生命周期控制器（阶段持久化/幂等收口）。 */
@@ -421,6 +431,16 @@ export class MainController {
   private readonly mainAgentProposalContract = new MainAgentTaskProposalContract();
   /** ALIGN-01-05：最近一次主 Agent 轮次的记账（只读给 UI；不含模型隐式状态）。 */
   private lastMainAgentTurnProgress: MainAgentTurnProgressRecord | null = null;
+  /** ALIGN-02-01：mission → 权威任务序列/任务 投影映射。 */
+  private readonly missionTaskSequences = new Map<
+    string,
+    {
+      readonly taskSequenceIdentifier: string;
+      readonly taskIdentifier: string;
+      readonly sequenceRevision: number;
+      readonly isSequenceCreated: boolean;
+    }
+  >();
   /** 任务级目标 Agent（GUI 投递目标）：作为该 mission 工具调用主体。 */
   private readonly missionTargetAgentIdentifiers = new Map<string, string>();
 
@@ -437,6 +457,16 @@ export class MainController {
   /** ALIGN-01-05：最近一次主 Agent 轮次记账（只读；未知返回 null）。 */
   getLastMainAgentTurnProgress(): MainAgentTurnProgressRecord | null {
     return this.lastMainAgentTurnProgress;
+  }
+
+  /** ALIGN-02-01：mission → 权威任务序列/任务 的投影映射（只读；未登记返回 null）。 */
+  getMissionTaskSequence(missionId: string): {
+    readonly taskSequenceIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly sequenceRevision: number;
+    readonly isSequenceCreated: boolean;
+  } | null {
+    return this.missionTaskSequences.get(missionId) ?? null;
   }
 
   constructor(private readonly options: MainControllerOptions) {}
@@ -527,6 +557,24 @@ export class MainController {
     if (workWindowDecision !== undefined && !workWindowDecision.isAllowed) {
       throw new DomainError("work-window-resting", workWindowDecision.reason);
     }
+    /**
+     * ALIGN-02-01（2026-10-28）：**先把用户任务登记进权威偏序集，再建 mission 投影**。
+     *
+     * 顺序不可颠倒：序列是权威待办，mission 只是"这一次任务组执行"的投影。
+     * 登记失败（例如序列竞态）⇒ 抛出，**不**留下一个没有权威来源的 mission。
+     *
+     * 只对 **assist** 登记：devolve 由主 Agent 直接调度、没有下级偏序集，
+     * 给它编一条"次级序列"就是把调度方式记错（等 ALIGN-02 统一后再迁移）。
+     */
+    const userTaskSequence =
+      mode === "assist"
+        ? await this.registerUserTaskInSequence({
+            missionId,
+            instructionText: message,
+            secondaryAgentInstanceId:
+              this.resolveSecondaryAgentInstanceIdentifier(missionId),
+          })
+        : null;
     await this.options.missionManager.createMission({
       missionId,
       mode,
@@ -536,6 +584,12 @@ export class MainController {
       ...(conversationIdentity === null
         ? {}
         : { conversationIdentifier: conversationIdentity.conversationIdentifier }),
+      ...(userTaskSequence === null
+        ? {}
+        : {
+            taskSequenceIdentifier: userTaskSequence.taskSequenceIdentifier,
+            originalTaskIdentifier: userTaskSequence.taskIdentifier,
+          }),
     });
     /**
      * ALIGN-01-01：把本次执行登记成该会话下的一次**运行**。
@@ -919,9 +973,63 @@ export class MainController {
     );
   }
 
+  /**
+   * ALIGN-02-01：把用户原始任务登记进目标次级的版本化偏序集。
+   *
+   * - 目标次级标识**与调度器同源**（同一 mission 的调度主体）；
+   * - 来源恒为 `user`、层级 0、保留原指令（截断只影响标题，`externalReference`
+   *   回指 mission，指令原文仍在 mission 摘要里）；
+   * - 匿名（无认证用户）**不登记**：宁可没有序列记录，也不伪造用户来源；
+   * - 未装配序列控制面 ⇒ 返回 null（旧行为），下游按"无权威来源"处理。
+   */
+  private async registerUserTaskInSequence(input: {
+    readonly missionId: string;
+    readonly instructionText: string;
+    readonly secondaryAgentInstanceId: string;
+  }): Promise<{
+    readonly taskSequenceIdentifier: string;
+    readonly taskIdentifier: string;
+  } | null> {
+    const sequenceController = this.options.taskSequenceManageController;
+    if (sequenceController === null || sequenceController === undefined) {
+      return null;
+    }
+    const authenticatedUserId = this.options.authenticatedUserId?.trim();
+    if (authenticatedUserId === undefined || authenticatedUserId === "") {
+      return null;
+    }
+    const taskSequenceIdentifier = `sequence-${input.secondaryAgentInstanceId}`;
+    const taskIdentifier = `task-${input.missionId}`;
+    const trimmedInstruction = input.instructionText.trim();
+    const registration = await sequenceController.publishOrInsertTask({
+      ownerAgentInstanceId: input.secondaryAgentInstanceId,
+      actor: { sourceKind: "user", actorId: authenticatedUserId },
+      sequenceId: taskSequenceIdentifier,
+      task: {
+        taskId: taskIdentifier,
+        title:
+          trimmedInstruction === ""
+            ? "（空指令）"
+            : trimmedInstruction.slice(0, 120),
+        priorityTier: 0,
+        externalReference: `mission:${input.missionId}`,
+      },
+      anchor: { predecessorTaskIds: [], successorTaskIds: [] },
+    });
+    this.missionTaskSequences.set(input.missionId, {
+      taskSequenceIdentifier: registration.document.sequenceId,
+      taskIdentifier: registration.taskIdentifier,
+      sequenceRevision: registration.document.revision,
+      isSequenceCreated: registration.isSequenceCreated,
+    });
+    return {
+      taskSequenceIdentifier: registration.document.sequenceId,
+      taskIdentifier: registration.taskIdentifier,
+    };
+  }
+
   /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */
-  private rememberUserMessageReference(conversationIdentifier: string | null): string {
-    const userMessageReference = `user-message-${randomUUID()}`;
+  private rememberUserMessageReference(conversationIdentifier: string | null): string {    const userMessageReference = `user-message-${randomUUID()}`;
     this.latestUserMessageReferences.set(
       conversationIdentifier ?? "",
       userMessageReference,
