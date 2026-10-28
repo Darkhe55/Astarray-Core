@@ -1,4 +1,26 @@
-# ALIGN 核心返修交接（2026-10-28，60 轮窗口第 1–21 轮）
+# ALIGN 核心返修交接（2026-10-28，60 轮窗口第 1–59 轮；§6 起为第 22–58 轮增量）
+
+> ## 从这里开始（下一位接手者，2026-10-29，第 59 轮）
+>
+> **先跑三条命令**（都在 `astarray/` 下）：
+> ```powershell
+> npm run typecheck
+> npm run lint
+> npm run build
+> ```
+> **先读三个文件**：
+> 1. [WINDOW_SUMMARY_2026-10-29](../reports/WINDOW_SUMMARY_2026-10-29.md) —— 规模、未闭合项、纪律声明；
+> 2. [DEFAULT_SWITCHES_AUDIT_2026-10-29](../reports/DEFAULT_SWITCHES_AUDIT_2026-10-29.md) —— 六个开关的真实缺省与可达性；
+> 3. [STATUS_UPDATE_WIRING_GAPS_2026-10-28](../reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md) —— 哪些组件"只有定义没有调用方"。
+>
+> **当前唯一阻塞卡**：REMOTE-01（平台阻塞）——
+> [REMOTE01_PLATFORM_BLOCK_2026-10-28](../reports/REMOTE01_PLATFORM_BLOCK_2026-10-28.md)。
+>
+> **待产品决策**：`GOAL_MODE_DEFAULT_ENABLED` 死常量二选一 ——
+> [GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29](../reports/GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29.md)（本文 §12）。
+>
+> **本窗口口径**：运行证据 = **0**；所有交付 `implemented-unverified`；
+> 不写/不跑测试；**不得**把任何"代码完成"读成"已验收"。
 
 本文件是 [ALIGN-04](ALIGN04_RECOVERY_AND_STATUS.md) 检查点 06 的交付物：把 ALIGN-01…04
 已做/未做的事**按调用链逐层登记**（接口存在 / 组件存在 / 生产接线 / 代码完成 / 运行证据），
