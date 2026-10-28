@@ -117,6 +117,7 @@ import {
 } from "../orchestration/tertiary-lifecycle.js";
 import { AgentIndividualMemoryStore } from "../orchestration/agent-individual-memory.js";
 import { buildTertiaryLifecycleHooks } from "../orchestration/tertiary-lifecycle-hooks.js";
+import { MissionRelationIndexStore } from "../orchestration/mission-relation-index.js";
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
@@ -1393,6 +1394,15 @@ export async function createApplicationRuntime(
         })
       : undefined;
 
+  /**
+   * ALIGN-04-01（2026-10-28）：mission 关系索引（显式关联落盘 + 重启恢复映射）。
+   *
+   * 只由显式登记写入；重启时 `hydratePersistedMissionRelations()` 只恢复"记录里写过"的
+   * 关联，不按昵称/路径猜测归属。
+   */
+  const missionRelationIndexStore = new MissionRelationIndexStore({
+    baseDirectory: stateDirectory,
+  });
   const controller = new MainController({
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
@@ -1411,6 +1421,8 @@ export async function createApplicationRuntime(
     ...(conversationIdentityStore === null
       ? {}
       : { conversationIdentityStore, mainAgentInstanceId }),
+    /** ALIGN-04-01：关系索引（显式关联落盘；重启恢复映射）。 */
+    missionRelationIndexStore,
     /**
      * ALIGN-02-01（2026-10-28）：权威任务序列控制面（用户任务先入偏序集，再建 mission 投影）。
      * 复用已装配的 `sequenceManageController`，不另建第二套序列。
@@ -1725,6 +1737,20 @@ export async function createApplicationRuntime(
     }
     return summaries;
   };
+
+  /**
+   * ALIGN-04-01（2026-10-28）：启动时从**权威关系索引**恢复 mission 映射。
+   *
+   * 只恢复"记录里明确写过"的关联；失败不阻断启动（索引是辅助恢复），但如实写到 stderr
+   * —— 不静默假装恢复成功。
+   */
+  try {
+    await controller.hydratePersistedMissionRelations();
+  } catch (error) {
+    process.stderr.write(
+      `astarray: 关系索引恢复失败（本次不恢复 mission 映射）: ${(error as Error).message}\n`,
+    );
+  }
 
   return {
     controller,
