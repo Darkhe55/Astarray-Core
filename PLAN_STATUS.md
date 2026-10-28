@@ -176,9 +176,22 @@
 > 同键异内容报 `operation-not-idempotent`（拒绝覆盖）。摘要引用/不自动注入沿用 ALIGN-01-06。
 > **未做**：补送无上限/无退避（每次心跳重试）、积压不可观测、损坏文件无清理；未做实测。
 >
-> **㉓ 下一步**：ALIGN-03-07（三级成功/中断/上下文过长后的关闭与接手复用生命周期控制器，
-> 先保存个体档案再释放进程；移交只附选定档案、不合并兄弟记忆；Git 远端失败是本地保全待同步，
-> 不把本地成功写成推送成功）。
+> **㉔ ALIGN-03-07 部分交付**：生产里的 `TertiaryAgentLifecycleController` 是**空 hooks** 构造的，
+> `runPhase` 在 hook 缺失时记 `none` 并继续 ⇒ 收口"看起来成功"、实际没存档案/没写移交/
+> 没处理 Git 资源；hook 也不带个体标识。现在 hook 收 `agentInstanceId`，并实装
+> `buildTertiaryLifecycleHooks`：检查点读**自己的**档案 revision（无档案 `no-archive`、
+> 损坏照常抛错）、移交文件只含**显式选定**附件哈希且声明 `doesMergeSiblingMemory:false`、
+> Git 资源如实报 `no-git-allocation`、其余阶段不再静默 `none`。
+> **未做**：**没有生产调用方驱动 `shutdown()`**（Worker 为进程内异步任务）、Git 资源端口未装配、
+> 移交读入/接手未实现。
+>
+> **㉕ ALIGN-03 收口说明**：7 个检查点全部推进过，但**全部是"部分交付"** ——
+> 共同原因是"组件与契约齐备、执行侧未消费"（任命/裁决、任务包信包、收据门禁、
+> 审查证据绑定、生命周期收口都没有自动触发点）。这不是新发现，而是 ALIGN-00 基线里
+> "接线缺口"主题的延续；下一步进入 ALIGN-04（恢复与状态纠偏），它正好需要这些持久关系。
+>
+> **㉖ 下一步**：ALIGN-04-01（持久化 project/conversation/agent/sequence/group/mission 的显式关联，
+> 不只存在 `MainController` 的 Map；重启从权威记录恢复映射，不按昵称或路径字符串猜归属）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
