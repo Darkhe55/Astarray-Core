@@ -49,6 +49,11 @@ import {
   type PermissionAskAuthorityPort,
 } from "./orchestration/permission-ask-decision-entry.js";
 import { UsageLedgerStore } from "./orchestration/usage-ledger-store.js";
+import {
+  analyzeLegacyIdentityAssociations,
+  collectLegacyIdentitySnapshot,
+} from "./orchestration/legacy-identity-migration.js";
+import type { LegacyIdentityAudit } from "./orchestration/legacy-identity-migration.js";
 /**
  * USAGE-01-02 预算预留/结算：并发 revision、未知用量保守占用、跨模型分账。
  * 口径（默认，待用户确认）：只限 token 与请求数；金额估价一律"未估算"。
@@ -649,6 +654,11 @@ import type { BackupDeletionAuthorizationControlPort } from "./core/types.js";
 import type { InstallationGateUserPort } from "./tools/installation-gate-guard.js";
 
 export type { BackupDeletionAuthorizationControlPort, InstallationGateUserPort };
+export type {
+  LegacyIdentityAudit,
+  LegacyLinkEvidence,
+  LegacyMissionLink,
+} from "./orchestration/legacy-identity-migration.js";
 import { createApplicationRuntime } from "./application/application-runtime.js";
 import { DomainError } from "./core/errors.js";
 import { resolveContextBudget } from "./orchestration/context-prompt-assembler.js";
@@ -2294,7 +2304,35 @@ export function parseTaskIdempotencyLedgerWithIntegrity(
   return { entries, isCorrupted: false, corruptionReason: null, unusableEntryCount: 0 };
 }
 
-/** 从状态目录加载幂等账目（缺文件/损坏 → 空账目，绝不伪造历史）。 */
+/**
+ * ALIGN-01-07（2026-10-28）：**只读**审计旧身份映射。
+ *
+ * 只根据可核对关联给出"可关联 / 保持独立"的判定，**不迁移、不写盘**：
+ * - 摘要声明了会话但无运行记录 ⇒ 不关联（声明不是证据）；
+ * - 恰好一个会话引用该 mission ⇒ 可关联（`single-run-reference`）；
+ * - 多个会话引用 ⇒ 保持独立并标歧义，不做"挑最近"这类猜测；
+ * - `main:ponder:*` / `scheduler:*` 等每次调用生成的个体**永不合并**。
+ *
+ * 返回 `isMigrationApplied: false`，调用方不得把这份结果当成"已迁移"。
+ */
+export async function auditLegacyIdentityMapping(
+  stateDirectory: string | undefined,
+): Promise<LegacyIdentityAudit> {
+  if (stateDirectory === undefined || stateDirectory === "") {
+    return analyzeLegacyIdentityAssociations({
+      conversations: [],
+      missions: [],
+      agentMemoryIdentifiers: [],
+    });
+  }
+  return analyzeLegacyIdentityAssociations(
+    await collectLegacyIdentitySnapshot({ stateDirectory }),
+  );
+}
+
+/**
+ * 从状态目录加载幂等账目（缺文件/损坏 → 空账目，绝不伪造历史）。
+ */
 export async function loadTaskIdempotencyLedger(
   stateDirectory: string | undefined,
 ): Promise<TaskIdempotencyLedgerEntry[]> {
