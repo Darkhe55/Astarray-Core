@@ -68,6 +68,21 @@ export interface GoalGateState {
   readonly requiresReplanning: boolean;
 }
 
+/** 可持久化的门禁快照（GOAL-02-03；与 `GoalGateState` 的区别是含内部基线）。 */
+export interface GoalGateSnapshot {
+  readonly goalIdentifier: string;
+  readonly contractRevision: number;
+  readonly completedGroupCount: number;
+  readonly checksSinceLastReduction: number;
+  readonly lastPotentialValue: number | null;
+  readonly bestPotentialValue: number | null;
+  readonly isPaused: boolean;
+  readonly pauseReason: string | null;
+  readonly evidenceGaps: readonly string[];
+  readonly consumedToolCalls: number;
+  readonly requiresReplanning: boolean;
+}
+
 export class GoalDispatchGate {
   private completedGroupCount = 0;
   private checksSinceLastReduction = 0;
@@ -80,6 +95,58 @@ export class GoalDispatchGate {
   private requiresReplanning = false;
 
   constructor(private readonly contract: GoalContract) {}
+
+  /** GOAL-02-03：导出可持久化快照（恢复时用它，而不是重算）。 */
+  createSnapshot(): GoalGateSnapshot {
+    return {
+      goalIdentifier: this.contract.goalIdentifier,
+      contractRevision: this.contract.revision,
+      completedGroupCount: this.completedGroupCount,
+      checksSinceLastReduction: this.checksSinceLastReduction,
+      lastPotentialValue: this.lastPotentialValue,
+      bestPotentialValue: this.bestPotentialValue,
+      isPaused: this.isPaused,
+      pauseReason: this.pauseReason,
+      evidenceGaps: [...this.evidenceGaps],
+      consumedToolCalls: this.consumedToolCalls,
+      requiresReplanning: this.requiresReplanning,
+    };
+  }
+
+  /**
+   * GOAL-02-03：从快照恢复。
+   *
+   * 契约 revision 不一致 ⇒ 拒绝恢复（旧目标版本的预算/暂停结论不能套到新版本上）；
+   * **不做任何副作用**，恢复后是否继续由调用方按 `requiresReplanning`/`isPaused` 决定。
+   */
+  static restoreFromSnapshot(
+    contract: GoalContract,
+    snapshot: GoalGateSnapshot,
+  ): GoalDispatchGate {
+    if (snapshot.goalIdentifier !== contract.goalIdentifier) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `快照属于目标 ${snapshot.goalIdentifier}，与当前 ${contract.goalIdentifier} 不一致。`,
+      );
+    }
+    if (snapshot.contractRevision !== contract.revision) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `快照绑定 revision ${snapshot.contractRevision}，当前契约是 ${contract.revision}：不得把旧预算/暂停结论套到新版本。`,
+      );
+    }
+    const gate = new GoalDispatchGate(contract);
+    gate.completedGroupCount = snapshot.completedGroupCount;
+    gate.checksSinceLastReduction = snapshot.checksSinceLastReduction;
+    gate.lastPotentialValue = snapshot.lastPotentialValue;
+    gate.bestPotentialValue = snapshot.bestPotentialValue;
+    gate.isPaused = snapshot.isPaused;
+    gate.pauseReason = snapshot.pauseReason;
+    gate.evidenceGaps = [...snapshot.evidenceGaps];
+    gate.consumedToolCalls = snapshot.consumedToolCalls;
+    gate.requiresReplanning = snapshot.requiresReplanning;
+    return gate;
+  }
 
   getState(): GoalGateState {
     return {
