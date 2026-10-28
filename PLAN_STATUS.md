@@ -201,8 +201,17 @@
 > **未做**：group（任务包）未写入（`createTaskBundle` 无生产调用方）；三级 Worker 个体未补登记；
 > 旧 mission 无关系文件；未跑"写入→重启→恢复→插入被拒"完整链路。
 >
-> **㉖ 下一步**：ALIGN-04-02（恢复先**只读对账**：哪些已完成、哪些租约失效、哪些副作用未知、
-> 哪些等待授权；用户可查看历史但**查看不启动任务**；旧授权不可仅凭恢复档案重用）。
+> **㉖ ALIGN-04-02 部分交付**：`MainController.resumeMission` 此前**从不咨询恢复中心** ——
+> 只要 mission 有未完成任务就重新调度（状态损坏/检查点需对账/租约冲突都不拦）。
+> 新增 `missionRecoveryGate`：`resumeMission` 先经 `RecoveryCenterController.inspectMission`
+> **只读**判定，mission 不存在 / `isCorrupted` / `reconciliationRequired` ⇒
+> `mission-locked` + 全部原因，**不写 running、不启动调度**。历史/恢复视图仍只读
+> （查看不启动任务）；恢复不读取历史批准记录（旧授权不会因恢复被复用）。
+> **未做**：门禁**默认关闭**；只拦**不代替对账**（不执行 Git/worktree/人工改动对账）；
+> 租约冲突未纳入；`reauthorizationRequiredTypes` 未被消费；未跑任何一条拒绝/通过路径。
+>
+> **㉗ 下一步**：ALIGN-04-03（获得现有合法恢复许可后，从未完成且 ready 的节点恢复；
+> 执行恢复租约幂等领取；已产出未回执先对账不盲目重跑；不确定副作用保持待裁决）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
