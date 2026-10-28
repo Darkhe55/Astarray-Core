@@ -336,9 +336,21 @@
 > **未做**：**无不可变存储**（revision 仅进程内递增、重启归零）；`messageIdentifiers` **未生效**；
 > **无授权绑定**；不脱敏（原文摘录，投递前须过 SEC-02-04）；来源粒度粗。
 >
-> **㊶ 下一步**：REMOTE-01-02（远程主体、权限与双步骤：首次绑定由认证用户单独确认账户/设备并返回
-> 明确授权范围；IM 来信不等于认证用户；拆 `prepareEvidenceExport` / `deliverEvidenceExport`，
-> 秘书模型只提案、可信本地控制面渲染/发出）。
+> **㊶ REMOTE-01-02 部分交付**：此前只有默认关闭的秘书契约（纯类型），**没有**远程主体绑定、
+> 入站核验、prepare/deliver 拆分与范围模型。新增 `remote-evidence-export.ts`：
+> ① `RemoteIdentityBinding`（`authenticatedUserId` 而非昵称、设备可为 null、窄 5 类记录类别、
+> 期限、撤销）+ 持久化存储；② `verifyRemoteInboundMessage`（签名→重放→时间戳→账户→期限→设备，
+> 通过给 `account-and-device`/`account-only`）；③ `evaluateRemoteExportScope` 三态
+> （预授权内 / **需独立批准** / 拒绝，**无自批入口**）；④ `prepareEvidenceExport`
+> 由**可信控制面渲染**、`deliverEvidenceExport` 只接受准备产物并**再次复核范围**、
+> **不接受模型文本**；⑤ 只加窄范围允许项。
+> **未做**：**无平台适配器**（`platformSignatureValid` 只是调用方布尔声明，真正 IM 验签未实现）、
+> **无首次绑定流程**（谁有权写绑定未约束）、**无独立短授权通道**、运行时未接线、
+> 投递幂等仅靠端口承诺（属 03）。
+>
+> **㊷ 下一步**：REMOTE-01-03（幂等 outbox 与 unknown 语义：稳定 operation id + interaction revision，
+> 重试读回执；必填字段/格式/长度/内容 hash/目标账户设备/授权 revision 不完整不发送；
+> 没有明确回执一律 unknown；不自动换目标、直接尝试其它账户/公开链接/邮件）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
