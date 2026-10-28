@@ -671,6 +671,42 @@ export interface TaskBundleRecord {
   taskIds: string[];
   status: "prepared" | "active" | "completed" | "failed";
   createdAtIso: string;
+  /**
+   * ALIGN-03-02（2026-10-28）：**派发信包**（权限上限、项目边界、原始要求、
+   * 完成条件、选择性附件、工具说明引用）。
+   *
+   * 语义：`allowedToolNames` 已经是**与上级有效权限求交后**的结果，
+   * `deniedToolNames` 记录被削掉的申请项（如实上报，不进入执行）。
+   * 旧包没有该字段 ⇒ 读取方按"旧格式、无信包"处理，不得凭空补默认权限。
+   */
+  dispatchEnvelope?: TaskBundleDispatchEnvelopeRecord;
+}
+
+/** 任务包派发信包的**持久化形状**（逻辑构造见 `task-bundle-dispatch-envelope.ts`）。 */
+export interface TaskBundleDispatchEnvelopeRecord {
+  readonly allowedToolNames: readonly string[];
+  readonly deniedToolNames: readonly string[];
+  readonly projectBoundary: {
+    readonly projectIdentifier: string;
+    readonly workspaceRootPath: string;
+    readonly isReadOnly: boolean;
+  };
+  readonly originalRequirements: {
+    readonly userTaskReference: string;
+    readonly instructionText: string;
+  };
+  readonly completionConditions: {
+    readonly acceptanceCriteria: string;
+    readonly requiredArtifactIdentifiers: readonly string[];
+  };
+  readonly selectedAttachments: readonly {
+    readonly attachmentIdentifier: string;
+    readonly contentHash: string;
+  }[];
+  readonly toolDocumentationReference: {
+    readonly toolGroupIdentifier: string;
+    readonly toolGroupRevision: number;
+  };
 }
 
 /** 序列变更类型；删除、覆盖、改序、取消和压缩属于破坏性变更。 */

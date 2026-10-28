@@ -398,6 +398,36 @@ export const taskBundleRecordSchema = z.object({
   taskIds: z.array(z.string().min(1)).min(1),
   status: z.enum(["prepared", "active", "completed", "failed"]),
   createdAtIso: z.iso.datetime(),
+  /** ALIGN-03-02：派发信包（可选；旧包没有该字段）。 */
+  dispatchEnvelope: z
+    .object({
+      allowedToolNames: z.array(z.string().min(1)),
+      deniedToolNames: z.array(z.string().min(1)),
+      projectBoundary: z.object({
+        projectIdentifier: z.string().min(1),
+        workspaceRootPath: z.string().min(1),
+        isReadOnly: z.boolean(),
+      }),
+      originalRequirements: z.object({
+        userTaskReference: z.string().min(1),
+        instructionText: z.string().min(1),
+      }),
+      completionConditions: z.object({
+        acceptanceCriteria: z.string().min(1),
+        requiredArtifactIdentifiers: z.array(z.string().min(1)),
+      }),
+      selectedAttachments: z.array(
+        z.object({
+          attachmentIdentifier: z.string().min(1),
+          contentHash: z.string().min(1),
+        }),
+      ),
+      toolDocumentationReference: z.object({
+        toolGroupIdentifier: z.string().min(1),
+        toolGroupRevision: z.number().int().min(1),
+      }),
+    })
+    .optional(),
 });
 
 export const taskSequenceAuditEntrySchema = z.object({

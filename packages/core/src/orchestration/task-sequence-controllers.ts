@@ -15,6 +15,7 @@ import type {
   AgentTaskNode,
   AgentTaskSequenceDocument,
   AgentTaskSequenceSnapshot,
+  TaskBundleDispatchEnvelopeRecord,
   TaskSourceKind,
 } from "../core/types.js";
 import type { AgentTaskSequenceStore } from "./agent-task-sequence-store.js";
@@ -83,6 +84,8 @@ export interface CreateTaskBundleInput {
   taskIds: string[];
   boundAgentInstanceId: string;
   requestedPriorityTier: number | null;
+  /** ALIGN-03-02：派发信包（已与上级权限求交；可选）。 */
+  dispatchEnvelope?: TaskBundleDispatchEnvelopeRecord;
 }
 
 export interface CancelTaskInput {
@@ -474,6 +477,9 @@ export class TaskSequenceManageController {
           taskIds: input.taskIds,
           boundAgentInstanceId: input.boundAgentInstanceId,
           requestedPriorityTier: input.requestedPriorityTier,
+          ...(input.dispatchEnvelope === undefined
+            ? {}
+            : { dispatchEnvelope: input.dispatchEnvelope }),
         });
         return {
           ...this.withNextRevision(sequence, sequence.nodes),
