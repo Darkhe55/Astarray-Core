@@ -70,9 +70,15 @@
 > 输出 `isMigrationApplied:false`；**没有写回、没有 CLI、没有在真实旧目录上跑过**。
 > ⇒ ALIGN-01 七个检查点中 6 个已交付、01-04 部分交付（直投消费者留待 ALIGN-02-01）。
 >
-> **⑩ 下一步**：进入 **ALIGN-02**（统一偏序调度主干）：先 02-01（任务序列成为权威来源 +
-> 序列生命周期），再 02-05（替换 `dispatchChain` 恒 false / 占用恒 0），
-> 顺带接上 01-04 遗留的直投消费者。
+> **⑩ ALIGN-02-01 交付**：`publishSequence` 此前**全仓零调用**，mission 是唯一待办。
+> 现在 assist 收到用户消息时先 `publishOrInsertTask` 登记进目标次级的版本化偏序集
+> （来源 user、层级 0、`externalReference=mission:<id>`，同 taskId 幂等，竞态如实失败），
+> 成功后才建 mission，摘要落 `taskSequenceIdentifier` + `originalTaskIdentifier`，
+> 另有 `getMissionTaskSequence` 只读查询。**只接 assist**；devolve 无下级偏序集不编造序列。
+> 调度器**尚未消费** ready set（02-03/05），默认执行仍是固定 T-001（02-02）。
+>
+> **⑪ 下一步**：ALIGN-02-02（默认执行不再用固定 T-001：次级读取目标与项目摘要，
+> 形成带依赖的执行节点，经本地 schema/循环/优先级校验后提交）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
