@@ -144,16 +144,26 @@ export interface SensitiveContentDlpScanner {
     content: string;
     sourceName: string;
   }): Promise<SensitiveResourceMatch>;
+  /**
+   * SEC-02-01（2026-10-28）：**四态扫描**（clean/sensitive/incomplete/error）。
+   *
+   * 可选以兼容既有自定义扫描器；装配的内置扫描器**总是**实现它，
+   * 策略层优先使用（只有 `clean` 放行，`incomplete`/`error` 一律按不可读处理）。
+   */
+  scanTextContentDetailed?(input: {
+    content: string;
+    sourceName: string;
+  }): Promise<SensitiveScanResult>;
 }
 
-/** 内置凭据内容模式（DLP）：正常文件名但内容疑似密钥。 */
-const DEFAULT_DLP_PATTERNS: Array<{ category: string; pattern: RegExp }> = [
-  { category: "api-key", pattern: /["']?(api[_-]?key|access[_-]?key|token|secret)["']?\s*[=:]\s*["']?[A-Za-z0-9_\-./]{16,}/i },
-  { category: "aws-credential", pattern: /AKIA[0-9A-Z]{16}/ },
-  { category: "private-key", pattern: /BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY|BEGIN PGP PRIVATE KEY BLOCK/ },
-  { category: "github-token", pattern: /(ghp|gho|ghu|ghs)_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9]{16,}/ },
-  { category: "connection-string", pattern: /(postgres|mysql|mongodb|redis|amqp)\+?s?:\/\/[^\s:@]+:[^\s:@]+@/ },
-];
+import {
+  DEFAULT_SENSITIVE_SCAN_LIMITS,
+  scanSensitiveContent,
+} from "./sensitive-content-scan-contract.js";
+import type {
+  SensitiveScanLimits,
+  SensitiveScanResult,
+} from "./sensitive-content-scan-contract.js";
 
 /**
  * 内置文件名规则（ADR-0018 列举项；大小写不敏感，含扩展名规则）。
@@ -266,14 +276,36 @@ export class SensitiveContentAccessPolicy {
       throw this.buildDenial(pathMatch.category);
     }
     if (input.content !== undefined) {
-      const contentMatch = await this.dlpScanner.scanTextContent({
+      /**
+       * SEC-02-01：优先用**四态**扫描；只有 `clean` 放行。
+       * `incomplete`/`error` 与 `sensitive` 同样拒绝 —— "没扫完"不是"安全"。
+       */
+      const detailedResult = await this.dlpScanner.scanTextContentDetailed?.({
         content: input.content,
         sourceName: input.canonicalPath,
       });
-      if (contentMatch.isSensitive) {
-        throw this.buildDenial(
-          contentMatch.matchedRuleCategory ?? "dlp:unknown",
-        );
+      if (detailedResult !== undefined) {
+        if (detailedResult.outcome !== "clean") {
+          const category =
+            detailedResult.matchedRuleIdentifiers[0] ??
+            (detailedResult.outcome === "incomplete"
+              ? "dlp:scan-incomplete"
+              : detailedResult.outcome === "error"
+                ? "dlp:scan-error"
+                : "dlp:unknown");
+          throw this.buildDenial(category);
+        }
+      } else {
+        /** 兼容：旧扫描器只有布尔结果；仍按"命中即拒"处理。 */
+        const contentMatch = await this.dlpScanner.scanTextContent({
+          content: input.content,
+          sourceName: input.canonicalPath,
+        });
+        if (contentMatch.isSensitive) {
+          throw this.buildDenial(
+            contentMatch.matchedRuleCategory ?? "dlp:unknown",
+          );
+        }
       }
     }
   }
@@ -297,23 +329,48 @@ export class SensitiveContentAccessPolicy {
   }
 }
 
-/** 默认本地可信 DLP 扫描器：有界内容扫描，命中返回类别。 */
+/** 默认本地可信 DLP 扫描器：按 UTF-8 字节分块扫描（SEC-02-01 四态契约）。 */
 export class DefaultDlpScanner implements SensitiveContentDlpScanner {
-  private static readonly MAX_SCAN_BYTES = 256 * 1024;
+  private readonly limits: SensitiveScanLimits;
 
+  constructor(options: { limits?: SensitiveScanLimits } = {}) {
+    this.limits = { ...DEFAULT_SENSITIVE_SCAN_LIMITS, ...options.limits };
+  }
+
+  /**
+   * 四态扫描：`clean | sensitive | incomplete | error`。
+   *
+   * **不再**用 `slice(0, 256 * 1024)`：旧实现按 UTF-16 code units 截断且尾部未扫仍返回
+   * `isSensitive:false`（"没扫到"被当成"安全"）。现在超限/超时/解码失败一律 `incomplete`/`error`。
+   */
+  async scanTextContentDetailed(input: {
+    content: string;
+    sourceName: string;
+  }): Promise<SensitiveScanResult> {
+    void input.sourceName;
+    return scanSensitiveContent({ content: input.content, limits: this.limits });
+  }
+
+  /**
+   * 旧接口兼容：把四态折叠成布尔，但**失败方向保守** ——
+   * `incomplete`/`error` 一律报 `isSensitive:true`（旧调用方不会因"没扫完"被放行）。
+   */
   async scanTextContent(input: {
     content: string;
     sourceName: string;
   }): Promise<SensitiveResourceMatch> {
-    void input.sourceName;
-    const boundedContent = input.content.slice(
-      0,
-      DefaultDlpScanner.MAX_SCAN_BYTES,
-    );
-    for (const rule of DEFAULT_DLP_PATTERNS) {
-      if (rule.pattern.test(boundedContent)) {
-        return { matchedRuleCategory: `dlp:${rule.category}`, isSensitive: true };
-      }
+    const result = await this.scanTextContentDetailed(input);
+    if (result.outcome === "sensitive") {
+      return {
+        matchedRuleCategory: result.matchedRuleIdentifiers[0] ?? "dlp:unknown",
+        isSensitive: true,
+      };
+    }
+    if (result.outcome === "incomplete") {
+      return { matchedRuleCategory: "dlp:scan-incomplete", isSensitive: true };
+    }
+    if (result.outcome === "error") {
+      return { matchedRuleCategory: "dlp:scan-error", isSensitive: true };
     }
     return { matchedRuleCategory: null, isSensitive: false };
   }

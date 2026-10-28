@@ -253,9 +253,19 @@
 > ③`SecondaryContinuousDispatchLoop` 是第二套调度器、从未被调用。
 > **结论**：26 个检查点**没有一个有运行证据**（本窗口不写/不跑测试）。
 >
-> **㉝ 下一步**：转入 **SEC-02**（本地敏感扫描完整性与外发边界）。它是 REMOTE-01 的前驱，
-> 也是胶囊回访"敏感命中即丢弃"能换成真实 DLP 策略的前提。
-> 若用户希望先解 ALIGN 的结构性缺口（合并两套记账），应优先于 SEC-02。
+> **㉝ SEC-02-01 部分交付**：`DefaultDlpScanner` 旧实现用 `content.slice(0, 256 * 1024)`
+> （常量写 BYTES、实际是 **UTF-16 code units**），**尾部未扫仍返回"安全"**，且结果没有
+> 规则版本/范围/字节数/限制原因。新增 `sensitive-content-scan-contract.ts`：
+> **四态** `clean/sensitive/incomplete/error`（**只有 clean 可继续**）、UTF-8 字节计量、
+> 流式 `TextDecoder(fatal)`、超字节/时限 ⇒ `incomplete` + "已扫 N/M 字节"、
+> 跨块用**有界 carry（≤8 KiB）** 覆盖多行私钥/长 token、结果自描述（版本/字节/原因/命中规则）。
+> 策略层优先走四态；旧布尔接口把 `incomplete`/`error` 折叠为"敏感"（保守）。
+> **未做**：规则覆盖仍最小集（**裸 `sk-` 与 redaction 差异未消除**）、通道矩阵、外发门禁、
+> 流式有界隔离缓冲；未跑任何扫描路径。
+>
+> **㉞ 下一步**：SEC-02-02（版本化检测器注册表：**阻断模型读取**与**日志掩码**两套策略分开；
+> 覆盖厂商格式/Authorization/Cookie/GitHub 新旧 token/多行与加密私钥/连接串/结构化敏感字段；
+> 只用人工构造假凭据）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
