@@ -78,6 +78,9 @@ import type {
 } from "./remote-evidence-snapshot.js";
 import type { ContextRecallController } from "./context-recall-controller.js";
 import type { ContextRecallResult } from "./context-recall-controller.js";
+import type { ActorIdentity, TaskSequenceStatusController } from "./task-sequence-controllers.js";
+import { TaskLedgerBridge } from "./task-ledger-bridge.js";
+import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
 import type { WorkWindowResumeDecision } from "./work-window-resume.js";
 import {
@@ -442,6 +445,13 @@ export interface MainControllerOptions {
   contextRecallControllerFactory?: (
     callerAgentInstanceId: string,
   ) => ContextRecallController;
+  /**
+   * 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面。
+   *
+   * 与 `taskSequenceManageController` **共享同一 store 实例**（同一份序列文件）；
+   * 用于两套记账对照（`inspectTaskLedgerAlignment`），不改变任何状态。
+   */
+  taskSequenceStatusController?: TaskSequenceStatusController | null;
   /**
    * ALIGN-02-06（2026-10-28）：运行中插入的**安全点注入端口**（可选）。
    *
@@ -1907,6 +1917,38 @@ export class MainController {
       capturedAtIso: new Date().toISOString(),
       additionalReasonCodes: [...new Set(additionalReasonCodes)],
     });
+  }
+
+  /**
+   * 接线缺口第 ① 项（2026-10-28）：**两套记账的只读对照**。
+   *
+   * 权威任务序列 vs mission 任务链：返回只在某一边的任务、状态不一致、ready 集合，
+   * 并如实列出**当前不具备**的能力（按 taskId 派发/运行中插入/图变更）。
+   * 只读：不改状态、不派发、不推进 revision。
+   */
+  async inspectTaskLedgerAlignment(input: {
+    readonly missionIdentifier: string;
+    readonly ownerAgentInstanceId: string;
+    readonly sequenceId: string;
+    readonly viewer: ActorIdentity;
+  }): Promise<TaskLedgerAlignmentReport> {
+    const statusController = this.options.taskSequenceStatusController;
+    if (statusController === null || statusController === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "任务序列状态控制面未装配：无法对照两套记账（不伪造一致）。",
+      );
+    }
+    const bridge = new TaskLedgerBridge({
+      sequenceLedger: {
+        getSnapshot: (snapshotInput) => statusController.getSnapshot(snapshotInput),
+      },
+      missionTaskChain: {
+        getMissionStatus: (missionIdentifier) =>
+          this.options.missionManager.getMissionStatus(missionIdentifier),
+      },
+    });
+    return bridge.inspectAlignment(input);
   }
 
   /** ALIGN-01-03：生成并记住本次用户消息引用（harness 侧，模型不可填）。 */
