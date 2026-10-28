@@ -1,5 +1,7 @@
 # Astarray TUI 实施流程
 
+> 2026-10-17 增补：[RELOCATE-01 冷启动项目重新关联](docs/tasks/RELOCATE01_COLD_START_PROJECT_RELINK_TASK_CARD.md)（pending）。项目身份与路径分离；确认新位置后先只读对账再恢复，不改写历史原文，不自动归档。工作中迁移明确留待后续讨论。
+
 > 2026-10-10 增补：[MERGE-01 / NODECTX-01](docs/tasks/MERGE01_NODECTX01_TASK_CARDS.md)（pending）。智能合并保留逐指令身份及授权；设置支持统一工具授权与参数细分总/逐工具开关。全面禁用有损上下文压缩，采用原文落盘、临时/永久节点关闭及窗口释放后自动补回；总结为独立辅助资料，不替换原文。旧“压缩”措辞若指有损上下文替代，以新卡为准，无损归档不受影响。计划状态修改必须执行，明确授权见 §8.4。
 
 > 2026-09-13增补：[摘要与运行中引导任务组](docs/tasks/SESSION_SUMMARY_AND_STEERING_TASK_CARDS.md)按SUM-01 → SUM-02 → GUIDE-01 → EVENT-01推进，依赖现有应用、上下文和恢复接线。摘要总长度由对话规模动态调整，无固定硬上限；单次读取与模型注入预算独立。四组目前pending，现有在途返修先收口，完成后增量回归E2E-01。
@@ -1702,7 +1704,7 @@ PLAN_STATUS.md。运行该批全部验收命令；未通过时不要开始 Batch
 
 现有 T07C 只处理模型/Provider 目录、允许列表、任务类型预设和切换策略，不能替代厂商协议适配、真实流式传输、CLI/TUI 装配、公开 SDK 和真实工作辅助闭环。新增高风险任务 `T07D`，详细任务卡为：
 
-- `docs/tasks/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md`
+- `docs/tasks/accepted/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md`
 
 T07D 必须补齐：
 
@@ -1727,9 +1729,9 @@ T07D 每轮只执行一个检查点，每个检查点预计不超过 3 小时；
 
 新增三项彼此独立的高风险任务：
 
-- `T05D`：人工与 Agent 并行编码、陈旧写入拒绝、文本/契约/行为冲突协调及次级受控合并。任务卡：`docs/tasks/T05D_HUMAN_AGENT_CONCURRENT_CHANGE_TASK_CARD.md`。
-- `T07E`：每个具体 Agent默认10个项目内容文件的活动工作集预算，同时限制字节/token，支持侦察拆分和范围化扩展。任务卡：`docs/tasks/T07E_AGENT_WORKING_SET_READ_BUDGET_TASK_CARD.md`。
-- `T12A`：统一检查点、启动只读对账、未知副作用阻塞、Agent身份/handoff、反馈、Provider、Git和读取预算恢复。任务卡：`docs/tasks/T12A_SESSION_RECOVERY_RECONCILIATION_TASK_CARD.md`。
+- `T05D`：人工与 Agent 并行编码、陈旧写入拒绝、文本/契约/行为冲突协调及次级受控合并。任务卡：`docs/tasks/accepted/T05D_HUMAN_AGENT_CONCURRENT_CHANGE_TASK_CARD.md`。
+- `T07E`：每个具体 Agent默认10个项目内容文件的活动工作集预算，同时限制字节/token，支持侦察拆分和范围化扩展。任务卡：`docs/tasks/accepted/T07E_AGENT_WORKING_SET_READ_BUDGET_TASK_CARD.md`。
+- `T12A`：统一检查点、启动只读对账、未知副作用阻塞、Agent身份/handoff、反馈、Provider、Git和读取预算恢复。任务卡：`docs/tasks/accepted/T12A_SESSION_RECOVERY_RECONCILIATION_TASK_CARD.md`。
 
 有效依赖偏序更新为：
 
@@ -1752,7 +1754,7 @@ T08C ─┬→ T08D → T07C ───────────┐
 
 ## 15. 2026-09-09 全局决策与局部上下文关闭增补
 
-新增高风险任务 `T09A`：把历史上下文拆分为版本化全局决策和每个具体 Agent 独占的局部上下文偏序图；通过本地闭包、关闭胶囊和结构化回访减少重复提示词，同时支持 Assist 阻塞验收与 Devolve 延迟人工核验。完整任务卡：`docs/tasks/T09A_CONTEXT_NODE_CLOSURE_AND_RECALL_TASK_CARD.md`。
+新增高风险任务 `T09A`：把历史上下文拆分为版本化全局决策和每个具体 Agent 独占的局部上下文偏序图；通过本地闭包、关闭胶囊和结构化回访减少重复提示词，同时支持 Assist 阻塞验收与 Devolve 延迟人工核验。完整任务卡：`docs/tasks/accepted/T09A_CONTEXT_NODE_CLOSURE_AND_RECALL_TASK_CARD.md`。
 
 冻结边界：
 
