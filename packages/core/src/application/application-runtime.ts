@@ -128,6 +128,7 @@ import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registr
 import type { MissionRuntimeLease } from "../orchestration/mission-runtime-registry.js";
 import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
+import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
 import { evaluateWorkWindowState } from "../orchestration/work-window-contract.js";
@@ -216,6 +217,8 @@ export interface ApplicationRuntime {
    * 默认不启动；需要 `isWorkWindowResumeMonitorEnabled` 显式开启。
    */
   workWindowTransitionMonitor: WorkWindowTransitionMonitor;
+  /** 清单第 ① 项收尾：两套记账差异历史（只读诊断）。 */
+  taskLedgerDivergenceJournal: TaskLedgerDivergenceJournal;
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
   toolPackageZipInstaller: ToolPackageZipInstaller;
@@ -854,6 +857,10 @@ export async function createApplicationRuntime(
   const missionRuntimeRegistry = new MissionRuntimeRegistry();
   const artifactRecordStore = new ArtifactRecordStore({ baseDirectory: stateDirectory });
   const projectWorkWindowStore = new ProjectWorkWindowStore({ baseDirectory: stateDirectory });
+  /** 清单第 ① 项收尾：两套记账差异历史（只读诊断；只记录不修复）。 */
+  const taskLedgerDivergenceJournal = new TaskLedgerDivergenceJournal({
+    baseDirectory: stateDirectory,
+  });
   /**
    * 接线缺口第 ④ 项（2026-10-28）：**时段变化检测器**。
    *
@@ -1578,6 +1585,7 @@ export async function createApplicationRuntime(
     taskSequenceManageController: sequenceManageController,
     /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
     taskSequenceStatusController: sequenceStatusController,
+    taskLedgerDivergenceJournal,
     /**
      * 清单第 ① 项下半场（2026-10-28）：**运行中插入的真实注入端口**。
      *
@@ -1945,6 +1953,7 @@ export async function createApplicationRuntime(
     artifactRecordStore,
     projectWorkWindowStore,
     workWindowTransitionMonitor,
+    taskLedgerDivergenceJournal,
     experimentSettingsStore,
     toolPackageLifecycleService,
     toolPackageZipInstaller,
