@@ -44,6 +44,12 @@ export class RegisteredAgentDirectory {
     return this.entriesByAgentId.has(agentInstanceId);
   }
 
+  /** 读取登记项（只读副本；未知返回 null）。 */
+  getAgentEntry(agentInstanceId: string): RegisteredAgentEntry | null {
+    const entry = this.entriesByAgentId.get(agentInstanceId);
+    return entry === undefined ? null : { ...entry };
+  }
+
   /** 登记校验（Agent 与所属/mission/任务包匹配）。 */
   verifyReportSource(input: {
     reportingAgentInstanceId: string;
