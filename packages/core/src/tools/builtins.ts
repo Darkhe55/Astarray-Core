@@ -1295,7 +1295,29 @@ async function searchProjectText(
       if (content.includes("\u0000")) {
         continue; // 二进制文件
       }
-      // T06C：名称正常但内容疑似凭据 → 丢弃整行结果
+      /**
+       * SEC-02-06（2026-10-28）：**检索命中也要做内容检查**。
+       *
+       * 旧实现只跳过敏感**文件名**，命中行直接返回 200 字符 —— 名称正常但内容含凭据的
+       * 文件会把秘密送给模型（注释声称会丢弃，实际没有调用）。这里对整份文件内容做一次
+       * 四态扫描；非 clean（命中/未完成/失败）⇒ **整文件跳过**，不返回任何一行。
+       */
+      if (sensitiveContentPolicy !== null) {
+        try {
+          await sensitiveContentPolicy.assertSensitiveContentReadAllowed({
+            canonicalPath: resolvedPath,
+            content,
+          });
+        } catch (error) {
+          if (
+            error instanceof DomainError &&
+            error.errorCode === "sensitive-content-read-denied"
+          ) {
+            continue;
+          }
+          throw error;
+        }
+      }
       const lines = content.split("\n");
       for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
         const line = lines[lineIndex]!;
