@@ -40,7 +40,7 @@
 
 ## 5. 未做（如实）
 
-- 两个缺口**本轮只记录、未修复**（修 `isReviewRequiredForMerge` 装配属新的代码检查点；
+- 缺口 ②（审查者开关）与同源硬编码已分别于第 54/55 轮修复（ADR-0090/0091）；缺口 ①（死常量）**仍只记录、未修复**（修 `isReviewRequiredForMerge` 装配属新的代码检查点；
   让常量真正生效需要改 `resolveGoalModeActivation` 的语义，需产品确认）。
 - 未运行任何代码；未验证"打开开关后的真实行为"。
 - 与共享总表 `docs/reports/TASKCARD_BACKLOG_2026-10-17.md` §11 **未同步**。
