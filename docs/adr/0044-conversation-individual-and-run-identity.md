@@ -67,15 +67,26 @@ mission 也可以被同一 run 覆盖（重放时同一 mission 返回同一 run
    └─ 透传 mainAgentInstanceId（state-dir 派生，跨重启稳定）
 ```
 
-## 6. 未完成（明确不算本 ADR 已交付）
+## 6. ponder 路径（ALIGN-01-02，2026-10-28 追加）
 
-- **ponder 个体复用**（ALIGN-01-02）：`respondInPonderMode` 仍在生成 `main:ponder:<随机>`，
-  尚未改为“一次会话选择既有主个体、新调用只新建 run”。
+`MainController.respondInPonderMode` 不再每次生成 `main:ponder:<随机>`：
+
+1. 有会话映射 ⇒ 用该会话**登记过的**主个体（不按角色名猜、不新建）；
+2. 无映射但装配层给了稳定 `mainAgentInstanceId` ⇒ 用它；
+3. 两者都没有 ⇒ 才退回本次调用临时 id（旧行为，且明确是兜底而非默认）。
+
+每次 ponder 调用都会登记一条**无 mission 的 run**（`beginRun` 不传 `missionIdentifier`），
+因此“持续追问”表现为同一会话、同一主个体、多条 run —— 这正是 ALIGN-01 要求的
+“一次会话选择既有主个体，新调用仅新建 run”。
+
+## 7. 未完成（明确不算本 ADR 已交付）
+
 - **主 Agent 提案控制面**（ALIGN-01-03/04）与**报告索引来源**（ALIGN-01-06）尚未接到本映射。
 - **重启恢复**（ALIGN-04-01/02）尚未消费该映射做对账。
 - 显式直投路径尚未写入同一会话，仍是独立入口。
+- 旧身份映射的迁移规则（ALIGN-01-07）尚未实现（只保证新链路不再造随机个体）。
 
-## 7. 验证状态
+## 8. 验证状态
 
 **implemented-unverified**。本检查点按任务卡口径**未编写/未运行测试**，也未做人工验收。
 已执行且通过的只有编译/静态门禁：`npm run typecheck`（exit 0）、

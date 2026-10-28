@@ -443,23 +443,29 @@ export class MainController {
       readonly conversationIdentifier?: string;
     },
   ): Promise<string> {
-    const mode = this.options.modeMachine.getCurrentMode();
-    if (mode === "ponder") {
-      await this.respondInPonderMode(message);
-      return "ponder";
-    }
-    const missionId = `mission-${randomUUID().slice(0, 8)}`;
-    const taskNodes = this.decomposePromptForScriptedRun(message);
     /**
-     * GUI-02-03（2026-11-08）：把**所属项目**写进 mission 摘要，
-     * 使历史视图能呈现卡内点名的"项目"字段。
-     * 取值与范围判定同源（`registeredProjectRoots[0]`），**不臆造**新概念。
+     * ALIGN-01-02：**项目归属在被任何模式消费之前解析**。
+     *
+     * ponder 也要绑定会话与个体（否则每次追问都换一个"主个体"，记忆无处归属），
+     * 所以这里不能像之前那样只服务于 mission 分支。
      */
     const requestedProjectIdentifier = options?.projectIdentifier?.trim();
     const projectIdentifier =
       requestedProjectIdentifier !== undefined && requestedProjectIdentifier !== ""
         ? requestedProjectIdentifier
         : this.options.registeredProjectRoots?.[0]?.projectIdentifier;
+    const mode = this.options.modeMachine.getCurrentMode();
+    if (mode === "ponder") {
+      await this.respondInPonderMode(message, {
+        projectIdentifier,
+        ...(options?.conversationIdentifier === undefined
+          ? {}
+          : { requestedConversationIdentifier: options.conversationIdentifier }),
+      });
+      return "ponder";
+    }
+    const missionId = `mission-${randomUUID().slice(0, 8)}`;
+    const taskNodes = this.decomposePromptForScriptedRun(message);
     const requestedTargetAgentInstanceIdentifier =
       options?.targetAgentInstanceIdentifier?.trim();
     /**
@@ -1071,7 +1077,10 @@ export class MainController {
   private async resolveConversationIdentityForMission(
     projectIdentifier: string | undefined,
     input: { readonly requestedConversationIdentifier?: string },
-  ): Promise<{ readonly conversationIdentifier: string } | null> {
+  ): Promise<{
+    readonly conversationIdentifier: string;
+    readonly mainAgentInstanceIdentifier: string;
+  } | null> {
     const store = this.options.conversationIdentityStore;
     if (store === null || store === undefined) {
       return null;
@@ -1094,11 +1103,45 @@ export class MainController {
         ? {}
         : { mainAgentInstanceIdentifier: this.options.mainAgentInstanceId }),
     });
-    return { conversationIdentifier: record.conversationIdentifier };
+    return {
+      conversationIdentifier: record.conversationIdentifier,
+      mainAgentInstanceIdentifier: record.mainAgentInstanceIdentifier,
+    };
   }
 
-  private async respondInPonderMode(message: string): Promise<void> {
-    const agentInstanceId = `main:ponder:${randomUUID().slice(0, 8)}`;
+  private async respondInPonderMode(
+    message: string,
+    identityInput: {
+      readonly projectIdentifier?: string | undefined;
+      readonly requestedConversationIdentifier?: string;
+    } = {},
+  ): Promise<void> {
+    /**
+     * ALIGN-01-02（2026-10-28）：**一次会话选择既有主个体，新调用只新建 run**。
+     *
+     * 旧行为是每次 `main:ponder:<随机>` ⇒ 个体每次不同、记忆无处归属。
+     * 现在的顺序：
+     *   1. 有会话映射 ⇒ 用该会话登记过的**主个体**（不按角色名猜、不新建）；
+     *   2. 没有映射但装配层给了稳定主个体 ⇒ 用它；
+     *   3. 只有在两者都没有时，才退回"本次调用临时 id"（并如实保留旧行为）。
+     * 每次调用都登记一条 **无 mission 的 run**：run 与 mission 正交。
+     */
+    const conversationIdentity = await this.resolveConversationIdentityForMission(
+      identityInput.projectIdentifier,
+      identityInput.requestedConversationIdentifier === undefined
+        ? {}
+        : { requestedConversationIdentifier: identityInput.requestedConversationIdentifier },
+    );
+    const agentInstanceId =
+      conversationIdentity?.mainAgentInstanceIdentifier ??
+      this.options.mainAgentInstanceId ??
+      `main:ponder:${randomUUID().slice(0, 8)}`;
+    if (conversationIdentity !== null) {
+      await this.options.conversationIdentityStore?.beginRun({
+        conversationIdentifier: conversationIdentity.conversationIdentifier,
+        agentInstanceIdentifier: agentInstanceId,
+      });
+    }
     const runtime = this.options.mainRuntimeFactory(agentInstanceId);
     // T06B/ADR-0014：思索模式允许本地只读白名单工具（查看项目文件、检索文本、只读任务状态），
     // 其余工具不暴露；即便模型凭空构造调用，也由本地权限裁决与策略引擎 fail-closed。
