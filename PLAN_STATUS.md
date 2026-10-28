@@ -127,8 +127,17 @@
 > mission 一致；证据全为自报前缀即拒绝；裁决者等于实现/测试者亦拒绝（纵深防御）。
 > **编排仍未强制**：任务 done 的完成门禁不要求存在独立验收裁决（属 03-02/03-03）。
 >
-> **⑰ 下一步**：ALIGN-03-02（任务包携带工具权限上限、项目边界、原始要求、完成条件与
-> 选择性附件；子权限与上级有效权限求交；工具首次说明/后续回访复用既有协议）。
+> **⑰ ALIGN-03-02 部分交付**：`TaskBundleRecord` 此前只有 id/绑定/revision/tasks/status，
+> 卡内六项（工具权限上限、项目边界、原始要求、完成条件、选择性附件、工具说明引用）**全无**。
+> 新增 `task-bundle-dispatch-envelope.ts`：严格白名单（**禁止**携带
+> `toolDescriptors/availableTools/toolLibrary/fullDocumentation/toolSchemas`）、
+> **权限只求交不放大**（超出项进 `deniedToolNames` 如实上报，求交为空即拒绝）、
+> 附件必须带内容哈希、工具说明只引用 `{groupId, revision}` 交给既有注入器。
+> 信包随 `TaskBundleRecord.dispatchEnvelope` 落盘（schema 校验），快照可读。
+> **执行侧尚未消费**（orchestrator/worker 派发仍用原工具端口），`createTaskBundle` 仍无生产调用方。
+>
+> **⑱ 下一步**：ALIGN-03-03（真实工具结果/产物记录/完成标识进入本地完成门禁；失败/中断只报原因，
+> 不伪造 done；早停从检查点有界续跑，不拿下一组掩盖未完成组）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

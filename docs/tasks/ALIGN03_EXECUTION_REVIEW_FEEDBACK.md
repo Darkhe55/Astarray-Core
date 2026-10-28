@@ -1,6 +1,6 @@
 # ALIGN-03：下级执行、次级审查集成与报告闭环
 
-日期：2026-10-27。状态：in_progress（01 部分交付 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–02 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -41,5 +41,26 @@
 **未做（如实）**：**编排未强制** —— 任务 `done` 的完成门禁没有要求"存在独立验收裁决"，
 不任命/不裁决仍可能被判完成（属 03-02/03-03）；三个入口无自动调用方；四级委派规则未改；
 证据前缀是约定而非封闭集合；未跑任何一条拒绝/通过路径。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 02 任务包派发信包（权限求交/边界/工具说明引用）——**部分交付**（2026-10-28）
+
+**审查发现**：`TaskBundleRecord` 只有 `bundleId/boundAgentInstanceId/sequenceRevision/taskIds/status`，
+卡内点名的六项（工具权限上限、项目边界、原始要求、完成条件、选择性附件、工具说明引用）**全无**；
+`createTaskBundle` 不接收权限上限/边界；工具说明协议（initial-full / reminder / delta）虽已完备，
+但任务包与它**没有任何引用关系**。
+
+**交付**：
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 信包构造 | `packages/core/src/orchestration/task-bundle-dispatch-envelope.ts` | 严格白名单；禁止 `toolDescriptors/availableTools/toolLibrary/fullDocumentation/toolSchemas`；六项校验；附件必须 `attachmentIdentifier + contentHash` |
+| 权限求交 | 同文件 `intersectToolPermissionCeiling` | `allowed = 请求 ∩ 上级`；超出项进 `deniedToolNames` 如实上报；求交为空即拒绝 |
+| 持久化 | `core/types.ts` + `core/schemas.ts` + `task-bundle-planner.ts` + `task-sequence-controllers.ts` | `TaskBundleRecord.dispatchEnvelope`（可选、schema 校验、随包落盘） |
+| 读取 | `TaskSequenceStatusController.getSnapshot().bundles` | 信包随包返回（已含） |
+
+**未做（如实）**：**执行侧不消费**（orchestrator/worker 派发仍用原工具端口与提示词，
+信包停在数据层）；`createTaskBundle` 仍无生产调用方；`deniedToolNames` 只上报不升级；
+工具说明协议未改动（只引用 revision）；未跑求交/禁止字段/六项缺失任何一条路径。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
