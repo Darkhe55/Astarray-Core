@@ -383,6 +383,8 @@ export const agentTaskNodeSchema = z.object({
       ),
     })
     .optional(),
+  /** ALIGN-01-04：所需产物标识（声明"要求产出什么"，不代表已产出）。 */
+  requiredArtifactIdentifiers: z.array(z.string().min(1)).max(50).optional(),
   sequenceOrdinal: z.number().int().min(1),
   createdAtIso: z.iso.datetime(),
 });

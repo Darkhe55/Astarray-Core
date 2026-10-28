@@ -52,6 +52,8 @@ export interface InsertTaskInput {
     externalReference: string | null;
     /** 可选：上游声明的上下文包（装配器据此保持整体性）。 */
     contextPack?: ContextPack;
+    /** ALIGN-01-04：提案声明的所需产物标识（不代表已产出）。 */
+    requiredArtifactIdentifiers?: string[];
   };
   anchor: {
     predecessorTaskIds: string[];
@@ -180,6 +182,13 @@ export class TaskSequenceManageController {
           ...(input.task.contextPack === undefined
             ? {}
             : { contextPack: input.task.contextPack }),
+          ...(input.task.requiredArtifactIdentifiers === undefined
+            ? {}
+            : {
+                requiredArtifactIdentifiers: [
+                  ...input.task.requiredArtifactIdentifiers,
+                ],
+              }),
         });
         partialOrder.insertNode(newNode, {
           predecessorTaskIds: input.anchor.predecessorTaskIds,
@@ -379,6 +388,7 @@ export class TaskSequenceManageController {
       externalReference: string | null;
       actor: ActorIdentity;
       contextPack?: ContextPack;
+      requiredArtifactIdentifiers?: string[];
     },
   ): AgentTaskNode {
     this.ordinalCounter += 1;
@@ -393,6 +403,9 @@ export class TaskSequenceManageController {
       blockReason: null,
       externalReference: options.externalReference,
       ...(options.contextPack === undefined ? {} : { contextPack: options.contextPack }),
+      ...(options.requiredArtifactIdentifiers === undefined
+        ? {}
+        : { requiredArtifactIdentifiers: options.requiredArtifactIdentifiers }),
       sequenceOrdinal: Date.now() * 1000 + this.ordinalCounter,
       createdAtIso: new Date().toISOString(),
     };
