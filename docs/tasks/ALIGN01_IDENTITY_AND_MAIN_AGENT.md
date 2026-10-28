@@ -1,6 +1,6 @@
 # ALIGN-01：稳定个体身份与只读主 Agent 主干
 
-日期：2026-10-27。状态：in_progress（01–03 已交付、04 部分交付，均 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–03、05 已交付、04 部分交付，均 implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -123,3 +123,27 @@ ponder 每次生成 `main:ponder:<随机>`；`missionId`/进程内 Map 同时充
 
 **验证状态**：未编写/未运行测试、未人工验收；`npm run typecheck` exit 0、
 `npx eslint <本批文件>` exit 0、`npm run build` 成功。
+
+### 05 主 Agent 单条处理预算（180 秒）——implemented-unverified（2026-10-28）
+
+**审查发现（实测）**：`SMART-01-04` 的 `MAIN_AGENT_DISPATCH_DEADLINE_MILLISECONDS = 180_000`
+与 `evaluateInstructionDeadline` **早就存在但没有任何执行方**：ponder 的 `AbortController`
+从未被 abort，慢模型/长工具循环会一直占住会话；也没有任何"超期记账"。
+
+**交付**：
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 契约 | `docs/adr/0046-main-agent-turn-budget.md` | 硬上限、超期语义、记账字段、落库失败不阻塞 |
+| 记账 | `packages/core/src/orchestration/main-agent-turn-budget.ts` | `MainAgentTurnProgressRecord` + 常量 180s；`isTaskDispatched` 恒 false |
+| 执行 | `main-controller.ts` `respondInPonderMode` | `AbortSignal.timeout(180s)` + `AbortSignal.any(取消)`；超期当场输出 `[需要继续]` |
+| 只读查询 | `getLastMainAgentTurnProgress()` | 供 UI 呈现"超时/待继续" |
+| 落库 | `application-runtime.ts` | `<state>/main-agent-turns/<turnId>.json`（原子写；失败不阻塞对话） |
+
+**assist 侧**：创建 mission 后**立即返回**、不 await 下级执行 —— 既有行为即满足
+"交付后释放等待"，本轮只核实未改动。
+
+**未做（如实）**：UI 呈现、超时后自动续跑（只有文案承诺）、assist 分支的主 Agent 模型轮次
+（等 ALIGN-02-02）、记账保留策略；Provider 侧重试上限未逐一审计。
+**超期路径没有用真实慢模型触发过 ⇒ 不宣称"超时一定生效"。**
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。

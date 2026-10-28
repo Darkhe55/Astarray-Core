@@ -47,8 +47,16 @@
 > 但 CLI 未注册 `executeDirectDispatchCommand`、SDK 未暴露直投，且全仓无任何生产代码调用
 > `publishSequence` ⇒ 直投会以 `task-sequence-not-found` 失败。留到 ALIGN-02-01 一起接。
 >
-> **⑦ 下一步**：ALIGN-01-05（主 Agent 单次处理 180 秒预算与"交付提案即释放等待"）
-> → 01-06（报告索引来源）→ 01-07（旧身份迁移）→ ALIGN-02（统一偏序调度主干 + 直投消费者）。
+> **⑦ ALIGN-01-05 交付**：主 Agent 单条处理预算落到执行层 —— 此前
+> `MAIN_AGENT_DISPATCH_DEADLINE_MILLISECONDS = 180_000` 只是无调用方的纯评估函数，
+> ponder 的 `AbortController` 从未 terminate。现在 ponder 用
+> `AbortSignal.timeout(180s)` + `AbortSignal.any` 真中止，超期当场记
+> `MainAgentTurnProgressRecord`（`isTaskDispatched` 恒 false）落
+> `<state>/main-agent-turns/`，并向用户输出 `[需要继续] …`。assist 侧"建 mission 即返回、
+> 不 await 下级"经核实已是既有行为。**超期路径未用真实慢模型触发过，不宣称一定生效。**
+>
+> **⑧ 下一步**：ALIGN-01-06（下级报告进入主 Agent 只读索引并带来源）
+> → 01-07（旧身份迁移规则）→ ALIGN-02（统一偏序调度主干 + 序列生命周期 + 直投消费者）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
