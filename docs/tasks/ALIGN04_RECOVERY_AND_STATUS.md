@@ -1,6 +1,6 @@
 # ALIGN-04：主干重启恢复与完成状态纠偏
 
-日期：2026-10-27。状态：in_progress（01 部分交付 implemented-unverified；2026-10-28）。
+日期：2026-10-27。状态：in_progress（01–02 部分交付，implemented-unverified；2026-10-28）。
 
 执行约定：只修改本卡负责范围；先备份覆盖前文件，保留并行工作。每轮一个编号步骤，超过 3 小时拆分剩余步骤继续。允许更新本卡与所属仓库索引，不授权安装依赖、提交推送或调用真实付费模型。本轮沿用用户要求，不编写/运行测试，不构建或人工验收；按源码调用链交付证据，完成只能标 implemented-unverified，不得宣称运行验证通过。既有测试和 CI 不删除、不弱化。发现相关实现已存在则复用，不重复造轮子；缺少可信授权或遇并行覆盖冲突只阻塞对应步骤。具体模型是否曾替换设计无可靠证据，不作来源归罪。
 
@@ -37,5 +37,28 @@
 **未做（如实）**：group（任务包）未写入（`createTaskBundle` 无生产调用方）；个体清单只有主/序列 owner/目标 agent，
 三级 Worker 未补登记；旧 mission 无关系文件（恢复不会猜，迁移入口未实现）；`unresolvedConversationCount`
 只作为返回值无 UI 呈现；未跑过"写入 → 重启 → 恢复 → 插入被拒"完整链路。
+
+**验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 02 恢复前只读对账门禁——**部分交付**（2026-10-28）
+
+**审查发现**：`RecoveryCenterController` / `ReadonlyReconciliationService` / `RecoveryClassificationService`
+都已相当完整（含"不确定副作用 ⇒ 阻断""一次性授权不延续"字段），但 **`MainController.resumeMission`
+从不咨询它们** —— 只要 mission 有未完成任务就重新调度，状态损坏/检查点需对账/租约冲突都不拦。
+历史查看本身已只读、不启动任务（已成立）；恢复不读历史批准记录（旧授权不会因恢复被复用），
+但也没有显式检查。
+
+**交付**：
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 门禁入口 | `main-controller.ts` `resumeMission` | 先调 `missionRecoveryGate`；拒绝 ⇒ `mission-locked` + 全部原因，**不写 running、不启动调度** |
+| 只读判定 | `application-runtime.ts` 构造的 gate | 只调 `RecoveryCenterController.inspectMission`（摘要/任务链/租约/检查点只读） |
+| 阻断条件 | 同上 | 不存在 / `isCorrupted` / `reconciliationRequired`（必须先完成对账，门禁**不代替**对账） |
+| 查看 ≠ 恢复 | — | 历史与恢复视图只读；恢复只能由显式 `resumeMission` 触发 |
+| 不继承授权 | — | 恢复不读取历史批准；权限仍由既有权权限引擎重新询问 |
+
+**未做（如实）**：门禁**默认关闭**；只拦不代劳（不执行 Git/worktree/人工改动对账）；
+租约冲突未纳入判定；`reauthorizationRequiredTypes` 未被消费；未跑"损坏 ⇒ 拒绝""需对账 ⇒ 拒绝"
+"正常 ⇒ 续接"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。

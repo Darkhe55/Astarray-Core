@@ -412,6 +412,17 @@ export interface MainControllerOptions {
    */
   missionRelationIndexStore?: MissionRelationIndexStore | null;
   /**
+   * ALIGN-04-02（2026-10-28）：**恢复前只读对账门禁**（可选）。
+   *
+   * `resumeMission` 先调用它；返回 `isAllowedToResume:false` ⇒ 拒绝续接并如实给出原因
+   * （状态损坏 / 尚未完成只读对账 / 租约被其他进程持有 …）。
+   * 只做只读判定：**查看历史不启动任务**，恢复必须显式调用 `resumeMission`。
+   */
+  missionRecoveryGate?: (missionId: string) => Promise<{
+    readonly isAllowedToResume: boolean;
+    readonly blockedReasons: readonly string[];
+  }>;
+  /**
    * ALIGN-02-06（2026-10-28）：运行中插入的**安全点注入端口**（可选）。
    *
    * 实现方必须保证：只在安全上下文边界注入、不改写已发出的工具调用、
@@ -770,6 +781,22 @@ export class MainController {
    * 读取持久化任务链中的未完成任务，按原 mode 重新调度；无未完成任务则幂等返回。
    */
   async resumeMission(missionId: string): Promise<void> {
+    /**
+     * ALIGN-04-02（2026-10-28）：**恢复前先过只读对账门禁**。
+     *
+     * 状态损坏 / 尚未完成只读对账 / 租约冲突时**不续接**，把原因如实抛出；
+     * 绝不因为"历史里有这条 mission"就自动启动任务。
+     */
+    const recoveryGate = this.options.missionRecoveryGate;
+    if (recoveryGate !== undefined) {
+      const recoveryDecision = await recoveryGate(missionId);
+      if (!recoveryDecision.isAllowedToResume) {
+        throw new DomainError(
+          "mission-locked",
+          `恢复被拒（先完成只读对账/解除阻塞再续接）: ${recoveryDecision.blockedReasons.join("；")}`,
+        );
+      }
+    }
     const missionStatus =
       await this.options.missionManager.getMissionStatus(missionId);
     if (missionStatus.taskChain === null) {

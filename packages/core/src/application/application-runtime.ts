@@ -118,6 +118,7 @@ import {
 import { AgentIndividualMemoryStore } from "../orchestration/agent-individual-memory.js";
 import { buildTertiaryLifecycleHooks } from "../orchestration/tertiary-lifecycle-hooks.js";
 import { MissionRelationIndexStore } from "../orchestration/mission-relation-index.js";
+import { RecoveryCenterController } from "../orchestration/recovery-center-controller.js";
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
@@ -319,6 +320,13 @@ export interface ApplicationRuntimeOptions {
    * 缺省关：该路径尚未实测，改变默认收口行为会把未验证的判断推给所有任务。
    */
   isCompletionReceiptRequired?: boolean;
+  /**
+   * ALIGN-04-02（2026-10-28）：恢复前是否启用**只读对账门禁**（缺省 false）。
+   *
+   * 打开后：`resumeMission` 先经恢复中心只读检查 —— mission 不存在/状态损坏/
+   * 检查点声明需对账时**拒绝续接**并给出原因；查看历史不会启动任务。
+   */
+  isMissionRecoveryGateEnabled?: boolean;
   /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
@@ -1403,6 +1411,46 @@ export async function createApplicationRuntime(
   const missionRelationIndexStore = new MissionRelationIndexStore({
     baseDirectory: stateDirectory,
   });
+
+  /**
+   * ALIGN-04-02：恢复前只读对账门禁（可选，缺省关）。
+   *
+   * 只调用恢复中心的**只读** `inspectMission`：不续接、不改状态、不启动任务。
+   */
+  const missionRecoveryController =
+    options.isMissionRecoveryGateEnabled === true
+      ? new RecoveryCenterController({ baseDirectory: stateDirectory })
+      : null;
+  const missionRecoveryGate =
+    missionRecoveryController === null
+      ? undefined
+      : async (missionId: string) => {
+          try {
+            const inspected = await missionRecoveryController.inspectMission(missionId);
+            const blockedReasons: string[] = [];
+            if (!inspected.view.exists) {
+              blockedReasons.push("mission 不存在（摘要与任务链均缺失）");
+            }
+            if (inspected.view.isCorrupted) {
+              blockedReasons.push("mission 状态损坏：需人工对账后再恢复");
+            }
+            if (inspected.view.reconciliationRequired) {
+              blockedReasons.push(
+                "检查点声明了 Git/worktree 状态：必须先完成只读对账再恢复",
+              );
+            }
+            return {
+              isAllowedToResume: blockedReasons.length === 0,
+              blockedReasons,
+            };
+          } catch (error) {
+            return {
+              isAllowedToResume: false,
+              blockedReasons: [`对账读取失败: ${(error as Error).message}`],
+            };
+          }
+        };
+
   const controller = new MainController({
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
@@ -1423,6 +1471,8 @@ export async function createApplicationRuntime(
       : { conversationIdentityStore, mainAgentInstanceId }),
     /** ALIGN-04-01：关系索引（显式关联落盘；重启恢复映射）。 */
     missionRelationIndexStore,
+    /** ALIGN-04-02：恢复前只读对账门禁（缺省不传 ⇒ 不发生门禁）。 */
+    ...(missionRecoveryGate === undefined ? {} : { missionRecoveryGate }),
     /**
      * ALIGN-02-01（2026-10-28）：权威任务序列控制面（用户任务先入偏序集，再建 mission 投影）。
      * 复用已装配的 `sequenceManageController`，不另建第二套序列。
