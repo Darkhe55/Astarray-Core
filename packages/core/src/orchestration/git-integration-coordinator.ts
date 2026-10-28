@@ -37,6 +37,11 @@ export interface SubmitContributionInput {
   baseCommit: string;
   headCommit: string;
   executedChecks: GitCheckExecutionRecord[];
+  /**
+   * ALIGN-03-04（2026-10-28）：审查者（具体个体）。给出时必须与贡献者不同，
+   * 且（若装配了注册目录）必须已登记；缺省 ⇒ 视为"未指定审查者"并如实记录。
+   */
+  reviewingAgentInstanceIdentifier?: string | null;
 }
 
 export interface FinalizeIntegrationInput {
@@ -146,6 +151,22 @@ export class GitIntegrationCoordinator {
         `未找到任务 ${input.taskId} 的 worker 分配记录`,
       );
     }
+    /**
+     * ALIGN-03-04（2026-10-28）：**审查者不得是贡献者**（作者不能自审）。
+     * 缺省未指定时如实记 null；给出非法审查者则拒绝，不静默降级。
+     */
+    const reviewingAgentInstanceIdentifier =
+      input.reviewingAgentInstanceIdentifier?.trim() ?? null;
+    if (
+      reviewingAgentInstanceIdentifier !== null &&
+      reviewingAgentInstanceIdentifier !== "" &&
+      reviewingAgentInstanceIdentifier === allocation.tertiaryAgentInstanceId
+    ) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        `贡献者不能担任自己的审查者（作者自审被拒）: ${reviewingAgentInstanceIdentifier}`,
+      );
+    }
     const verification = await this.options.verifier.verifyContribution({
       allocation,
       repositoryPath: input.repositoryPath,
@@ -166,8 +187,33 @@ export class GitIntegrationCoordinator {
           ? verification.failureReasons.join("；")
           : null,
       executedChecks: input.executedChecks.map((check) => ({ ...check })),
+      reviewingAgentInstanceIdentifier:
+        reviewingAgentInstanceIdentifier === "" ? null : reviewingAgentInstanceIdentifier,
     };
     if (verification.reviewDecision === "accepted") {
+      /**
+       * ALIGN-03-04：合并前**必须**确认共享仓库工作区干净。
+       *
+       * 下面会 `checkout` 集成分支并 `merge` —— 如果工作区里有未提交改动
+       * （常见于人工并行修改），切分支/合并会覆盖或携带它们。此处**拒绝操作**，
+       * 不自动 stash、不 reset、不 checkout 丢弃。
+       *
+       * 只看**已跟踪**文件的改动（`--untracked-files=no`）：未跟踪文件不会被
+       * checkout/merge 静默覆盖（git 会拒绝冲突的覆盖），把它们也算进来只会
+       * 让正常构建产物（dist/tmp）误挡合并。
+       */
+      const worktreeStatus = await this.gitProcess.run(
+        input.repositoryPath,
+        ["status", "--porcelain", "--untracked-files=no"],
+        "检查共享仓库工作区是否干净",
+      );
+      if (worktreeStatus.stdoutText.trim() !== "") {
+        throw new DomainError(
+          "stale-human-change",
+          "共享仓库存在未提交改动（可能来自人工并行修改）：拒绝自动切换分支/合并；" +
+            "请先由人工提交或转移这些改动（本流程不会 stash/reset/checkout 丢弃它们）。",
+        );
+      }
       await this.gitProcess.run(
         input.repositoryPath,
         [
@@ -292,6 +338,25 @@ export class GitIntegrationCoordinator {
       return report;
     }
     if (input.isTargetBranchMergeAllowed) {
+      /**
+       * ALIGN-03-04：目标分支合并前同样的**工作区干净**守卫。
+       *
+       * 有未提交改动（人工并行修改）时**不合入**、也**不** stash/reset/checkout 丢弃，
+       * 只把风险如实写进报告，由人工处理后再收尾。
+       */
+      const targetWorktreeStatus = await this.gitProcess.run(
+        input.repositoryPath,
+        ["status", "--porcelain", "--untracked-files=no"],
+        "检查共享仓库工作区是否干净（目标分支合并前）",
+      );
+      if (targetWorktreeStatus.stdoutText.trim() !== "") {
+        report.unresolvedRisks.push(
+          "共享仓库存在未提交改动（可能来自人工并行修改）：未合入目标分支；" +
+            "本流程不会 stash/reset/checkout 丢弃这些改动。",
+        );
+        await this.options.reportStore.saveReport(report);
+        return report;
+      }
       // 目标分支合并前自动创建恢复点（目标分支引用可回退）
       await this.options.recoveryPointService.createRecoveryPoint({
         missionId: input.missionId,

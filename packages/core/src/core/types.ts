@@ -809,6 +809,13 @@ export interface GitContributionReviewRecord {
   reviewDecision: "accepted" | "rejected" | "needs-rework";
   rejectionReason: string | null;
   executedChecks: GitCheckExecutionRecord[];
+  /**
+   * ALIGN-03-04（2026-10-28）：本次贡献的**审查者**具体个体。
+   *
+   * 语义：审查者不得是贡献者（作者不能自审）；缺省 null 表示"未指定审查者"
+   * （只能按未审查处理，不得当作已审查）。旧报告没有该字段 ⇒ 读取方按 null。
+   */
+  reviewingAgentInstanceIdentifier?: string | null;
 }
 
 /** 结构化集成报告；与次级 Agent 工作存档关联。 */

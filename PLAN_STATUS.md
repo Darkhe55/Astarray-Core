@@ -144,9 +144,18 @@
 > 早停有界续跑（G5 ≤2 次）与"失败只报原因"经核对已存在，未改动。
 > **验证器本身仍未调用**（需把 `TaskCompletionEventV1` 从 Worker 传到编排层）。
 >
-> **⑲ 下一步**：ALIGN-03-04（涉及 Git 的任务由次级创建隔离工作区/分支、指定审查者、
-> 判定返修或合并；三级只提交自己的分支、不直接合入目标分支；不覆盖人工并行修改、
-> 不自动 stash/reset）。
+> **⑲ ALIGN-03-04 部分交付**：隔离 worktree/分支、贡献验证、返修判定、目标分支五门禁都已有；
+> 补上两处缺口：①`GitContributionReviewRecord` 新增**审查者字段**，审查者 == 贡献者 ⇒ 拒绝
+> （作者不能自审），缺省 `null` 表示"未指定"而非"已审查"；②`submitContribution` 与
+> `finalizeIntegration` 在做 `checkout`/`merge` 之前**必须确认共享仓库已跟踪文件干净**
+> （`status --porcelain --untracked-files=no`）：脏 ⇒ 提交侧抛 `stale-human-change`、
+> 收尾侧写 `unresolvedRisks` 且不合入，**绝不 stash/reset/checkout 丢弃**。
+> `reset --hard` 仍只存在于显式恢复点恢复（恢复前自动建前置恢复点）。
+> **未做**：审查者注册/隶属校验、"指定审查者"分配入口、按路径联动人工改动分类；
+> 目标分支合并仍恒不可用（人工体验/授权无来源）。
+>
+> **⑳ 下一步**：ALIGN-03-05（审查结果绑定任务/来源个体/产物 revision 或 commit/证据/结论；
+> 过期或不匹配证据不得合并；人工验收策略按现有配置，不凭本卡改变批准权）。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 
