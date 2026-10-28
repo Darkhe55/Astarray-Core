@@ -23,6 +23,28 @@ export class TaskGraph {
     this.validateAcyclic();
   }
 
+  /**
+   * 清单第 ① 项下半场（2026-10-28）：**运行中追加节点**。
+   *
+   * 只允许在**安全点**（无在途任务）调用；拒绝重复 ID 与不存在的依赖
+   * （依赖必须已存在，避免插入一个永远不可运行的节点）。
+   */
+  addNode(node: TaskDependencyNode): void {
+    if (this.nodesById.has(node.id)) {
+      throw new DomainError("invalid-task-chain", `任务 ID 重复: ${node.id}`);
+    }
+    for (const dependencyId of node.dependsOn) {
+      if (!this.nodesById.has(dependencyId)) {
+        throw new DomainError(
+          "invalid-task-chain",
+          `追加节点的依赖不存在: ${node.id} -> ${dependencyId}（拒绝产生不可运行节点）`,
+        );
+      }
+    }
+    this.nodesById.set(node.id, { ...node, dependsOn: [...node.dependsOn] });
+    this.validateAcyclic();
+  }
+
   static fromTaskChain(document: TaskChainDocument): TaskGraph {
     return new TaskGraph(document.tasks);
   }

@@ -585,6 +585,32 @@ export class MissionOrchestrator {
     return [...this.inFlightTaskIds];
   }
 
+  /** 当前调度图里的任务标识（只读；供运行中插入做依赖校验）。 */
+  getKnownTaskIdentifiers(): string[] {
+    return this.dagScheduler.getCurrentGraph().getTaskIds();
+  }
+
+  /**
+   * 清单第 ① 项下半场（2026-10-28）：**安全点注入**（无在途任务时才允许）。
+   *
+   * 与既有"推迟到下一组"互补：这里真的把节点加入内存图并原子写回任务链；
+   * 有在途任务时**如实返回 `no-safe-point`**，由调用方按原语义推迟。
+   */
+  async injectTaskAtSafePoint(node: TaskDependencyNode): Promise<{
+    readonly kind: "injected" | "no-safe-point";
+    readonly reason: string;
+  }> {
+    if (!this.dagScheduler.isAtSafePointForInjection()) {
+      return {
+        kind: "no-safe-point",
+        reason: "有在途任务：当前不是安全点，注入推迟到下一组。",
+      };
+    }
+    await this.dagScheduler.injectTask(node);
+    this.wake();
+    return { kind: "injected", reason: "已在安全点注入并由调度器接管。" };
+  }
+
   /** 供主 Agent 直接调度（Devolve）或指令处理（Assist）使用。 */
   async unblockTask(taskId: string): Promise<void> {
     await this.dagScheduler.unblockTask(taskId);

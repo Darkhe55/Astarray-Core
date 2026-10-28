@@ -480,9 +480,20 @@
 > `GoalModeStateStore` 与门禁**未连**（"按 mission 找契约+快照"的 owner 未实现）；
 > `resumeMission` 路径未接目标门禁；无 UI。
 >
-> **55 下一步**：清单第 ① 项**下半场** —— 给 `MissionOrchestrator` 增加"运行中按 taskId 插入"
-> 的最小**安全点注入**：复用已有 `taskGroupInsertionPort` 语义，把 `requestRuntimeTaskInsertion`
-> 从"只能推迟到下一组"推进到"有安全点时真的注入"，并保持"没有安全点就推迟"的如实语义。
+> **55 清单第 ① 项下半场：运行中插入的真实安全点注入（部分）**：此前 `insert-now` 分支
+> 唯一的"注入"就是"落到推迟"（端口从未被实现），`DagScheduler` 的图在构造时固定。
+> 现在：①`TaskGraph.addNode`（拒绝重复 ID、拒绝**不存在的依赖**、重做无环校验）；
+> ②`DagScheduler.injectTask`（**仅在无在途任务**时允许，追加后 `updateTaskChain` 原子写回 revision+1）；
+> ③`MissionOrchestrator.injectTaskAtSafePoint` + `getKnownTaskIdentifiers`；
+> ④`MainController.injectTaskIntoRunningMission`（稳定 id `task-runtime-insert-<hash12>`、
+> 依赖只保留图中已存在的、重复注入返回 false）；⑤运行时**装配了默认 `taskGroupInsertionPort`**；
+> 返回 false 时仍走"登记进序列、推迟到下一组"。
+> **未做**：不支持改已有节点依赖/改序/移动锚点；安全点判定以"没有已领取任务"为准（极短窗口未加锁）；
+> 无 UI/CLI；注入只改 mission 链，序列侧仍单独登记（两边可能短暂不一致，对照能看出但不自动修复）。
+>
+> **56 下一步**：清单第 ① 项**收尾** —— 把"序列 → mission 链"的**写回**做成显式一步：
+> 在注入/推迟完成后，用 `TaskLedgerBridge` 的对照结果记录差异快照（只读、落一条诊断记录），
+> 让"两边不一致"从"能查"变成"有历史可追溯"，仍不自动修复。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 
 

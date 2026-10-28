@@ -1542,6 +1542,11 @@ export async function createApplicationRuntime(
           }
         };
 
+  /**
+   * 清单第 ① 项下半场：注入端口需要引用控制器本身。
+   * 用 holder 对象而不是 `let`，避免闭包内被窄化成 never。
+   */
+  const controllerHolder: { current: MainController | null } = { current: null };
   const controller = new MainController({
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
@@ -1573,6 +1578,14 @@ export async function createApplicationRuntime(
     taskSequenceManageController: sequenceManageController,
     /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
     taskSequenceStatusController: sequenceStatusController,
+    /**
+     * 清单第 ① 项下半场（2026-10-28）：**运行中插入的真实注入端口**。
+     *
+     * 只在调度器无在途任务（安全点）时真的加入任务链并写回；
+     * 否则返回 false，保持"推迟到下一组"的既有语义。
+     */
+    taskGroupInsertionPort: async (input): Promise<boolean> =>
+      (await controllerHolder.current?.injectTaskIntoRunningMission(input)) ?? false,
     /** 清单第 ⑥ 项：目标门禁（缺省不参与；只观察/可选强制）。 */
     ...(options.goalDispatchGateResolver === undefined
       ? {}

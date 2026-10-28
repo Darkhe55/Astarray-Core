@@ -2004,6 +2004,56 @@ export class MainController {
   }
 
   /**
+   * 清单第 ① 项下半场（2026-10-28）：**运行中插入的真实注入端口**。
+   *
+   * 只在调度器**没有在途任务**（安全点）时真正加入内存图并写回任务链；
+   * 否则返回 false，让 `requestRuntimeTaskInsertion` 按原语义**推迟到下一组**。
+   * 依赖只保留图里已有的任务（不存在的一律丢弃，避免产生不可运行节点）。
+   */
+  async injectTaskIntoRunningMission(input: {
+    readonly missionIdentifier: string;
+    readonly request: RuntimeTaskInsertionRequest;
+    readonly groupIdentifier: string;
+  }): Promise<boolean> {
+    const active = this.activeOrchestrators.get(input.missionIdentifier);
+    if (active === undefined) {
+      return false;
+    }
+    const taskIdentifier = `task-runtime-insert-${createHash("sha256")
+      .update(input.request.requestIdentifier)
+      .digest("hex")
+      .slice(0, 12)}`;
+    const knownTaskIdentifiers = new Set(
+      active.scheduler.getKnownTaskIdentifiers(),
+    );
+    if (knownTaskIdentifiers.has(taskIdentifier)) {
+      return false;
+    }
+    const requestedDependencies = [
+      ...input.request.dependsOn,
+      ...(input.request.anchorTaskIdentifier !== null &&
+      knownTaskIdentifiers.has(input.request.anchorTaskIdentifier)
+        ? [input.request.anchorTaskIdentifier]
+        : []),
+    ];
+    const dependsOn = [...new Set(requestedDependencies)].filter((dependencyId) =>
+      knownTaskIdentifiers.has(dependencyId),
+    );
+    const injectionResult = await active.scheduler.injectTaskAtSafePoint({
+      id: taskIdentifier,
+      description: `${input.request.title}\n\n${input.request.description}`,
+      dependsOn,
+      taskType: "generic",
+      toolNames: [],
+      assignedAgentId: null,
+      status: "pending",
+      resultLocation: null,
+      acceptanceCriteria: input.request.acceptanceCriteria,
+    });
+    return injectionResult.kind === "injected";
+  }
+
+  /**
    * 清单第 ⑥ 项（2026-10-28）：**目标门禁只读观察/可选强制**。
    *
    * 未装配 resolver ⇒ 直接返回"未阻断"（行为不变）。
