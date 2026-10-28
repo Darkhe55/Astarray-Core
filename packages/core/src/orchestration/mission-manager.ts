@@ -47,6 +47,17 @@ export interface MissionSummary {
   taskSequenceIdentifier?: string;
   /** ALIGN-02-01：序列里承载本次用户原始任务的任务标识（`task-<missionId>`）。 */
   originalTaskIdentifier?: string;
+  /**
+   * ALIGN-02-02（2026-10-28）：本次执行的任务分解来源。
+   *
+   * - `model`：候选分解通过本地校验；
+   * - `single-node-fallback`：有规划器但规划/校验失败，已**降级**为单节点；
+   * - `legacy-single-node`：未装配规划器（旧行为），**不是**"已规划"。
+   * 旧摘要没有该字段 ⇒ 读取方按"未知来源"处理，不得当作已规划。
+   */
+  taskPlanningOutcome?: "model" | "single-node-fallback" | "legacy-single-node";
+  /** ALIGN-02-02：降级原因（仅 `single-node-fallback` 时有值）。 */
+  taskPlanningFallbackReason?: string;
 }
 
 export interface MissionStatus {
@@ -80,6 +91,10 @@ export interface CreateMissionInput {
   taskSequenceIdentifier?: string;
   /** ALIGN-02-01：序列中承载用户原始任务的任务标识（可选）。 */
   originalTaskIdentifier?: string;
+  /** ALIGN-02-02：任务分解来源（可选；缺省 ⇒ 摘要不写，读取方按未知处理）。 */
+  taskPlanningOutcome?: "model" | "single-node-fallback" | "legacy-single-node";
+  /** ALIGN-02-02：降级原因（可选）。 */
+  taskPlanningFallbackReason?: string;
 }
 
 export class MissionManager {
@@ -145,6 +160,14 @@ export class MissionManager {
       ...(typeof input.originalTaskIdentifier === "string" &&
       input.originalTaskIdentifier.trim().length > 0
         ? { originalTaskIdentifier: input.originalTaskIdentifier.trim() }
+        : {}),
+      /** ALIGN-02-02：分解来源必须如实落盘（降级不得伪装成"已规划"）。 */
+      ...(input.taskPlanningOutcome === undefined
+        ? {}
+        : { taskPlanningOutcome: input.taskPlanningOutcome }),
+      ...(typeof input.taskPlanningFallbackReason === "string" &&
+      input.taskPlanningFallbackReason.trim().length > 0
+        ? { taskPlanningFallbackReason: input.taskPlanningFallbackReason.trim() }
         : {}),
     };
     await this.summaryWriteMutex.runExclusive(() =>
