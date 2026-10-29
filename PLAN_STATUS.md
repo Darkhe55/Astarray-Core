@@ -3903,3 +3903,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > **92a 推送状态（2026-10-29 R18）**：R18 提交**本地已提交但未推送** —— 连续 5 次
 > `git push` 失败（`Could not read from remote repository`）。按纪律记录、下一轮合并重试；远端未改写。
+
+> **93 R19（D 阶段第 6 步）：block 误报率探针（完成，未执行）**：新增
+> `scripts/manual/egress-false-positive-probe.mjs`：**8 条 normal 样本**（中文/英文散文、代码、
+> JSON、`.invalid` URL、SQL、提交信息）+ **6 条假凭据样本**（Anthropic/OpenAI-compatible/GitHub/
+> AWS/PEM/连接串，全部 `FAKE` 或 `.invalid`），逐样本输出结论并汇总 `falsePositives` /
+> `missesOrOtherRules`；SDK 增补纯函数导出（`scanSensitiveContent` 等）。
+> **边界**：样本级探针 ≠ 产品级误报率；样本少且人工构造；只测规则命中、不测阻断行为。
+> **验证**：**未执行**；仅 `node --check`（语法 exit 0）+ typecheck/build。
+> **推送状态**：R18 与 R19 提交**仍未推送**（远端不可达），下一轮继续合并重试。
+> **下一轮**：R20 —— 通道矩阵刷新（把 R14–R19 的结论写回矩阵：通道 7 有 block 选项、
+> 通道 13 覆盖两家、通道 14 有一处加固；仍缺项如实保留）。
