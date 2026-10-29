@@ -39,12 +39,15 @@ export interface DeferredInsertionQueueDocument {
 export class DeferredInsertionQueueStore {
   private readonly filePath: string;
   private readonly backupFilePath: string;
+  private readonly maximumConsumedEntries: number;
   private readonly writeLock = new AsyncMutex();
 
-  constructor(options: { baseDirectory: string }) {
+  constructor(options: { baseDirectory: string; maximumConsumedEntries?: number }) {
     const directoryPath = path.join(options.baseDirectory, "task-ledger");
     this.filePath = path.join(directoryPath, "deferred-insertions.json");
     this.backupFilePath = `${this.filePath}.bak`;
+    /** R25：`consumed` 有界（缺省 200），超出丢弃最旧（只丢弃已消费历史，不动 pending）。 */
+    this.maximumConsumedEntries = Math.max(1, options.maximumConsumedEntries ?? 200);
   }
 
   async read(): Promise<DeferredInsertionQueueDocument> {
@@ -156,7 +159,7 @@ export class DeferredInsertionQueueStore {
             consumedAtIso: input.consumedAtIso,
             consumedByGroupIdentifier: input.consumedByGroupIdentifier,
           },
-        ],
+        ].slice(-this.maximumConsumedEntries),
       } satisfies DeferredInsertionQueueDocument);
       return { didConsume: true };
     });

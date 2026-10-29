@@ -2162,6 +2162,50 @@ export class MainController {
   }
 
   /**
+   * R25（2026-10-29）：**组边界消费推迟插入**。
+   *
+   * 只在编排器确认"无在途任务"时调用；逐条标记已消费并记录差异快照。
+   * **消费 ≠ 派发**：不改运行中图、不启动任务，输出里明确说明。
+   */
+  private async consumeDeferredInsertions(missionIdentifier: string): Promise<void> {
+    const queueStore = this.options.deferredInsertionQueueStore;
+    if (queueStore === null || queueStore === undefined) {
+      return;
+    }
+    const pendingEntries = await queueStore
+      .listPending(missionIdentifier)
+      .catch(() => []);
+    if (pendingEntries.length === 0) {
+      return;
+    }
+    const sequenceMapping = this.missionTaskSequences.get(missionIdentifier) ?? null;
+    for (const entry of pendingEntries) {
+      const consumed = await queueStore
+        .markConsumed({
+          insertRequestIdentifier: entry.insertRequestIdentifier,
+          consumedAtIso: new Date().toISOString(),
+          consumedByGroupIdentifier: "task-group-boundary",
+        })
+        .catch(() => ({ didConsume: false }));
+      if (!consumed.didConsume) {
+        continue;
+      }
+      if (sequenceMapping !== null) {
+        await this.recordTaskLedgerDivergenceSnapshot({
+          missionIdentifier,
+          ownerAgentInstanceIdentifier: sequenceMapping.ownerAgentInstanceIdentifier,
+          sequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
+          trigger: "deferred-insertion-consumed",
+        });
+      }
+      this.options.streamOutput(
+        missionIdentifier,
+        `[任务账本] 已消费推迟插入 ${entry.taskIdentifier}（消费 ≠ 派发：任务已进入权威序列，仍需下一组调度；运行中图变更仍不支持）`,
+      );
+    }
+  }
+
+  /**
    * 清单第 ① 项收尾（2026-10-28）：记录一次差异快照（只读；失败不阻断业务）。
    */
   private async recordTaskLedgerDivergenceSnapshot(input: {
@@ -2980,7 +3024,15 @@ export class MainController {
         : {}),
       /** 计划 R7：完成收据落盘（缺省 null ⇒ 不落盘）。 */
       completionReceiptStore: this.options.completionReceiptStore ?? null,
-      onMissionGateBlocked: (failureReason) => {
+      /** R25：组边界消费推迟插入（消费 ≠ 派发；无既存队列则不接）。 */
+      ...(this.options.deferredInsertionQueueStore === null ||
+      this.options.deferredInsertionQueueStore === undefined
+        ? {}
+        : {
+            taskGroupBoundaryPort: async (): Promise<void> => {
+              await this.consumeDeferredInsertions(missionId);
+            },
+          }),      onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
         void this.options.missionManager
@@ -3185,7 +3237,15 @@ export class MainController {
         : {}),
       /** 计划 R7：完成收据落盘（缺省 null ⇒ 不落盘）。 */
       completionReceiptStore: this.options.completionReceiptStore ?? null,
-      onMissionGateBlocked: (failureReason) => {
+      /** R25：组边界消费推迟插入（消费 ≠ 派发；无既存队列则不接）。 */
+      ...(this.options.deferredInsertionQueueStore === null ||
+      this.options.deferredInsertionQueueStore === undefined
+        ? {}
+        : {
+            taskGroupBoundaryPort: async (): Promise<void> => {
+              await this.consumeDeferredInsertions(missionId);
+            },
+          }),      onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
         void this.options.missionManager

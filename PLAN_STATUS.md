@@ -3977,3 +3977,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 队列**不驱动派发**（DagScheduler 缺口仍在）、`consumed` 无上限；未运行入队/幂等/拒绝/消费任何一条。
 > **下一轮**：R25 —— 在**组边界安全点**接消费：新组开始时逐条 `markConsumed` + 写差异快照，
 > 仍不改运行中图（消费≠派发，如实标注）。
+
+> **99 R25（E 阶段第 5 步）：组边界消费推迟插入（完成）**：`MissionOrchestratorOptions` 新增
+> `taskGroupBoundaryPort`；`runLoop` 每轮开头在 **`inFlightTaskIds.size === 0`**（安全点）调用，
+> 抛错只升级不中断。控制器 `consumeDeferredInsertions` 逐条 `markConsumed("task-group-boundary")`
+> + 写差异快照（`trigger: deferred-insertion-consumed`）+ 流式说明
+> "**消费 ≠ 派发**：任务已进权威序列，仍需下一组调度；运行中图变更仍不支持"。
+> `consumed` **有界 200 条**（超出丢最旧，不动 pending）。
+> **未做**：消费**不驱动派发**（DagScheduler 缺口仍在）、端口每轮读一次队列（成本未测）、
+> "组边界"用"无在途任务"近似（无组标识）、超出丢弃**无计数暴露**；未运行任何消费路径。
+> **下一轮**：R26 —— `consumed` 丢弃**可观察**（记录丢弃计数并通过 CLI/日志暴露），
+> 让"历史被截断"这件事不再静默。
