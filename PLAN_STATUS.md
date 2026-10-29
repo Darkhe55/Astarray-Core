@@ -3772,3 +3772,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未做**：**没有写入方**（worker 成功分支尚未构建收据，R7）、**没有读取方**
 > （`completionReceiptReader` 未接，R8）；未运行任何写入/幂等/拒绝/损坏路径。
 > **下一轮**：R7 —— worker 成功分支构建收据（工具计数、产物路径、完成事件校验）并调用存储。
+
+> **81 R7（完成门禁生产方第 2 步）：Worker 成功收据落盘（完成）**：`worker-agent` 早已用真实本地状态
+> （工具调用数/落盘产物/完成事件校验）构造收据，但编排层**从不落盘**、通过即丢弃。
+> 现在 `MissionOrchestratorOptions.completionReceiptStore` 装配后，`handleWorkerOutcome` 的
+> `success` 分支**先落盘再走门禁**：只保存 worker 给的收据（不改内容、不补默认）；
+> 落盘失败**不改变完成判定**但 `onUserEscalation` 如实升级；`MainController` 同名选项透传给
+> assist/devolve 两个调度器；运行时构造 `<state>/completion-receipts/` 并暴露句柄。
+> **未做**：**读取侧未接**（`completionReceiptReader` 空位，R8）、严格模式在无收据时仍阻断、
+> 编排层**不重算**收据与真实产物的一致性；未运行任何落盘/失败/幂等/拒绝路径。
+> **下一轮**：R8 —— `completionReceiptReader` 接本地存储（严格模式可读到收据）。

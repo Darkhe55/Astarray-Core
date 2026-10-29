@@ -130,6 +130,7 @@ import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
+import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
 import { GoalMissionBindingStore } from "../orchestration/goal-mission-binding-store.js";
 import { GoalGateCache } from "../orchestration/goal-gate-cache.js";
@@ -238,6 +239,8 @@ export interface ApplicationRuntime {
   goalGateCache: GoalGateCache;
   /** GOAL-02 R3：最近一次 hydrate 的结果（还原数 + 跳过原因）。 */
   goalGateHydration: GoalGateHydrationResult;
+  /** 计划 R7：完成收据存储（worker 成功分支落盘；严格模式读取）。 */
+  completionReceiptStore: CompletionReceiptStore;
   /**
    * GOAL-02 R5：激活目标模式（唯一入口；经 `resolveGoalModeActivation` 判定）。
    * 未调用或判定未通过 ⇒ 门禁解析器恒为 null，目标模式不参与派发/恢复。
@@ -922,6 +925,14 @@ export async function createApplicationRuntime(
    * 后续轮次（R3 解析器 / R4 恢复对账 / R5 激活校验）才接进流程。
    */
   const goalModeStateStore = new GoalModeStateStore({
+    baseDirectory: stateDirectory,
+  });
+  /**
+   * 计划 R7（2026-10-29）：**完成收据存储**。
+   *
+   * 只构造句柄；worker 成功分支提供收据时才落盘（R7），严格模式读取同一份（R8）。
+   */
+  const completionReceiptStore = new CompletionReceiptStore({
     baseDirectory: stateDirectory,
   });
   /**
@@ -2129,6 +2140,7 @@ export async function createApplicationRuntime(
     goalMissionBindingStore,
     goalGateCache,
     goalGateHydration,
+    completionReceiptStore,
     activateGoalMode,
     getGoalModeActivation,
     experimentSettingsStore,
