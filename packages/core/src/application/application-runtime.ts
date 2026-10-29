@@ -279,6 +279,11 @@ export interface ApplicationRuntime {
   unbindMissionFromGoal: (
     missionIdentifier: string,
   ) => Promise<{ readonly didUnbind: boolean }>;
+  /** R36：关闭目标实验（只置标记；关闭后该目标不再还原门禁、不再新增目标派发）。 */
+  closeGoalExperiment: (input: {
+    readonly goalIdentifier: string;
+    readonly reason: string;
+  }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
   refreshGoalGateCache: () => Promise<GoalGateHydrationResult>;
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
@@ -1170,6 +1175,26 @@ export async function createApplicationRuntime(
     });
     await refreshGoalGateCache();
     return { goalIdentifier: input.goalIdentifier };
+  };
+  /**
+   * R36（2026-10-29）：**关闭目标实验**。
+   *
+   * 只置关闭标记（保留任务/历史/限制/已执行结果），随后刷新缓存：
+   * 关闭的目标不再还原门禁 ⇒ 解析器对它返回 null ⇒ **不再新增目标派发**。
+   * 已有任务与状态不受影响；没有任何"静默删除"。
+   */
+  const closeGoalExperiment = async (input: {
+    readonly goalIdentifier: string;
+    readonly reason: string;
+  }): Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }> => {
+    const closedAtIso = new Date().toISOString();
+    await goalModeStateStore.closeExperiment({
+      goalIdentifier: input.goalIdentifier,
+      closedAtIso,
+      reason: input.reason,
+    });
+    await refreshGoalGateCache();
+    return { isExperimentClosed: true, closedAtIso };
   };
   const unbindMissionFromGoal = async (
     missionIdentifier: string,
@@ -2425,6 +2450,7 @@ export async function createApplicationRuntime(
     createGoalContract,
     bindMissionToGoal,
     unbindMissionFromGoal,
+    closeGoalExperiment,
     refreshGoalGateCache,
     experimentSettingsStore,
     toolPackageLifecycleService,
@@ -2471,7 +2497,6 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
-
 
 
 
