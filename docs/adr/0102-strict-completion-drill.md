@@ -41,3 +41,10 @@
 - 未运行脚本（需用户授权）；
 - 脚本只覆盖存储层，不覆盖控制器门禁；
 - 没有 CI 接入（也不应在本窗口接）。
+
+## 6. 执行记录（2026-10-29，窗口后补）
+
+已执行：`node scripts/manual/strict-completion-drill.mjs`，**exit 0**，7 项断言全 `ok`
+（含"同任务不同内容拒绝覆盖""缺裁决 ⇒ read 为 null""缺收据 ⇒ 判定不足"）。
+**仅覆盖存储层**；完整门禁仍需真实 mission 验收。详见
+[SCRIPT_RUN_EVIDENCE_2026-10-29](../reports/SCRIPT_RUN_EVIDENCE_2026-10-29.md)。
