@@ -10,6 +10,7 @@ import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
 import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
+import { formatDiagnosticLogLine } from "../infra/log-line-safety.js";
 import type { FeedbackIpcMessage } from "./ipc-protocol.js";
 import type { FeedbackMessage } from "../core/types.js";
 import { ForkFeedbackClient } from "./transport.js";
@@ -197,7 +198,15 @@ export class FeedbackProcessSupervisor {
     if (this.isShuttingDown) {
       return;
     }
-    process.stderr.write(`astarray: 反馈进程故障 - ${error.message}\n`);
+    /**
+     * R18（2026-10-29）：异常消息可能含换行（子进程 stderr 拼入）⇒ 先安全化，
+     * 避免一行日志被拆成多行、伪造额外日志行。
+     */
+    const failureLine = formatDiagnosticLogLine({
+      prefix: "astarray: 反馈进程故障 - ",
+      message: error.message,
+    });
+    process.stderr.write(`${failureLine.line}\n`);
     const failedChild = this.childProcess;
     this.childProcess = null;
     this.client = null;
