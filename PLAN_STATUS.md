@@ -3805,3 +3805,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未做**：**没有写入方**（`IndependentReviewGate.recordVerdict` 也未写本存储）、
 > **没有读取方**（`completionVerdictReader` 空位，R10）、不校验裁决者独立性；未运行任何写入路径。
 > **下一轮**：R10 —— `completionVerdictReader` 接本地存储（严格模式可读到裁决）。
+
+> **84 R10（完成门禁生产方第 5 步）：严格模式读取独立裁决（完成）**：运行时构造
+> `CompletionVerdictStore` 并提供 `completionVerdictReader(missionId)`：**无裁决 ⇒ null**
+> （门禁按缺裁决阻断）；**存在 rejected ⇒ `isAccepted:false`**（理由带 `task: reason`）；
+> **全部 accepted ⇒ 通过**；存储损坏/缺失按"无裁决"处理（不伪造）。裁决句柄一并暴露。
+> **未做**：**写入方仍未接** —— `IndependentReviewGate.recordVerdict` 不写本存储，卡在
+> `AgentAppointment` **没有 missionIdentifier 字段**（R11 先加字段）；聚合是 **mission 级**、
+> **未按任务逐一对齐**（某任务无裁决仍可能通过，已知粗糙点，R11 收紧）；未运行任何读取路径。
+> **下一轮**：R11 —— 给 `AgentAppointment` 加 `missionIdentifier` 并在 `recordVerdict` 写裁决存储；
+> 同时把门禁聚合收紧为"任务逐一对齐"。
