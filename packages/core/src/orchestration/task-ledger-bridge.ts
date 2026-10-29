@@ -180,6 +180,94 @@ export class TaskLedgerBridge {
   }
 
   /**
+   * R23（2026-10-29）：**单任务派发的只读预检**。
+   *
+   * 只回答"按现有两套记账看，这个任务能不能被单独派发、缺什么"，**不改任何状态、不派发**。
+   * 预检通过**不等于**可以派发：编排层仍没有按 taskId 的领取/派发 API（见 capabilities）。
+   */
+  async inspectSingleTaskDispatchPrecheck(input: {
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly ownerAgentInstanceId: string;
+    readonly sequenceId: string;
+    readonly viewer: ActorIdentity;
+  }): Promise<{
+    readonly missionIdentifier: string;
+    readonly sequenceId: string;
+    readonly sequenceRevision: number;
+    readonly taskIdentifier: string;
+    readonly isDispatchable: boolean;
+    readonly blockedReasons: readonly string[];
+    readonly sequenceStatus: string | null;
+    readonly missionStatus: string | null;
+    readonly capabilities: {
+      readonly canDispatchTaskByTaskIdentifier: false;
+      readonly note: string;
+    };
+  }> {
+    const [snapshot, missionStatus] = await Promise.all([
+      this.options.sequenceLedger.getSnapshot({
+        ownerAgentInstanceId: input.ownerAgentInstanceId,
+        sequenceId: input.sequenceId,
+        viewer: input.viewer,
+      }),
+      this.options.missionTaskChain.getMissionStatus(input.missionIdentifier),
+    ]);
+    if (missionStatus.taskChain === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `mission ${input.missionIdentifier} 没有任务链：无法做单任务派发预检。`,
+      );
+    }
+    const sequenceNode =
+      snapshot.nodes.find((node) => node.taskId === input.taskIdentifier) ?? null;
+    const missionTask =
+      missionStatus.taskChain.tasks.find((task) => task.id === input.taskIdentifier) ??
+      null;
+    const blockedReasons: string[] = [];
+    if (sequenceNode === null) {
+      blockedReasons.push("任务不在权威序列中（序列侧没有这个任务）");
+    }
+    if (missionTask === null) {
+      blockedReasons.push("任务不在 mission 任务链中");
+    }
+    if (
+      sequenceNode !== null &&
+      missionTask !== null &&
+      sequenceNode.status !== missionTask.status
+    ) {
+      blockedReasons.push(
+        `两套记账状态不一致（序列=${sequenceNode.status}, mission=${missionTask.status}）：先对账再派发`,
+      );
+    }
+    if (
+      sequenceNode !== null &&
+      !snapshot.readyTaskIds.includes(input.taskIdentifier)
+    ) {
+      blockedReasons.push("序列侧判定为未 ready（依赖未满足或状态不是 pending）");
+    }
+    if (missionTask !== null && missionTask.status !== "pending") {
+      blockedReasons.push(
+        `mission 侧状态为 ${missionTask.status}，不是可派发的 pending`,
+      );
+    }
+    return {
+      missionIdentifier: input.missionIdentifier,
+      sequenceId: snapshot.sequenceId,
+      sequenceRevision: snapshot.revision,
+      taskIdentifier: input.taskIdentifier,
+      isDispatchable: blockedReasons.length === 0,
+      blockedReasons,
+      sequenceStatus: sequenceNode?.status ?? null,
+      missionStatus: missionTask?.status ?? null,
+      capabilities: {
+        canDispatchTaskByTaskIdentifier: false,
+        note: "预检通过不等于可派发：编排层仍没有按 taskId 的领取/派发 API。",
+      },
+    };
+  }
+
+  /**
    * 按 taskId 派发：**当前不支持**，显式拒绝。
    *
    * 不返回"已派发"，也不做静默 no-op —— 调用方必须看到缺失能力清单。
