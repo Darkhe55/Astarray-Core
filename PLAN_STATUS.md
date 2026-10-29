@@ -3939,3 +3939,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 未运行"写入后免手填/改绑拒绝/缺失仍手填"任何一条。
 > **下一轮**：R22 —— 用索引**增强 CLI**：`task-ledger status --mission X` 一条命令完成对账
 > （不再要求 sequence/owner），并把"索引缺失"与"对账失败"区分开。
+
+> **95a R21 装配缺口（自查发现，已修）**：R21 的提交 `c6b8cff3` **只加了存储、控制器 helper 与 CLI 读取**，
+> 但 `application-runtime` **没有把 `missionSequenceBindingStore` 传给控制器**（import 未被使用，lint 才发现）。
+> 后果：**索引在生产上永远不会被写入**，CLI 只能读到空 ⇒ "免手填"名存实亡。
+> 已补：运行时构造并透传（本提交），`typecheck`/`lint`/`build` 恢复全绿。
+> **仍无运行验证**；这也是本轮唯一一次"提交后才发现接线没接上"的情况，按纪律如实记录，不改写历史提交。
