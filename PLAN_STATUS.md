@@ -3740,3 +3740,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **77a 推送状态（2026-10-29 R3）**：R3 提交 `0994b1a5` 之后的门禁解析器提交**本地已提交但未推送** ——
 > 连续 5 次 `git push` 失败（`Could not read from remote repository`）。按纪律记录原因、本阶段跳过，
 > **下一轮（R4）完成时合并重试**；远端未改写。
+
+> **78 R4（GOAL-02 接线第 3 步）：恢复前目标对账（完成）**：新增可选端口
+> `missionGoalResumeReconciliation`；`resumeMission` 顺序改为
+> 幂等守卫 → 只读恢复门禁 → **目标对账** → 就绪分类 → 租约 → 启动。
+> 运行时实现：未绑定目标 ⇒ `resume`（不参与）；绑定但**契约缺失/非法 ⇒ `stay-paused`**；
+> 有状态 ⇒ `evaluateResume`（在途组 ⇒ `reconcile-first`；暂停/需重规划 ⇒ `stay-paused`）。
+> 非 `resume` ⇒ 抛 `mission-locked`（含 outcome/detail/证据缺口），**不启动调度器、不重跑任务**。
+> 只读：不写目标状态、不改任务链、不派发。
+> **未做**：生产上仍不触发（无契约/绑定/状态写入方）、`resolveGoalModeActivation` 仍无调用方（R5）、
+> `reconcile-first` 后没有"对账后继续"流程；未运行任何拒绝/放行路径。
+> **下一轮**：R5 —— 派发/恢复前调用 `resolveGoalModeActivation` 做激活校验，并处置死常量
+> （推荐 A：删常量、保留判定；若用户选 B 则按 B 改）。
