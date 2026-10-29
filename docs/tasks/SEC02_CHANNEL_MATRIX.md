@@ -16,14 +16,14 @@
 | 4 | 目录元数据 | `listDirectory` → `filterSensitiveDirectoryEntries` | 名称规则 | 过滤条目名 | ✅ |
 | 5 | Git diff/show/log | `gitReadonlyView` → `assertSensitiveContentReadAllowed(content=stdout)` | 四态 DLP | 拒绝输出 | ✅ |
 | 6 | 命令 stdout/stderr | — | — | — | — **无通用 shell 工具**：`builtins.ts` 只有 10 个工具（readFile/listDirectory/writeFileTemporary/createProjectFile/replaceFileContent/backupVault/deleteBackup/taskSequenceStatus/searchProjectText/gitReadonlyView），无 exec/shell/process；git 输出走通道 5 |
-| 7 | 插件 / MCP 工具结果 | `mcp-tool-bridge` 结果出口 | `Redactor`（**掩码**，非阻断） | 掩码后的文本仍**送给模型** | 🟡 **掩码 ≠ 放行**：漏检的秘密会到模型 |
+| 7 | 插件 / MCP 工具结果 | `mcp-tool-bridge` 结果出口 | `Redactor` + **可选四态扫描**（ADR-0105） | `record` 仍返回；`block` 非 clean ⇒ 拒绝返回 | 🟡 **可选 block（默认 record）**；误报率未测 |
 | 8 | 网络响应 | — | — | — | ❌ 无内置 HTTP 工具；MCP 场景见通道 7 |
 | 9 | 文档转换 / OCR | `document-view-adapter` / `read-format/*` | 无敏感引用（检索 `sensitive|redact|dlp` 0 命中） | 转换文本若经 readFile 则受通道 1 覆盖；**其他转换入口未核** | ❌ 未覆盖（除 readFile 路径） |
 | 10 | 归档解析 | — | — | — | — 无"把归档内容返回模型"的工具 |
 | 11 | 缓存命中 | 缓存模块（`infra/cache`） | 无敏感引用 | 缓存只存计算/工具结果元数据 | ❌ 未核 |
 | 12 | 恢复记录 / 汇报 / 摘要 / 长期记忆 | `summarization/*` → `evaluateSummaryPublishability`（ADR-0086）；`context-prompt-assembler` / `agent-individual-memory` 仍无检查 | 摘要片段：四态 DLP（**写入侧**）；提示词注入：无（**且当前没有摘要注入点**） | 非 clean 片段**不落盘**并计数 | 🟡 **写入侧三块已加闸**（摘要/长期记忆/三级汇报，ADR-0086/0087）；提示词注入仍无检查；**摘要/报告/记忆读取侧已加标注**（ADR-0088/0089） |
-| 13 | 模型请求最终装配出口 | provider runtime 组消息 | 无 | 发往模型 | ❌ 未覆盖（最后一道闸不存在） |
-| 14 | 日志 / 诊断导出 | `infra/redaction.ts`（`Redactor`） | 掩码规则（同一目录） | 掩码后写日志/导出 | 🟡 掩码已接；**换行注入与完整导出口径未核** |
+| 13 | 模型请求最终装配出口 | `anthropic-messages-runtime` / `openai-compatible-runtime` 的 `fetch` 之前 | **请求体四态扫描**（ADR-0080） | `record` 记录并发送；`block` 拒绝发送 | 🟡 **两 runtime 已接（默认 record）**；azure/bedrock/gemini **无 runtime ⇒ 不适用**（见核查报告） |
+| 14 | 日志 / 诊断导出 | `infra/redaction.ts`（`Redactor`）；`infra/log-line-safety.ts`（ADR-0106） | 掩码规则 + 换行转义/截断 | 掩码后写日志；**一处异常日志已加固** | 🟡 掩码已接；**换行加固仅 1 处**、无统一 logger、ANSI 未处理 |
 | 15 | 授权范围外发 | `outbound-content-gate`（SEC-02-04） | 四态扫描结果 + 授权绑定 | **尚无调用方** | ❌ 契约存在、未接线 |
 
 ## 2. 类别 × 通道矩阵
@@ -74,12 +74,24 @@
    `block` 模式误报率实测、其余入口（非这两个 runtime 的调用）、以及"扫描记录"的持久化/呈现。
 2. **摘要/记忆/汇报**（通道 12）：**写入侧三块已加闸**（ADR-0086/0087），**读取侧已标注**
    （ADR-0088/0089），注入侧已产出标注并记录（ADR-0103/0104）；仍缺"按标注决定是否注入"的策略与 UI。
-3. **MCP/插件结果**（通道 7）：掩码不能替代阻断；需要在结果返回模型前判定。
-4. **日志换行注入**与诊断导出完整性（通道 14）。
+3. **MCP/插件结果**（通道 7）：**已有可选 block（ADR-0105，默认 record）**；仍缺误报率实测与默认策略决定。
+4. **日志换行注入**（通道 14）：**一处已加固（ADR-0106）**；仍缺"统一 logger 保证全覆盖"、ANSI 控制字符处理与诊断导出完整性。
 5. **文档转换/OCR/归档/缓存**（9/10/11）：逐一确认是否存在把内容返回模型的路径。
-6. 全部通道的**实际行为**（拒绝/掩码）都还没有运行证据。
+6. 全部通道的**实际行为**（拒绝/掩码）都还没有运行证据；`block` 模式只有**未执行的探针脚本**（ADR-0107），没有实测数字。
 
 ## 6. 验证状态
 
 **implemented-unverified**：本矩阵是**静态调用链核对**，不是运行验证。
 通道 3 的修复已写入代码并通过 `typecheck`/`eslint`/`build`，但**没有跑过**任何检索用例。
+
+## 7. 最新状态（2026-10-29，R14–R19 刷新）
+
+| 通道 | 本轮变化 | ADR | 仍缺 |
+|---|---|---|---|
+| 7 插件/MCP | 结果**可选 block**（默认 record；检查脱敏后文本） | 0105 | 误报率实测、默认策略 |
+| 12 摘要/记忆/汇报 | 注入侧标注（`AssembledContextPrompt.contentScan`）+ 环形运行记录 | 0103/0104 | 按标注决定是否注入的策略、持久化、UI |
+| 13 模型最终出口 | 两个 runtime 的请求体扫描（默认 record）；适配器核查结论为**不适用** | 0080、核查报告 | block 误报率、其余入口、记录持久化 |
+| 14 日志 | 换行转义 + 有界截断（**一处**） | 0106 | 统一 logger、ANSI、导出完整性 |
+
+**结论**：矩阵中 ❌ 的通道 13 已变为"**已接但默认只记录**"；🟡 的 7/12/14 仍是 🟡（有改进、未闭合）。
+**仍未闭合**：所有 `block` 都**未实测**；`block` 只在用户显式开启时生效。
