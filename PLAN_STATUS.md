@@ -673,6 +673,16 @@
 >
 > **窗口结束**。下一位接手者从 `ALIGN_CORE_HANDOFF.md` 开头的"从这里开始"进入。
 > 每轮一个检查点，单独提交，按纪律尝试推送。
+>
+> **75 R1（新窗口 60 轮）：计划与基线冻结（完成）**：新增
+> [NEXT60_PLAN_2026-10-29.md](astarray/docs/tasks/NEXT60_PLAN_2026-10-29.md) —— 8 阶段、
+> 逐轮检查点（B: GOAL-02 接线；C: 完成门禁生产方；D: SEC-02 收口；E: 两套记账收口；
+> F: 剩余可做卡；G: 证据与文档；H: 收尾）、每轮固定动作、明确不做项与需用户决定项。
+> **基线**：HEAD `b0e52992`；`typecheck` exit 0、`lint` exit 0、`build` 成功；
+> `git status` 仅含**非本轮**改动（`docs/tasks/RESUME02_EXPERIMENTAL_SMART_CONTINUATION.md`
+> 的前序修改，本窗口不提交）与本计划文件。
+> 八卡状态沿用：**7 in_progress + 1 blocked（REMOTE-01）**，无卡 done；运行证据 0。
+> **下一轮**：R2 —— 运行时构造 `GoalModeStateStore` 并暴露句柄（不启动、不改行为）。
 
 
 > ## ⚠️ 最新交接（2026-11-08，第 81–95 轮，**请先读这一份**）
