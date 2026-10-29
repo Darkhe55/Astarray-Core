@@ -1053,6 +1053,7 @@ taskLedgerCommand
   .option("--sequence <sequence-id>", "权威任务序列标识")
   .option("--owner <agent-instance-id>", "序列 owner（个体标识）")
   .option("--recent <count>", "最近多少条差异历史", "10")
+  .option("--list-bindings", "只读列出已登记的 mission↔序列 索引（无需 mission）")
   .option("--json", "JSON 输出")
   .action(
     async (options: {
@@ -1060,6 +1061,7 @@ taskLedgerCommand
       sequence?: string;
       owner?: string;
       recent?: string;
+      listBindings?: boolean;
       json?: boolean;
     }) => {
       process.exitCode = await executeTaskLedgerStatusCommand({
@@ -1076,6 +1078,7 @@ taskLedgerCommand
         ...(options.recent === undefined
           ? {}
           : { recentCount: Number(options.recent) }),
+        ...(options.listBindings === true ? { isListBindings: true } : {}),
         isJsonOutput: options.json === true,
       });
     },
