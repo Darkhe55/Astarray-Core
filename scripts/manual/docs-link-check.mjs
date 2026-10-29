@@ -52,7 +52,14 @@ const deadLinks = [];
 let checkedLinkCount = 0;
 
 for (const filePath of files) {
-  const content = await readFile(filePath, "utf8");
+  const rawContent = await readFile(filePath, "utf8");
+  /**
+   * 跳过**代码块与行内代码**：文档里常有 ](relative/path) 这类示例，
+   * 它们不是真链接，按链接检查会产生假死链。
+   */
+  const content = rawContent
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]*`/g, "");
   const relativeSource = path.relative(rootDirectory, filePath).replace(/\\/g, "/");
   for (const match of content.matchAll(/\]\(([^)\s]+)\)/g)) {
     const rawTarget = match[1];
