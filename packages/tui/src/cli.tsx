@@ -21,7 +21,10 @@ import { executeObsPerfRotateCommand } from "./cli/obs-perf-rotate-command.js";
 // 清单第 ① 项出口（2026-10-28）：两套记账的只读对账视图。
 import { executeTaskLedgerStatusCommand } from "./cli/task-ledger-command.js";
 // F 阶段 R31（2026-10-29）：目标模式的只读状态视图（不提供写命令）。
-import { executeGoalModeStatusCommand } from "./cli/goal-mode-command.js";
+import {
+  executeGoalModeStatusCommand,
+  executeGoalModeVerdictsCommand,
+} from "./cli/goal-mode-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
   DEFAULT_HISTORY_PAGE_SIZE,
@@ -1110,6 +1113,19 @@ taskLedgerCommand
 const goalModeCommand = program
   .command("goal-mode")
   .description("目标模式（实验能力）的只读状态：契约/绑定/可还原门禁/跳过原因");
+
+goalModeCommand
+  .command("verdicts")
+  .description("只读列出最近的派发判定记录（有界 200 条，不含正文）")
+  .option("--recent <count>", "显示最近多少条", "20")
+  .option("--json", "JSON 输出")
+  .action(async (options: { recent?: string; json?: boolean }) => {
+    process.exitCode = await executeGoalModeVerdictsCommand({
+      stateDirectory: defaultStateDirectory(),
+      recentCount: options.recent === undefined ? 20 : Number(options.recent),
+      isJsonOutput: options.json === true,
+    });
+  });
 
 goalModeCommand
   .command("status")

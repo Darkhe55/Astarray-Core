@@ -13,6 +13,7 @@ import { GoalContractStore } from "../../../core/src/orchestration/goal-contract
 import { GoalMissionBindingStore } from "../../../core/src/orchestration/goal-mission-binding-store.js";
 import { GoalModeStateStore } from "../../../core/src/orchestration/goal-mode-store.js";
 import { GoalGateCache } from "../../../core/src/orchestration/goal-gate-cache.js";
+import { GoalDispatchVerdictJournal } from "../../../core/src/orchestration/goal-dispatch-verdict-journal.js";
 import { EXIT_CODES, printJson } from "./json-output.js";
 
 export interface GoalModeStatusCommandInput {
@@ -94,6 +95,62 @@ export async function executeGoalModeStatusCommand(
   );
   process.stdout.write(
     "注意: 强制模式仍缺省关（isGoalModeEnforcementEnabled），当前只观察不阻断。\n",
+  );
+  return EXIT_CODES.SUCCESS;
+}
+
+export interface GoalModeVerdictsCommandInput {
+  readonly stateDirectory: string;
+  readonly recentCount: number;
+  readonly isJsonOutput: boolean;
+}
+
+/** R35：`goal-mode verdicts` —— 只读列出最近的派发判定记录（有界，不含正文）。 */
+export async function executeGoalModeVerdictsCommand(
+  input: GoalModeVerdictsCommandInput,
+): Promise<number> {
+  const journal = new GoalDispatchVerdictJournal({
+    baseDirectory: input.stateDirectory,
+  });
+  let document: Awaited<ReturnType<GoalDispatchVerdictJournal["read"]>>;
+  try {
+    document = await journal.read();
+  } catch (error) {
+    if (input.isJsonOutput) {
+      printJson({ status: "failed", reason: (error as Error).message });
+    } else {
+      process.stdout.write(`读取判定记录失败: ${(error as Error).message}\n`);
+    }
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const limit = Math.max(1, Math.trunc(input.recentCount));
+  const recent = document.records.slice(-limit);
+  if (input.isJsonOutput) {
+    printJson({
+      status: "read-only",
+      totalRecordedCount: document.totalRecordedCount,
+      droppedRecordCount: document.droppedRecordCount,
+      returnedCount: recent.length,
+      records: recent,
+      note: "只读：判定记录有界（200 条），不含正文；isEnforced=false 表示仅观察未阻断。",
+    });
+    return EXIT_CODES.SUCCESS;
+  }
+  process.stdout.write("===== 目标门禁判定记录（只读）=====\n");
+  process.stdout.write(
+    `累计记录: ${String(document.totalRecordedCount)} 条；被截断丢弃: ${String(document.droppedRecordCount)} 条；本次显示最近 ${String(recent.length)} 条\n`,
+  );
+  for (const record of recent) {
+    process.stdout.write(
+      `- ${record.observedAtIso} mission=${record.missionIdentifier} allowed=${String(record.isAllowed)} ` +
+        `enforced=${String(record.isEnforced)} reason=${record.reasonCode ?? "-"}\n`,
+    );
+  }
+  if (recent.length === 0) {
+    process.stdout.write("（还没有任何判定记录：未激活/未绑定/未观察）\n");
+  }
+  process.stdout.write(
+    "注意: isEnforced=false 表示只观察未阻断（强制模式缺省关）。\n",
   );
   return EXIT_CODES.SUCCESS;
 }
