@@ -4076,3 +4076,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `evaluateResume` 永远看不到在途组）、契约 revision 变更无迁移入口（报 revision-mismatch）、
 > 仍无激活/强制 CLI；未运行"还原成功/不覆盖/revision 变化"任何一条。
 > **下一轮**：R34 —— 在编排器**组边界**接 `beginTaskGroup` / `finishTaskGroup`（真正推进状态）。
+
+> **108 R34（F 阶段第 5 步）：目标组开始/结束写状态（完成）**：编排器新增
+> `goalTaskGroupBeginPort` / `goalTaskGroupFinishPort`：**有 start-task 且无在途且未开始** ⇒ begin；
+> **在途归零** ⇒ finish（`success`⇒completed，其它⇒interrupted；失败只升级）。运行时实现只在
+> mission 已绑定目标、契约存在且 `state.contractRevision === contract.revision` 时写：
+> begin 写 `currentTaskGroupIdentifier`；**finish 原样回写 snapshot/依据/V/消耗**（只清在途标记）。
+> 控制器按 mission 绑定闭包并透传两个调度器。
+> **未做**：**不推进 V**（`completedGroupCount`/`checksSinceLastReduction`/`consumedToolCalls` 都不变
+> ⇒ 门禁进展/停滞判定仍不触发）、组标识**进程内递增**不持久唯一、`outcome` 当前未被
+> `finishTaskGroup` 消费、并行下"组"是近似；未运行 begin/finish/skip 任何一条。
+> **下一轮**：R35 —— 判定记录持久化（`onGoalDispatchVerdict` 落环形/JSON），让"某次派发为何被放行"可审计。
