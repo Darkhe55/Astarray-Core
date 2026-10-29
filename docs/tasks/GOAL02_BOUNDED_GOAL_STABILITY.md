@@ -117,3 +117,12 @@
   **决定性缺口 = `GoalModeStateStore` 无任何写入方** ⇒ hydrate 恒 `state-missing`、
   `restoredCount=0`、解析器恒 null；`evaluateResume` 的拦截分支在生产上永不触发。
   另：强制模式无入口、激活无 CLI/UI、判定不落盘、`closeExperiment` 无调用方。
+
+### R33–R37 补充（2026-10-29）
+
+- **R33**：`createGoalContract` 首次写目标状态（ADR-0118）；**R34**：组开始/结束写状态，不推进 V（ADR-0119）。
+- **R35**：判定落盘（有界 200，`goal-mode verdicts` 只读；ADR-0120）。
+- **R36**：`closeGoalExperiment` 接线；已关闭目标以 `experiment-closed` 跳过还原（ADR-0121）。
+- **R37**：收口报告（[GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29](../../reports/GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29.md)）：
+  **V 计算仍未接**（`recordGroupCompletion` / `recordToolCallConsumed` 零调用方）⇒ 门禁只剩静态判定；
+  强制模式/激活仍无用户入口（建议走宿主启动配置，不做 CLI 命令）；无重新开启路径；组标识不持久。
