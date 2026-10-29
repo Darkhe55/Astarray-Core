@@ -129,6 +129,7 @@ import type { MissionRuntimeLease } from "../orchestration/mission-runtime-regis
 import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
+import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
 import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
 import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
 import { CompletionVerdictStore } from "../orchestration/completion-verdict-store.js";

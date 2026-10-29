@@ -3927,3 +3927,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > **更正（R20 结束）**：上一段推送状态已过时 —— 本轮重试成功（`c6596e7d..9115bbe2`），
 > R18、R18a、R19、R20 共 **4 个提交均已推送**，`ahead=0`。
+
+> **95 R21（E 阶段第 1 步）：mission↔序列 持久索引（完成）**：新增
+> `mission-sequence-binding-store.ts`（`<state>/task-ledger/mission-sequences.json`：
+> mission → sequence/owner/时间；**同 mission 不同序列 ⇒ journal-corrupted 拒绝改绑**；
+> 重复同序列幂等；缺失 ⇒ `null`，**不推断**；原子写 + 备份）。
+> 接线：控制器在**发布路径**与**关系索引回填路径**各 `void persistMissionSequenceBinding`
+> （**失败不阻断发布**，但 `streamOutput` 如实告知）；运行时构造并透传；
+> `task-ledger status` 在缺 `--sequence`/`--owner` 时**先查索引补全**，索引缺失仍报缺参数。
+> **未做**：只索引**不修复**、**无 revoke/改绑入口**（只能人工删文件）、一 mission 一序列、
+> 未运行"写入后免手填/改绑拒绝/缺失仍手填"任何一条。
+> **下一轮**：R22 —— 用索引**增强 CLI**：`task-ledger status --mission X` 一条命令完成对账
+> （不再要求 sequence/owner），并把"索引缺失"与"对账失败"区分开。

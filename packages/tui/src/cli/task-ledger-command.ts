@@ -11,6 +11,7 @@ import { AgentTaskSequenceStore } from "../../../core/src/orchestration/agent-ta
 import { MissionManager } from "../../../core/src/orchestration/mission-manager.js";
 import { TaskLedgerBridge } from "../../../core/src/orchestration/task-ledger-bridge.js";
 import { TaskLedgerDivergenceJournal } from "../../../core/src/orchestration/task-ledger-divergence-journal.js";
+import { MissionSequenceBindingStore } from "../../../core/src/orchestration/mission-sequence-binding-store.js";
 import { TaskSequenceStatusController } from "../../../core/src/orchestration/task-sequence-controllers.js";
 import { TaskStore } from "../../../core/src/infra/task-store.js";
 import { EXIT_CODES, printJson } from "./json-output.js";
@@ -32,10 +33,32 @@ export async function executeTaskLedgerStatusCommand(
     baseDirectory: input.stateDirectory,
   });
   const recentDivergences = await journal.readRecent(recentCount);
+  /**
+   * R21（2026-10-29）：**优先用持久索引补全** sequence/owner（缺省才要求手填）。
+   * 索引缺失 ⇒ 仍如实报"缺参数"，**不猜**。
+   */
+  let resolvedSequenceIdentifier = input.sequenceIdentifier;
+  let resolvedOwnerAgentInstanceIdentifier = input.ownerAgentInstanceIdentifier;
+  if (
+    input.missionIdentifier !== undefined &&
+    (resolvedSequenceIdentifier === undefined ||
+      resolvedOwnerAgentInstanceIdentifier === undefined)
+  ) {
+    const bindingStore = new MissionSequenceBindingStore({
+      baseDirectory: input.stateDirectory,
+    });
+    const binding = await bindingStore
+      .readForMission(input.missionIdentifier)
+      .catch(() => null);
+    if (binding !== null) {
+      resolvedSequenceIdentifier ??= binding.sequenceIdentifier;
+      resolvedOwnerAgentInstanceIdentifier ??= binding.ownerAgentInstanceIdentifier;
+    }
+  }
   const missingInputs = [
     input.missionIdentifier === undefined ? "--mission" : null,
-    input.sequenceIdentifier === undefined ? "--sequence" : null,
-    input.ownerAgentInstanceIdentifier === undefined ? "--owner" : null,
+    resolvedSequenceIdentifier === undefined ? "--sequence" : null,
+    resolvedOwnerAgentInstanceIdentifier === undefined ? "--owner" : null,
   ].filter((missing): missing is string => missing !== null);
 
   if (missingInputs.length > 0) {
@@ -86,8 +109,8 @@ export async function executeTaskLedgerStatusCommand(
   try {
     report = await bridge.inspectAlignment({
       missionIdentifier: input.missionIdentifier as string,
-      sequenceId: input.sequenceIdentifier as string,
-      ownerAgentInstanceId: input.ownerAgentInstanceIdentifier as string,
+      sequenceId: resolvedSequenceIdentifier as string,
+      ownerAgentInstanceId: resolvedOwnerAgentInstanceIdentifier as string,
       viewer: { sourceKind: "user", actorId: "cli" },
     });
   } catch (error) {
