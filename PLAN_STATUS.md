@@ -3723,3 +3723,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **76a 推送状态（2026-10-29 R2）**：R2 提交 `0994b1a5` **本地已提交但未推送** —— 连续 5 次
 > `git push` 失败（`Could not read from remote repository`）。按纪律记录原因、本阶段跳过，
 > **下一轮（R3）完成时合并重试**；远端未改写。
+
+> **77 R3（GOAL-02 接线第 2 步）：门禁解析器（完成）**：新增三个只读模块并接入运行时：
+> ①`goal-contract-store.ts`（契约落盘；写入前校验，非法拒绝；损坏返回 null）；
+> ②`goal-mission-binding-store.ts`（mission→目标 唯一绑定；**改绑须先解绑**，防换目标绕过暂停）；
+> ③`goal-gate-cache.ts`（启动 `hydrate()`：绑定→契约→状态→`restoreFromSnapshot`；
+> **缺任一条件不还原**并记录 `contract-missing`/`state-missing`/`revision-mismatch`/`restore-failed`；
+> 之后 `resolve(mission)` 同步）。
+> 运行时默认把 `goalDispatchGateResolver` 指向缓存；`isGoalModeEnforcementEnabled` 仍缺省 false
+> ⇒ **只观察、不阻断派发**；空目录 ⇒ 0 条、解析器恒 null，**行为与接线前一致**。
+> **未做**：**没有写入方**（无 API/CLI 创建契约或绑定 ⇒ 生产上恒 0 条）、**缓存无失效/刷新**、
+> `resumeMission` 未接 `evaluateResume`（R4）、`resolveGoalModeActivation` 仍无调用方（R5）；
+> 未运行任何还原/跳过路径。
+> **下一轮**：R4 —— `resumeMission` 接入 `evaluateResume`（在途组 ⇒ 拒绝自动恢复并给原因）。

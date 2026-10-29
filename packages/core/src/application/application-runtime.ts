@@ -130,6 +130,10 @@ import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
+import { GoalContractStore } from "../orchestration/goal-contract-store.js";
+import { GoalMissionBindingStore } from "../orchestration/goal-mission-binding-store.js";
+import { GoalGateCache } from "../orchestration/goal-gate-cache.js";
+import type { GoalGateHydrationResult } from "../orchestration/goal-gate-cache.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
 import { evaluateWorkWindowState } from "../orchestration/work-window-contract.js";
@@ -225,6 +229,14 @@ export interface ApplicationRuntime {
    * 后续轮次用它做解析器、恢复对账与激活校验。
    */
   goalModeStateStore: GoalModeStateStore;
+  /** GOAL-02 R3：契约存储（显式控制面写入；解析器只读）。 */
+  goalContractStore: GoalContractStore;
+  /** GOAL-02 R3：mission ↔ 目标 绑定（只维护映射）。 */
+  goalMissionBindingStore: GoalMissionBindingStore;
+  /** GOAL-02 R3：门禁缓存（同步解析；启动时 hydrate）。 */
+  goalGateCache: GoalGateCache;
+  /** GOAL-02 R3：最近一次 hydrate 的结果（还原数 + 跳过原因）。 */
+  goalGateHydration: GoalGateHydrationResult;
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
   toolPackageZipInstaller: ToolPackageZipInstaller;
@@ -899,6 +911,22 @@ export async function createApplicationRuntime(
   const goalModeStateStore = new GoalModeStateStore({
     baseDirectory: stateDirectory,
   });
+  /**
+   * GOAL-02 R3：门禁解析器的三个只读输入 + 启动时还原缓存。
+   *
+   * 全部为空（没有契约/绑定/状态）时 `hydrate()` 返回 0 条，解析器恒为 null，
+   * **行为与接线前逐字一致**。
+   */
+  const goalContractStore = new GoalContractStore({ baseDirectory: stateDirectory });
+  const goalMissionBindingStore = new GoalMissionBindingStore({
+    baseDirectory: stateDirectory,
+  });
+  const goalGateCache = new GoalGateCache({
+    bindingStore: goalMissionBindingStore,
+    contractStore: goalContractStore,
+    stateStore: goalModeStateStore,
+  });
+  const goalGateHydration = await goalGateCache.hydrate();
   /**
    * 接线缺口第 ④ 项（2026-10-28）：**时段变化检测器**。
    *
@@ -1634,7 +1662,16 @@ export async function createApplicationRuntime(
       (await controllerHolder.current?.injectTaskIntoRunningMission(input)) ?? false,
     /** 清单第 ⑥ 项：目标门禁（缺省不参与；只观察/可选强制）。 */
     ...(options.goalDispatchGateResolver === undefined
-      ? {}
+      ? {
+          /**
+           * GOAL-02 R3（2026-10-29）：**本地解析器**。
+           *
+           * 按 mission 查缓存；未绑定/未还原 ⇒ null（目标模式不参与）。
+           * `isGoalModeEnforcementEnabled` 仍默认 false ⇒ **只观察，不阻断派发**。
+           */
+          goalDispatchGateResolver: (missionIdentifier: string) =>
+            goalGateCache.resolve(missionIdentifier),
+        }
       : { goalDispatchGateResolver: options.goalDispatchGateResolver }),
     ...(options.isGoalModeEnforcementEnabled === true
       ? { isGoalModeEnforcementEnabled: true }
@@ -2000,6 +2037,10 @@ export async function createApplicationRuntime(
     workWindowTransitionMonitor,
     taskLedgerDivergenceJournal,
     goalModeStateStore,
+    goalContractStore,
+    goalMissionBindingStore,
+    goalGateCache,
+    goalGateHydration,
     experimentSettingsStore,
     toolPackageLifecycleService,
     toolPackageZipInstaller,
