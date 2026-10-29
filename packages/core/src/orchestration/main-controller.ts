@@ -79,6 +79,7 @@ import type {
 import type { ContextRecallController } from "./context-recall-controller.js";
 import type { ContextRecallResult } from "./context-recall-controller.js";
 import type { ActorIdentity, TaskSequenceStatusController } from "./task-sequence-controllers.js";
+import type { MissionSequenceBindingStore } from "./mission-sequence-binding-store.js";
 import { TaskLedgerBridge } from "./task-ledger-bridge.js";
 import {
   buildTaskLedgerDivergenceEntry,
@@ -202,6 +203,13 @@ export interface MainControllerOptions {
    * 严格模式（`isCompletionReceiptRequired`）读取同一份存储（R8）。
    */
   completionReceiptStore?: CompletionReceiptStore | null;
+  /**
+   * 计划 R21（2026-10-29）：**mission ↔ 序列 持久索引**（缺省 null ⇒ 只保留内存映射）。
+   *
+   * 装配后：登记序列映射时同时落盘；`task-ledger status` 可据此免手填。
+   * 绑定失败**不阻断**发布，但会流式告知（索引是辅助观测，不是主链路）。
+   */
+  missionSequenceBindingStore?: MissionSequenceBindingStore | null;
   /**
    * 计划 R11（2026-10-29）：**完成裁决存储**（缺省 null ⇒ 裁决只走既有验收门禁，不落盘）。
    * 装配后：`recordAcceptanceVerdict` 通过校验即写入（merge-ready ⇒ accepted；其余 ⇒ rejected）。
@@ -1328,6 +1336,12 @@ export class MainController {
       sequenceRevision: registration.document.revision,
       isSequenceCreated: registration.isSequenceCreated,
     });
+    /** R21：登记 mission↔序列 持久索引（失败不阻断发布，只流式告知）。 */
+    void this.persistMissionSequenceBinding({
+      missionIdentifier: input.missionId,
+      sequenceIdentifier: registration.document.sequenceId,
+      ownerAgentInstanceIdentifier: input.secondaryAgentInstanceId,
+    });
     return {
       taskSequenceIdentifier: registration.document.sequenceId,
       taskIdentifier: registration.taskIdentifier,
@@ -1663,6 +1677,12 @@ export class MainController {
           /** 关系索引不保存序列 revision ⇒ 标记为未知（0），插入前必须重新读取。 */
           sequenceRevision: 0,
           isSequenceCreated: false,
+        });
+        /** R21：恢复时把已有映射回填到持久索引（同样不阻断）。 */
+        void this.persistMissionSequenceBinding({
+          missionIdentifier: record.missionIdentifier,
+          sequenceIdentifier: record.taskSequenceIdentifier,
+          ownerAgentInstanceIdentifier: record.sequenceOwnerAgentInstanceIdentifier,
         });
       }
       restoredMissionCount += 1;
@@ -2050,6 +2070,35 @@ export class MainController {
       capturedAtIso: new Date().toISOString(),
       additionalReasonCodes: [...new Set(additionalReasonCodes)],
     });
+  }
+
+  /**
+   * R21（2026-10-29）：把 mission↔序列 映射写入持久索引。
+   *
+   * 失败**不阻断**发布（索引是辅助观测），但必须流式告知，不能假装已落盘。
+   */
+  private async persistMissionSequenceBinding(input: {
+    readonly missionIdentifier: string;
+    readonly sequenceIdentifier: string;
+    readonly ownerAgentInstanceIdentifier: string;
+  }): Promise<void> {
+    const store = this.options.missionSequenceBindingStore;
+    if (store === null || store === undefined) {
+      return;
+    }
+    try {
+      await store.bind({
+        missionIdentifier: input.missionIdentifier,
+        sequenceIdentifier: input.sequenceIdentifier,
+        ownerAgentInstanceIdentifier: input.ownerAgentInstanceIdentifier,
+        boundAtIso: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.options.streamOutput(
+        input.missionIdentifier,
+        `[任务账本] mission↔序列索引写入失败：${(error as Error).message}`,
+      );
+    }
   }
 
   /**
