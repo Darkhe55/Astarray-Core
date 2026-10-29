@@ -52,8 +52,8 @@ npm run check        # 本窗口从未运行
 
 ```powershell
 npm run build
-node scripts/manual/strict-completion-drill.mjs     # 未执行过
-node scripts/manual/egress-false-positive-probe.mjs # 未执行过
+node scripts/manual/strict-completion-drill.mjs     # 已执行：exit 0，7 项全过（仅存储层）
+node scripts/manual/egress-false-positive-probe.mjs # 已执行：exit 0，8 正常 0 误报 / 6 假凭据全命中
 node scripts/manual/taskcard-status-index.mjs       # 已执行（文档）
 node scripts/manual/symbol-usage-audit.mjs          # 已执行（文本）
 node scripts/manual/docs-link-check.mjs             # 已执行（0 死链）

@@ -46,3 +46,10 @@ node scripts/manual/egress-false-positive-probe.mjs
 ## 5. 验证状态
 
 **未运行**；`node --check` exit 0（语法）；`typecheck`/`build` 通过（SDK 导出为纯函数）。
+
+## 6. 执行记录（2026-10-29，窗口后补）
+
+首次执行 **exit 1**：8 条 normal 全 clean（0 误报），6 条假凭据 **5 命中 / 1 MISS**
+（`fake-aws`）。定位为**样本长度写错**（规则要求 `AKIA` 后 16 位，样本只有 14 位），
+修正样本后复跑 **exit 0**，6/6 命中、0 误报。详见
+[SCRIPT_RUN_EVIDENCE_2026-10-29](../reports/SCRIPT_RUN_EVIDENCE_2026-10-29.md)。

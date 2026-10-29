@@ -42,8 +42,8 @@ npm run test        # 本窗口从未运行（需授权）
 npm run check       # 本窗口从未运行（需授权）
 node scripts/manual/docs-link-check.mjs         # 已跑：0 死链
 node scripts/manual/symbol-usage-audit.mjs      # 已跑：29 符号均在
-node scripts/manual/strict-completion-drill.mjs # 未执行
-node scripts/manual/egress-false-positive-probe.mjs # 未执行
+node scripts/manual/strict-completion-drill.mjs # 已执行：exit 0（仅存储层）
+node scripts/manual/egress-false-positive-probe.mjs # 已执行：exit 0（样本修 1 处后 6/6 命中）
 ```
 
 判读口径见 [交付说明](DELIVERY_NOTE_2026-10-29.md) §3：**命令能跑通 ≠ 判定正确**。
