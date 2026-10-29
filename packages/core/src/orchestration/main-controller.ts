@@ -80,6 +80,7 @@ import type { ContextRecallController } from "./context-recall-controller.js";
 import type { ContextRecallResult } from "./context-recall-controller.js";
 import type { ActorIdentity, TaskSequenceStatusController } from "./task-sequence-controllers.js";
 import type { MissionSequenceBindingStore } from "./mission-sequence-binding-store.js";
+import type { DeferredInsertionQueueStore } from "./deferred-insertion-queue.js";
 import { TaskLedgerBridge } from "./task-ledger-bridge.js";
 import {
   buildTaskLedgerDivergenceEntry,
@@ -210,6 +211,13 @@ export interface MainControllerOptions {
    * 绑定失败**不阻断**发布，但会流式告知（索引是辅助观测，不是主链路）。
    */
   missionSequenceBindingStore?: MissionSequenceBindingStore | null;
+  /**
+   * 计划 R24（2026-10-29）：**推迟到下一组的插入队列**（缺省 null ⇒ 只保留返回文本）。
+   *
+   * 装配后：`deferred-to-sequence` 路径会把条目写入队列，供下一组安全点消费。
+   * 本类**不做消费**（消费方是后续检查点）；入队失败流式告知、不阻断插入本身。
+   */
+  deferredInsertionQueueStore?: DeferredInsertionQueueStore | null;
   /**
    * 计划 R11（2026-10-29）：**完成裁决存储**（缺省 null ⇒ 裁决只走既有验收门禁，不落盘）。
    * 装配后：`recordAcceptanceVerdict` 通过校验即写入（merge-ready ⇒ accepted；其余 ⇒ rejected）。
@@ -1492,6 +1500,26 @@ export class MainController {
       sequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
       trigger: "runtime-insert-deferred",
     });
+    /** R24：写入"下一组待消费"队列（失败不阻断插入，只流式告知）。 */
+    const deferredQueue = this.options.deferredInsertionQueueStore;
+    if (deferredQueue !== null && deferredQueue !== undefined) {
+      try {
+        await deferredQueue.enqueue({
+          insertRequestIdentifier: request.requestIdentifier,
+          missionIdentifier: request.missionIdentifier,
+          taskIdentifier: registration.taskIdentifier,
+          sequenceIdentifier: registration.document.sequenceId,
+          ownerAgentInstanceIdentifier: sequenceMapping.ownerAgentInstanceIdentifier,
+          reason: decision.reason,
+          enqueuedAtIso: new Date().toISOString(),
+        });
+      } catch (error) {
+        this.options.streamOutput(
+          request.missionIdentifier,
+          `[任务账本] 推迟插入入队失败：${(error as Error).message}`,
+        );
+      }
+    }
     return {
       outcome: "deferred-to-sequence",
       reason:

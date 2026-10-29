@@ -3966,3 +3966,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 不展开依赖链、脚本需读 JSON 区分通过/阻塞；未运行五条判定任何一条。
 > **下一轮**：R24 —— 组边界注入（把"推迟到下一组"变成**显式队列 + 下一组安全点消费**），
 > 仍不改运行中图。
+
+> **98 R24（E 阶段第 4 步）：推迟插入显式队列（完成，无消费方）**：新增
+> `deferred-insertion-queue.ts`（`<state>/task-ledger/deferred-insertions.json`，
+> `pending`/`consumed` 两段；请求标识幂等；同请求不同任务/序列 ⇒ `journal-corrupted`；
+> 原子写 + 备份）。`deferred-to-sequence` 路径在差异快照后**入队**（失败不阻断、流式告知）；
+> 控制器与运行时透传；CLI `task-ledger status --deferred-insertions [--mission X]` 只读列出，
+> 空队列输出 `no-pending-insertions` 并注明"消费尚未接"。
+> **未做**：**没有消费方**（`markConsumed` 无生产调用者 ⇒ 队列只增）、**不判定安全点**、
+> 队列**不驱动派发**（DagScheduler 缺口仍在）、`consumed` 无上限；未运行入队/幂等/拒绝/消费任何一条。
+> **下一轮**：R25 —— 在**组边界安全点**接消费：新组开始时逐条 `markConsumed` + 写差异快照，
+> 仍不改运行中图（消费≠派发，如实标注）。
