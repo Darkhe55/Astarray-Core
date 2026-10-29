@@ -270,14 +270,16 @@ export function assertSubRequirementWeightsPreserveParent(input: {
   }
 }
 
-/** 目标模式**默认关闭**（实验能力；只能由认证用户显式开启）。 */
-export const GOAL_MODE_DEFAULT_ENABLED = false;
-
 /**
- * 目标模式激活判定。
+ * 目标模式激活判定（**唯一开关**）。
  *
- * 三条同时满足才开启：显式请求（不是默认）＋请求者是认证用户＋显式开启开关。
- * 模型/三级 Agent/匿名调用一律不满足（本函数不接受"模型说已开启"作为证据）。
+ * 默认关闭在这里表达：三个条件必须同时为真（显式用户请求 + 认证用户 + 显式开启），
+ * 且请求来源必须是 `user`。模型/三级 Agent/匿名调用一律不满足
+ * （本函数不接受"模型说已开启"作为证据）。
+ *
+ * R5（2026-10-29）：删除 `GOAL_MODE_DEFAULT_ENABLED` 常量 —— 它此前**没有任何调用方**
+ * （全仓仅定义处 1 次），留着只会让审计误以为"默认关闭已被代码保证"。
+ * 现在"默认关闭"的唯一事实来源就是本函数；调用方**必须**用它，不能自行判断。
  */
 export function resolveGoalModeActivation(input: {
   readonly isExplicitUserRequest: boolean;

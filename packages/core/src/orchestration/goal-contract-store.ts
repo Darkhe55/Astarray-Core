@@ -15,6 +15,7 @@ import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 import { validateGoalContract } from "./goal-contract.js";
+import { resolveGoalModeActivation } from "./goal-contract.js";
 import type { GoalContract } from "./goal-contract.js";
 
 export class GoalContractStore {
@@ -41,6 +42,27 @@ export class GoalContractStore {
     await this.writeLock.runExclusive(async () => {
       await writeAtomicJson(this.contractFilePath(contract.goalIdentifier), contract);
     });
+  }
+
+  /**
+   * GOAL-02 R5（2026-10-29）：**激活后才能创建目标契约**。
+   *
+   * 这是 `resolveGoalModeActivation` 的**第一个生产调用点**：未激活（匿名/模型来源/
+   * 未显式开启）⇒ 拒绝落盘；激活判定与拒绝原因由该函数给出，本方法不自行判断。
+   */
+  async saveActivated(
+    contract: GoalContract,
+    activationInput: Parameters<typeof resolveGoalModeActivation>[0],
+  ): Promise<{ readonly isActive: boolean; readonly reason: string }> {
+    const activation = resolveGoalModeActivation(activationInput);
+    if (!activation.isActive) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        `目标模式未激活，拒绝创建目标契约: ${activation.reason}`,
+      );
+    }
+    await this.save(contract);
+    return activation;
   }
 
   async read(goalIdentifier: string): Promise<GoalContract | null> {

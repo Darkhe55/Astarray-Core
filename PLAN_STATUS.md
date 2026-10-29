@@ -3752,3 +3752,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `reconcile-first` 后没有"对账后继续"流程；未运行任何拒绝/放行路径。
 > **下一轮**：R5 —— 派发/恢复前调用 `resolveGoalModeActivation` 做激活校验，并处置死常量
 > （推荐 A：删常量、保留判定；若用户选 B 则按 B 改）。
+
+> **79 R5（GOAL-02 接线第 4 步）：激活成为唯一开关、删除死常量（完成）**：
+> 按方案 A 删除 `GOAL_MODE_DEFAULT_ENABLED`（此前全仓仅定义处 1 次、无调用方）；
+> `resolveGoalModeActivation` 成为**唯一开关**（来源=user + 已认证 + 显式请求 + 显式开启）。
+> 新增：`GoalContractStore.saveActivated`（未激活 ⇒ 拒绝创建契约）；
+> 运行时 `activateGoalMode` / `getGoalModeActivation`（**默认未激活**）；
+> 未激活 ⇒ `goalDispatchGateResolver` 恒 `null` ⇒ 目标模式不参与派发/恢复。
+> 调用链：`resolveGoalModeActivation` → `saveActivated` / `activateGoalMode` → resolver。
+> **未做**：**无 UI/CLI 调用激活入口**、**契约/绑定仍无写入方**（生产恒 0 条）、
+> 强制模式仍缺省关；未运行"未激活 ⇒ null""模型来源 ⇒ 拒绝""未激活 ⇒ 拒绝建契约"任何一条。
+> **下一轮**：R6 —— 完成收据的**本地存储**（按 mission/task 落盘、原子写；严格模式可读）。

@@ -133,6 +133,7 @@ import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
 import { GoalMissionBindingStore } from "../orchestration/goal-mission-binding-store.js";
 import { GoalGateCache } from "../orchestration/goal-gate-cache.js";
+import { resolveGoalModeActivation } from "../orchestration/goal-contract.js";
 import type { GoalGateHydrationResult } from "../orchestration/goal-gate-cache.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
@@ -237,6 +238,18 @@ export interface ApplicationRuntime {
   goalGateCache: GoalGateCache;
   /** GOAL-02 R3：最近一次 hydrate 的结果（还原数 + 跳过原因）。 */
   goalGateHydration: GoalGateHydrationResult;
+  /**
+   * GOAL-02 R5：激活目标模式（唯一入口；经 `resolveGoalModeActivation` 判定）。
+   * 未调用或判定未通过 ⇒ 门禁解析器恒为 null，目标模式不参与派发/恢复。
+   */
+  activateGoalMode: (input: {
+    readonly isExplicitUserRequest: boolean;
+    readonly isAuthenticatedUser: boolean;
+    readonly isExplicitlyEnabled: boolean;
+    readonly requestedBy: "user" | "model" | "tertiary-agent";
+  }) => { readonly isActive: boolean; readonly reason: string };
+  /** GOAL-02 R5：当前激活状态（只读）。 */
+  getGoalModeActivation: () => { readonly isActive: boolean; readonly reason: string };
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
   toolPackageZipInstaller: ToolPackageZipInstaller;
@@ -927,6 +940,29 @@ export async function createApplicationRuntime(
     stateStore: goalModeStateStore,
   });
   const goalGateHydration = await goalGateCache.hydrate();
+  /**
+   * GOAL-02 R5（2026-10-29）：**激活状态**（默认未激活）。
+   *
+   * 唯一的激活判定是 `resolveGoalModeActivation`（不再有 `GOAL_MODE_DEFAULT_ENABLED` 常量）。
+   * 未激活 ⇒ 门禁解析器恒为 null ⇒ 目标模式完全不参与派发/恢复。
+   */
+  let isGoalModeActivated = false;
+  let goalModeActivationReason = "目标模式未激活（默认关闭：需认证用户显式请求并显式开启）。";
+  const activateGoalMode = (input: {
+    readonly isExplicitUserRequest: boolean;
+    readonly isAuthenticatedUser: boolean;
+    readonly isExplicitlyEnabled: boolean;
+    readonly requestedBy: "user" | "model" | "tertiary-agent";
+  }): { readonly isActive: boolean; readonly reason: string } => {
+    const activation = resolveGoalModeActivation(input);
+    isGoalModeActivated = activation.isActive;
+    goalModeActivationReason = activation.reason;
+    return activation;
+  };
+  const getGoalModeActivation = (): {
+    readonly isActive: boolean;
+    readonly reason: string;
+  } => ({ isActive: isGoalModeActivated, reason: goalModeActivationReason });
   /**
    * GOAL-02 R4（2026-10-29）：**恢复前的目标模式对账**。
    *
@@ -1722,7 +1758,7 @@ export async function createApplicationRuntime(
            * `isGoalModeEnforcementEnabled` 仍默认 false ⇒ **只观察，不阻断派发**。
            */
           goalDispatchGateResolver: (missionIdentifier: string) =>
-            goalGateCache.resolve(missionIdentifier),
+            isGoalModeActivated ? goalGateCache.resolve(missionIdentifier) : null,
         }
       : { goalDispatchGateResolver: options.goalDispatchGateResolver }),
     ...(options.isGoalModeEnforcementEnabled === true
@@ -2093,6 +2129,8 @@ export async function createApplicationRuntime(
     goalMissionBindingStore,
     goalGateCache,
     goalGateHydration,
+    activateGoalMode,
+    getGoalModeActivation,
     experimentSettingsStore,
     toolPackageLifecycleService,
     toolPackageZipInstaller,
