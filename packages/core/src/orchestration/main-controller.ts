@@ -457,6 +457,18 @@ export interface MainControllerOptions {
     readonly blockedReasons: readonly string[];
   }>;
   /**
+   * GOAL-02 R4（2026-10-29）：**恢复前的目标模式对账**（可选）。
+   *
+   * 缺省不传 ⇒ 不参与（行为与接线前一致）。装配后：`resumeMission` 在只读恢复门禁之后、
+   * 就绪分类之前调用；返回非 `resume` ⇒ **拒绝自动恢复**并给出原因（与就绪分类并列，
+   * 不重跑在途组、不重复副作用）。
+   */
+  missionGoalResumeReconciliation?: (missionId: string) => Promise<{
+    readonly outcome: "resume" | "reconcile-first" | "stay-paused";
+    readonly detail: string;
+    readonly evidenceGaps?: readonly string[];
+  }>;
+  /**
    * ALIGN-04-05（2026-10-28）：**按调用者构造的回访控制器**（节点关闭 → 回访重建）。
    *
    * 每个调用者（个体）有自己的回执冷却/预算账本，所以按 `callerAgentInstanceId` 构造；
@@ -898,6 +910,26 @@ export class MainController {
         throw new DomainError(
           "mission-locked",
           `恢复被拒（先完成只读对账/解除阻塞再续接）: ${recoveryDecision.blockedReasons.join("；")}`,
+        );
+      }
+    }
+    /**
+     * GOAL-02 R4（2026-10-29）：**目标模式对账**。
+     *
+     * 有绑定目标且持久化状态显示"有在途组 / 暂停 / 需重规划"时**拒绝自动恢复**；
+     * 未装配该端口（或未绑定目标）时行为与接线前一致。
+     */
+    const goalReconciliation = this.options.missionGoalResumeReconciliation;
+    if (goalReconciliation !== undefined) {
+      const goalDecision = await goalReconciliation(missionId);
+      if (goalDecision.outcome !== "resume") {
+        const evidenceGaps =
+          goalDecision.evidenceGaps === undefined || goalDecision.evidenceGaps.length === 0
+            ? ""
+            : `；证据缺口: ${goalDecision.evidenceGaps.join("；")}`;
+        throw new DomainError(
+          "mission-locked",
+          `目标模式恢复对账未通过（${goalDecision.outcome}）: ${goalDecision.detail}${evidenceGaps}`,
         );
       }
     }
