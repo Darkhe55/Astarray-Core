@@ -4123,3 +4123,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 重开迁移规则需产品决定。GOAL-02 卡同步补记。**无代码改动**。
 > **下一轮**：R38 —— 把本地 V 计算接入 `recordGroupCompletion`（逐 requirement 依据），让门禁第一次有
 > 真正的进展/停滞判定（仍不改强制开关）。
+
+> **112 R38（F 阶段第 8 步）：本地 V 计算接入（完成）**：新增 `goal-requirement-assessment.ts`
+> （要求 → 本地证据：节点全 done **且** 每节点有 accepted 裁决 ⇒ `valid/independent-acceptance`；
+> 未映射/缺节点/缺裁决 ⇒ `unverified`；**不读模型输出**）。运行时在**组结束**时：
+> 读 mission 链 + accepted 裁决 + 收据 `toolCallCount` → `computeGoalPotential` → 门禁
+> `recordToolCallConsumed` + `recordGroupCompletion({groupKind:"normal", recordedBy:"local-verifier"})`
+> → 用新 `createSnapshot()` 与逐项 `remainingContribution` 落 `finishTaskGroup`；失败降级为"只清在途标记"。
+> 效果：`recordGroupCompletion` / `recordToolCallConsumed` **第一次有生产调用方**，门禁进展/停滞/预算分支
+> 第一次可能触发。
+> **未做**：`groupKind` 恒 `normal`（调查/返工不可区分）、只在组结束算 V、**暂停只落状态**（强制仍关，
+> 不阻断派发、无用户提示）、V 依赖裁决与收据齐备；未运行任何 V/降级路径。
+> **下一轮**：R39 —— F 阶段收尾自查：核对 R30–R38 的"未做"是否仍准确，并更新 GOAL-02 卡状态。
