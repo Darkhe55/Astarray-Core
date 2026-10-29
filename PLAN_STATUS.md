@@ -4055,3 +4055,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > **105a 推送状态（2026-10-29 R31）**：R31 提交**本地已提交但未推送** —— 连续 5 次 `git push` 失败
 > （`Could not read from remote repository`）。按纪律记录、下一轮合并重试；远端未改写。
+
+> **106 R32（F 阶段第 3 步）：GOAL-02 端到端静态核对（完成，审计）**：四要素现状 ——
+> **契约/绑定有写入方**（R30），**激活有入口但无 CLI/UI**，**状态零写入方**。
+> 决定性缺口：`GoalModeStateStore.write/beginTaskGroup/finishTaskGroup/closeExperiment`
+> **没有任何调用方** ⇒ 即使写入契约与绑定，`GoalGateCache.hydrate` 仍在第三步 `state-missing`、
+> `restoredCount=0`、解析器恒 null；`evaluateResume` 在无状态时返回 `resume`（"按首次运行处理"），
+> 其**拦截分支在生产上永不触发**。另列：强制模式无入口、判定只回调不落盘、`closeExperiment` 未接线。
+> 报告：`docs/reports/GOAL02_END_TO_END_GAPS_2026-10-29.md`；GOAL-02 卡同步补记。**无代码改动**。
+> **下一轮**：R33 —— 在编排器**组开始/结束**接入 `beginTaskGroup` / `finishTaskGroup`，
+> 让状态第一次被写入（这是缺口 1 的唯一解法）。
