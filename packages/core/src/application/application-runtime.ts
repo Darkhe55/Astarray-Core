@@ -428,6 +428,15 @@ export interface ApplicationRuntimeOptions {
    */
   goalDispatchGateResolver?: (missionIdentifier: string) => GoalDispatchGate | null;
   isGoalModeEnforcementEnabled?: boolean;
+  /**
+   * R51（2026-10-29）：**组性质提供者**（可选）。
+   *
+   * 只依据本次组将启动的任务标识返回 `normal` / `investigation` / `rework`；
+   * 缺省不传 ⇒ 一律 `normal`（调查/返工组不计入停滞检查）。
+   */
+  goalTaskGroupKindProvider?: (input: {
+    readonly taskIdentifiers: readonly string[];
+  }) => "normal" | "investigation" | "rework";
   onGoalDispatchVerdict?: (record: GoalDispatchVerdictRecord) => void;
   /**
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
@@ -1135,6 +1144,8 @@ export async function createApplicationRuntime(
     finish: async (input: {
       readonly missionIdentifier: string;
       readonly taskGroupIdentifier: string;
+      readonly outcome: "completed" | "interrupted";
+      readonly groupKind: "normal" | "investigation" | "rework";
       readonly finishedAtIso: string;
     }): Promise<void> => {
       const goalIdentifier = await goalMissionBindingStore
@@ -1207,8 +1218,8 @@ export async function createApplicationRuntime(
           );
           gate.recordGroupCompletion({
             groupIdentifier: input.taskGroupIdentifier,
-            outcome: "completed",
-            groupKind: "normal",
+            outcome: input.outcome,
+            groupKind: input.groupKind,
             potentialValueAfterGroup: potentialResult.potentialValue,
             recordedBy: "local-verifier",
             recordedAtIso: input.finishedAtIso,
@@ -2058,6 +2069,10 @@ export async function createApplicationRuntime(
     deferredInsertionQueueStore,
     /** R34：目标组开始/结束（只在已绑定目标且 revision 一致时写状态）。 */
     goalTaskGroupStatePort,
+    /** R51：组性质提供者（缺省不传 ⇒ normal；调查/返工不计入停滞）。 */
+    ...(options.goalTaskGroupKindProvider === undefined
+      ? {}
+      : { goalTaskGroupKindProvider: options.goalTaskGroupKindProvider }),
     /**
      * 清单第 ① 项下半场（2026-10-28）：**运行中插入的真实注入端口**。
      *
