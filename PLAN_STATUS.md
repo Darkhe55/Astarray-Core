@@ -3891,3 +3891,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > **更正（2026-10-29 R17 结束）**：上一段的推送状态已过时 —— 本轮结束前 `git push` 成功
 > （`3484c196..064b6afc`），R16 与 R17 提交**均已推送**，`ahead=0`。
+
+> **92 R18（D 阶段第 5 步）：日志换行注入加固（完成）**：新增 `infra/log-line-safety.ts`
+> （`sanitizeLogLine` / `formatDiagnosticLogLine`）：`\r\n`/`\r`/`\n`/U+2028/U+2029 转义为可见形式、
+> 有界截断（缺省 2000 字符）并标注、返回转义计数；**不是脱敏**、不改 IPC/JSON 载荷。
+> 应用点：`process-supervisor.handleChildProcessFailure` 的 `error.message`（此前直接拼进模板字符串）。
+> **未做**：**只覆盖一处**（入口心跳/子进程 stdout 转发未应用；后者有意保留原文）、
+> **无统一 logger** 保证全覆盖、**未处理 ANSI 控制字符**；未跑"含换行/超长/计数"任何一条。
+> **下一轮**：R19 —— `block` 模式的**误报率测量脚本**（不执行）：用仓库内假凭据夹具 +
+> 普通文本样本，统计会命中哪些规则，为"是否默认拦截"提供数据而非猜测。
