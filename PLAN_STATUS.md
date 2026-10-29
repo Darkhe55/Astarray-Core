@@ -3782,3 +3782,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未做**：**读取侧未接**（`completionReceiptReader` 空位，R8）、严格模式在无收据时仍阻断、
 > 编排层**不重算**收据与真实产物的一致性；未运行任何落盘/失败/幂等/拒绝路径。
 > **下一轮**：R8 —— `completionReceiptReader` 接本地存储（严格模式可读到收据）。
+
+> **81a 推送状态（2026-10-29 R7）**：R7 的收据落盘提交**本地已提交但未推送** —— 连续 5 次
+> `git push` 失败（`Could not read from remote repository`）。按纪律记录原因、本阶段跳过，
+> **下一轮（R8）完成时合并重试**；远端未改写。
