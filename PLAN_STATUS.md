@@ -4145,3 +4145,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 报告：`docs/reports/F_PHASE_CONSISTENCY_2026-10-29.md`。**无代码改动**。
 > **下一轮**：R40 —— 关闭 F 阶段，转入 **G 阶段（证据与文档）**：先补"任务卡状态总表"的机器可核对视图
 > （每卡 checkpoint 数、最后证据 ADR/提交），只读脚本 + 文档。
+
+> **114 R40（G 阶段第 1 步）：任务卡只读状态索引（完成）**：新增
+> `scripts/manual/taskcard-status-index.mjs`（**只读**扫 `docs/tasks/**/*.md`，统计去重 checkpoint 标识、
+> ADR 引用数、是否提到阻塞/未完成、最近日期、行数），**已运行**并生成
+> `docs/reports/TASKCARD_STATUS_VIEW_2026-10-29.md`（71 行，覆盖 docs/tasks 全部 Markdown）。
+> 明确边界：**只统计文档事实**，不能说明任务真的完成，也不替代 `PLAN_STATUS`；
+> **未做**：与 `TASKCARD_BACKLOG_2026-10-17.md` 的 42 卡清单交叉核对（R41 候选）。
+> **下一轮**：R41 —— 索引脚本增加"与 backlog 清单交叉核对"（只报告差异，不改卡）。
