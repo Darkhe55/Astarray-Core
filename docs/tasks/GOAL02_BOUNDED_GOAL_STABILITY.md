@@ -113,7 +113,7 @@
 - **R30**：控制面最小入口（`createGoalContract` / `bindMissionToGoal` / `unbindMissionFromGoal`
   / `refreshGoalGateCache`），只走宿主代码，默认不激活、不阻断（ADR-0116）。
 - **R31**：`goal-mode status` 只读 CLI（契约数/绑定数/可还原/跳过原因），**无写命令**（ADR-0117）。
-- **R32**：端到端静态核对（[GOAL02_END_TO_END_GAPS_2026-10-29](../../reports/GOAL02_END_TO_END_GAPS_2026-10-29.md)）：
+- **R32**：端到端静态核对（[GOAL02_END_TO_END_GAPS_2026-10-29](../reports/GOAL02_END_TO_END_GAPS_2026-10-29.md)）：
   **决定性缺口 = `GoalModeStateStore` 无任何写入方** ⇒ hydrate 恒 `state-missing`、
   `restoredCount=0`、解析器恒 null；`evaluateResume` 的拦截分支在生产上永不触发。
   另：强制模式无入口、激活无 CLI/UI、判定不落盘、`closeExperiment` 无调用方。
@@ -123,7 +123,7 @@
 - **R33**：`createGoalContract` 首次写目标状态（ADR-0118）；**R34**：组开始/结束写状态，不推进 V（ADR-0119）。
 - **R35**：判定落盘（有界 200，`goal-mode verdicts` 只读；ADR-0120）。
 - **R36**：`closeGoalExperiment` 接线；已关闭目标以 `experiment-closed` 跳过还原（ADR-0121）。
-- **R37**：收口报告（[GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29](../../reports/GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29.md)）：
+- **R37**：收口报告（[GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29](../reports/GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29.md)）：
   **V 计算仍未接**（`recordGroupCompletion` / `recordToolCallConsumed` 零调用方）⇒ 门禁只剩静态判定；
   强制模式/激活仍无用户入口（建议走宿主启动配置，不做 CLI 命令）；无重新开启路径；组标识不持久。
 
@@ -131,7 +131,7 @@
 
 - **R38**：本地 V 计算接入组结束（要求评估 → `computeGoalPotential` → `recordGroupCompletion` /
   `recordToolCallConsumed` → `finishTaskGroup`），失败只清在途标记（ADR-0122）。
-- **R39**：F 阶段一致性自查（[F_PHASE_CONSISTENCY_2026-10-29](../../reports/F_PHASE_CONSISTENCY_2026-10-29.md)）：
+- **R39**：F 阶段一致性自查（[F_PHASE_CONSISTENCY_2026-10-29](../reports/F_PHASE_CONSISTENCY_2026-10-29.md)）：
   **V 已接**（推翻 R37 报告 §2.1 的"未接"）；仍缺 = 强制模式入口、激活入口、重新开启、组标识持久、
   `groupKind` 区分；其中"入口形态"与"重开规则"**需产品决定**。
 
