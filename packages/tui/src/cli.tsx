@@ -1118,12 +1118,14 @@ goalModeCommand
   .command("verdicts")
   .description("只读列出最近的派发判定记录（有界 200 条，不含正文）")
   .option("--recent <count>", "显示最近多少条", "20")
+  .option("--export <path>", "只读导出全部保留记录为 JSONL（每行一条）")
   .option("--json", "JSON 输出")
-  .action(async (options: { recent?: string; json?: boolean }) => {
+  .action(async (options: { recent?: string; export?: string; json?: boolean }) => {
     process.exitCode = await executeGoalModeVerdictsCommand({
       stateDirectory: defaultStateDirectory(),
       recentCount: options.recent === undefined ? 20 : Number(options.recent),
       isJsonOutput: options.json === true,
+      ...(options.export === undefined ? {} : { exportPath: options.export }),
     });
   });
 

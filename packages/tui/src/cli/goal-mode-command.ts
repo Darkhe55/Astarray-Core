@@ -119,6 +119,8 @@ export interface GoalModeVerdictsCommandInput {
   readonly stateDirectory: string;
   readonly recentCount: number;
   readonly isJsonOutput: boolean;
+  /** R53（2026-10-29）：给了就**只读导出**全部保留记录为 JSONL（每行一条）。 */
+  readonly exportPath?: string;
 }
 
 /** R35：`goal-mode verdicts` —— 只读列出最近的派发判定记录（有界，不含正文）。 */
@@ -138,6 +140,40 @@ export async function executeGoalModeVerdictsCommand(
       process.stdout.write(`读取判定记录失败: ${(error as Error).message}\n`);
     }
     return EXIT_CODES.USAGE_ERROR;
+  }
+  /**
+   * R53（2026-10-29）：`--export` ⇒ 把**存储中保留的全部记录**写成 JSONL（不含正文）。
+   *
+   * 只读源存储；写入失败 ⇒ 退出码 2（不谎报导出成功）。导出不改默认视图与保留策略。
+   */
+  if (input.exportPath !== undefined) {
+    const exportPath = input.exportPath.trim();
+    if (exportPath === "") {
+      process.stderr.write("astarray: --export 需要非空路径\n");
+      return EXIT_CODES.USAGE_ERROR;
+    }
+    try {
+      const jsonLines = document.records.map((record) => JSON.stringify(record)).join("\n");
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(exportPath, jsonLines === "" ? "" : `${jsonLines}\n`, "utf8");
+    } catch (error) {
+      process.stderr.write(`astarray: 导出判定记录失败: ${(error as Error).message}\n`);
+      return EXIT_CODES.USAGE_ERROR;
+    }
+    if (input.isJsonOutput) {
+      printJson({
+        status: "exported",
+        exportPath,
+        exportedCount: document.records.length,
+        droppedRecordCount: document.droppedRecordCount,
+        note: "JSONL 每行一条判定；不含正文；导出不改变保留策略。",
+      });
+    } else {
+      process.stdout.write(
+        `已导出 ${String(document.records.length)} 条判定到 ${exportPath}（JSONL；丢弃 ${String(document.droppedRecordCount)} 条历史不可恢复）\n`,
+      );
+    }
+    return EXIT_CODES.SUCCESS;
   }
   const limit = Math.max(1, Math.trunc(input.recentCount));
   const recent = document.records.slice(-limit);
