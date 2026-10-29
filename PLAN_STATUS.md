@@ -683,6 +683,17 @@
 > 的前序修改，本窗口不提交）与本计划文件。
 > 八卡状态沿用：**7 in_progress + 1 blocked（REMOTE-01）**，无卡 done；运行证据 0。
 > **下一轮**：R2 —— 运行时构造 `GoalModeStateStore` 并暴露句柄（不启动、不改行为）。
+>
+> **76 R2（GOAL-02 接线第 1 步）：装配状态存储句柄（完成）**：
+> `application-runtime.ts` 构造 `GoalModeStateStore({baseDirectory: stateDirectory})`，
+> 加入 `ApplicationRuntime` 接口与返回对象（句柄可被后续解析器/恢复对账使用）。
+> **只构造、不启动、不读写、不改变任何派发行为**；未接 resolver、未接 `resumeMission`、
+> 未调用 `evaluateResume`。
+> **验证**：`typecheck` exit 0、`eslint <改动文件>` exit 0、`build` 成功；**未运行任何行为验证**。
+> **源码调用链**：`ApplicationRuntime` 构造 → `new GoalModeStateStore` → 返回对象
+> `goalModeStateStore`（当前无消费者）。
+> **下一轮**：R3 —— 提供 `goalDispatchGateResolver` 的本地实现（按 mission 读持久化状态并还原
+> `GoalDispatchGate`），仍默认 `isGoalModeEnforcementEnabled=false`（只观察）。
 
 
 > ## ⚠️ 最新交接（2026-11-08，第 81–95 轮，**请先读这一份**）
