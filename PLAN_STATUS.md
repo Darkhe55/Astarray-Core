@@ -4087,3 +4087,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ⇒ 门禁进展/停滞判定仍不触发）、组标识**进程内递增**不持久唯一、`outcome` 当前未被
 > `finishTaskGroup` 消费、并行下"组"是近似；未运行 begin/finish/skip 任何一条。
 > **下一轮**：R35 —— 判定记录持久化（`onGoalDispatchVerdict` 落环形/JSON），让"某次派发为何被放行"可审计。
+
+> **109 R35（F 阶段第 6 步）：目标门禁判定落盘（完成）**：新增 `goal-dispatch-verdict-journal.ts`
+> （`<state>/goal-mode/dispatch-verdicts.json`，**有界 200 条**，累计 `totalRecordedCount` /
+> `droppedRecordCount`；只记录 mission/project/revision/是否放行/原因码/证据缺口/**isEnforced**/时间，
+> 不含正文；原子写 + 备份）。运行时**总是**装配 `onGoalDispatchVerdict`：先 `void journal.record`
+> （失败被吞，不成为派发单点故障）再转宿主回调。CLI 新增 `goal-mode verdicts [--recent N] [--json]`
+> 只读列出，显示累计/丢弃数并注明 `isEnforced=false` 表示仅观察。
+> **未做**：**不改判定行为**（仍只观察）、写入 fire-and-forget 且**吞错无告警**、
+> 每次判定写文件（高频成本未测）、无导出/轮转；未运行"记录/超限/失败"任何一条。
+> **下一轮**：R36 —— 把 `closeExperiment` 接上（实验关闭后**停止新增目标派发**、保留任务与历史），
+> 并让 `goal-mode status` 显示关闭状态。
