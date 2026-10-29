@@ -46,3 +46,8 @@ McpToolBridge.queryTask / cancelTask / readResult      packages/core/src/bridge/
 
 **implemented-unverified**：未编写/未运行测试。
 已执行：`npm run typecheck` exit 0、`npx eslint <本批文件>` exit 0、`npm run build` 成功。
+
+## 6. 口径核对（R46，2026-10-29）
+
+与 ADR-0080（出口扫描）、`SEC02_CHANNEL_MATRIX` §8 对齐：**默认 `record`、`block` 未实测、
+覆盖范围仅结果摘要字段**。本文档不再使用任何暗示"block 已验证"的措辞。
