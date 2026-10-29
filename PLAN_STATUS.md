@@ -4259,3 +4259,5 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > **120a 推送状态（2026-10-29 R46）**：R46 提交**本地已提交但未推送** —— 连续 5 次 `git push` 失败
 > （`Could not read from remote repository`）。按纪律记录、下一轮合并重试；远端未改写。
+>
+> **更正（R46 结束）**：上一段已过时 —— 重试成功（`9c7e7456..bb7cef12`），R46 两个提交**均已推送**，`ahead=0`。
