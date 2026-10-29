@@ -227,6 +227,13 @@ export interface MissionOrchestratorOptions {
    * 落盘失败**不吞掉**（升级提示），但也不改写收据内容。
    */
   completionReceiptStore?: CompletionReceiptStore | null;
+  /**
+   * 计划 R25（2026-10-29）：**组边界安全点端口**（可选）。
+   *
+   * 每个调度轮开始、且**没有在途任务**时调用一次；用于消费"推迟到下一组"的插入队列。
+   * 只做登记/记录，**不改运行中图、不派发**（DagScheduler 仍不支持图变更）。
+   */
+  taskGroupBoundaryPort?: () => Promise<void>;
   /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
   isConversationMode?: boolean;
   /**
@@ -645,6 +652,19 @@ export class MissionOrchestrator {
         }
       }
       await this.ensureGitIntegrationSession();
+      /**
+       * R25：**组边界安全点**（无在途任务）—— 消费推迟插入队列。
+       * 消费 ≠ 派发：不改变运行中图，只把待办移入"已消费"并记录。
+       */
+      if (this.inFlightTaskIds.size === 0 && this.options.taskGroupBoundaryPort !== undefined) {
+        try {
+          await this.options.taskGroupBoundaryPort();
+        } catch (error) {
+          this.options.onUserEscalation(
+            `组边界消费推迟插入失败: ${(error as Error).message}`,
+          );
+        }
+      }
       const actions = await this.dagScheduler.scheduleRound();
       for (const action of actions) {
         if (action.action === "start-task") {
