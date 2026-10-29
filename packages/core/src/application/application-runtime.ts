@@ -1934,26 +1934,45 @@ export async function createApplicationRuntime(
     completionReceiptReader: async (missionIdentifier: string, taskIdentifier: string) =>
       await completionReceiptStore.read(missionIdentifier, taskIdentifier),
     /**
-     * 计划 R10（2026-10-29）：**独立裁决读取**。
+     * 计划 R10/R12（2026-10-29）：**独立裁决读取（逐任务对齐）**。
      *
-     * 口径：该 mission **没有任何裁决** ⇒ null（门禁按"缺裁决"阻断）；
-     * 有裁决但存在 rejected ⇒ 不通过并带出理由；全部 accepted ⇒ 通过。
-     * 读取不伪造：存储损坏/缺失一律按"无裁决"处理。
+     * 按控制器给出的**已 done 任务列表**逐个读取：
+     * - 任务缺裁决 ⇒ 不通过，理由列出缺失任务；
+     * - 任意任务 rejected ⇒ 不通过，带出 `task: reason`；
+     * - 全部 accepted ⇒ 通过；空列表 ⇒ null。
+     * 读取不伪造：存储损坏/缺失一律按"缺裁决"处理。
      */
-    completionVerdictReader: async (missionIdentifier: string) => {
-      const verdictRecords = await completionVerdictStore.listForMission(missionIdentifier);
-      if (verdictRecords.length === 0) {
+    completionVerdictReader: async (
+      missionIdentifier: string,
+      taskIdentifiers: readonly string[],
+    ) => {
+      if (taskIdentifiers.length === 0) {
         return null;
       }
-      const rejectedRecords = verdictRecords.filter(
-        (record) => record.verdict === "rejected",
-      );
-      return {
-        isAccepted: rejectedRecords.length === 0,
-        reasons: rejectedRecords.flatMap((record) =>
-          record.reasons.map((reason) => `${record.taskIdentifier}: ${reason}`),
-        ),
-      };
+      const missingTaskIdentifiers: string[] = [];
+      const rejectedReasons: string[] = [];
+      for (const taskIdentifier of taskIdentifiers) {
+        const verdictRecord = await completionVerdictStore.read(
+          missionIdentifier,
+          taskIdentifier,
+        );
+        if (verdictRecord === null) {
+          missingTaskIdentifiers.push(taskIdentifier);
+          continue;
+        }
+        if (verdictRecord.verdict === "rejected") {
+          rejectedReasons.push(
+            `${taskIdentifier}: ${verdictRecord.reasons.join("；")}`,
+          );
+        }
+      }
+      const reasons = [
+        ...(missingTaskIdentifiers.length === 0
+          ? []
+          : [`缺少任务裁决: ${missingTaskIdentifiers.join(", ")}`]),
+        ...rejectedReasons,
+      ];
+      return { isAccepted: reasons.length === 0, reasons };
     },
     backupVault,
     backupDeletionController,
