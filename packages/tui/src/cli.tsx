@@ -1057,6 +1057,7 @@ taskLedgerCommand
   .option("--task <task-id>", "单任务派发只读预检（需要 --mission；不改任务链、不派发）")
   .option("--deferred-insertions", "只读列出推迟到下一组的待消费插入队列（可配 --mission 过滤）")
   .option("--propose-writeback", "只读生成写回提案（不执行写回；需要 --mission）")
+  .option("--summary", "一屏只读汇总：差异 + 写回提案 + 待消费队列 + 丢弃计数（需要 --mission）")
   .option("--json", "JSON 输出")
   .action(
     async (options: {
@@ -1068,6 +1069,7 @@ taskLedgerCommand
       task?: string;
       deferredInsertions?: boolean;
       proposeWriteback?: boolean;
+      summary?: boolean;
       json?: boolean;
     }) => {
       process.exitCode = await executeTaskLedgerStatusCommand({
@@ -1092,6 +1094,7 @@ taskLedgerCommand
         ...(options.proposeWriteback === true
           ? { isProposeWriteBack: true }
           : {}),
+        ...(options.summary === true ? { isSummaryView: true } : {}),
         isJsonOutput: options.json === true,
       });
     },
