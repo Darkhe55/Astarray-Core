@@ -34,6 +34,8 @@ export interface TaskLedgerStatusCommandInput {
   readonly taskIdentifier?: string;
   /** R24（2026-10-29）：只读列出"推迟到下一组"的待消费插入队列。 */
   readonly isListDeferredInsertions?: boolean;
+  /** R27（2026-10-29）：只读生成"写回提案"（不执行写回）。 */
+  readonly isProposeWriteBack?: boolean;
 }
 
 export async function executeTaskLedgerStatusCommand(
@@ -259,6 +261,51 @@ export async function executeTaskLedgerStatusCommand(
       process.stdout.write(`- 阻塞: ${blockedReason}\n`);
     }
     process.stdout.write(`注意: ${precheck.capabilities.note}\n`);
+    return EXIT_CODES.SUCCESS;
+  }
+
+  /** R27：`--propose-writeback` ⇒ 只读生成写回提案（不执行）。 */
+  if (input.isProposeWriteBack === true) {
+    let proposal: Awaited<
+      ReturnType<TaskLedgerBridge["buildWriteBackProposal"]>
+    >;
+    try {
+      proposal = await bridge.buildWriteBackProposal({
+        missionIdentifier: input.missionIdentifier as string,
+        sequenceId: resolvedSequenceIdentifier as string,
+        ownerAgentInstanceId: resolvedOwnerAgentInstanceIdentifier as string,
+        viewer: { sourceKind: "user", actorId: "cli" },
+      });
+    } catch (error) {
+      if (input.isJsonOutput) {
+        printJson({ status: "failed", reason: (error as Error).message });
+      } else {
+        process.stdout.write(`生成写回提案失败: ${(error as Error).message}\n`);
+      }
+      return EXIT_CODES.USAGE_ERROR;
+    }
+    if (input.isJsonOutput) {
+      printJson({
+        status: proposal.entries.length === 0 ? "no-writeback-needed" : "proposal",
+        proposal,
+      });
+      return EXIT_CODES.SUCCESS;
+    }
+    process.stdout.write(
+      `写回提案（mission ${proposal.missionIdentifier} ↔ 序列 ${proposal.sequenceId}，revision ${String(proposal.sequenceRevision)}）\n`,
+    );
+    process.stdout.write(
+      `条目数: ${String(proposal.entries.length)}；可执行: ${String(proposal.isExecutable)}\n`,
+    );
+    for (const entry of proposal.entries) {
+      process.stdout.write(
+        `- ${entry.taskIdentifier} [${entry.proposedAction}] 序列=${entry.sequenceStatus ?? "（无）"} mission=${entry.missionStatus ?? "（无）"}\n` +
+          `    依据: ${entry.rationale}\n    风险: ${entry.risk}\n`,
+      );
+    }
+    for (const note of proposal.notes) {
+      process.stdout.write(`注意: ${note}\n`);
+    }
     return EXIT_CODES.SUCCESS;
   }
 

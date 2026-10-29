@@ -3999,3 +3999,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 上限仍非用户可配；未跑"未超上限/超上限/旧文件缺字段"任何一条。
 > **下一轮**：R27 —— 写回（write-back）：把 mission 侧完成状态回写权威序列的**提案**（只读生成提案，
 > 不自动写），并给出差异与风险说明。
+
+> **101 R27（E 阶段第 7 步）：写回提案只读生成（完成，不执行）**：
+> `TaskLedgerBridge.buildWriteBackProposal` 基于对齐报告 + 两侧快照逐任务给出
+> `mark-sequence-done`（mission done / 序列未 done）、`needs-human-review`（其它不一致，含反向）、
+> `missing-in-sequence` / `missing-in-mission`；一致则不产出 no-op。每条
+> `requiresHumanApproval: true`，整体 **`isExecutable: false`**，`notes` 写明"只读生成、应用前需重新生成"。
+> CLI：`task-ledger status --mission X --propose-writeback`（缺 sequence/owner 用 R21 索引补全），
+> 无条目 ⇒ `no-writeback-needed`。**不写任何文件、不改任何状态**。
+> **未做**：**没有执行端**（提案不可应用）、提案**不带 revision 校验防护**、
+> `mark-sequence-done` **不检查下游依赖**（风险仅文本）；未运行四种分支/空提案任何一条。
+> **下一轮**：R28 —— 只读修复建议的 **CLI 汇总视图**：把"差异 + 提案 + 待消费队列 + 丢弃计数"
+> 合成一屏，便于人工一次性判断（仍只读）。

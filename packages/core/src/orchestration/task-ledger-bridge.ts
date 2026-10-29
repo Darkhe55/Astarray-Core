@@ -290,6 +290,141 @@ export class TaskLedgerBridge {
     };
   }
 
+  /**
+   * R27（2026-10-29）：**写回提案（只读生成，不执行）**。
+   *
+   * 依据 `inspectAlignment` 的差异，逐条给出 `proposedAction` / 依据 / 风险；
+   * 每条都 `requiresHumanApproval: true`，整体固定 `isExecutable: false`。
+   * **不写任何文件、不改任何状态**：写回执行属于后续检查点。
+   */
+  async buildWriteBackProposal(input: {
+    readonly missionIdentifier: string;
+    readonly ownerAgentInstanceId: string;
+    readonly sequenceId: string;
+    readonly viewer: ActorIdentity;
+  }): Promise<{
+    readonly missionIdentifier: string;
+    readonly sequenceId: string;
+    readonly sequenceRevision: number;
+    readonly generatedAtIso: string;
+    readonly isExecutable: false;
+    readonly entries: readonly {
+      readonly taskIdentifier: string;
+      readonly sequenceStatus: string | null;
+      readonly missionStatus: string | null;
+      readonly proposedAction:
+        | "mark-sequence-done"
+        | "needs-human-review"
+        | "missing-in-sequence"
+        | "missing-in-mission";
+      readonly rationale: string;
+      readonly risk: string;
+      readonly requiresHumanApproval: true;
+    }[];
+    readonly notes: readonly string[];
+  }> {
+    const report = await this.inspectAlignment(input);
+    /** 对齐报告只给差异；具体状态需再取一次快照（提案要写清两侧状态）。 */
+    const [snapshot, missionStatus] = await Promise.all([
+      this.options.sequenceLedger.getSnapshot({
+        ownerAgentInstanceId: input.ownerAgentInstanceId,
+        sequenceId: input.sequenceId,
+        viewer: input.viewer,
+      }),
+      this.options.missionTaskChain.getMissionStatus(input.missionIdentifier),
+    ]);
+    const sequenceStatusByTaskIdentifier = new Map(
+      snapshot.nodes.map((node) => [node.taskId, node.status]),
+    );
+    const missionStatusByTaskIdentifier = new Map(
+      (missionStatus.taskChain?.tasks ?? []).map((task) => [task.id, task.status]),
+    );
+    const entries: {
+      taskIdentifier: string;
+      sequenceStatus: string | null;
+      missionStatus: string | null;
+      proposedAction:
+        | "mark-sequence-done"
+        | "needs-human-review"
+        | "missing-in-sequence"
+        | "missing-in-mission";
+      rationale: string;
+      risk: string;
+      requiresHumanApproval: true;
+    }[] = [];
+    const allTaskIdentifiers = [
+      ...new Set([
+        ...report.sequenceTaskIdentifiers,
+        ...report.missionTaskIdentifiers,
+      ]),
+    ].sort();
+    for (const taskIdentifier of allTaskIdentifiers) {
+      const sequenceStatus = sequenceStatusByTaskIdentifier.get(taskIdentifier) ?? null;
+      const missionTaskStatus = missionStatusByTaskIdentifier.get(taskIdentifier) ?? null;
+      if (sequenceStatus === null) {
+        entries.push({
+          taskIdentifier,
+          sequenceStatus,
+          missionStatus: missionTaskStatus,
+          proposedAction: "missing-in-sequence",
+          rationale: "任务只在 mission 链中：写回需要在序列中创建对应任务（当前无该能力）。",
+          risk: "创建任务会改变序列 revision 与依赖图，必须先确认锚点。",
+          requiresHumanApproval: true,
+        });
+        continue;
+      }
+      if (missionTaskStatus === null) {
+        entries.push({
+          taskIdentifier,
+          sequenceStatus,
+          missionStatus: missionTaskStatus,
+          proposedAction: "missing-in-mission",
+          rationale: "任务只在权威序列中：可能需要补进 mission 链，或从序列移除。",
+          risk: "两种处理方向后果相反，必须由人决定。",
+          requiresHumanApproval: true,
+        });
+        continue;
+      }
+      if (sequenceStatus === missionTaskStatus) {
+        continue;
+      }
+      if (missionTaskStatus === "done") {
+        entries.push({
+          taskIdentifier,
+          sequenceStatus,
+          missionStatus: missionTaskStatus,
+          proposedAction: "mark-sequence-done",
+          rationale: "mission 侧已 done 而序列侧未 done：把完成状态回写序列是最小改动。",
+          risk: "若序列侧仍有未完成的依赖者，提前置 done 会让下游 ready 判定失真。",
+          requiresHumanApproval: true,
+        });
+        continue;
+      }
+      entries.push({
+        taskIdentifier,
+        sequenceStatus,
+        missionStatus: missionTaskStatus,
+        proposedAction: "needs-human-review",
+        rationale: `mission 侧为 ${missionTaskStatus}、序列侧为 ${sequenceStatus}：无法安全地单向推导。`,
+        risk: "自动写回可能把未完成任务标成完成，或把已完成任务重新打开。",
+        requiresHumanApproval: true,
+      });
+    }
+    return {
+      missionIdentifier: input.missionIdentifier,
+      sequenceId: report.sequenceId,
+      sequenceRevision: report.sequenceRevision,
+      generatedAtIso: new Date().toISOString(),
+      isExecutable: false,
+      entries,
+      notes: [
+        "本提案只读生成，不写任何文件、不改任何状态。",
+        "所有条目都需要人工批准；执行写回需要单独的、可审计的入口（尚未实现）。",
+        "提案基于当前快照；应用前应重新生成，避免 revision 已变。",
+      ],
+    };
+  }
+
   /** 运行中插入：**当前不支持**，显式拒绝。 */
   requestInsertionByTaskIdentifier(input: {
     readonly missionIdentifier: string;
