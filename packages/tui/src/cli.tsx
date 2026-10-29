@@ -20,6 +20,8 @@ import {
 import { executeObsPerfRotateCommand } from "./cli/obs-perf-rotate-command.js";
 // 清单第 ① 项出口（2026-10-28）：两套记账的只读对账视图。
 import { executeTaskLedgerStatusCommand } from "./cli/task-ledger-command.js";
+// F 阶段 R31（2026-10-29）：目标模式的只读状态视图（不提供写命令）。
+import { executeGoalModeStatusCommand } from "./cli/goal-mode-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
   DEFAULT_HISTORY_PAGE_SIZE,
@@ -1099,6 +1101,26 @@ taskLedgerCommand
       });
     },
   );
+
+/**
+ * F 阶段 R31（2026-10-29）：`goal-mode status` —— 目标模式**只读**视图。
+ *
+ * 不提供任何写命令：创建契约/绑定 mission/激活目标模式只能由宿主代码调用。
+ */
+const goalModeCommand = program
+  .command("goal-mode")
+  .description("目标模式（实验能力）的只读状态：契约/绑定/可还原门禁/跳过原因");
+
+goalModeCommand
+  .command("status")
+  .description("显示契约数、mission 绑定数、可还原门禁数与 hydrate 跳过原因")
+  .option("--json", "JSON 输出")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await executeGoalModeStatusCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+    });
+  });
 
 /**
  * `folder`：对话式文件夹授权的 CLI 共用入口（FOLDER-01-03）。

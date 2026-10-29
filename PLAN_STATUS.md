@@ -4041,3 +4041,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 逐个刷新（未批量）、**强制模式仍未接**；未运行"未激活拒绝/绑定后非 null/解绑回 null"任何一条。
 > **下一轮**：R31 —— `goal mode status` 的**只读 CLI 视图**（激活状态/绑定数/契约数/hydrate 跳过原因），
 > 让控制面可被观察（但**不提供写命令**）。
+
+> **105 R31（F 阶段第 2 步）：`goal-mode status` 只读视图（完成）**：新增 CLI `goal-mode status [--json]`：
+> 读契约（`GoalContractStore.list`，非法/损坏自动跳过）、读绑定（`GoalMissionBindingStore.list`）、
+> 用 `GoalGateCache.hydrate()` **只读重算**并报告 `restoredCount` 与按原因分组的 `skippedByReason`
+> （contract-missing / contract-invalid / state-missing / revision-mismatch / restore-failed）。
+> 输出固定两条注意：**激活状态属运行时内存、CLI 无法得知**（未激活时解析器恒 null）；
+> 强制模式仍缺省关（只观察）。**不提供任何写命令**。
+> **未做**：看不到当前进程激活状态（已显式说明不猜）、每次调用重算一遍（成本未测）、
+> 不显示契约明细；未运行"无契约无绑定/可还原/不一致跳过"任何一条。
+> **下一轮**：R32 —— 对齐 `main-controller` 的 `goalDispatchGateResolver` 调用点与 `resumeMission`，
+> 确认"激活 + 绑定 + 契约 + 状态"四者齐备时**端到端**行为（静态核对 + 缺口清单，不运行）。
