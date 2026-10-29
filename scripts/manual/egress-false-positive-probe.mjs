@@ -70,7 +70,7 @@ const fakeCredentialSamples = [
   },
   {
     identifier: "fake-aws",
-    text: "aws_access_key_id = AKIAFAKE0000000000",
+    text: "aws_access_key_id = AKIAFAKE000000000000",
     expectedRulePrefix: "cloud:aws-access-key-id",
   },
   {

@@ -4383,3 +4383,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **9 项未做**（未跑测试、`block` 未实测、强制/激活无入口、无重开、未真正按 taskId 派发、无写回执行端、
 > 无图变更、REMOTE-01 阻塞、`groupKind` 无策略）、验收命令与下一步优先级。
 > **仓库仍有 B/C/D 三类未闭合项**（见上文 A–D 段）；**没有一条声称未运行的验证通过**。
+
+> **135 窗口后补：两个未执行脚本的首次真实运行（完成，含 1 处夹具修复）**：
+> ①`strict-completion-drill.mjs` **exit 0**，7 项断言全 `ok`（含"拒绝覆盖""缺裁决 ⇒ null""缺收据 ⇒ 不足"）；
+> ②`egress-false-positive-probe.mjs` 首跑 **exit 1**：8 normal **0 误报**、6 假凭据 **5 命中 / 1 MISS**
+> （`fake-aws`）—— 定位为**样本长度写错**（规则 `credential-detector-registry.ts:123` 要求 `AKIA` 后
+> **16 位**，样本只有 14 位）；修样本后复跑 **exit 0**，**6/6 命中、0 误报**。
+> 记录：`docs/reports/SCRIPT_RUN_EVIDENCE_2026-10-29.md`；ADR-0102/0107 追加执行记录；
+> 总表/交付说明/最终报告状态同步。**仍只覆盖存储层与规则命中层**：
+> `npm run test` / `check` / 真实 mission 验收**仍未运行**；`block` 默认值仍无足够数据。
