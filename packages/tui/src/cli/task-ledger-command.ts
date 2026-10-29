@@ -72,15 +72,24 @@ export async function executeTaskLedgerStatusCommand(
     const queueStore = new DeferredInsertionQueueStore({
       baseDirectory: input.stateDirectory,
     });
-    const pendingEntries = await queueStore
-      .listPending(input.missionIdentifier)
-      .catch(() => []);
+    const queueDocument = await queueStore.read().catch(() => null);
+    const pendingEntries =
+      queueDocument === null
+        ? []
+        : input.missionIdentifier === undefined
+          ? queueDocument.pending
+          : queueDocument.pending.filter(
+              (entry) => entry.missionIdentifier === input.missionIdentifier,
+            );
     if (input.isJsonOutput) {
       printJson({
         status: pendingEntries.length === 0 ? "no-pending-insertions" : "listed",
         pendingCount: pendingEntries.length,
         pendingEntries,
-        note: "队列只记录推迟插入；消费发生在下一组安全点（当前尚未接消费方）。",
+        /** R26：已消费历史被截断的次数与时间（0/null ⇒ 未截断）。 */
+        droppedConsumedCount: queueDocument?.droppedConsumedCount ?? 0,
+        lastDroppedAtIso: queueDocument?.lastDroppedAtIso ?? null,
+        note: "队列只记录推迟插入；消费发生在下一组安全点（消费 ≠ 派发）。",
       });
     } else {
       process.stdout.write(
@@ -96,6 +105,13 @@ export async function executeTaskLedgerStatusCommand(
       if (pendingEntries.length === 0) {
         process.stdout.write("（没有待消费的推迟插入）\n");
       }
+      process.stdout.write(
+        `已消费历史被截断: ${String(queueDocument?.droppedConsumedCount ?? 0)} 条` +
+          (queueDocument?.lastDroppedAtIso === null ||
+          queueDocument?.lastDroppedAtIso === undefined
+            ? "（未截断）\n"
+            : `（最后丢弃于 ${queueDocument.lastDroppedAtIso}）\n`),
+      );
     }
     return EXIT_CODES.SUCCESS;
   }

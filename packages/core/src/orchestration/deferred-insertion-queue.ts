@@ -29,6 +29,14 @@ export interface DeferredInsertionEntry {
 export interface DeferredInsertionQueueDocument {
   readonly schemaVersion: 1;
   readonly documentRevision: number;
+  /**
+   * R26（2026-10-29）：**已消费历史被截断的可观察计数**。
+   *
+   * `consumed` 有界（缺省 200）；超出时丢弃最旧并累加本计数、记录最后丢弃时间，
+   * 使"历史不完整"可被查询，而不是静默发生。
+   */
+  readonly droppedConsumedCount: number;
+  readonly lastDroppedAtIso: string | null;
   readonly pending: readonly DeferredInsertionEntry[];
   readonly consumed: readonly (DeferredInsertionEntry & {
     readonly consumedAtIso: string;
@@ -56,7 +64,14 @@ export class DeferredInsertionQueueStore {
       this.backupFilePath,
     );
     if (readResult === null) {
-      return { schemaVersion: 1, documentRevision: 0, pending: [], consumed: [] };
+      return {
+        schemaVersion: 1,
+        documentRevision: 0,
+        droppedConsumedCount: 0,
+        lastDroppedAtIso: null,
+        pending: [],
+        consumed: [],
+      };
     }
     const content = readResult.content as Partial<DeferredInsertionQueueDocument> | null;
     if (
@@ -65,12 +80,25 @@ export class DeferredInsertionQueueStore {
       !Array.isArray(content.pending) ||
       !Array.isArray(content.consumed)
     ) {
-      return { schemaVersion: 1, documentRevision: 0, pending: [], consumed: [] };
+      return {
+        schemaVersion: 1,
+        documentRevision: 0,
+        droppedConsumedCount: 0,
+        lastDroppedAtIso: null,
+        pending: [],
+        consumed: [],
+      };
     }
     return {
       schemaVersion: 1,
       documentRevision:
         typeof content.documentRevision === "number" ? content.documentRevision : 0,
+      droppedConsumedCount:
+        typeof content.droppedConsumedCount === "number"
+          ? content.droppedConsumedCount
+          : 0,
+      lastDroppedAtIso:
+        typeof content.lastDroppedAtIso === "string" ? content.lastDroppedAtIso : null,
       pending: content.pending,
       consumed: content.consumed,
     };
@@ -110,6 +138,8 @@ export class DeferredInsertionQueueStore {
       await writeAtomicJson(this.filePath, {
         schemaVersion: 1,
         documentRevision: document.documentRevision + 1,
+        droppedConsumedCount: document.droppedConsumedCount,
+        lastDroppedAtIso: document.lastDroppedAtIso,
         pending: [...document.pending, entry],
         consumed: document.consumed,
       } satisfies DeferredInsertionQueueDocument);
@@ -135,7 +165,7 @@ export class DeferredInsertionQueueStore {
     readonly insertRequestIdentifier: string;
     readonly consumedAtIso: string;
     readonly consumedByGroupIdentifier: string;
-  }): Promise<{ readonly didConsume: boolean }> {
+  }): Promise<{ readonly didConsume: boolean; readonly droppedCount: number }> {
     return await this.writeLock.runExclusive(async () => {
       const document = await this.read();
       const target = document.pending.find(
@@ -143,25 +173,31 @@ export class DeferredInsertionQueueStore {
           candidate.insertRequestIdentifier === input.insertRequestIdentifier,
       );
       if (target === undefined) {
-        return { didConsume: false };
+        return { didConsume: false, droppedCount: 0 };
       }
+      const nextConsumed = [
+        ...document.consumed,
+        {
+          ...target,
+          consumedAtIso: input.consumedAtIso,
+          consumedByGroupIdentifier: input.consumedByGroupIdentifier,
+        },
+      ];
+      const droppedCount = Math.max(0, nextConsumed.length - this.maximumConsumedEntries);
       await writeAtomicJson(this.filePath, {
         schemaVersion: 1,
         documentRevision: document.documentRevision + 1,
+        /** R26：丢弃最旧时累加计数并记录时间（历史截断可观察）。 */
+        droppedConsumedCount: document.droppedConsumedCount + droppedCount,
+        lastDroppedAtIso:
+          droppedCount > 0 ? input.consumedAtIso : document.lastDroppedAtIso,
         pending: document.pending.filter(
           (candidate) =>
             candidate.insertRequestIdentifier !== input.insertRequestIdentifier,
         ),
-        consumed: [
-          ...document.consumed,
-          {
-            ...target,
-            consumedAtIso: input.consumedAtIso,
-            consumedByGroupIdentifier: input.consumedByGroupIdentifier,
-          },
-        ].slice(-this.maximumConsumedEntries),
+        consumed: nextConsumed.slice(-this.maximumConsumedEntries),
       } satisfies DeferredInsertionQueueDocument);
-      return { didConsume: true };
+      return { didConsume: true, droppedCount };
     });
   }
 }
