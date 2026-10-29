@@ -129,6 +129,7 @@ import type { MissionRuntimeLease } from "../orchestration/mission-runtime-regis
 import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
+import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
 import { evaluateWorkWindowState } from "../orchestration/work-window-contract.js";
@@ -219,6 +220,11 @@ export interface ApplicationRuntime {
   workWindowTransitionMonitor: WorkWindowTransitionMonitor;
   /** 清单第 ① 项收尾：两套记账差异历史（只读诊断）。 */
   taskLedgerDivergenceJournal: TaskLedgerDivergenceJournal;
+  /**
+   * 目标模式 R2（2026-10-29）：目标状态存储句柄（只构造，不启动）。
+   * 后续轮次用它做解析器、恢复对账与激活校验。
+   */
+  goalModeStateStore: GoalModeStateStore;
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
   toolPackageZipInstaller: ToolPackageZipInstaller;
@@ -882,6 +888,15 @@ export async function createApplicationRuntime(
   const projectWorkWindowStore = new ProjectWorkWindowStore({ baseDirectory: stateDirectory });
   /** 清单第 ① 项收尾：两套记账差异历史（只读诊断；只记录不修复）。 */
   const taskLedgerDivergenceJournal = new TaskLedgerDivergenceJournal({
+    baseDirectory: stateDirectory,
+  });
+  /**
+   * 目标模式 R2（2026-10-29）：**状态存储装配**。
+   *
+   * 只构造句柄，不启动、不读写、不改变任何派发行为；
+   * 后续轮次（R3 解析器 / R4 恢复对账 / R5 激活校验）才接进流程。
+   */
+  const goalModeStateStore = new GoalModeStateStore({
     baseDirectory: stateDirectory,
   });
   /**
@@ -1984,6 +1999,7 @@ export async function createApplicationRuntime(
     projectWorkWindowStore,
     workWindowTransitionMonitor,
     taskLedgerDivergenceJournal,
+    goalModeStateStore,
     experimentSettingsStore,
     toolPackageLifecycleService,
     toolPackageZipInstaller,
