@@ -15,10 +15,28 @@
  *   node scripts/manual/taskcard-status-index.mjs
  *   node scripts/manual/taskcard-status-index.mjs > docs/reports/TASKCARD_STATUS_VIEW.md
  */
+import { execFileSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const tasksDirectory = path.join(process.cwd(), "docs", "tasks");
+/** 2026-10-17 台账声称"docs/tasks/*.md = 42 张卡"；用创建日期做交叉核对。 */
+const BACKLOG_BASELINE_DATE = "2026-10-17";
+const BACKLOG_BASELINE_CARD_COUNT = 42;
+
+/** 该文件的首次提交日期（只读 git 日志；失败返回 null）。 */
+function findFirstCommitDate(relativePath) {
+  try {
+    const output = execFileSync(
+      "git",
+      ["log", "--diff-filter=A", "-1", "--format=%as", "--", relativePath],
+      { cwd: process.cwd(), encoding: "utf8" },
+    ).trim();
+    return output === "" ? null : output;
+  } catch {
+    return null;
+  }
+}
 
 async function collectMarkdownFiles(directory) {
   const files = [];
@@ -72,6 +90,7 @@ for (const filePath of files) {
   const content = await readFile(filePath, "utf8");
   const relativePath = path.relative(process.cwd(), filePath).replace(/\\/g, "/");
   rows.push({
+    firstCommitDate: findFirstCommitDate(relativePath),
     relativePath,
     checkpointCount: countDistinctCheckpoints(content),
     adrIdentifiers: collectAdrIdentifiers(content),
@@ -98,4 +117,31 @@ process.stdout.write(
   `\n合计 ${rows.length} 个文件；其中提到"未完成/in_progress"的有 ` +
     `${rows.filter((row) => row.mentionsIncomplete).length} 个，提到"平台阻塞"的有 ` +
     `${rows.filter((row) => row.mentionsBlocked).length} 个。\n`,
+);
+
+/**
+ * R41：与 2026-10-17 台账的"42 张卡"做**只读交叉核对**。
+ *
+ * 只报告差异，不判定哪边对，也不修改任何卡。
+ */
+const addedAfterBaseline = rows.filter(
+  (row) => row.firstCommitDate !== null && row.firstCommitDate > BACKLOG_BASELINE_DATE,
+);
+process.stdout.write("\n## 与 2026-10-17 台账的交叉核对（只读）\n\n");
+process.stdout.write(
+  `- 台账声称基线：\`docs/tasks/*.md\` = **${BACKLOG_BASELINE_CARD_COUNT} 张卡**（不含 README/PRODUCT_INTEGRATION_ROLLOUT）。\n`,
+);
+process.stdout.write(`- 当前扫描到的文件数：**${rows.length}**。\n`);
+process.stdout.write(
+  `- 创建时间晚于 ${BACKLOG_BASELINE_DATE} 的文件：**${addedAfterBaseline.length}** 个。\n\n`,
+);
+process.stdout.write("| 晚于基线的文件 | 首次提交 |\n|---|---|\n");
+for (const row of addedAfterBaseline.sort((left, right) =>
+  String(left.firstCommitDate).localeCompare(String(right.firstCommitDate)),
+)) {
+  process.stdout.write(`| ${row.relativePath} | ${row.firstCommitDate ?? "-"} |\n`);
+}
+process.stdout.write(
+  "\n注意：这些文件里包含计划/索引/矩阵等**非任务卡**文档，脚本**不判断**哪份算卡；" +
+    "差异只用于人工核对，不构成任务完成或未完成的结论。\n",
 );

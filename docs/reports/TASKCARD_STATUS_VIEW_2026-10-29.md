@@ -27,7 +27,7 @@
 | docs/tasks/HISTORY01_LOCAL_RUN_HISTORY_AND_RESUME_VIEW_TASK_CARD.md | 1 | 0 | 否 | 是 | 2026-10-25 | 185 |
 | docs/tasks/LESSON01_MODEL_ALIGNED_COMMUNICATION_MEMORY_TASK_CARD.md | 1 | 0 | 否 | 是 | 2026-10-20 | 155 |
 | docs/tasks/MERGE01_NODECTX01_TASK_CARDS.md | 2 | 0 | 否 | 是 | 2026-11-08 | 647 |
-| docs/tasks/NEXT60_PLAN_2026-10-29.md | 54 | 1 | 是 | 是 | 2026-10-29 | 166 |
+| docs/tasks/NEXT60_PLAN_2026-10-29.md | 54 | 1 | 是 | 是 | 2026-10-29 | 167 |
 | docs/tasks/OBS01_PERFORMANCE_USAGE_AND_DIAGNOSTICS_TASK_CARDS.md | 13 | 0 | 是 | 是 | 2026-11-08 | 107 |
 | docs/tasks/OCT28_CORE_EXTENSION_INDEX.md | 0 | 0 | 否 | 否 | 2026-10-28 | 20 |
 | docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md | 2 | 0 | 是 | 否 | 2026-10-10 | 89 |
@@ -69,3 +69,53 @@
 | docs/tasks/archive/completed-checkpoints/T07D00_PROVIDER_AUDIT.md | 0 | 0 | 否 | 否 | 2026-08-22 | 33 |
 
 合计 65 个文件；其中提到"未完成/in_progress"的有 40 个，提到"平台阻塞"的有 35 个。
+
+## 与 2026-10-17 台账的交叉核对（只读）
+
+- 台账声称基线：`docs/tasks/*.md` = **42 张卡**（不含 README/PRODUCT_INTEGRATION_ROLLOUT）。
+- 当前扫描到的文件数：**65**。
+- 创建时间晚于 2026-10-17 的文件：**39** 个。
+
+| 晚于基线的文件 | 首次提交 |
+|---|---|
+| docs/tasks/RELOCATE01_COLD_START_PROJECT_RELINK_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/README.md | 2026-10-18 |
+| docs/tasks/accepted/T05D_HUMAN_AGENT_CONCURRENT_CHANGE_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T07E_AGENT_WORKING_SET_READ_BUDGET_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T08C_T07C_AGENT_ROUTING_AND_MODEL_POLICY_TASK_CARDS.md | 2026-10-18 |
+| docs/tasks/accepted/T08D_CRAFTSMAN_TERTIARY_PRESET_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T09A_CONTEXT_NODE_CLOSURE_AND_RECALL_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T12A_SESSION_RECOVERY_RECONCILIATION_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/accepted/T12_SECURITY_HARDENING_TASK_CARD.md | 2026-10-18 |
+| docs/tasks/GUI03_CAPABILITY_MATRIX.md | 2026-10-26 |
+| docs/tasks/UX01_IMPLEMENTATION_MAP.md | 2026-10-26 |
+| docs/tasks/ALIGN00_CORE_REPAIR_INDEX.md | 2026-10-28 |
+| docs/tasks/ALIGN01_IDENTITY_AND_MAIN_AGENT.md | 2026-10-28 |
+| docs/tasks/ALIGN02_SEQUENCE_AND_DISPATCH.md | 2026-10-28 |
+| docs/tasks/ALIGN03_EXECUTION_REVIEW_FEEDBACK.md | 2026-10-28 |
+| docs/tasks/ALIGN04_RECOVERY_AND_STATUS.md | 2026-10-28 |
+| docs/tasks/ALIGN_CORE_HANDOFF.md | 2026-10-28 |
+| docs/tasks/GOAL02_BOUNDED_GOAL_STABILITY.md | 2026-10-28 |
+| docs/tasks/REMOTE01_SCOPED_RUN_EVIDENCE_EXPORT.md | 2026-10-28 |
+| docs/tasks/SEC02_CHANNEL_MATRIX.md | 2026-10-28 |
+| docs/tasks/SEC02_CREDENTIAL_COVERAGE.md | 2026-10-28 |
+| docs/tasks/SEC02_LOCAL_SCAN_COVERAGE.md | 2026-10-28 |
+| docs/tasks/NEXT60_PLAN_2026-10-29.md | 2026-10-29 |
+| docs/tasks/OCT28_CORE_EXTENSION_INDEX.md | 2026-10-29 |
+| docs/tasks/RESUME02_EXPERIMENTAL_SMART_CONTINUATION.md | 2026-10-29 |
+| docs/tasks/SPLIT_ARCHIVE_REMAINING.md | 2026-10-29 |
+| docs/tasks/archive/ARCHIVE_REVIEW_2026-10-23.md | 2026-10-29 |
+| docs/tasks/archive/completed-checkpoints/B6R00_BASELINE.md | 2026-10-29 |
+| docs/tasks/archive/completed-checkpoints/COMM01_01_COMPLETED.md | 2026-10-29 |
+| docs/tasks/archive/completed-checkpoints/HISTORY01_01_02_COMPLETED.md | 2026-10-29 |
+| docs/tasks/archive/completed-checkpoints/README.md | 2026-10-29 |
+| docs/tasks/archive/completed-checkpoints/T07D00_PROVIDER_AUDIT.md | 2026-10-29 |
+
+注意：这些文件里包含计划/索引/矩阵等**非任务卡**文档，脚本**不判断**哪份算卡；差异只用于人工核对，不构成任务完成或未完成的结论。
