@@ -138,6 +138,7 @@ import { GoalContractStore } from "../orchestration/goal-contract-store.js";
 import { GoalMissionBindingStore } from "../orchestration/goal-mission-binding-store.js";
 import { GoalGateCache } from "../orchestration/goal-gate-cache.js";
 import { resolveGoalModeActivation } from "../orchestration/goal-contract.js";
+import type { GoalContract } from "../orchestration/goal-contract.js";
 import type { GoalGateHydrationResult } from "../orchestration/goal-gate-cache.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
@@ -258,6 +259,24 @@ export interface ApplicationRuntime {
   }) => { readonly isActive: boolean; readonly reason: string };
   /** GOAL-02 R5：当前激活状态（只读）。 */
   getGoalModeActivation: () => { readonly isActive: boolean; readonly reason: string };
+  /**
+   * GOAL-02 R30：**控制面最小入口**（宿主代码调用；**无 CLI/UI**）。
+   *
+   * `createGoalContract` 经 `saveActivated`（未激活 ⇒ 抛 `task-sequence-permission-denied`），
+   * 成功/绑定/解绑后都会刷新门禁缓存，使解析器立即看到新数据。
+   */
+  createGoalContract: (input: {
+    readonly contract: GoalContract;
+    readonly activation: Parameters<typeof resolveGoalModeActivation>[0];
+  }) => Promise<{ readonly isActive: boolean; readonly reason: string }>;
+  bindMissionToGoal: (input: {
+    readonly missionIdentifier: string;
+    readonly goalIdentifier: string;
+  }) => Promise<{ readonly goalIdentifier: string }>;
+  unbindMissionFromGoal: (
+    missionIdentifier: string,
+  ) => Promise<{ readonly didUnbind: boolean }>;
+  refreshGoalGateCache: () => Promise<GoalGateHydrationResult>;
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
   toolPackageZipInstaller: ToolPackageZipInstaller;
@@ -1001,6 +1020,50 @@ export async function createApplicationRuntime(
     readonly isActive: boolean;
     readonly reason: string;
   } => ({ isActive: isGoalModeActivated, reason: goalModeActivationReason });
+  /**
+   * F 阶段 R30（2026-10-29）：**目标模式控制面最小入口**。
+   *
+   * 在此之前 R3–R5 的接线**没有任何写入方**：契约/绑定都不存在 ⇒ 解析器恒 null。
+   * 这里提供三个宿主侧方法（**无 CLI/UI**）：
+   * - `createGoalContract`：经 `saveActivated`，未激活 ⇒ 拒绝落盘；
+   * - `bindMissionToGoal`：写入 mission→goal 映射（不改绑，需先 `unbindMissionFromGoal`）；
+   * - 两者随后 `refreshGoalGateCache()`，让门禁解析器立即看到新数据。
+   * 仍**默认不激活、不阻断**；强制模式仍由 `isGoalModeEnforcementEnabled` 控制（缺省关）。
+   */
+  const refreshGoalGateCache = async (): Promise<GoalGateHydrationResult> => {
+    const hydrationResult = await goalGateCache.hydrate();
+    return hydrationResult;
+  };
+  const createGoalContract = async (input: {
+    readonly contract: GoalContract;
+    readonly activation: Parameters<typeof resolveGoalModeActivation>[0];
+  }): Promise<{ readonly isActive: boolean; readonly reason: string }> => {
+    const activation = await goalContractStore.saveActivated(
+      input.contract,
+      input.activation,
+    );
+    await refreshGoalGateCache();
+    return activation;
+  };
+  const bindMissionToGoal = async (input: {
+    readonly missionIdentifier: string;
+    readonly goalIdentifier: string;
+  }): Promise<{ readonly goalIdentifier: string }> => {
+    await goalMissionBindingStore.bind({
+      missionIdentifier: input.missionIdentifier,
+      goalIdentifier: input.goalIdentifier,
+      boundAtIso: new Date().toISOString(),
+    });
+    await refreshGoalGateCache();
+    return { goalIdentifier: input.goalIdentifier };
+  };
+  const unbindMissionFromGoal = async (
+    missionIdentifier: string,
+  ): Promise<{ readonly didUnbind: boolean }> => {
+    const didUnbind = await goalMissionBindingStore.unbind(missionIdentifier);
+    await refreshGoalGateCache();
+    return { didUnbind };
+  };
   /**
    * GOAL-02 R4（2026-10-29）：**恢复前的目标模式对账**。
    *
@@ -2225,6 +2288,10 @@ export async function createApplicationRuntime(
     completionVerdictStore,
     activateGoalMode,
     getGoalModeActivation,
+    createGoalContract,
+    bindMissionToGoal,
+    unbindMissionFromGoal,
+    refreshGoalGateCache,
     experimentSettingsStore,
     toolPackageLifecycleService,
     toolPackageZipInstaller,
