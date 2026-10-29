@@ -134,6 +134,7 @@ import { DeferredInsertionQueueStore } from "../orchestration/deferred-insertion
 import { GoalModeStateStore, GOAL_MODE_STATE_SCHEMA_VERSION } from "../orchestration/goal-mode-store.js";
 import type { PersistedGoalModeState } from "../orchestration/goal-mode-store.js";
 import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
+import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdict-journal.js";
 import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
 import { CompletionVerdictStore } from "../orchestration/completion-verdict-store.js";
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
@@ -963,6 +964,10 @@ export async function createApplicationRuntime(
    * 只构造句柄，不启动、不读写、不改变任何派发行为；
    * 后续轮次（R3 解析器 / R4 恢复对账 / R5 激活校验）才接进流程。
    */
+  /** R35：目标门禁判定记录（有界 200 条；只记录判定，不含正文）。 */
+  const goalDispatchVerdictJournal = new GoalDispatchVerdictJournal({
+    baseDirectory: stateDirectory,
+  });
   const goalModeStateStore = new GoalModeStateStore({
     baseDirectory: stateDirectory,
   });
@@ -1980,9 +1985,27 @@ export async function createApplicationRuntime(
     ...(options.isGoalModeEnforcementEnabled === true
       ? { isGoalModeEnforcementEnabled: true }
       : {}),
-    ...(options.onGoalDispatchVerdict === undefined
-      ? {}
-      : { onGoalDispatchVerdict: options.onGoalDispatchVerdict }),
+    /**
+     * R35（2026-10-29）：判定**总是**落盘（有界 200 条），再转交宿主回调。
+     *
+     * 落盘失败不影响判定与派发（诊断不得成为单点故障）；记录不含正文。
+     */
+    onGoalDispatchVerdict: (verdictRecord: GoalDispatchVerdictRecord): void => {
+      void goalDispatchVerdictJournal
+        .record({
+          missionIdentifier: verdictRecord.missionIdentifier,
+          projectIdentifier: verdictRecord.projectIdentifier,
+          contractRevision: verdictRecord.contractRevision,
+          isAllowed: verdictRecord.isAllowed,
+          reasonCode: verdictRecord.reasonCode,
+          detail: verdictRecord.detail,
+          evidenceGaps: [...verdictRecord.evidenceGaps],
+          isEnforced: verdictRecord.isEnforced,
+          observedAtIso: verdictRecord.observedAtIso,
+        })
+        .catch(() => undefined);
+      options.onGoalDispatchVerdict?.(verdictRecord);
+    },
     /** ALIGN-02-02：模型分解（缺省不传 ⇒ 单节点旧行为，摘要标 legacy-single-node）。 */
     ...(taskDecompositionDraftProvider === undefined
       ? {}
