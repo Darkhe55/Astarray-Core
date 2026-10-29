@@ -126,3 +126,11 @@
 - **R37**：收口报告（[GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29](../../reports/GOAL02_CLOSURE_RECOMMENDATIONS_2026-10-29.md)）：
   **V 计算仍未接**（`recordGroupCompletion` / `recordToolCallConsumed` 零调用方）⇒ 门禁只剩静态判定；
   强制模式/激活仍无用户入口（建议走宿主启动配置，不做 CLI 命令）；无重新开启路径；组标识不持久。
+
+### R38–R39 补充（2026-10-29）
+
+- **R38**：本地 V 计算接入组结束（要求评估 → `computeGoalPotential` → `recordGroupCompletion` /
+  `recordToolCallConsumed` → `finishTaskGroup`），失败只清在途标记（ADR-0122）。
+- **R39**：F 阶段一致性自查（[F_PHASE_CONSISTENCY_2026-10-29](../../reports/F_PHASE_CONSISTENCY_2026-10-29.md)）：
+  **V 已接**（推翻 R37 报告 §2.1 的"未接"）；仍缺 = 强制模式入口、激活入口、重新开启、组标识持久、
+  `groupKind` 区分；其中"入口形态"与"重开规则"**需产品决定**。

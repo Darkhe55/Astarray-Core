@@ -70,3 +70,12 @@
 ## 5. 验证状态
 
 **静态核对**（上述检索与文件位置为证）；**未运行任何代码**；本轮**无代码改动**。
+
+## 更新（R38/R39，2026-10-29）
+
+- **§2.1 "V 计算未接" 已过期**：R38 已接（[ADR-0122](../adr/0122-local-potential-in-group-boundary.md)）——
+  `assessGoalRequirementsFromLocalState` → `computeGoalPotential` → `recordGroupCompletion` /
+  `recordToolCallConsumed` → `finishTaskGroup` 落盘；`recordGroupCompletion` 与
+  `recordToolCallConsumed` 现在各有生产调用方。
+- **仍缺**（不变）：强制模式/激活无用户入口、无重新开启路径、组标识不持久、`groupKind` 恒 normal。
+- 详见 [F_PHASE_CONSISTENCY_2026-10-29](../reports/F_PHASE_CONSISTENCY_2026-10-29.md)。
