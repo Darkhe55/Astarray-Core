@@ -4313,3 +4313,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未做**：**不是全局唯一**（同一秒重启+同计数器理论上可撞名，无 UUID/持久序列）、
 > **不含 mission 标识**（多 mission 靠时间戳区分）、未运行"重启后标识不同/时间戳一致"任何一条。
 > **下一轮**：R53 —— 判定导出 `goal-mode verdicts --export <path>`（只读，写 JSONL）。
+
+> **127 R53（H 阶段第 3 步）：判定记录只读导出（完成）**：`goal-mode verdicts --export <path>` 把
+> `<state>/goal-mode/dispatch-verdicts.json` 中**保留的全部记录**写成 **JSONL**（每行一条，字段同存储，
+> 不含正文）；**只读源**（不改保留策略、不清空、不轮转）；空记录 ⇒ 空文件；
+> **导出失败（路径空/不可写）⇒ stderr + 退出码 2**，不谎报成功；`--json` 返回
+> `{status:"exported", exportedCount, droppedRecordCount, note}`，并明确"丢弃的历史不可恢复"。
+> **未做**：不导出已丢弃记录（只剩计数）、**不校验目标路径**（可写任意可写位置）、
+> 无签名/哈希链（可被事后编辑）、未运行"有记录/空/不可写"任何一条。
+> **下一轮**：R54 —— `PLAN_STATUS`/卡片最终一致性核对（仅文档）。
