@@ -140,7 +140,8 @@ import { CompletionVerdictStore } from "../orchestration/completion-verdict-stor
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
 import { GoalMissionBindingStore } from "../orchestration/goal-mission-binding-store.js";
 import { GoalGateCache } from "../orchestration/goal-gate-cache.js";
-import { resolveGoalModeActivation } from "../orchestration/goal-contract.js";
+import { resolveGoalModeActivation, computeGoalPotential } from "../orchestration/goal-contract.js";
+import { assessGoalRequirementsFromLocalState } from "../orchestration/goal-requirement-assessment.js";
 import type { GoalContract } from "../orchestration/goal-contract.js";
 import type { GoalGateHydrationResult } from "../orchestration/goal-gate-cache.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
@@ -1154,13 +1155,84 @@ export async function createApplicationRuntime(
       ) {
         return;
       }
+      /**
+       * R38（2026-10-29）：**本地 V 计算**（缺口 1 的第二步）。
+       *
+       * 依据 = mission 链真实状态 + accepted 独立裁决 + 完成收据里的真实工具计数：
+       * - 全部要求满足 ⇒ `computeGoalPotential` 给出 V；
+       * - 任一要求未映射/未完成/缺裁决 ⇒ 该项 `unverified`（V 不会因此被当作 0）；
+       * - 计算失败或门禁不可用 ⇒ **只清在途标记**，不写伪 V、不推进组数。
+       */
+      let nextGateSnapshot = state.gateSnapshot;
+      let nextRequirementBases = state.requirementBases;
+      let nextPotentialValue = state.lastPotentialValue;
+      let nextConsumedToolCalls = state.consumedToolCalls;
+      try {
+        const missionStatus = await missionManager.getMissionStatus(
+          input.missionIdentifier,
+        );
+        const missionTasks = missionStatus.taskChain?.tasks ?? [];
+        const missionTaskStatusByTaskIdentifier = new Map(
+          missionTasks.map((task) => [task.id, task.status]),
+        );
+        const acceptedVerdictTaskIdentifiers = new Set<string>();
+        let receiptToolCallTotal = 0;
+        for (const task of missionTasks) {
+          if (task.status !== "done") {
+            continue;
+          }
+          const verdictRecord = await completionVerdictStore
+            .read(input.missionIdentifier, task.id)
+            .catch(() => null);
+          if (verdictRecord !== null && verdictRecord.verdict === "accepted") {
+            acceptedVerdictTaskIdentifiers.add(task.id);
+          }
+          const receipt = await completionReceiptStore
+            .read(input.missionIdentifier, task.id)
+            .catch(() => null);
+          if (receipt !== null && Number.isFinite(receipt.toolCallCount)) {
+            receiptToolCallTotal += Math.max(0, Math.trunc(receipt.toolCallCount));
+          }
+        }
+        const assessments = assessGoalRequirementsFromLocalState({
+          contract,
+          missionTaskStatusByTaskIdentifier,
+          taskIdentifiersWithAcceptedVerdict: acceptedVerdictTaskIdentifiers,
+        });
+        const potentialResult = computeGoalPotential({ contract, assessments });
+        const gate = goalGateCache.resolve(input.missionIdentifier);
+        if (potentialResult.status === "computed" && gate !== null) {
+          gate.recordToolCallConsumed(
+            Math.max(0, receiptToolCallTotal - state.consumedToolCalls),
+          );
+          gate.recordGroupCompletion({
+            groupIdentifier: input.taskGroupIdentifier,
+            outcome: "completed",
+            groupKind: "normal",
+            potentialValueAfterGroup: potentialResult.potentialValue,
+            recordedBy: "local-verifier",
+            recordedAtIso: input.finishedAtIso,
+          });
+          nextGateSnapshot = gate.createSnapshot();
+          nextRequirementBases = potentialResult.assessments.map((assessment) => ({
+            requirementIdentifier: assessment.requirementIdentifier,
+            weight: assessment.weight,
+            evidence: assessment.evidence,
+            remainingContribution: assessment.remainingContribution,
+          }));
+          nextPotentialValue = potentialResult.potentialValue;
+          nextConsumedToolCalls = receiptToolCallTotal;
+        }
+      } catch {
+        /** V 计算失败 ⇒ 不写伪值；下面仍只清在途标记。 */
+      }
       await goalModeStateStore.finishTaskGroup({
         state,
         finishedAtIso: input.finishedAtIso,
-        gateSnapshot: state.gateSnapshot,
-        requirementBases: state.requirementBases,
-        lastPotentialValue: state.lastPotentialValue,
-        consumedToolCalls: state.consumedToolCalls,
+        gateSnapshot: nextGateSnapshot,
+        requirementBases: nextRequirementBases,
+        lastPotentialValue: nextPotentialValue,
+        consumedToolCalls: nextConsumedToolCalls,
       });
     },
   };
