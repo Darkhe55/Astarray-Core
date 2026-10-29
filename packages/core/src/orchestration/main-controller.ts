@@ -212,6 +212,25 @@ export interface MainControllerOptions {
    */
   missionSequenceBindingStore?: MissionSequenceBindingStore | null;
   /**
+   * R34（2026-10-29）：**目标组开始/结束的状态端口**（缺省 null ⇒ 不记录）。
+   *
+   * 装配后：编排器在"有 start-task 且无在途"时 begin、在途归零时 finish；
+   * 只更新目标持久状态的在途组标记，**不推进 V、不派发**。
+   */
+  goalTaskGroupStatePort?: {
+    begin(input: {
+      readonly missionIdentifier: string;
+      readonly taskGroupIdentifier: string;
+      readonly startedAtIso: string;
+    }): Promise<void>;
+    finish(input: {
+      readonly missionIdentifier: string;
+      readonly taskGroupIdentifier: string;
+      readonly outcome: "completed" | "interrupted";
+      readonly finishedAtIso: string;
+    }): Promise<void>;
+  } | null;
+  /**
    * 计划 R24（2026-10-29）：**推迟到下一组的插入队列**（缺省 null ⇒ 只保留返回文本）。
    *
    * 装配后：`deferred-to-sequence` 路径会把条目写入队列，供下一组安全点消费。
@@ -2162,6 +2181,45 @@ export class MainController {
   }
 
   /**
+   * R34（2026-10-29）：把目标组端口按 mission 绑定成编排器可用的闭包。
+   *
+   * 未装配端口 ⇒ 返回空对象（调度器行为不变）。
+   */
+  private buildGoalTaskGroupPorts(missionIdentifier: string): {
+    goalTaskGroupBeginPort?: (input: {
+      readonly taskGroupIdentifier: string;
+      readonly startedAtIso: string;
+    }) => Promise<void>;
+    goalTaskGroupFinishPort?: (input: {
+      readonly taskGroupIdentifier: string;
+      readonly outcome: "completed" | "interrupted";
+      readonly finishedAtIso: string;
+    }) => Promise<void>;
+  } {
+    const statePort = this.options.goalTaskGroupStatePort ?? null;
+    if (statePort === null) {
+      return {};
+    }
+    return {
+      goalTaskGroupBeginPort: async (input) => {
+        await statePort.begin({
+          missionIdentifier,
+          taskGroupIdentifier: input.taskGroupIdentifier,
+          startedAtIso: input.startedAtIso,
+        });
+      },
+      goalTaskGroupFinishPort: async (input) => {
+        await statePort.finish({
+          missionIdentifier,
+          taskGroupIdentifier: input.taskGroupIdentifier,
+          outcome: input.outcome,
+          finishedAtIso: input.finishedAtIso,
+        });
+      },
+    };
+  }
+
+  /**
    * R25（2026-10-29）：**组边界消费推迟插入**。
    *
    * 只在编排器确认"无在途任务"时调用；逐条标记已消费并记录差异快照。
@@ -3031,6 +3089,8 @@ export class MainController {
         : {}),
       /** 计划 R7：完成收据落盘（缺省 null ⇒ 不落盘）。 */
       completionReceiptStore: this.options.completionReceiptStore ?? null,
+      /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
+      ...this.buildGoalTaskGroupPorts(missionId),
       /** R25：组边界消费推迟插入（消费 ≠ 派发；无既存队列则不接）。 */
       ...(this.options.deferredInsertionQueueStore === null ||
       this.options.deferredInsertionQueueStore === undefined
@@ -3244,6 +3304,8 @@ export class MainController {
         : {}),
       /** 计划 R7：完成收据落盘（缺省 null ⇒ 不落盘）。 */
       completionReceiptStore: this.options.completionReceiptStore ?? null,
+      /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
+      ...this.buildGoalTaskGroupPorts(missionId),
       /** R25：组边界消费推迟插入（消费 ≠ 派发；无既存队列则不接）。 */
       ...(this.options.deferredInsertionQueueStore === null ||
       this.options.deferredInsertionQueueStore === undefined
