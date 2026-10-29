@@ -130,6 +130,7 @@ import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
+import { DeferredInsertionQueueStore } from "../orchestration/deferred-insertion-queue.js";
 import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
 import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
 import { CompletionVerdictStore } from "../orchestration/completion-verdict-store.js";
@@ -929,6 +930,10 @@ export async function createApplicationRuntime(
    * CLI 侧独立构造同一路径的存储来读取（见 `task-ledger status`）。
    */
   const missionSequenceBindingStore = new MissionSequenceBindingStore({
+    baseDirectory: stateDirectory,
+  });
+  /** R24：推迟到下一组的插入队列（控制器入队；消费方在后续检查点）。 */
+  const deferredInsertionQueueStore = new DeferredInsertionQueueStore({
     baseDirectory: stateDirectory,
   });
   /**
@@ -1775,6 +1780,8 @@ export async function createApplicationRuntime(
     taskLedgerDivergenceJournal,
     /** R21：mission↔序列 持久索引（控制器写入；CLI 读取）。 */
     missionSequenceBindingStore,
+    /** R24：推迟插入队列（控制器入队；尚不消费）。 */
+    deferredInsertionQueueStore,
     /**
      * 清单第 ① 项下半场（2026-10-28）：**运行中插入的真实注入端口**。
      *

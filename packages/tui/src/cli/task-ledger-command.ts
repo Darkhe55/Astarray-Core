@@ -16,6 +16,7 @@ import { MissionManager } from "../../../core/src/orchestration/mission-manager.
 import { TaskLedgerBridge } from "../../../core/src/orchestration/task-ledger-bridge.js";
 import { TaskLedgerDivergenceJournal } from "../../../core/src/orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../../../core/src/orchestration/mission-sequence-binding-store.js";
+import { DeferredInsertionQueueStore } from "../../../core/src/orchestration/deferred-insertion-queue.js";
 import { TaskSequenceStatusController } from "../../../core/src/orchestration/task-sequence-controllers.js";
 import { TaskStore } from "../../../core/src/infra/task-store.js";
 import { EXIT_CODES, printJson } from "./json-output.js";
@@ -31,6 +32,8 @@ export interface TaskLedgerStatusCommandInput {
   readonly isListBindings?: boolean;
   /** R23（2026-10-29）：给了就做"单任务派发只读预检"，代替整体对照。 */
   readonly taskIdentifier?: string;
+  /** R24（2026-10-29）：只读列出"推迟到下一组"的待消费插入队列。 */
+  readonly isListDeferredInsertions?: boolean;
 }
 
 export async function executeTaskLedgerStatusCommand(
@@ -60,6 +63,38 @@ export async function executeTaskLedgerStatusCommand(
       }
       if (bindings.length === 0) {
         process.stdout.write("（索引为空：尚未有任务发布，或索引写入失败）\n");
+      }
+    }
+    return EXIT_CODES.SUCCESS;
+  }
+  /** R24：`--deferred-insertions` 只读视图（不需要 mission）。 */
+  if (input.isListDeferredInsertions === true) {
+    const queueStore = new DeferredInsertionQueueStore({
+      baseDirectory: input.stateDirectory,
+    });
+    const pendingEntries = await queueStore
+      .listPending(input.missionIdentifier)
+      .catch(() => []);
+    if (input.isJsonOutput) {
+      printJson({
+        status: pendingEntries.length === 0 ? "no-pending-insertions" : "listed",
+        pendingCount: pendingEntries.length,
+        pendingEntries,
+        note: "队列只记录推迟插入；消费发生在下一组安全点（当前尚未接消费方）。",
+      });
+    } else {
+      process.stdout.write(
+        `推迟插入队列（${String(pendingEntries.length)} 条待消费）：` + "\n",
+      );
+      for (const entry of pendingEntries) {
+        process.stdout.write(
+          `- ${entry.enqueuedAtIso} mission=${entry.missionIdentifier} ` +
+            `task=${entry.taskIdentifier} sequence=${entry.sequenceIdentifier}` +
+            "\n",
+        );
+      }
+      if (pendingEntries.length === 0) {
+        process.stdout.write("（没有待消费的推迟插入）\n");
       }
     }
     return EXIT_CODES.SUCCESS;
