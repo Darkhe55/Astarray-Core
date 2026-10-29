@@ -670,6 +670,24 @@ export type {
   OutboundContentCandidate,
   OutboundContentGateDecision,
 } from "./tools/outbound-content-gate.js";
+/**
+ * R13（2026-10-29）：**严格完成门禁的存储与判定原语**。
+ *
+ * 供手工验收脚本/控制面读写收据与裁决；**不改变任何门禁行为**。
+ * 注意：这只是存储层 API，完整门禁仍需 `MainController` 的 mission 上下文。
+ */
+export {
+  CompletionReceiptStore,
+} from "./orchestration/completion-receipt-store.js";
+export {
+  CompletionVerdictStore,
+} from "./orchestration/completion-verdict-store.js";
+export { evaluateCompletionReceipt } from "./orchestration/completion-receipt.js";
+export type { CompletionReceipt } from "./orchestration/completion-receipt.js";
+export type {
+  CompletionVerdictKind,
+  CompletionVerdictRecord,
+} from "./orchestration/completion-verdict-store.js";
 export type {
   LegacyIdentityAudit,
   LegacyLinkEvidence,
