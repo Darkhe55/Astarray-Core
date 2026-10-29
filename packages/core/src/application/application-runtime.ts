@@ -131,6 +131,7 @@ import { ProjectWorkWindowStore } from "../orchestration/project-work-window-sto
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
 import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
+import { CompletionVerdictStore } from "../orchestration/completion-verdict-store.js";
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
 import { GoalMissionBindingStore } from "../orchestration/goal-mission-binding-store.js";
 import { GoalGateCache } from "../orchestration/goal-gate-cache.js";
@@ -241,6 +242,8 @@ export interface ApplicationRuntime {
   goalGateHydration: GoalGateHydrationResult;
   /** 计划 R7：完成收据存储（worker 成功分支落盘；严格模式读取）。 */
   completionReceiptStore: CompletionReceiptStore;
+  /** 计划 R10：完成裁决存储（读取已接；写入方待 R11）。 */
+  completionVerdictStore: CompletionVerdictStore;
   /**
    * GOAL-02 R5：激活目标模式（唯一入口；经 `resolveGoalModeActivation` 判定）。
    * 未调用或判定未通过 ⇒ 门禁解析器恒为 null，目标模式不参与派发/恢复。
@@ -933,6 +936,15 @@ export async function createApplicationRuntime(
    * 只构造句柄；worker 成功分支提供收据时才落盘（R7），严格模式读取同一份（R8）。
    */
   const completionReceiptStore = new CompletionReceiptStore({
+    baseDirectory: stateDirectory,
+  });
+  /**
+   * 计划 R10（2026-10-29）：**完成裁决存储**。
+   *
+   * 只构造句柄；读取经 `completionVerdictReader`（本文件）。
+   * 写入方尚未接（缺少 appointment 的 mission 字段，R11）。
+   */
+  const completionVerdictStore = new CompletionVerdictStore({
     baseDirectory: stateDirectory,
   });
   /**
@@ -1921,6 +1933,28 @@ export async function createApplicationRuntime(
     completionReceiptStore,
     completionReceiptReader: async (missionIdentifier: string, taskIdentifier: string) =>
       await completionReceiptStore.read(missionIdentifier, taskIdentifier),
+    /**
+     * 计划 R10（2026-10-29）：**独立裁决读取**。
+     *
+     * 口径：该 mission **没有任何裁决** ⇒ null（门禁按"缺裁决"阻断）；
+     * 有裁决但存在 rejected ⇒ 不通过并带出理由；全部 accepted ⇒ 通过。
+     * 读取不伪造：存储损坏/缺失一律按"无裁决"处理。
+     */
+    completionVerdictReader: async (missionIdentifier: string) => {
+      const verdictRecords = await completionVerdictStore.listForMission(missionIdentifier);
+      if (verdictRecords.length === 0) {
+        return null;
+      }
+      const rejectedRecords = verdictRecords.filter(
+        (record) => record.verdict === "rejected",
+      );
+      return {
+        isAccepted: rejectedRecords.length === 0,
+        reasons: rejectedRecords.flatMap((record) =>
+          record.reasons.map((reason) => `${record.taskIdentifier}: ${reason}`),
+        ),
+      };
+    },
     backupVault,
     backupDeletionController,
     workArchiveStore,
@@ -2150,6 +2184,7 @@ export async function createApplicationRuntime(
     goalGateCache,
     goalGateHydration,
     completionReceiptStore,
+    completionVerdictStore,
     activateGoalMode,
     getGoalModeActivation,
     experimentSettingsStore,
