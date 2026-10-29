@@ -3763,3 +3763,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未做**：**无 UI/CLI 调用激活入口**、**契约/绑定仍无写入方**（生产恒 0 条）、
 > 强制模式仍缺省关；未运行"未激活 ⇒ null""模型来源 ⇒ 拒绝""未激活 ⇒ 拒绝建契约"任何一条。
 > **下一轮**：R6 —— 完成收据的**本地存储**（按 mission/task 落盘、原子写；严格模式可读）。
+
+> **80 R6（完成门禁生产方第 1 步）：完成收据本地存储（完成）**：新增
+> `completion-receipt-store.ts`：`<state>/completion-receipts/<mission>/<task>.json`
+> （路径清洗、原子写、备份恢复）。写入前用 `evaluateCompletionReceipt` 校验，不足 ⇒ 拒绝落盘；
+> **同 mission/task 已有收据**：内容相同 ⇒ 幂等（`didWrite:false`），内容不同 ⇒
+> `journal-corrupted` **拒绝覆盖**；损坏读回 `null`（不伪造收据）。只存收据字段，不存正文。
+> **未做**：**没有写入方**（worker 成功分支尚未构建收据，R7）、**没有读取方**
+> （`completionReceiptReader` 未接，R8）；未运行任何写入/幂等/拒绝/损坏路径。
+> **下一轮**：R7 —— worker 成功分支构建收据（工具计数、产物路径、完成事件校验）并调用存储。
