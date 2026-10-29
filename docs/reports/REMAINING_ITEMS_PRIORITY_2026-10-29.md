@@ -1,6 +1,6 @@
 # 未闭合项复核与优先级建议（2026-10-29，R56）
 
-> 依据：[PLAN_STATUS](../PLAN_STATUS.md) A–D 段、[证据与口径总表](EVIDENCE_AND_WORDING_MASTER_2026-10-29.md) §3。
+> 依据：[PLAN_STATUS](../../PLAN_STATUS.md) A–D 段、[证据与口径总表](EVIDENCE_AND_WORDING_MASTER_2026-10-29.md) §3。
 > **本文件只给建议，不改变任何代码或开关**。
 
 ## 1. 先做"能证明"的事：待运行证据（优先级 P0）

@@ -298,7 +298,7 @@
 > 连续 5+ 次 `git push` 均失败（`Could not read from remote repository`）。
 > 按施工纪律：本阶段跳过推送、记录原因，**下一阶段完成后把累积提交一并重试**。远端未改写。
 >
-> **㉜ ALIGN-04-06 交付（文档）**：新增 [docs/tasks/ALIGN_CORE_HANDOFF.md](astarray/docs/tasks/ALIGN_CORE_HANDOFF.md)，
+> **㉜ ALIGN-04-06 交付（文档）**：新增 [docs/tasks/ALIGN_CORE_HANDOFF.md](docs/tasks/ALIGN_CORE_HANDOFF.md)，
 > 按 26 个检查点逐项登记**接口/组件/生产接线/代码完成/运行证据**五层状态，并列出
 > ①5 个默认开关及其行为变化；②未完成项按"结构性 / 缺生产能力 / 缺外部条件 / 未验证"分类；
 > ③备份与提交可回溯；④按解除阻塞收益排序的下一步。
@@ -454,7 +454,7 @@
 > ④**不声称稳定性**（`stabilityGuarantee: "none"` 是刻意设计，不是遗漏）。
 >
 > **㊽ 跨卡接线复核（状态补丁）**：新增
-> [docs/reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md](astarray/docs/reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md)
+> [docs/reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md](docs/reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md)
 > —— 不覆盖共享总表，待人工集成。静态检索确认：本窗口 9 个公开 API（`requestRunEvidence`、
 > `handleWorkWindowResume`、`recallClosedContext`、`inspectMissionResumeReadiness`、
 > `evaluateOutboundContentGate`、`GoalDispatchGate`、`GoalModeStateStore`、
@@ -510,7 +510,7 @@
 > 真实时钟下的跨天边界/时区/时钟跳变未验证。
 >
 > **53 清单第 ⑤ 项：REMOTE-01 标为平台阻塞（不做假投递）**：新增
-> [REMOTE01_PLATFORM_BLOCK_2026-10-28.md](astarray/docs/reports/REMOTE01_PLATFORM_BLOCK_2026-10-28.md)。
+> [REMOTE01_PLATFORM_BLOCK_2026-10-28.md](docs/reports/REMOTE01_PLATFORM_BLOCK_2026-10-28.md)。
 > **检索证据**：公开仓 `webhook|feishu|dingtalk|slack|telegram|wecom|nodemailer|smtp` **0 命中**；
 > 私有仓同模式 + `RemoteEvidenceExportService|RemoteDeliveryTransportPort` **0 命中**；
 > core 网络出口只有注入的 `fetchImpl`/transport 端口（`fetch(|http.request|undici` 0 命中）；
@@ -619,7 +619,7 @@
 > `docs/reports/TASKCARD_BACKLOG_2026-10-17.md` §11（那是共享总表，改动需人工集成）。
 >
 > **64 收尾第 2 步：任务卡状态一致性复核（完成）**：新增
-> [STATUS_CARD_CONSISTENCY_2026-10-29.md](astarray/docs/reports/STATUS_CARD_CONSISTENCY_2026-10-29.md)。
+> [STATUS_CARD_CONSISTENCY_2026-10-29.md](docs/reports/STATUS_CARD_CONSISTENCY_2026-10-29.md)。
 > 逐卡核对八张卡（ALIGN-00…04、SEC-02、REMOTE-01、GOAL-02）的**状态行与检查点记录**：
 > **修正 3 处状态行**（只改状态行，**不改历史记录**）：
 > ①ALIGN-00 把"01-01…03 已交付"改为逐项列举；
@@ -633,14 +633,14 @@
 > **65 收尾第 3 步：ADR 索引完整性复核（完成）**：脚本核对 `docs/adr/0*.md`：
 > **89 份、编号 0001–0089 连续无缺号、无重复**；**0044–0089（46 份）全部具备
 > "未完成"与"验证状态"两节**；0001–0043（43 份）早于约定、两节均无（**历史不追改**）。
-> 新建 [docs/adr/README.md](astarray/docs/adr/README.md) **只读索引**（脚本生成，逐行列出
+> 新建 [docs/adr/README.md](docs/adr/README.md) **只读索引**（脚本生成，逐行列出
 > 编号/文件/标题/两节有无），并在开头写明"运行证据=0、`implemented-unverified` 不代表验收"。
-> 审计记录：[ADR_INDEX_AUDIT_2026-10-29.md](astarray/docs/reports/ADR_INDEX_AUDIT_2026-10-29.md)。
+> 审计记录：[ADR_INDEX_AUDIT_2026-10-29.md](docs/reports/ADR_INDEX_AUDIT_2026-10-29.md)。
 > **未做**：索引**不校验内容质量**、**生成脚本未入库**（一次性）、**无 CI 守卫**
 > （编号连续性/两节完整性无自动检查）、0001–0043 未补两节。
 >
 > **66 收尾第 4 步：默认开关与阻塞项复核（完成）**：静态核对六项开关的缺省值/消费点/可达性，
-> 交付 [DEFAULT_SWITCHES_AUDIT_2026-10-29.md](astarray/docs/reports/DEFAULT_SWITCHES_AUDIT_2026-10-29.md)。
+> 交付 [DEFAULT_SWITCHES_AUDIT_2026-10-29.md](docs/reports/DEFAULT_SWITCHES_AUDIT_2026-10-29.md)。
 > **发现两处真实缺口**：①`GOAL_MODE_DEFAULT_ENABLED` 是**死常量**（全仓仅定义处 1 次；
 > `resolveGoalModeActivation` 不读它，"默认关闭"实际靠调用方传参）；②`isReviewRequiredForMerge`
 > **无法从产品装配打开**（`application-runtime:1676` 构造 `GitIntegrationCoordinator` 时未传该字段，
@@ -673,7 +673,7 @@
 > **69 收尾第 7 步：死常量决策记录（完成，未改语义）**：`GOAL_MODE_DEFAULT_ENABLED`
 > （`goal-contract.ts:274`）全仓**仅定义处 1 次**，`resolveGoalModeActivation` **不读它** ⇒
 > "默认关闭"实际靠调用方传参，**常量不构成保护**。交付
-> [GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29.md](astarray/docs/reports/GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29.md)：
+> [GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29.md](docs/reports/GOAL_MODE_DEFAULT_CONSTANT_DECISION_2026-10-29.md)：
 > 方案 **A（推荐）** 删除常量、明确"唯一开关是运行时配置"（**零行为变化**、去掉误导）；
 > 方案 **B** 让激活函数读常量作为额外必要条件（**编译期可关死实验**，但属**语义变化**：
 > 开启权从"认证用户"变为"构建期 + 认证用户"，与卡内表述不完全一致）。
@@ -681,7 +681,7 @@
 > **未做**：未删除/未修改常量与激活函数、未运行验证、未更新 ADR-0075/0082 对该常量的描述。
 >
 > **70 收尾第 8 步：最终交付复核（完成）**：交付
-> [WINDOW_SUMMARY_2026-10-29.md](astarray/docs/reports/WINDOW_SUMMARY_2026-10-29.md)。
+> [WINDOW_SUMMARY_2026-10-29.md](docs/reports/WINDOW_SUMMARY_2026-10-29.md)。
 > 复核结果：`typecheck` exit 0、`lint` exit 0、`build` 成功；`git status --porcelain`
 > **只有既有未提交文件**（13 M + 7 ??，**不含本窗口任何改动**）；暂存区空；
 > `origin/main..HEAD = 0`。规模：本段 **39 个提交**、ADR 总数 **91**（编号连续无重复）、
@@ -729,7 +729,7 @@
 > 每轮一个检查点，单独提交，按纪律尝试推送。
 >
 > **75 R1（新窗口 60 轮）：计划与基线冻结（完成）**：新增
-> [NEXT60_PLAN_2026-10-29.md](astarray/docs/tasks/NEXT60_PLAN_2026-10-29.md) —— 8 阶段、
+> [NEXT60_PLAN_2026-10-29.md](docs/tasks/NEXT60_PLAN_2026-10-29.md) —— 8 阶段、
 > 逐轮检查点（B: GOAL-02 接线；C: 完成门禁生产方；D: SEC-02 收口；E: 两套记账收口；
 > F: 剩余可做卡；G: 证据与文档；H: 收尾）、每轮固定动作、明确不做项与需用户决定项。
 > **基线**：HEAD `b0e52992`；`typecheck` exit 0、`lint` exit 0、`build` 成功；
@@ -4346,3 +4346,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （强制/激活走**宿主启动配置**、重开**重置**、验证需授权）；D 类平台/立项阻塞。
 > 结论顺序：跑脚本 → `groupKind` → 产品决定 → 写回+审批 → 按 taskId 派发 → D 类。
 > **下一轮**：R57 —— 文档死链检查（只读脚本：相对链接指向的文件是否存在）。
+
+> **131 R57（H 阶段第 7 步）：文档死链检查（完成）**：新增 `scripts/manual/docs-link-check.mjs`
+> （**只读**：扫 `docs/**/*.md` + 仓库根 `*.md` 的 `](相对路径)`，跳过 http/mailto/锚点，
+> **exit 0 无死链 / 1 有死链**，不改文档）。**首次运行发现 17 条死链**并全部修复：
+> `PLAN_STATUS` 10 条（`astarray/docs/...` → `docs/...`）、ADR-0125 1 条（应在 `../reports/`）、
+> `REMAINING_ITEMS_PRIORITY` 1 条（`../` → `../../`）、GOAL02 卡 3 条 + `NEXT60_PLAN` 2 条
+> （`../../reports/` → `../reports/`）；**复跑 418 文件 / 352 链接 / 死链 0（exit 0）**。
+> 报告 `docs/reports/DOCS_LINK_CHECK_2026-10-29.md`。**只查存在性**（不校验内容/锚点/外链），无 CI 守卫。
+> **下一轮**：R58 —— 交付说明定稿（基于 R55 草稿，补 R56/R57 结论）。
