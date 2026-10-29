@@ -3719,3 +3719,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 
 
+
+> **76a 推送状态（2026-10-29 R2）**：R2 提交 `0994b1a5` **本地已提交但未推送** —— 连续 5 次
+> `git push` 失败（`Could not read from remote repository`）。按纪律记录原因、本阶段跳过，
+> **下一轮（R3）完成时合并重试**；远端未改写。
