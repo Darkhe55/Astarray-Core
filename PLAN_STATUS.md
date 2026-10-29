@@ -3877,3 +3877,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **下一轮**：R17 —— 按报告 §4 的清单，为 **bedrock-converse** 写最小 runtime 骨架（默认不注册）
 > 并在其出口接扫描？先评估是否值得：若无真实调用方，写骨架也只是又一层 dead code ——
 > 下一轮先做**决策记录**，不盲目加代码。
+
+> **91 R17（D 阶段第 4 步）：MCP 结果返回前敏感检查（完成）**：通道 7 此前**只掩码不阻断**。
+> 现在 `McpToolBridgeOptions` 新增 `resultScanMode: off|record|block`（**缺省 record**）与
+> `onResultScan` 回调；`redactText` 改为"**脱敏 → 四态检查 → 返回/拒绝**"：
+> 检查**脱敏后**文本（避免把已掩掉的原文误报）；`record` 非 clean 时回调记录**仍返回**；
+> `block` 非 clean ⇒ 抛 `sensitive-content-read-denied`（不返回）；记录不含正文。
+> **未做**：默认 `record` **不阻断**（需用户显式 block，误报率未测）、只覆盖结果摘要字段、
+> 记录无持久化/UI；未跑"clean/record/block"任何一条。
+> **推送状态（R16/R17）**：R16 提交 `5ebd7d0a` 与 R17 提交本轮**均因远端不可达未推送**，
+> 按纪律记录、下一轮合并重试。
+> **下一轮**：R18 —— 日志换行注入加固（通道 14：掩码输出里若含换行仍可能伪造日志行）。
