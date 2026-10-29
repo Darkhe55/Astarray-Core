@@ -923,6 +923,15 @@ export async function createApplicationRuntime(
     baseDirectory: stateDirectory,
   });
   /**
+   * R21（2026-10-29）：**mission↔序列 持久索引**。
+   *
+   * 只构造句柄并透传给控制器；写入发生在发布/回填路径，失败不阻断发布。
+   * CLI 侧独立构造同一路径的存储来读取（见 `task-ledger status`）。
+   */
+  const missionSequenceBindingStore = new MissionSequenceBindingStore({
+    baseDirectory: stateDirectory,
+  });
+  /**
    * 目标模式 R2（2026-10-29）：**状态存储装配**。
    *
    * 只构造句柄，不启动、不读写、不改变任何派发行为；
@@ -1764,6 +1773,8 @@ export async function createApplicationRuntime(
     /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
     taskSequenceStatusController: sequenceStatusController,
     taskLedgerDivergenceJournal,
+    /** R21：mission↔序列 持久索引（控制器写入；CLI 读取）。 */
+    missionSequenceBindingStore,
     /**
      * 清单第 ① 项下半场（2026-10-28）：**运行中插入的真实注入端口**。
      *
