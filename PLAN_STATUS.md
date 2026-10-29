@@ -3864,3 +3864,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未合并**（各记一份）；未跑"记录一条/记录抛错不影响装配/超 100 条先进先出"任何一条。
 > **下一轮**：R16 —— azure / bedrock / gemini 适配器**核查**（是否独立于两个已接 runtime），
 > 能接则接出口扫描，不能接则如实登记为未覆盖。
+
+> **90 R16（D 阶段第 3 步）：适配器出口扫描核查（完成，审计）**：检索证据表明
+> `AzureOpenAiAdapter` / `BedrockConverseAdapter` / `GeminiInteractionsAdapter` **只在定义处出现**，
+> 没有实例化、`ProviderProtocolAdapter` **没有 transport**（只解析事件、不发请求）⇒ 三者
+> **不在任何请求路径上**，出口扫描对它们**当前不适用**（不是"漏接"）。
+> 交付 `docs/reports/PROVIDER_ADAPTER_COVERAGE_2026-10-29.md`（含检索命令与 11 处命中）；
+> 同步修正 `SEC02_CHANNEL_MATRIX` 中"通道 13 完全没有扫描"的过期表述（已由 ADR-0080 接两个 runtime）。
+> **无代码改动**（不新增"假装已覆盖"的检查）。
+> **未做**：未来接入时必须在其 runtime 出口调用 `applyProviderEgressScan`（清单见报告 §4）；
+> 仍无"已接扫描"的 CI 守卫。
+> **下一轮**：R17 —— 按报告 §4 的清单，为 **bedrock-converse** 写最小 runtime 骨架（默认不注册）
+> 并在其出口接扫描？先评估是否值得：若无真实调用方，写骨架也只是又一层 dead code ——
+> 下一轮先做**决策记录**，不盲目加代码。
