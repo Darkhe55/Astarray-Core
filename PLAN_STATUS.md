@@ -3955,3 +3955,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （此前缺失一律 0，脚本需注意）、`status` 字段未版本化；未运行三条路径任何一条。
 > **下一轮**：R23 —— 单任务认领/派发（`dispatch single task`）的**只读预检**：
 > 按 taskId 给出"是否可独立派发/缺什么"，不改任务链。
+
+> **97 R23（E 阶段第 3 步）：单任务派发只读预检（完成）**：`TaskLedgerBridge.inspectSingleTaskDispatchPrecheck`
+> 只读回答"按两套记账看该任务能否单独派发、缺什么"：五条**缺一不可**（在序列、在 mission 链、
+> 两侧状态一致、序列 ready、mission 为 pending）；返回固定
+> `canDispatchTaskByTaskIdentifier: false` + 说明（**预检通过 ≠ 可派发**）。
+> CLI：`task-ledger status --mission X --task Y`（缺 sequence/owner 先用 R21 索引补全），
+> 输出 `dispatch-precheck-passed|blocked`，**退出码 0**（报告不是错误；只有快照失败/mission 不存在才 2）。
+> **未做**：**没有真正派发**（`requestDispatchByTaskIdentifier` 仍拒绝）、**不检查权限/租约/预算/目标门禁**、
+> 不展开依赖链、脚本需读 JSON 区分通过/阻塞；未运行五条判定任何一条。
+> **下一轮**：R24 —— 组边界注入（把"推迟到下一组"变成**显式队列 + 下一组安全点消费**），
+> 仍不改运行中图。
