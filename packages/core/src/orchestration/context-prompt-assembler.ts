@@ -19,6 +19,7 @@ import {
   buildReadSideContentScanLabel,
   type ReadSideContentScanLabel,
 } from "../tools/read-side-content-scan.js";
+import { recordPromptContentScan } from "./prompt-scan-journal.js";
 import { renderContextPacks, validateContextPack } from "./context-pack.js";
 
 /** 系统规则文本（独立于可选全局记录，任何预算下都进入提示词）。 */
@@ -339,6 +340,28 @@ export function createContextPromptProvider(
             },
     });
     emitRuntimeEvent(assembled);
+    /**
+     * R15（2026-10-29）：**消费装配标注** —— 写一条有界运行记录（只含结论，不含正文）。
+     *
+     * 不阻断、不改内容；记录失败不影响装配（诊断不能成为装配的单点故障）。
+     */
+    if (assembled.contentScan !== undefined) {
+      try {
+        recordPromptContentScan({
+          missionIdentifier: input.missionId,
+          agentInstanceIdentifier: input.agentInstanceId,
+          taskIdentifier: input.task.id,
+          outcome: assembled.contentScan.outcome,
+          ruleSetVersion: assembled.contentScan.ruleSetVersion,
+          matchedRuleIdentifiers: assembled.contentScan.matchedRuleIdentifiers,
+          limitReason: assembled.contentScan.limitReason,
+          isClean: assembled.contentScan.isClean,
+          recordedAtIso: assembled.contentScan.evaluatedAtIso,
+        });
+      } catch {
+        // 诊断记录失败不影响装配结果
+      }
+    }
     return assembled;
   };
 }

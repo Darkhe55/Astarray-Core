@@ -3854,3 +3854,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 与 ADR-0080 的模型请求出口扫描**未合并**；未跑"干净 ⇒ isClean / 命中 ⇒ 标注 false 且正文不变"。
 > **下一轮**：R15 —— 让装配路径**消费**该标注：写入一条运行诊断记录（事件/日志），
 > 仍不阻断、不改内容，使"这份上下文是否检查过"可事后核对。
+
+> **89 R15（D 阶段第 2 步）：装配标注落运行记录（完成）**：新增 `prompt-scan-journal.ts`
+> （进程内环形缓冲 100 条；记录 mission/agent/task/结论/规则版本/命中规则/限制/isClean/时间，
+> **不含提示词正文**）；`createContextPromptProvider` 返回前 `recordPromptContentScan`，
+> **记录失败被吞掉**（不成为装配单点故障），**不阻断、不改内容**；SDK 导出
+> `readPromptContentScanRecords` / `clearPromptContentScanRecords` / 上限常量与类型（只读诊断）。
+> **未做**：**无持久化**（重启即丢）、**无 UI**、`isClean:false` 仍会注入、与 ADR-0080 出口扫描
+> **未合并**（各记一份）；未跑"记录一条/记录抛错不影响装配/超 100 条先进先出"任何一条。
+> **下一轮**：R16 —— azure / bedrock / gemini 适配器**核查**（是否独立于两个已接 runtime），
+> 能接则接出口扫描，不能接则如实登记为未覆盖。
