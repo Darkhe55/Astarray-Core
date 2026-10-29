@@ -134,3 +134,12 @@
 - **R39**：F 阶段一致性自查（[F_PHASE_CONSISTENCY_2026-10-29](../../reports/F_PHASE_CONSISTENCY_2026-10-29.md)）：
   **V 已接**（推翻 R37 报告 §2.1 的"未接"）；仍缺 = 强制模式入口、激活入口、重新开启、组标识持久、
   `groupKind` 区分；其中"入口形态"与"重开规则"**需产品决定**。
+
+### R51–R54 补充（2026-10-29）
+
+- **R51**：`groupKind` 接入组边界（`goalTaskGroupKindProvider`，同步纯函数；缺省仍 `normal`；
+  仓内**没有判定策略**）（ADR-0126）。
+- **R52**：组标识改为 `goal-group-<UTC14>-<n>`，跨重启可区分（ADR-0127）。
+- **R53**：`goal-mode verdicts --export <path>` 只读导出 JSONL（ADR-0128）。
+- **R54**：`PLAN_STATUS` A/B 段同步：A 段补 R51–R53；B 段把"组标识持久化"改为"**全局唯一**"、
+  把"判定导出"改为"**导出已完成，缺轮转**"、把 "groupKind 区分"改为"**判定策略**"（不再说"一律 normal"）。
