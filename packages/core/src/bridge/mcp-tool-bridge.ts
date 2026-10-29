@@ -14,6 +14,9 @@
  * 7) 协议层不直接执行底层写工具：本地写/执行类工具名一律显式拒绝。
  */
 import { Redactor } from "../infra/redaction.js";
+import { DomainError } from "../core/errors.js";
+import { scanSensitiveContent } from "../tools/sensitive-content-scan-contract.js";
+import type { SensitiveScanResult } from "../tools/sensitive-content-scan-contract.js";
 
 export const MCP_BRIDGE_TOOL_NAMES = [
   "submit_task",
@@ -102,6 +105,22 @@ export interface McpToolBridgeOptions {
   maximumTrackedReceipts?: number;
   nowMilliseconds?: () => number;
   identifierFactory?: () => string;
+  /**
+   * R17（2026-10-29）：**结果返回前的敏感内容检查**（缓解"掩码不等于放行"）。
+   *
+   * - `off`：不检查（旧行为）；
+   * - `record`（缺省）：检查并回调记录，**仍返回**（与出口扫描同口径）；
+   * - `block`：命中/未完成/失败 ⇒ 抛 `sensitive-content-read-denied`，**不返回结果**。
+   * 检查对象是**脱敏后**的文本（先掩码、再判定），因此不会因掩码改变而误报原文。
+   */
+  resultScanMode?: "off" | "record" | "block";
+  /** 记录回调（`record` 模式必用；`block` 模式命中时也会回调）。 */
+  onResultScan?: (record: {
+    readonly outcome: SensitiveScanResult["outcome"];
+    readonly ruleSetVersion: number;
+    readonly matchedRuleIdentifiers: readonly string[];
+    readonly limitReason: string | null;
+  }) => void;
 }
 
 export interface McpBridgeSession {
@@ -198,6 +217,15 @@ export class McpToolBridge {
   private readonly applicationPort: McpBridgeApplicationPort;
   private readonly permissionRecheckPort: McpBridgePermissionRecheckPort;
   private readonly resultRedactionPort: McpBridgeResultRedactionPort;
+  private readonly resultScanMode: "off" | "record" | "block";
+  private readonly onResultScan:
+    | ((record: {
+        readonly outcome: SensitiveScanResult["outcome"];
+        readonly ruleSetVersion: number;
+        readonly matchedRuleIdentifiers: readonly string[];
+        readonly limitReason: string | null;
+      }) => void)
+    | null;
   private readonly maximumTrackedReceipts: number;
   private readonly nowMilliseconds: () => number;
   private readonly identifierFactory: () => string;
@@ -216,6 +244,8 @@ export class McpToolBridge {
       }),
     };
     this.resultRedactionPort = options.resultRedactionPort ?? defaultRedactionPort;
+    this.resultScanMode = options.resultScanMode ?? "record";
+    this.onResultScan = options.onResultScan ?? null;
     this.maximumTrackedReceipts = options.maximumTrackedReceipts ?? 1000;
     this.nowMilliseconds = options.nowMilliseconds ?? (() => Date.now());
     this.identifierFactory =
@@ -526,8 +556,42 @@ export class McpToolBridge {
     return status === "done" || status === "failed" || status === "cancelled";
   }
 
+  /**
+   * R17（2026-10-29）：脱敏 → **检查** → 返回/拒绝。
+   *
+   * `record`（缺省）：检查并回调，仍返回；`block`：非 clean ⇒ 抛错，不返回；
+   * `off`：旧行为。检查对象是**脱敏后**文本（掩码先行，避免把已掩掉的原文误报）。
+   */
   private redactText(value: string | null): string | null {
-    return value === null ? null : this.resultRedactionPort.redact(value);
+    if (value === null) {
+      return null;
+    }
+    const redacted = this.resultRedactionPort.redact(value);
+    if (this.resultScanMode === "off") {
+      return redacted;
+    }
+    const scanResult = scanSensitiveContent({ content: redacted });
+    if (scanResult.outcome === "clean") {
+      return redacted;
+    }
+    const record = {
+      outcome: scanResult.outcome,
+      ruleSetVersion: scanResult.ruleSetVersion,
+      matchedRuleIdentifiers: [...scanResult.matchedRuleIdentifiers],
+      limitReason: scanResult.limitReason,
+    } as const;
+    this.onResultScan?.(record);
+    if (this.resultScanMode === "block") {
+      throw new DomainError(
+        "sensitive-content-read-denied",
+        `MCP 结果未通过内容检查（规则版本 ${String(scanResult.ruleSetVersion)}）：${
+          scanResult.outcome === "sensitive"
+            ? `命中规则 ${scanResult.matchedRuleIdentifiers.join(", ")}`
+            : `${scanResult.outcome}: ${scanResult.limitReason ?? "未知原因"}`
+        }`,
+      );
+    }
+    return redacted;
   }
 
   private buildSuccess(
