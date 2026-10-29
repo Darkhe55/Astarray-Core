@@ -1912,6 +1912,15 @@ export async function createApplicationRuntime(
     ...(options.isCompletionReceiptRequired === true
       ? { isCompletionReceiptRequired: true }
       : {}),
+    /**
+     * 计划 R7/R8（2026-10-29）：**完成收据的写与读**。
+     *
+     * 写入：调度器在 worker success 时保存 worker 给的收据；
+     * 读取：严格模式下由控制器按 mission/task 读同一份存储（缺则视为"无收据"）。
+     */
+    completionReceiptStore,
+    completionReceiptReader: async (missionIdentifier: string, taskIdentifier: string) =>
+      await completionReceiptStore.read(missionIdentifier, taskIdentifier),
     backupVault,
     backupDeletionController,
     workArchiveStore,

@@ -3786,3 +3786,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **81a 推送状态（2026-10-29 R7）**：R7 的收据落盘提交**本地已提交但未推送** —— 连续 5 次
 > `git push` 失败（`Could not read from remote repository`）。按纪律记录原因、本阶段跳过，
 > **下一轮（R8）完成时合并重试**；远端未改写。
+
+> **82 R8（完成门禁生产方第 3 步）：严格模式读取已落盘收据（完成）**：运行时提供
+> `completionReceiptReader = (missionId, taskId) => completionReceiptStore.read(...)`；
+> **同时修复 R7 的装配缺口** —— R7 只在调度器侧用 `completionReceiptStore`，但运行时
+> **没把 store 传给控制器** ⇒ 调度器拿到 null、收据实际不会落盘。现在控制器选项同时传
+> 写（store）与读（reader），共用同一份存储。读取失败/不存在 ⇒ null（不伪造收据），
+> 门禁按"无收据"处理。
+> **未做**：严格模式在无收据时仍阻断（既定 fail-closed）、`completionVerdictReader` 仍空位
+> （R9–R10）、读取**不重算**与真实产物的一致性；未运行任何读写路径。
+> **下一轮**：R9 —— 独立裁决的本地存储与读取端口（accepted/rejected + 理由）。
