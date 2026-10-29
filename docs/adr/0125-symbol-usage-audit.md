@@ -3,7 +3,7 @@
 - 状态：已采纳（只读脚本 + 生成报告）
 - 日期：2026-10-29
 - 来源：[NEXT60_PLAN_2026-10-29](../tasks/NEXT60_PLAN_2026-10-29.md) R44、ADR-0123/0124
-- 相关：[EVIDENCE_INDEX_2026-10-29](EVIDENCE_INDEX_2026-10-29.md)
+- 相关：[EVIDENCE_INDEX_2026-10-29](../reports/EVIDENCE_INDEX_2026-10-29.md)
 
 ## 1. 背景
 
