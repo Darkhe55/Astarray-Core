@@ -4295,3 +4295,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 组标识持久化、判定导出），随后文档收尾（一致性核对、交付说明、未闭合清单、死链检查、最终自查）；
 > 并明确"不做"清单（不跑测试/不开启强制/不做图变更）。
 > **下一轮**：R51 —— `groupKind` 区分接入组结束端口（无意图时仍 `normal`）。
+
+> **125 R51（H 阶段第 1 步）：`groupKind` 接入（完成）**：编排器新增
+> `goalTaskGroupKindProvider?`（同步纯函数，按本次 `start-task` 任务标识返回
+> `normal|investigation|rework`）；组开始时记录（**抛错 ⇒ 保守 normal**），组结束时把 `groupKind`
+> 传入 `goalTaskGroupFinishPort`；运行时用它填 `recordGroupCompletion({groupKind, outcome})`；
+> `MainController` 与 `ApplicationRuntime` 各加透传选项，**缺省不传 ⇒ 与 R34 行为一致**。
+> **未做**：**没有默认实现**（仓内没有"如何判定调查/返工"的策略，也不该由模型自述决定）⇒
+> 生产未传 provider 时仍一律 `normal`，**误判风险未消除，只是有了接入点**；provider 必须同步纯函数；
+> 未运行"investigation ⇒ 不计停滞 / 抛错 ⇒ 回退"任何一条。
+> **下一轮**：R52 —— 组标识持久化（`task-group-<n>` 加启动会话标识，跨重启可追溯）。

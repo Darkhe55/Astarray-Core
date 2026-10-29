@@ -81,6 +81,7 @@ import type { ContextRecallResult } from "./context-recall-controller.js";
 import type { ActorIdentity, TaskSequenceStatusController } from "./task-sequence-controllers.js";
 import type { MissionSequenceBindingStore } from "./mission-sequence-binding-store.js";
 import type { DeferredInsertionQueueStore } from "./deferred-insertion-queue.js";
+import type { GoalGroupKind } from "./goal-dispatch-gate.js";
 import { TaskLedgerBridge } from "./task-ledger-bridge.js";
 import {
   buildTaskLedgerDivergenceEntry,
@@ -217,6 +218,14 @@ export interface MainControllerOptions {
    * 装配后：编排器在"有 start-task 且无在途"时 begin、在途归零时 finish；
    * 只更新目标持久状态的在途组标记，**不推进 V、不派发**。
    */
+  /**
+   * R51（2026-10-29）：**组性质提供者**（可选；缺省 ⇒ 一律 `normal`）。
+   *
+   * 只依据本次组将启动的任务标识判断；调查/返工组不计入停滞检查。
+   */
+  goalTaskGroupKindProvider?: (input: {
+    readonly taskIdentifiers: readonly string[];
+  }) => GoalGroupKind;
   goalTaskGroupStatePort?: {
     begin(input: {
       readonly missionIdentifier: string;
@@ -227,6 +236,8 @@ export interface MainControllerOptions {
       readonly missionIdentifier: string;
       readonly taskGroupIdentifier: string;
       readonly outcome: "completed" | "interrupted";
+      /** R51：组性质（由编排器 provider 给出，缺省 normal）。 */
+      readonly groupKind: GoalGroupKind;
       readonly finishedAtIso: string;
     }): Promise<void>;
   } | null;
@@ -2193,6 +2204,7 @@ export class MainController {
     goalTaskGroupFinishPort?: (input: {
       readonly taskGroupIdentifier: string;
       readonly outcome: "completed" | "interrupted";
+      readonly groupKind: GoalGroupKind;
       readonly finishedAtIso: string;
     }) => Promise<void>;
   } {
@@ -2213,6 +2225,7 @@ export class MainController {
           missionIdentifier,
           taskGroupIdentifier: input.taskGroupIdentifier,
           outcome: input.outcome,
+          groupKind: input.groupKind,
           finishedAtIso: input.finishedAtIso,
         });
       },
@@ -3091,6 +3104,10 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R51：组性质（缺省不传 ⇒ normal）。 */
+      ...(this.options.goalTaskGroupKindProvider === undefined
+        ? {}
+        : { goalTaskGroupKindProvider: this.options.goalTaskGroupKindProvider }),
       /** R25：组边界消费推迟插入（消费 ≠ 派发；无既存队列则不接）。 */
       ...(this.options.deferredInsertionQueueStore === null ||
       this.options.deferredInsertionQueueStore === undefined
@@ -3306,6 +3323,10 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R51：组性质（缺省不传 ⇒ normal）。 */
+      ...(this.options.goalTaskGroupKindProvider === undefined
+        ? {}
+        : { goalTaskGroupKindProvider: this.options.goalTaskGroupKindProvider }),
       /** R25：组边界消费推迟插入（消费 ≠ 派发；无既存队列则不接）。 */
       ...(this.options.deferredInsertionQueueStore === null ||
       this.options.deferredInsertionQueueStore === undefined
