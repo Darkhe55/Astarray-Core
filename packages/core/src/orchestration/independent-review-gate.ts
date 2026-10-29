@@ -21,6 +21,7 @@ import { DomainError } from "../core/errors.js";
 import type { AcceptanceVerdictGate } from "./acceptance-verdict-gate.js";
 import type { AgentAppointmentRegistry, AppointmentRiskLevel } from "./agent-appointment-registry.js";
 import type { RegisteredAgentDirectory } from "./registered-agent-directory.js";
+import type { CompletionVerdictStore } from "./completion-verdict-store.js";
 
 /** 被视为"执行者自报"的证据前缀（不构成独立审查证据）。 */
 const SELF_REPORT_EVIDENCE_PREFIXES = [
@@ -76,15 +77,25 @@ export class IndependentReviewGate {
   private readonly appointmentRegistry: AgentAppointmentRegistry;
   private readonly acceptanceVerdictGate: AcceptanceVerdictGate;
   private readonly registeredAgentDirectory: RegisteredAgentDirectory | null;
+  /**
+   * 计划 R11（2026-10-29）：**完成裁决存储**（可选）。
+   *
+   * 装配后：`recordVerdict` 在既有校验全部通过后，把裁决写入本地存储
+   * （merge-ready ⇒ accepted；rework/blocked-human-review ⇒ rejected + 理由）。
+   * 未装配 ⇒ 只走既有验收门禁（行为不变）。
+   */
+  private readonly completionVerdictStore: CompletionVerdictStore | null;
 
   constructor(options: {
     appointmentRegistry: AgentAppointmentRegistry;
     acceptanceVerdictGate: AcceptanceVerdictGate;
     registeredAgentDirectory?: RegisteredAgentDirectory | null;
+    completionVerdictStore?: CompletionVerdictStore | null;
   }) {
     this.appointmentRegistry = options.appointmentRegistry;
     this.acceptanceVerdictGate = options.acceptanceVerdictGate;
     this.registeredAgentDirectory = options.registeredAgentDirectory ?? null;
+    this.completionVerdictStore = options.completionVerdictStore ?? null;
   }
 
   /**
@@ -138,6 +149,8 @@ export class IndependentReviewGate {
     }
     this.appointmentRegistry.createAppointment({
       appointmentId: input.appointmentIdentifier,
+      /** 计划 R11：把 mission 记进任命（裁决落盘需要）。 */
+      missionIdentifier: input.missionIdentifier,
       boundTaskIdentifier: input.taskIdentifier,
       boundTaskRevision: input.taskRevision,
       appointingSecondaryAgentInstanceId:
@@ -202,6 +215,29 @@ export class IndependentReviewGate {
         createdAtIso: input.verdict.createdAtIso ?? new Date().toISOString(),
       },
     });
+    /**
+     * 计划 R11（2026-10-29）：**裁决落盘**。
+     *
+     * 走到这里说明三类校验都通过（非自审、证据非纯自报、理由非空）。
+     * 映射：`merge-ready` ⇒ accepted；`rework` / `blocked-human-review` ⇒ rejected（带理由）。
+     * 任命没有 mission（旧任命/独立工作流场景）⇒ **不落盘**（不按任务名推断 mission）。
+     */
+    const verdictStore = this.completionVerdictStore;
+    const missionIdentifier = appointment.missionIdentifier;
+    if (verdictStore !== null && missionIdentifier !== null) {
+      const isAcceptedVerdict = input.verdict.verdict === "merge-ready";
+      const decidedAtIso = input.verdict.createdAtIso ?? new Date().toISOString();
+      await verdictStore.save({
+        missionIdentifier,
+        taskIdentifier: appointment.boundTaskIdentifier,
+        verdict: isAcceptedVerdict ? "accepted" : "rejected",
+        reasons: isAcceptedVerdict
+          ? [input.verdict.reason.trim()]
+          : [`verdict:${input.verdict.verdict}`, input.verdict.reason.trim()],
+        deciderAgentInstanceIdentifier: acceptingAgentInstanceIdentifier,
+        decidedAtIso,
+      });
+    }
   }
 
   /** 合并就绪评估（委托既有门禁；不在这里重复判定规则）。 */

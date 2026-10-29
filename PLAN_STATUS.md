@@ -3815,3 +3815,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未按任务逐一对齐**（某任务无裁决仍可能通过，已知粗糙点，R11 收紧）；未运行任何读取路径。
 > **下一轮**：R11 —— 给 `AgentAppointment` 加 `missionIdentifier` 并在 `recordVerdict` 写裁决存储；
 > 同时把门禁聚合收紧为"任务逐一对齐"。
+
+> **85 R11（完成门禁生产方第 6 步）：独立裁决落盘（完成）**：根因是 `AgentAppointment` **没有
+> mission 字段**（裁决无法按 mission 分目录）。现在：①任命新增 `missionIdentifier: string | null`
+> （createAppointment 可选传入，**不按任务名推断**）；②`IndependentReviewGate.appoint` 写入 mission；
+> ③门禁可注入 `completionVerdictStore`，`recordVerdict` 在**三类校验全部通过后**落盘：
+> `merge-ready ⇒ accepted`、`rework/blocked-human-review ⇒ rejected`（理由含 `verdict:<raw>`）；
+> 裁决者=验收者个体、时间=裁决时间；④**任命无 mission ⇒ 不落盘**；⑤控制器与运行时注入同一份存储。
+> **未做**：**任务级聚合未收紧**（仍 mission 级"全 accepted"，某任务无裁决仍可能通过，R12）；
+> 独立工作流任命不传 mission ⇒ 其裁决不落盘；**裁决落盘失败会抛错**（可能出现"门禁已记录、
+> 存储未落盘"的不一致，无事务/补偿）；未运行任何落盘路径。
+> **下一轮**：R12 —— 门禁聚合收紧为**逐任务对齐**（每个已 done 任务都要有 accepted 裁决）。

@@ -87,6 +87,7 @@ import {
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
+import type { CompletionVerdictStore } from "./completion-verdict-store.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
 import type { CompletionReceipt } from "./completion-receipt.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
@@ -201,6 +202,11 @@ export interface MainControllerOptions {
    * 严格模式（`isCompletionReceiptRequired`）读取同一份存储（R8）。
    */
   completionReceiptStore?: CompletionReceiptStore | null;
+  /**
+   * 计划 R11（2026-10-29）：**完成裁决存储**（缺省 null ⇒ 裁决只走既有验收门禁，不落盘）。
+   * 装配后：`recordAcceptanceVerdict` 通过校验即写入（merge-ready ⇒ accepted；其余 ⇒ rejected）。
+   */
+  completionVerdictStore?: CompletionVerdictStore | null;
   /** 显式对话模式（GUI 聊天）。 */
   isConversationMode?: boolean;
   /**
@@ -1522,6 +1528,7 @@ export class MainController {
       appointmentRegistry: facade.appointmentRegistry,
       acceptanceVerdictGate: facade.acceptanceVerdictGate,
       registeredAgentDirectory: this.options.registeredAgentDirectory ?? null,
+      completionVerdictStore: this.options.completionVerdictStore ?? null,
     });
     return this.independentReviewGateInstance;
   }
