@@ -3796,3 +3796,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **未做**：严格模式在无收据时仍阻断（既定 fail-closed）、`completionVerdictReader` 仍空位
 > （R9–R10）、读取**不重算**与真实产物的一致性；未运行任何读写路径。
 > **下一轮**：R9 —— 独立裁决的本地存储与读取端口（accepted/rejected + 理由）。
+
+> **83 R9（完成门禁生产方第 4 步）：独立裁决本地存储（完成）**：新增
+> `completion-verdict-store.ts`：`<state>/completion-verdicts/<mission>/<task>.json`
+> （路径清洗、原子写、备份）。必填 mission/task/`verdict(accepted|rejected)`/**裁决者具体个体标识**/
+> 时间；**rejected 必须带理由**；同 mission/task 已有裁决：同内容幂等、不同 ⇒ `journal-corrupted`
+> **拒绝覆盖**；损坏读回 null。**不判断独立性**（留给 `IndependentReviewGate`），只保证记录不可改写。
+> **未做**：**没有写入方**（`IndependentReviewGate.recordVerdict` 也未写本存储）、
+> **没有读取方**（`completionVerdictReader` 空位，R10）、不校验裁决者独立性；未运行任何写入路径。
+> **下一轮**：R10 —— `completionVerdictReader` 接本地存储（严格模式可读到裁决）。
