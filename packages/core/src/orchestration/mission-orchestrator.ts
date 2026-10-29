@@ -234,6 +234,21 @@ export interface MissionOrchestratorOptions {
    * 只做登记/记录，**不改运行中图、不派发**（DagScheduler 仍不支持图变更）。
    */
   taskGroupBoundaryPort?: () => Promise<void>;
+  /**
+   * R34（2026-10-29）：**目标模式的组开始/结束端口**（可选）。
+   *
+   * 在"有 start-task 动作且无在途任务"时开始一次；在在途任务归零时结束一次。
+   * 结束**不推进 V**（V 计算尚未接线）—— 只清空在途组标记，避免恢复时误判 `reconcile-first`。
+   */
+  goalTaskGroupBeginPort?: (input: {
+    readonly taskGroupIdentifier: string;
+    readonly startedAtIso: string;
+  }) => Promise<void>;
+  goalTaskGroupFinishPort?: (input: {
+    readonly taskGroupIdentifier: string;
+    readonly outcome: "completed" | "interrupted";
+    readonly finishedAtIso: string;
+  }) => Promise<void>;
   /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
   isConversationMode?: boolean;
   /**
@@ -375,6 +390,9 @@ export class MissionOrchestrator {
    */
   private readonly pendingMutatingToolNamesByTask = new Map<string, Set<string>>();
   private readonly inFlightTaskIds = new Set<string>();
+  /** R34：当前目标组标识（非 null 表示已开始、尚未结束）。 */
+  private currentGoalTaskGroupIdentifier: string | null = null;
+  private goalTaskGroupCounter = 0;
   private readonly inFlightWorkerPromises = new Set<Promise<void>>();
   /**
    * 2026-11-08（RELIABILITY「`shutdown()` 返回即静默」修复，方向 C）：
@@ -666,6 +684,30 @@ export class MissionOrchestrator {
         }
       }
       const actions = await this.dagScheduler.scheduleRound();
+      /**
+       * R34：**组开始**（有 start-task 动作、无在途任务、尚未开始）⇒ 记录在途组。
+       * 端口失败只升级，不阻断调度。
+       */
+      if (
+        this.currentGoalTaskGroupIdentifier === null &&
+        this.inFlightTaskIds.size === 0 &&
+        actions.some((action) => action.action === "start-task") &&
+        this.options.goalTaskGroupBeginPort !== undefined
+      ) {
+        this.goalTaskGroupCounter += 1;
+        const taskGroupIdentifier = `task-group-${String(this.goalTaskGroupCounter)}`;
+        this.currentGoalTaskGroupIdentifier = taskGroupIdentifier;
+        try {
+          await this.options.goalTaskGroupBeginPort({
+            taskGroupIdentifier,
+            startedAtIso: new Date().toISOString(),
+          });
+        } catch (error) {
+          this.options.onUserEscalation(
+            `目标组开始记录失败: ${(error as Error).message}`,
+          );
+        }
+      }
       for (const action of actions) {
         if (action.action === "start-task") {
           void this.launchWorker(action).catch((error: Error) => {
@@ -686,6 +728,38 @@ export class MissionOrchestrator {
       }
     }
     await this.finishMission("cancelled");
+  }
+
+  /**
+   * R34（2026-10-29）：在途归零时结束目标组（只清在途标记，不推进 V）。
+   *
+   * 端口失败只升级，不影响任务收口（诊断不能成为收口单点故障）。
+   */
+  private async maybeFinishGoalTaskGroup(
+    outcome: "completed" | "interrupted",
+  ): Promise<void> {
+    if (this.inFlightTaskIds.size > 0) {
+      return;
+    }
+    const taskGroupIdentifier = this.currentGoalTaskGroupIdentifier;
+    if (taskGroupIdentifier === null) {
+      return;
+    }
+    this.currentGoalTaskGroupIdentifier = null;
+    if (this.options.goalTaskGroupFinishPort === undefined) {
+      return;
+    }
+    try {
+      await this.options.goalTaskGroupFinishPort({
+        taskGroupIdentifier,
+        outcome,
+        finishedAtIso: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.options.onUserEscalation(
+        `目标组结束记录失败: ${(error as Error).message}`,
+      );
+    }
   }
 
   /**
@@ -995,10 +1069,15 @@ export class MissionOrchestrator {
       try {
         const outcome = await worker.run();
         this.inFlightTaskIds.delete(action.taskId);
+        /** R34：在途归零 ⇒ 结束本组（只清标记，不推进 V）。 */
+        await this.maybeFinishGoalTaskGroup(
+          outcome.outcome === "success" ? "completed" : "interrupted",
+        );
         await this.handleWorkerOutcome(action.taskId, outcome, agentInstanceId);
       } catch (error) {
         // 运行时/工具异常必须收敛为任务失败，不得变成未处理拒绝（T07D-R2-02）。
         this.inFlightTaskIds.delete(action.taskId);
+        await this.maybeFinishGoalTaskGroup("interrupted");
         await this.handleWorkerOutcome(action.taskId, {
           outcome: "failure",
           toolName: null,

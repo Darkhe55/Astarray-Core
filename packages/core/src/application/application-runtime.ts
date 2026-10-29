@@ -1086,6 +1086,74 @@ export async function createApplicationRuntime(
     await refreshGoalGateCache();
     return activation;
   };
+  /**
+   * R34（2026-10-29）：**目标组开始/结束**的持久化实现。
+   *
+   * 只在 mission 已绑定目标、契约存在且 revision 一致时写入；
+   * `finish` 只清空在途组标记（`gateSnapshot` 原样回写，**不推进 V**）。
+   */
+  const goalTaskGroupStatePort = {
+    begin: async (input: {
+      readonly missionIdentifier: string;
+      readonly taskGroupIdentifier: string;
+      readonly startedAtIso: string;
+    }): Promise<void> => {
+      const goalIdentifier = await goalMissionBindingStore
+        .readGoalIdentifier(input.missionIdentifier)
+        .catch(() => null);
+      if (goalIdentifier === null) {
+        return;
+      }
+      const [contract, state] = await Promise.all([
+        goalContractStore.read(goalIdentifier).catch(() => null),
+        goalModeStateStore.read(goalIdentifier).catch(() => null),
+      ]);
+      if (
+        contract === null ||
+        state === null ||
+        state.contractRevision !== contract.revision
+      ) {
+        return;
+      }
+      await goalModeStateStore.beginTaskGroup({
+        state,
+        taskGroupIdentifier: input.taskGroupIdentifier,
+        startedAtIso: input.startedAtIso,
+      });
+    },
+    finish: async (input: {
+      readonly missionIdentifier: string;
+      readonly taskGroupIdentifier: string;
+      readonly finishedAtIso: string;
+    }): Promise<void> => {
+      const goalIdentifier = await goalMissionBindingStore
+        .readGoalIdentifier(input.missionIdentifier)
+        .catch(() => null);
+      if (goalIdentifier === null) {
+        return;
+      }
+      const [contract, state] = await Promise.all([
+        goalContractStore.read(goalIdentifier).catch(() => null),
+        goalModeStateStore.read(goalIdentifier).catch(() => null),
+      ]);
+      if (
+        contract === null ||
+        state === null ||
+        state.contractRevision !== contract.revision ||
+        state.currentTaskGroupIdentifier !== input.taskGroupIdentifier
+      ) {
+        return;
+      }
+      await goalModeStateStore.finishTaskGroup({
+        state,
+        finishedAtIso: input.finishedAtIso,
+        gateSnapshot: state.gateSnapshot,
+        requirementBases: state.requirementBases,
+        lastPotentialValue: state.lastPotentialValue,
+        consumedToolCalls: state.consumedToolCalls,
+      });
+    },
+  };
   const bindMissionToGoal = async (input: {
     readonly missionIdentifier: string;
     readonly goalIdentifier: string;
@@ -1886,6 +1954,8 @@ export async function createApplicationRuntime(
     missionSequenceBindingStore,
     /** R24：推迟插入队列（控制器入队；尚不消费）。 */
     deferredInsertionQueueStore,
+    /** R34：目标组开始/结束（只在已绑定目标且 revision 一致时写状态）。 */
+    goalTaskGroupStatePort,
     /**
      * 清单第 ① 项下半场（2026-10-28）：**运行中插入的真实注入端口**。
      *
