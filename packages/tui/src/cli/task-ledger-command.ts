@@ -4,8 +4,12 @@
  * 只读纪律：不改任务链、不改序列、不派发、不调模型、不写任何文件；
  * 只读两个已有存储与差异历史 journal。
  *
- * 输入全部显式：`--mission` / `--sequence` / `--owner`。
- * 缺任一项 ⇒ 只展示差异历史，并**如实说明**为什么没有对照结果（不猜测 mission↔序列映射）。
+ * 输入：`--mission` 必需；`--sequence` / `--owner` 可省略 —— R21/R22 起优先用
+ * `<state>/task-ledger/mission-sequences.json` 的持久索引补全。
+ * - **索引缺失**（查过但没绑定）⇒ 状态 `index-missing`、退出码 `USAGE_ERROR`，并提示可用
+ *   `--list-bindings` 核对；
+ * - **缺参数**（没给 mission）⇒ 状态 `missing-inputs`、退出码 `SUCCESS`（仍展示差异历史）。
+ * **不猜测** mission↔序列 映射。
  */
 import { AgentTaskSequenceStore } from "../../../core/src/orchestration/agent-task-sequence-store.js";
 import { MissionManager } from "../../../core/src/orchestration/mission-manager.js";
@@ -23,11 +27,41 @@ export interface TaskLedgerStatusCommandInput {
   readonly ownerAgentInstanceIdentifier?: string;
   readonly recentCount?: number;
   readonly isJsonOutput: boolean;
+  /** R22（2026-10-29）：只读列出已登记的 mission↔序列 索引。 */
+  readonly isListBindings?: boolean;
 }
 
 export async function executeTaskLedgerStatusCommand(
   input: TaskLedgerStatusCommandInput,
 ): Promise<number> {
+  /** R22：`--list-bindings` 优先（只读视图，不需要 mission）。 */
+  if (input.isListBindings === true) {
+    const bindingStoreForList = new MissionSequenceBindingStore({
+      baseDirectory: input.stateDirectory,
+    });
+    const bindings = await bindingStoreForList.list().catch(() => []);
+    if (input.isJsonOutput) {
+      printJson({
+        status: bindings.length === 0 ? "no-bindings" : "listed",
+        bindingCount: bindings.length,
+        bindings,
+        note: "索引只记录发布/回填时登记的映射；缺失不等于两边不一致。",
+      });
+    } else {
+      process.stdout.write(`mission↔序列 索引（${String(bindings.length)} 条）：` + "\n");
+      for (const binding of bindings) {
+        process.stdout.write(
+          `- ${binding.missionIdentifier} → ${binding.sequenceIdentifier} ` +
+            `owner=${binding.ownerAgentInstanceIdentifier} at=${binding.boundAtIso}` +
+            "\n",
+        );
+      }
+      if (bindings.length === 0) {
+        process.stdout.write("（索引为空：尚未有任务发布，或索引写入失败）\n");
+      }
+    }
+    return EXIT_CODES.SUCCESS;
+  }
   const recentCount = input.recentCount ?? 10;
   const journal = new TaskLedgerDivergenceJournal({
     baseDirectory: input.stateDirectory,
@@ -35,15 +69,18 @@ export async function executeTaskLedgerStatusCommand(
   const recentDivergences = await journal.readRecent(recentCount);
   /**
    * R21（2026-10-29）：**优先用持久索引补全** sequence/owner（缺省才要求手填）。
-   * 索引缺失 ⇒ 仍如实报"缺参数"，**不猜**。
+   * R22：区分"**索引缺失**"（查过但没绑定）与"**缺参数**"（没查/没给 mission）。
    */
   let resolvedSequenceIdentifier = input.sequenceIdentifier;
   let resolvedOwnerAgentInstanceIdentifier = input.ownerAgentInstanceIdentifier;
+  let hasLookedUpIndex = false;
+  let isIndexBindingMissing = false;
   if (
     input.missionIdentifier !== undefined &&
     (resolvedSequenceIdentifier === undefined ||
       resolvedOwnerAgentInstanceIdentifier === undefined)
   ) {
+    hasLookedUpIndex = true;
     const bindingStore = new MissionSequenceBindingStore({
       baseDirectory: input.stateDirectory,
     });
@@ -53,6 +90,8 @@ export async function executeTaskLedgerStatusCommand(
     if (binding !== null) {
       resolvedSequenceIdentifier ??= binding.sequenceIdentifier;
       resolvedOwnerAgentInstanceIdentifier ??= binding.ownerAgentInstanceIdentifier;
+    } else {
+      isIndexBindingMissing = true;
     }
   }
   const missingInputs = [
@@ -62,18 +101,22 @@ export async function executeTaskLedgerStatusCommand(
   ].filter((missing): missing is string => missing !== null);
 
   if (missingInputs.length > 0) {
+    /** 索引里确实没有绑定 ⇒ 单独一种状态（可用 `--list-bindings` 核对）。 */
+    const isIndexMissing = hasLookedUpIndex && isIndexBindingMissing;
+    const statusText = isIndexMissing ? "index-missing" : "missing-inputs";
+    const noteText = isIndexMissing
+      ? `未找到 mission ${input.missionIdentifier ?? ""} 的 mission↔序列 索引；请显式提供 --sequence/--owner，或先用 --list-bindings 核对已有绑定。`
+      : "对账需要 --mission/--sequence/--owner；本命令不猜测 mission 与序列的映射关系。";
     if (input.isJsonOutput) {
       printJson({
-        status: "missing-inputs",
+        status: statusText,
         missingInputs,
         divergenceCount: recentDivergences.length,
         recentDivergences,
-        note: "对账需要 --mission/--sequence/--owner；本命令不猜测 mission 与序列的映射关系。",
+        note: noteText,
       });
     } else {
-      process.stdout.write(
-        `对账需要 --mission / --sequence / --owner（缺少: ${missingInputs.join(", ")}）。\n`,
-      );
+      process.stdout.write(`${noteText}（缺少: ${missingInputs.join(", ")}）。\n`);
       process.stdout.write(
         `差异历史（最近 ${String(recentDivergences.length)} 条）:\n`,
       );
@@ -86,7 +129,8 @@ export async function executeTaskLedgerStatusCommand(
         );
       }
     }
-    return EXIT_CODES.SUCCESS;
+    /** R22：索引缺失是可诊断的"用态错误"（不同退出码），缺参数仍按成功返回。 */
+    return isIndexMissing ? EXIT_CODES.USAGE_ERROR : EXIT_CODES.SUCCESS;
   }
 
   const taskStore = new TaskStore({ baseDirectory: input.stateDirectory });
