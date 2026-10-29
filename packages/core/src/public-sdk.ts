@@ -698,6 +698,22 @@ export {
   MAXIMUM_PROMPT_CONTENT_SCAN_RECORDS,
 } from "./orchestration/prompt-scan-journal.js";
 export type { PromptContentScanRecord } from "./orchestration/prompt-scan-journal.js";
+/**
+ * R19（2026-10-29）：**敏感扫描器公开入口**（供误报率探针/诊断使用）。
+ * 纯函数，不联网、不写盘；`DEFAULT_SENSITIVE_SCAN_LIMITS` 给出默认字节/时限边界。
+ */
+export {
+  scanSensitiveContent,
+  SENSITIVE_SCAN_RULE_SET_VERSION,
+  DEFAULT_SENSITIVE_SCAN_RULES,
+  DEFAULT_SENSITIVE_SCAN_LIMITS,
+} from "./tools/sensitive-content-scan-contract.js";
+export type {
+  SensitiveScanOutcome,
+  SensitiveScanResult,
+  SensitiveScanRule,
+  SensitiveScanLimits,
+} from "./tools/sensitive-content-scan-contract.js";
 export type {
   LegacyIdentityAudit,
   LegacyLinkEvidence,
