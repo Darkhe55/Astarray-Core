@@ -15,6 +15,10 @@ import { estimateRecallTokenCount } from "./context-recall-controller.js";
 import type { ContextAssemblyRuntimeEvent } from "./context-runtime-metrics.js";
 import type { LocalContextGraphStore } from "./local-context-graph-store.js";
 import type { ContextPack } from "./context-pack.js";
+import {
+  buildReadSideContentScanLabel,
+  type ReadSideContentScanLabel,
+} from "../tools/read-side-content-scan.js";
 import { renderContextPacks, validateContextPack } from "./context-pack.js";
 
 /** 系统规则文本（独立于可选全局记录，任何预算下都进入提示词）。 */
@@ -60,6 +64,11 @@ export interface AssembleContextPromptInput {
 
 export interface AssembledContextPrompt {
   promptText: string;
+  /**
+   * R14（2026-10-29）：**注入侧扫描标注**（只标注、不阻断）。
+   * 由 `buildReadSideContentScanLabel` 在装配完成时计算；旧调用方忽略即可。
+   */
+  contentScan?: ReadSideContentScanLabel;
   injectedGlobalDecisionIdentifiers: string[];
   injectedFrontierNodeIdentifiers: string[];
   excludedClosedNodeCount: number;
@@ -139,8 +148,15 @@ export function assembleContextPrompt(
     );
   }
 
+  const promptText = lines.join("\n");
   return {
-    promptText: lines.join("\n"),
+    promptText,
+    /**
+     * SEC-02 通道 12 / R14（2026-10-29）：**注入侧扫描标注**。
+     *
+     * 只标注（结论/规则版本/时间），**不改内容、不阻断**；调用方可用它决定是否注入。
+     */
+    contentScan: buildReadSideContentScanLabel(promptText),
     injectedGlobalDecisionIdentifiers,
     injectedFrontierNodeIdentifiers,
     excludedClosedNodeCount: input.activeFrontier?.excludedClosedNodeCount ?? 0,
