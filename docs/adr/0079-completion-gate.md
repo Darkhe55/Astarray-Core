@@ -1,6 +1,7 @@
 # ADR-0079 完成门禁：任务链完成 + 收据 + 独立裁决（接线缺口第 ② 项）
 
-- 状态：部分采纳（assist 路径已接；收据/裁决生产方与 devolve 路径未接）
+- 状态：部分采纳（assist 路径已接；**收据/裁决生产方已于 R6–R12 接入，见 §7 更新**；
+  devolve 路径同样拿到 `completionReceiptStore`；严格开关仍默认关闭）
 - 日期：2026-10-28
 - 来源：[STATUS_UPDATE_WIRING_GAPS_2026-10-28](../reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md) 清单第 ② 项
 - 相关：ADR-0060（独立审查门禁）、`completion-receipt.ts`
@@ -56,3 +57,25 @@ SecondaryAgent.onReportToMain（"任务完成状态:" 分支）      packages/co
 
 **implemented-unverified**：未编写/未运行测试、未人工验收。
 已执行：`npm run typecheck` exit 0、`npx eslint <本批文件>` exit 0、`npm run build` 成功。
+
+## 7. 更新（R47，2026-10-29）：生产方已存在，"默认关闭"的理由已改变
+
+本文写于 2026-10-28，当时结论是"**没有任何地方写完成收据或完成裁决**"，因此打开严格开关
+会阻断所有 done（fail-closed），这是开关默认关闭的原因。**该前提已被 R6–R12 推翻**：
+
+| 事实 | 现状 | 证据 |
+|---|---|---|
+| 收据生产方 | worker 成功分支构造收据，调度器 `success` 分支**先落盘再走门禁** | ADR-0095/0096 |
+| 收据读取 | 严格模式 `completionReceiptReader` 读同一份存储 | ADR-0097 |
+| 裁决生产方 | `IndependentReviewGate.recordVerdict` 校验通过后落盘 | ADR-0098/0100 |
+| 裁决读取 | 逐任务对齐（缺任一任务裁决 ⇒ 不通过） | ADR-0099/0101 |
+| devolve 路径 | 控制器把 `completionReceiptStore` 同时传给 assist 与 devolve | `main-controller.ts:3091` / `:3306` |
+
+**仍然成立的部分**：
+- **严格开关默认关闭**（`isCompletionReceiptRequired` 缺省 false）—— 但现在的理由是
+  "**未运行验证**"，不再是"没有生产方"；
+- 收据/裁决的写入、幂等、拒绝覆盖、逐任务对齐**全部未运行验证**；
+- 没有收据或没有裁决时仍然 **fail-closed**（不伪造 done），这是刻意行为。
+
+**结论**：本文 §3 的"打开后所有 done 都会被阻断"**已过期**；新结论是"打开后会按收据 + 逐任务裁决
+判定，缺证据才阻断"，但仍**没有实测**。
