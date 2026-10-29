@@ -2186,9 +2186,16 @@ export class MainController {
           consumedAtIso: new Date().toISOString(),
           consumedByGroupIdentifier: "task-group-boundary",
         })
-        .catch(() => ({ didConsume: false }));
+        .catch(() => ({ didConsume: false, droppedCount: 0 }));
       if (!consumed.didConsume) {
         continue;
+      }
+      /** R26：历史被截断要可观察（不改变保留策略，只告知）。 */
+      if (consumed.droppedCount > 0) {
+        this.options.streamOutput(
+          missionIdentifier,
+          `[任务账本] 推迟插入已消费历史超出上限，丢弃最旧 ${String(consumed.droppedCount)} 条（可用 --deferred-insertions 查看累计丢弃数）`,
+        );
       }
       if (sequenceMapping !== null) {
         await this.recordTaskLedgerDivergenceSnapshot({
