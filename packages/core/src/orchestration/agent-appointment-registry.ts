@@ -11,6 +11,13 @@ export type AppointmentRiskLevel = "high" | "low";
 
 export interface AgentAppointment {
   appointmentId: string;
+  /**
+   * 计划 R11（2026-10-29）：所属 mission。
+   *
+   * 旧任命（或独立工作流场景）没有该字段 ⇒ `null`；**不按任务名/路径推断 mission**。
+   * 完成裁决需要它才能落盘（`CompletionVerdictStore` 按 mission 分目录）。
+   */
+  missionIdentifier: string | null;
   /** 绑定任务标识与 revision（变化即失效）。 */
   boundTaskIdentifier: string;
   boundTaskRevision: number;
@@ -47,6 +54,7 @@ export class AgentAppointmentRegistry {
    */
   createAppointment(input: {
     appointmentId: string;
+    missionIdentifier?: string | null;
     boundTaskIdentifier: string;
     boundTaskRevision: number;
     appointingSecondaryAgentInstanceId: string;
@@ -87,6 +95,7 @@ export class AgentAppointmentRegistry {
     }
     const appointment: AgentAppointment = {
       appointmentId: input.appointmentId,
+      missionIdentifier: input.missionIdentifier ?? null,
       boundTaskIdentifier: input.boundTaskIdentifier,
       boundTaskRevision: input.boundTaskRevision,
       appointingSecondaryAgentInstanceId: input.appointingSecondaryAgentInstanceId,
