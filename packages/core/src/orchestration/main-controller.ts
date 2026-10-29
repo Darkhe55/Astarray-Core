@@ -512,8 +512,14 @@ export interface MainControllerOptions {
    * 接线缺口第 ② 项：**独立完成裁决读取端口**。
    *
    * 缺省 null ⇒ 在要求收据的模式下视为"缺少独立裁决"（不确认即阻断）。
+   *
+   * R12（2026-10-29）：接收**已 done 任务标识列表**，由实现逐任务对齐
+   * （每个任务都要有 accepted 裁决；缺任何一条 ⇒ 不通过并列出）。
    */
-  completionVerdictReader?: (missionIdentifier: string) => Promise<{
+  completionVerdictReader?: (
+    missionIdentifier: string,
+    taskIdentifiers: readonly string[],
+  ) => Promise<{
     readonly isAccepted: boolean;
     readonly reasons: readonly string[];
   } | null>;
@@ -2261,10 +2267,17 @@ export class MainController {
         blockedReasons.push(`完成收据不足: ${insufficientReceipts.join(" | ")}`);
       }
       const verdictReader = this.options.completionVerdictReader;
+      /**
+       * R12（2026-10-29）：**逐任务对齐** —— 把已 done 任务交给读取端口，
+       * 由它确认"每个任务都有 accepted 裁决"，而不是只看 mission 级汇总。
+       */
+      const doneTaskIdentifiers = tasks
+        .filter((candidate) => candidate.status === "done")
+        .map((candidate) => candidate.id);
       const verdict =
         verdictReader === undefined
           ? null
-          : await verdictReader(missionId).catch(() => null);
+          : await verdictReader(missionId, doneTaskIdentifiers).catch(() => null);
       if (verdict === null || !verdict.isAccepted) {
         blockedReasons.push(
           `缺少已接受的独立完成裁决${verdict === null ? "" : `：${verdict.reasons.join("；")}`}`,
