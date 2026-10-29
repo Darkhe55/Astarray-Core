@@ -98,3 +98,12 @@
 未跑"在途组 ⇒ reconcile-first/版本不一致 ⇒ 拒绝/关闭后不恢复且历史保留/状态视图无稳定性保证"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### R5 激活成为唯一开关（2026-10-29）
+
+**交付**：删除死常量 `GOAL_MODE_DEFAULT_ENABLED`；`resolveGoalModeActivation` 成为唯一判定；
+`GoalContractStore.saveActivated` 在未激活时**拒绝创建契约**；运行时新增
+`activateGoalMode` / `getGoalModeActivation`（默认未激活）；未激活时门禁解析器恒返回 `null`
+（目标模式不参与派发/恢复）。ADR-0094。
+
+**未做**：无 UI/CLI 调用激活入口；契约/绑定仍无写入方；强制模式仍缺省关；未运行验证。

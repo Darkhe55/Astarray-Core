@@ -37,7 +37,7 @@
    拆分不改变总权重（浮点用容差）。
 6. **安全不变量独立**：`evaluateSafetyInvariants` **不接受 V 参数**（结构上隔离）；
    违反即 `isSatisfied:false`，与 V 是否下降无关。
-7. **默认关闭**：`GOAL_MODE_DEFAULT_ENABLED = false`；
+7. **默认关闭**：初始由常量表达；**R5（ADR-0094）已删除该常量**，改由 `resolveGoalModeActivation` 唯一判定；
    `resolveGoalModeActivation` 要求"用户来源 + 认证用户 + 显式请求 + 显式开启"四者同时成立，
    模型/三级 Agent 的"我已开启"不构成证据。
 
