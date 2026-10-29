@@ -30,6 +30,7 @@ import type { ContextPromptProvider } from "./context-prompt-assembler.js";
 import { resolvePublisherRecipientIdForTask } from "./task-publisher-feedback-route.js";
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
+import type { GoalGroupKind } from "./goal-dispatch-gate.js";
 import type { GuidanceControlQueue } from "../runtime-guidance/guidance-control-queue.js";
 
 /**
@@ -247,8 +248,19 @@ export interface MissionOrchestratorOptions {
   goalTaskGroupFinishPort?: (input: {
     readonly taskGroupIdentifier: string;
     readonly outcome: "completed" | "interrupted";
+    /** R51：本次组的性质（缺省 provider ⇒ `normal`）。 */
+    readonly groupKind: GoalGroupKind;
     readonly finishedAtIso: string;
   }) => Promise<void>;
+  /**
+   * R51（2026-10-29）：**组性质提供者**（可选，同步、无副作用）。
+   *
+   * 只根据本次组要启动的任务标识给出 `normal` / `investigation` / `rework`；
+   * 缺省不传 ⇒ 一律 `normal`（与 R34 行为一致）。调查/返工组不计入停滞。
+   */
+  goalTaskGroupKindProvider?: (input: {
+    readonly taskIdentifiers: readonly string[];
+  }) => GoalGroupKind;
   /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
   isConversationMode?: boolean;
   /**
@@ -392,6 +404,8 @@ export class MissionOrchestrator {
   private readonly inFlightTaskIds = new Set<string>();
   /** R34：当前目标组标识（非 null 表示已开始、尚未结束）。 */
   private currentGoalTaskGroupIdentifier: string | null = null;
+  /** R51：当前组性质（缺省 normal）。 */
+  private currentGoalTaskGroupKind: GoalGroupKind = "normal";
   private goalTaskGroupCounter = 0;
   private readonly inFlightWorkerPromises = new Set<Promise<void>>();
   /**
@@ -697,6 +711,17 @@ export class MissionOrchestrator {
         this.goalTaskGroupCounter += 1;
         const taskGroupIdentifier = `task-group-${String(this.goalTaskGroupCounter)}`;
         this.currentGoalTaskGroupIdentifier = taskGroupIdentifier;
+        /** R51：记录组性质（provider 抛错 ⇒ 保守按 normal）。 */
+        try {
+          this.currentGoalTaskGroupKind =
+            this.options.goalTaskGroupKindProvider?.({
+              taskIdentifiers: actions
+                .filter((action) => action.action === "start-task")
+                .map((action) => action.taskId),
+            }) ?? "normal";
+        } catch {
+          this.currentGoalTaskGroupKind = "normal";
+        }
         try {
           await this.options.goalTaskGroupBeginPort({
             taskGroupIdentifier,
@@ -753,8 +778,10 @@ export class MissionOrchestrator {
       await this.options.goalTaskGroupFinishPort({
         taskGroupIdentifier,
         outcome,
+        groupKind: this.currentGoalTaskGroupKind,
         finishedAtIso: new Date().toISOString(),
       });
+      this.currentGoalTaskGroupKind = "normal";
     } catch (error) {
       this.options.onUserEscalation(
         `目标组结束记录失败: ${(error as Error).message}`,
