@@ -4065,3 +4065,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 报告：`docs/reports/GOAL02_END_TO_END_GAPS_2026-10-29.md`；GOAL-02 卡同步补记。**无代码改动**。
 > **下一轮**：R33 —— 在编排器**组开始/结束**接入 `beginTaskGroup` / `finishTaskGroup`，
 > 让状态第一次被写入（这是缺口 1 的唯一解法）。
+
+> **107 R33（F 阶段第 4 步）：目标状态初始化（完成）**：`runtime.createGoalContract` 在契约落盘后
+> 若**没有状态**则写一条初始状态（`contractRevision=契约 revision`、`owner/sourceRequestReference`
+> 取契约原值、`gateSnapshot = new GoalDispatchGate(contract).createSnapshot()`、`requirementBases: []`、
+> `consumedToolCalls/CostUnits: 0`、未暂停未关闭），**已存在则不覆盖**；随后刷新缓存。
+> 效果：契约+绑定+状态齐备且 revision 一致 ⇒ `hydrate` 可 `restoreFromSnapshot`，
+> 解析器**第一次可能非 null**（仍受激活与强制开关闭约束）。
+> **未做**：**组开始/结束仍未接**（`beginTaskGroup`/`finishTaskGroup` 无调用者 ⇒ 状态初始化后不再更新、
+> `evaluateResume` 永远看不到在途组）、契约 revision 变更无迁移入口（报 revision-mismatch）、
+> 仍无激活/强制 CLI；未运行"还原成功/不覆盖/revision 变化"任何一条。
+> **下一轮**：R34 —— 在编排器**组边界**接 `beginTaskGroup` / `finishTaskGroup`（真正推进状态）。
