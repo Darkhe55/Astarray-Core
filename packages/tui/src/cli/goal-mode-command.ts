@@ -52,6 +52,14 @@ export async function executeGoalModeStatusCommand(
     return EXIT_CODES.USAGE_ERROR;
   }
 
+  /** R36：统计已关闭的目标（关闭后不再还原门禁，但契约/状态仍在）。 */
+  const closedGoalIdentifiers: string[] = [];
+  for (const contract of contracts) {
+    const state = await stateStore.read(contract.goalIdentifier).catch(() => null);
+    if (state !== null && state.isExperimentClosed) {
+      closedGoalIdentifiers.push(contract.goalIdentifier);
+    }
+  }
   const skippedByReason = new Map<string, number>();
   for (const issue of hydration.issues) {
     skippedByReason.set(issue.reason, (skippedByReason.get(issue.reason) ?? 0) + 1);
@@ -67,6 +75,8 @@ export async function executeGoalModeStatusCommand(
       skippedGateCount: blockedMissionCount,
       skippedByReason: Object.fromEntries(skippedByReason),
       skippedIssues: hydration.issues,
+      closedGoalCount: closedGoalIdentifiers.length,
+      closedGoalIdentifiers,
       notes: [
         "本命令只读：不创建契约、不绑定 mission、不激活目标模式。",
         "激活状态是运行时内存状态，CLI 无法得知；未激活时门禁解析器恒为 null。",
@@ -85,6 +95,12 @@ export async function executeGoalModeStatusCommand(
   for (const [reason, count] of skippedByReason) {
     process.stdout.write(`  - ${reason}: ${String(count)}\n`);
   }
+  process.stdout.write(
+    `已关闭实验的目标: ${String(closedGoalIdentifiers.length)}` +
+      (closedGoalIdentifiers.length === 0
+        ? "\n"
+        : `（${closedGoalIdentifiers.join(", ")}；关闭后不再还原门禁）\n`),
+  );
   for (const binding of bindings) {
     process.stdout.write(
       `  ${binding.missionIdentifier} → ${binding.goalIdentifier}（绑定于 ${binding.boundAtIso}）\n`,

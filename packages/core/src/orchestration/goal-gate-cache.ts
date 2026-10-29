@@ -27,6 +27,7 @@ export interface GoalGateHydrationIssue {
     | "contract-invalid"
     | "state-missing"
     | "revision-mismatch"
+    | "experiment-closed"
     | "restore-failed";
 }
 
@@ -88,6 +89,20 @@ export class GoalGateCache {
           missionIdentifier: binding.missionIdentifier,
           goalIdentifier: binding.goalIdentifier,
           reason: "state-missing",
+        });
+        continue;
+      }
+      /**
+       * R36（2026-10-29）：**实验已关闭 ⇒ 不还原门禁**。
+       *
+       * 关闭后不再新增目标派发（解析器返回 null ⇒ 目标模式不参与）；任务/历史/限制**原样保留**
+       * （状态文件仍在，`goal-mode status` 可见关闭标记）。
+       */
+      if (state.isExperimentClosed) {
+        issues.push({
+          missionIdentifier: binding.missionIdentifier,
+          goalIdentifier: binding.goalIdentifier,
+          reason: "experiment-closed",
         });
         continue;
       }

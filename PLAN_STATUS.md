@@ -4103,3 +4103,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （`Could not read from remote repository`）。按纪律记录、下一轮合并重试；远端未改写。
 >
 > **更正（R35 结束）**：上一段已过时 —— 重试成功（`352d5b39..eb945050`），R35 两个提交**均已推送**，`ahead=0`。
+
+> **110 R36（F 阶段第 7 步）：关闭目标实验（完成）**：`runtime.closeGoalExperiment({goalIdentifier, reason})`
+> 调用既有 `GoalModeStateStore.closeExperiment`（只置 `isExperimentClosed`/`closedAtIso`/`pauseReason`，
+> **保留**任务/历史/限制/已执行结果）后刷新缓存；`GoalGateCache.hydrate` 遇到已关闭状态**跳过还原**
+> 并记录新原因 **`experiment-closed`** ⇒ 解析器对该 mission 返回 null ⇒ **不再新增目标派发**。
+> `goal-mode status` 显示 `closedGoalCount` / `closedGoalIdentifiers` 并注明"关闭后不再还原门禁"。
+> **未做**：只影响目标门禁（**不停止**已在跑的 mission、不撤销任务）、**无重新开启入口**、
+> 关闭本身不写判定记录；未运行"关闭后跳过/状态可见/不改任务"任何一条。
+> **下一轮**：R37 —— 收口 F 阶段：写"GOAL-02 剩余缺口与开关建议"报告（强制模式/激活 UI/
+> V 计算/重新开启），只文档。
