@@ -4052,3 +4052,6 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 不显示契约明细；未运行"无契约无绑定/可还原/不一致跳过"任何一条。
 > **下一轮**：R32 —— 对齐 `main-controller` 的 `goalDispatchGateResolver` 调用点与 `resumeMission`，
 > 确认"激活 + 绑定 + 契约 + 状态"四者齐备时**端到端**行为（静态核对 + 缺口清单，不运行）。
+>
+> **105a 推送状态（2026-10-29 R31）**：R31 提交**本地已提交但未推送** —— 连续 5 次 `git push` 失败
+> （`Could not read from remote repository`）。按纪律记录、下一轮合并重试；远端未改写。
