@@ -131,7 +131,9 @@ import { ProjectWorkWindowStore } from "../orchestration/project-work-window-sto
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
 import { DeferredInsertionQueueStore } from "../orchestration/deferred-insertion-queue.js";
-import { GoalModeStateStore } from "../orchestration/goal-mode-store.js";
+import { GoalModeStateStore, GOAL_MODE_STATE_SCHEMA_VERSION } from "../orchestration/goal-mode-store.js";
+import type { PersistedGoalModeState } from "../orchestration/goal-mode-store.js";
+import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
 import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
 import { CompletionVerdictStore } from "../orchestration/completion-verdict-store.js";
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
@@ -143,7 +145,7 @@ import type { GoalGateHydrationResult } from "../orchestration/goal-gate-cache.j
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
 import { createPauseReasonState } from "../orchestration/work-window-contract.js";
 import { evaluateWorkWindowState } from "../orchestration/work-window-contract.js";
-import type { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
+
 import type { GoalDispatchVerdictRecord } from "../orchestration/main-controller.js";
 import {
   createWorkWindowTransitionMonitor,
@@ -1042,6 +1044,45 @@ export async function createApplicationRuntime(
       input.contract,
       input.activation,
     );
+    /**
+     * R33（2026-10-29）：**状态初始化**（缺口 1 的第一步）。
+     *
+     * 此前 `GoalModeStateStore` 没有任何写入方 ⇒ hydrate 恒 `state-missing`。
+     * 这里在契约首次落盘后写一条初始状态（`gateSnapshot` 由新建门禁导出），
+     * 使"契约 + 绑定 + 状态"三者齐备、`revision` 一致 ⇒ 缓存可还原。
+     *
+     * 已存在状态 ⇒ **不覆盖**（不重置已累计的组数/预算）。
+     */
+    const existingState = await goalModeStateStore
+      .read(input.contract.goalIdentifier)
+      .catch(() => null);
+    if (existingState === null) {
+      const initialGateSnapshot = new GoalDispatchGate(
+        input.contract,
+      ).createSnapshot();
+      const initialState: PersistedGoalModeState = {
+        schemaVersion: GOAL_MODE_STATE_SCHEMA_VERSION,
+        documentRevision: 1,
+        goalIdentifier: input.contract.goalIdentifier,
+        contractRevision: input.contract.revision,
+        ownerIdentifier: input.contract.ownerIdentifier,
+        sourceRequestReference: input.contract.sourceRequestReference,
+        requirementBases: [],
+        lastPotentialValue: null,
+        currentTaskGroupIdentifier: null,
+        currentTaskGroupStartedAtIso: null,
+        consumedToolCalls: 0,
+        consumedCostUnits: 0,
+        pauseReason: null,
+        evidenceGaps: [],
+        requiresReplanning: false,
+        isExperimentClosed: false,
+        closedAtIso: null,
+        gateSnapshot: initialGateSnapshot,
+        updatedAtIso: new Date().toISOString(),
+      };
+      await goalModeStateStore.write(initialState);
+    }
     await refreshGoalGateCache();
     return activation;
   };
