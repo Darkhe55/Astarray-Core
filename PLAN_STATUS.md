@@ -4031,3 +4031,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 报告：`docs/reports/E_PHASE_CONSISTENCY_2026-10-29.md`。**无代码改动**。
 > **下一轮**：R30 —— 补 GOAL-02 控制面**最小入口**（创建契约 + 绑定 mission + 激活），
 > 让 R2–R5 的接线第一次有真实写入方（仍默认不激活、不阻断）。
+
+> **104 R30（F 阶段第 1 步）：目标模式控制面最小入口（完成）**：`ApplicationRuntime` 新增
+> `createGoalContract({contract, activation})`（经 `saveActivated`，**未激活 ⇒ 拒绝**）、
+> `bindMissionToGoal`（改绑仍须先解绑）、`unbindMissionFromGoal`、`refreshGoalGateCache`；
+> 写成功后**立即刷新门禁缓存**，让 R3 的解析器第一次有真实数据可用。
+> 约束不变：**默认不激活**、`isGoalModeEnforcementEnabled` 仍缺省关（只观察）、控制面只写自己的存储。
+> **未做**：**无 CLI/UI**（只有宿主代码能调）、**`bindMissionToGoal` 不校验 mission 存在性**、
+> 逐个刷新（未批量）、**强制模式仍未接**；未运行"未激活拒绝/绑定后非 null/解绑回 null"任何一条。
+> **下一轮**：R31 —— `goal mode status` 的**只读 CLI 视图**（激活状态/绑定数/契约数/hydrate 跳过原因），
+> 让控制面可被观察（但**不提供写命令**）。
