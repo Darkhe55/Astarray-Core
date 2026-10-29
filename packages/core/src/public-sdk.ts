@@ -688,6 +688,16 @@ export type {
   CompletionVerdictKind,
   CompletionVerdictRecord,
 } from "./orchestration/completion-verdict-store.js";
+/**
+ * R15（2026-10-29）：**提示词装配扫描的运行记录**（只读诊断；进程内环形缓冲）。
+ * 只含结论与规则版本，**不含提示词正文**。
+ */
+export {
+  readPromptContentScanRecords,
+  clearPromptContentScanRecords,
+  MAXIMUM_PROMPT_CONTENT_SCAN_RECORDS,
+} from "./orchestration/prompt-scan-journal.js";
+export type { PromptContentScanRecord } from "./orchestration/prompt-scan-journal.js";
 export type {
   LegacyIdentityAudit,
   LegacyLinkEvidence,
