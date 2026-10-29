@@ -3736,3 +3736,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `resumeMission` 未接 `evaluateResume`（R4）、`resolveGoalModeActivation` 仍无调用方（R5）；
 > 未运行任何还原/跳过路径。
 > **下一轮**：R4 —— `resumeMission` 接入 `evaluateResume`（在途组 ⇒ 拒绝自动恢复并给原因）。
+
+> **77a 推送状态（2026-10-29 R3）**：R3 提交 `0994b1a5` 之后的门禁解析器提交**本地已提交但未推送** ——
+> 连续 5 次 `git push` 失败（`Could not read from remote repository`）。按纪律记录原因、本阶段跳过，
+> **下一轮（R4）完成时合并重试**；远端未改写。
