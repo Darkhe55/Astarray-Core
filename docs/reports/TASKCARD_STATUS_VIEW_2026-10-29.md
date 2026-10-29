@@ -1,0 +1,71 @@
+> 由只读脚本 `scripts/manual/taskcard-status-index.mjs` 生成；只统计**文档事实**，不验证任何产品行为。
+
+| 任务卡 | checkpoint 标识数 | ADR 引用数 | 提到阻塞 | 提到未完成 | 最近日期 | 行数 |
+|---|---|---|---|---|---|---|
+| docs/tasks/2026-09-16_INCREMENTAL_DESIGN_TASK_CARDS.md | 0 | 0 | 否 | 否 | 2026-10-23 | 153 |
+| docs/tasks/2026-10-01_RUNTIME_USABILITY_AND_RELIABILITY_TASK_CARDS.md | 20 | 0 | 是 | 是 | 2026-11-08 | 130 |
+| docs/tasks/ALIGN00_CORE_REPAIR_INDEX.md | 0 | 0 | 否 | 是 | 2026-10-29 | 32 |
+| docs/tasks/ALIGN01_IDENTITY_AND_MAIN_AGENT.md | 0 | 0 | 是 | 是 | 2026-10-29 | 192 |
+| docs/tasks/ALIGN02_SEQUENCE_AND_DISPATCH.md | 0 | 0 | 是 | 是 | 2026-10-28 | 149 |
+| docs/tasks/ALIGN03_EXECUTION_REVIEW_FEEDBACK.md | 0 | 0 | 是 | 是 | 2026-10-28 | 170 |
+| docs/tasks/ALIGN04_RECOVERY_AND_STATUS.md | 0 | 0 | 是 | 是 | 2026-10-28 | 146 |
+| docs/tasks/ALIGN_CORE_HANDOFF.md | 6 | 4 | 是 | 是 | 2026-10-29 | 286 |
+| docs/tasks/AR07_FINAL_ACCEPTANCE.md | 4 | 0 | 是 | 是 | 2026-11-08 | 365 |
+| docs/tasks/B6R-04b-TUI-PERMISSION-PROFILES.md | 0 | 0 | 否 | 否 | 2026-08-16 | 47 |
+| docs/tasks/B6R-11-COVERAGE-SPRINT.md | 0 | 0 | 否 | 否 | - | 27 |
+| docs/tasks/B6R00_BASELINE.md | 0 | 0 | 否 | 否 | - | 6 |
+| docs/tasks/B6R10_FINAL_ACCEPTANCE.md | 2 | 0 | 是 | 是 | 2026-11-08 | 160 |
+| docs/tasks/BATCH6_REPAIR_TASK_CARDS.md | 0 | 0 | 是 | 是 | 2026-08-15 | 320 |
+| docs/tasks/CLIENT01_FOLDER_GRANTS_SECRETARY_AND_ONBOARDING_TASK_CARDS.md | 6 | 0 | 否 | 是 | 2026-10-23 | 117 |
+| docs/tasks/COMM01_ADDRESSABLE_UPPER_LAYER_AND_SINGLE_PARENT_TASK_CARD.md | 1 | 0 | 否 | 是 | 2026-10-28 | 323 |
+| docs/tasks/E2E01_STANDALONE_WORKFLOW_ACCEPTANCE_TASK_CARD.md | 3 | 0 | 是 | 是 | 2026-11-08 | 72 |
+| docs/tasks/EXP01_WORKFLOW_DISCOVERY_AND_HISTORY_MAINTENANCE_TASK_CARDS.md | 8 | 0 | 是 | 是 | 2026-10-20 | 130 |
+| docs/tasks/GOAL02_BOUNDED_GOAL_STABILITY.md | 11 | 8 | 否 | 是 | 2026-10-29 | 137 |
+| docs/tasks/GUI01_R_PRODUCT_WORKBENCH_TASK_CARD.md | 2 | 0 | 是 | 是 | 2026-10-11 | 108 |
+| docs/tasks/GUI03_CAPABILITY_MATRIX.md | 4 | 0 | 否 | 否 | 2026-10-26 | 82 |
+| docs/tasks/GUI_MVP_CODING_TASK_CARD.md | 1 | 0 | 是 | 是 | 2026-09-13 | 227 |
+| docs/tasks/HISTORY01_LOCAL_RUN_HISTORY_AND_RESUME_VIEW_TASK_CARD.md | 1 | 0 | 否 | 是 | 2026-10-25 | 185 |
+| docs/tasks/LESSON01_MODEL_ALIGNED_COMMUNICATION_MEMORY_TASK_CARD.md | 1 | 0 | 否 | 是 | 2026-10-20 | 155 |
+| docs/tasks/MERGE01_NODECTX01_TASK_CARDS.md | 2 | 0 | 否 | 是 | 2026-11-08 | 647 |
+| docs/tasks/NEXT60_PLAN_2026-10-29.md | 54 | 1 | 是 | 是 | 2026-10-29 | 166 |
+| docs/tasks/OBS01_PERFORMANCE_USAGE_AND_DIAGNOSTICS_TASK_CARDS.md | 13 | 0 | 是 | 是 | 2026-11-08 | 107 |
+| docs/tasks/OCT28_CORE_EXTENSION_INDEX.md | 0 | 0 | 否 | 否 | 2026-10-28 | 20 |
+| docs/tasks/PRODUCT_INTEGRATION_ROLLOUT.md | 2 | 0 | 是 | 否 | 2026-10-10 | 89 |
+| docs/tasks/PROJECT01_ISOLATION_AND_CROSS_PROJECT_BORROWING_TASK_CARD.md | 7 | 0 | 否 | 是 | 2026-11-08 | 561 |
+| docs/tasks/README.md | 2 | 1 | 否 | 是 | 2026-10-10 | 86 |
+| docs/tasks/RELOCATE01_COLD_START_PROJECT_RELINK_TASK_CARD.md | 6 | 0 | 是 | 是 | 2026-10-24 | 102 |
+| docs/tasks/REMOTE01_SCOPED_RUN_EVIDENCE_EXPORT.md | 0 | 0 | 是 | 否 | 2026-10-28 | 111 |
+| docs/tasks/RESUME02_EXPERIMENTAL_SMART_CONTINUATION.md | 0 | 0 | 是 | 是 | 2026-10-29 | 79 |
+| docs/tasks/SEC02_CHANNEL_MATRIX.md | 2 | 7 | 否 | 是 | 2026-10-29 | 98 |
+| docs/tasks/SEC02_CREDENTIAL_COVERAGE.md | 0 | 0 | 否 | 是 | 2026-10-28 | 56 |
+| docs/tasks/SEC02_LOCAL_SCAN_COVERAGE.md | 0 | 0 | 否 | 是 | 2026-10-28 | 226 |
+| docs/tasks/SESSION_SUMMARY_AND_STEERING_TASK_CARDS.md | 5 | 0 | 是 | 是 | 2026-11-08 | 125 |
+| docs/tasks/SMART01_INSTRUCTION_WINDOW_AND_MAIN_RESPONSIVENESS_TASK_CARD.md | 2 | 0 | 否 | 是 | 2026-11-08 | 276 |
+| docs/tasks/SPLIT_ARCHIVE_REMAINING.md | 0 | 0 | 否 | 否 | 2026-10-25 | 13 |
+| docs/tasks/T07D00_PROVIDER_AUDIT.md | 0 | 0 | 否 | 否 | - | 6 |
+| docs/tasks/TOOLKIT01_PROJECT_TO_GENERAL_TOOL_LIFECYCLE_TASK_CARD.md | 6 | 1 | 是 | 是 | 2026-10-24 | 881 |
+| docs/tasks/UX01_IMPLEMENTATION_MAP.md | 0 | 0 | 否 | 是 | 2026-10-26 | 65 |
+| docs/tasks/WB00_MICRO_EDIT_WORKBENCH_PROTOTYPE_TASK_CARD.md | 0 | 0 | 是 | 否 | 2026-09-10 | 65 |
+| docs/tasks/accepted/BRIDGE01_EXTERNAL_TOOL_MVP_TASK_CARD.md | 2 | 1 | 是 | 是 | 2026-11-08 | 108 |
+| docs/tasks/accepted/INT00_PRODUCT_PATH_AUDIT_TASK_CARD.md | 1 | 0 | 是 | 否 | 2026-09-10 | 76 |
+| docs/tasks/accepted/README.md | 1 | 0 | 否 | 是 | 2026-10-18 | 33 |
+| docs/tasks/accepted/T05D_HUMAN_AGENT_CONCURRENT_CHANGE_TASK_CARD.md | 0 | 3 | 是 | 否 | 2026-08-19 | 166 |
+| docs/tasks/accepted/T07D_PROVIDER_RUNTIME_AND_STANDALONE_AGENT_TASK_CARD.md | 2 | 1 | 是 | 是 | 2026-09-10 | 325 |
+| docs/tasks/accepted/T07D_R1_APPLICATION_SDK_WIRING_TASK_CARD.md | 1 | 0 | 是 | 否 | 2026-09-10 | 91 |
+| docs/tasks/accepted/T07D_R2_PROVIDER_PRODUCT_WIRING_TASK_CARD.md | 2 | 0 | 是 | 否 | 2026-10-06 | 131 |
+| docs/tasks/accepted/T07E_AGENT_WORKING_SET_READ_BUDGET_TASK_CARD.md | 0 | 4 | 是 | 否 | 2026-08-19 | 142 |
+| docs/tasks/accepted/T08C_T07C_AGENT_ROUTING_AND_MODEL_POLICY_TASK_CARDS.md | 0 | 2 | 是 | 是 | 2026-08-18 | 121 |
+| docs/tasks/accepted/T08D_CRAFTSMAN_TERTIARY_PRESET_TASK_CARD.md | 0 | 1 | 否 | 否 | - | 67 |
+| docs/tasks/accepted/T09A_CONTEXT_NODE_CLOSURE_AND_RECALL_TASK_CARD.md | 2 | 9 | 是 | 是 | 2026-11-08 | 289 |
+| docs/tasks/accepted/T09A_R1_CONTEXT_RUNTIME_WIRING_TASK_CARD.md | 2 | 0 | 是 | 否 | 2026-09-10 | 91 |
+| docs/tasks/accepted/T12A_R1_RECOVERY_PRODUCT_WIRING_TASK_CARD.md | 2 | 0 | 是 | 否 | 2026-09-10 | 65 |
+| docs/tasks/accepted/T12A_SESSION_RECOVERY_RECONCILIATION_TASK_CARD.md | 1 | 3 | 是 | 是 | 2026-09-10 | 166 |
+| docs/tasks/accepted/T12_SECURITY_HARDENING_TASK_CARD.md | 0 | 1 | 是 | 否 | 2026-08-26 | 96 |
+| docs/tasks/archive/ARCHIVE_REVIEW_2026-10-23.md | 0 | 0 | 否 | 是 | 2026-10-23 | 26 |
+| docs/tasks/archive/completed-checkpoints/B6R00_BASELINE.md | 0 | 0 | 否 | 否 | 2026-08-16 | 81 |
+| docs/tasks/archive/completed-checkpoints/COMM01_01_COMPLETED.md | 0 | 0 | 否 | 否 | 2026-10-25 | 16 |
+| docs/tasks/archive/completed-checkpoints/HISTORY01_01_02_COMPLETED.md | 0 | 0 | 否 | 否 | 2026-10-25 | 20 |
+| docs/tasks/archive/completed-checkpoints/README.md | 0 | 0 | 否 | 否 | 2026-10-22 | 25 |
+| docs/tasks/archive/completed-checkpoints/T07D00_PROVIDER_AUDIT.md | 0 | 0 | 否 | 否 | 2026-08-22 | 33 |
+
+合计 65 个文件；其中提到"未完成/in_progress"的有 40 个，提到"平台阻塞"的有 35 个。
