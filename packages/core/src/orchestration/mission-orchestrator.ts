@@ -29,6 +29,7 @@ import type { ContextPromptProvider } from "./context-prompt-assembler.js";
 // COMM-01-02（2026-10-26）：发布任务时登记自己的信箱 ⇒ 反馈走发布者反向通道。
 import { resolvePublisherRecipientIdForTask } from "./task-publisher-feedback-route.js";
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
+import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { GuidanceControlQueue } from "../runtime-guidance/guidance-control-queue.js";
 
 /**
@@ -219,6 +220,13 @@ export interface MissionOrchestratorOptions {
    * **不判 done**，把任务置 blocked 并升级原因。默认关闭是为了不在未实测前改变所有任务收口。
    */
   isCompletionReceiptRequired?: boolean;
+  /**
+   * 计划 R7（2026-10-29）：**完成收据存储**（缺省 null ⇒ 不落盘）。
+   *
+   * 装配后：success 且 worker 提供了收据时，先落盘再走完成门禁；
+   * 落盘失败**不吞掉**（升级提示），但也不改写收据内容。
+   */
+  completionReceiptStore?: CompletionReceiptStore | null;
   /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
   isConversationMode?: boolean;
   /**
@@ -1194,6 +1202,26 @@ export class MissionOrchestrator {
     }
     switch (outcome.outcome) {
       case "success": {
+        /**
+         * 计划 R7（2026-10-29）：**收据落盘**。
+         *
+         * worker 在成功分支用真实本地状态构造收据（工具调用数/落盘产物/完成事件校验）；
+         * 这里只负责保存 —— 不修改内容、不补默认收据。
+         * 落盘失败**不改变完成判定**，但如实升级（否则"收据丢了"会被静默吞掉）。
+         */
+        const successReceipt = outcome.completionReceipt ?? null;
+        if (successReceipt !== null) {
+          const receiptStore = this.options.completionReceiptStore ?? null;
+          if (receiptStore !== null) {
+            try {
+              await receiptStore.save(successReceipt);
+            } catch (error) {
+              this.options.onUserEscalation(
+                `任务 ${taskId} 的完成收据落盘失败：${(error as Error).message}`,
+              );
+            }
+          }
+        }
         /**
          * ALIGN-03-03：**完成收据门禁**（默认关闭）。没有可核对收据时，
          * `success` 只是"Worker 认为成功"，不足以判 done —— 置 blocked 并如实升级，

@@ -86,6 +86,7 @@ import {
 } from "./task-ledger-divergence-journal.js";
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
+import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
 import type { CompletionReceipt } from "./completion-receipt.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
@@ -193,6 +194,13 @@ export interface MainControllerOptions {
    * 打开后：`success` 但收据缺失/矛盾 ⇒ 任务置 blocked 并升级，**不伪造 done**。
    */
   isCompletionReceiptRequired?: boolean;
+  /**
+   * 计划 R7（2026-10-29）：**完成收据存储**（缺省 null ⇒ 不落盘）。
+   *
+   * 装配后：Worker 成功分支提供的收据会先落盘，再走完成门禁；
+   * 严格模式（`isCompletionReceiptRequired`）读取同一份存储（R8）。
+   */
+  completionReceiptStore?: CompletionReceiptStore | null;
   /** 显式对话模式（GUI 聊天）。 */
   isConversationMode?: boolean;
   /**
@@ -2873,6 +2881,8 @@ export class MainController {
       ...(this.options.isCompletionReceiptRequired === true
         ? { isCompletionReceiptRequired: true }
         : {}),
+      /** 计划 R7：完成收据落盘（缺省 null ⇒ 不落盘）。 */
+      completionReceiptStore: this.options.completionReceiptStore ?? null,
       onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
@@ -3076,6 +3086,8 @@ export class MainController {
       ...(this.options.isCompletionReceiptRequired === true
         ? { isCompletionReceiptRequired: true }
         : {}),
+      /** 计划 R7：完成收据落盘（缺省 null ⇒ 不落盘）。 */
+      completionReceiptStore: this.options.completionReceiptStore ?? null,
       onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
