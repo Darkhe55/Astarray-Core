@@ -29,6 +29,8 @@ export interface TaskLedgerStatusCommandInput {
   readonly isJsonOutput: boolean;
   /** R22（2026-10-29）：只读列出已登记的 mission↔序列 索引。 */
   readonly isListBindings?: boolean;
+  /** R23（2026-10-29）：给了就做"单任务派发只读预检"，代替整体对照。 */
+  readonly taskIdentifier?: string;
 }
 
 export async function executeTaskLedgerStatusCommand(
@@ -96,6 +98,9 @@ export async function executeTaskLedgerStatusCommand(
   }
   const missingInputs = [
     input.missionIdentifier === undefined ? "--mission" : null,
+    input.taskIdentifier !== undefined && input.missionIdentifier === undefined
+      ? "--mission (--task 需要)"
+      : null,
     resolvedSequenceIdentifier === undefined ? "--sequence" : null,
     resolvedOwnerAgentInstanceIdentifier === undefined ? "--owner" : null,
   ].filter((missing): missing is string => missing !== null);
@@ -148,6 +153,63 @@ export async function executeTaskLedgerStatusCommand(
         missionManager.getMissionStatus(missionIdentifier),
     },
   });
+
+  /**
+   * R23（2026-10-29）：`--task` ⇒ **单任务派发只读预检**（替代整体对照）。
+   * 预检通过**不等于**可派发；输出里固定带 `canDispatchTaskByTaskIdentifier: false`。
+   */
+  if (input.taskIdentifier !== undefined) {
+    let precheck: Awaited<
+      ReturnType<TaskLedgerBridge["inspectSingleTaskDispatchPrecheck"]>
+    >;
+    try {
+      precheck = await bridge.inspectSingleTaskDispatchPrecheck({
+        missionIdentifier: input.missionIdentifier as string,
+        taskIdentifier: input.taskIdentifier,
+        sequenceId: resolvedSequenceIdentifier as string,
+        ownerAgentInstanceId: resolvedOwnerAgentInstanceIdentifier as string,
+        viewer: { sourceKind: "user", actorId: "cli" },
+      });
+    } catch (error) {
+      if (input.isJsonOutput) {
+        printJson({
+          status: "failed",
+          reason: (error as Error).message,
+          divergenceCount: recentDivergences.length,
+          recentDivergences,
+        });
+      } else {
+        process.stdout.write(`单任务派发预检失败: ${(error as Error).message}\n`);
+      }
+      return EXIT_CODES.USAGE_ERROR;
+    }
+    if (input.isJsonOutput) {
+      printJson({
+        status: precheck.isDispatchable
+          ? "dispatch-precheck-passed"
+          : "dispatch-precheck-blocked",
+        precheck,
+        recentDivergences,
+      });
+      return EXIT_CODES.SUCCESS;
+    }
+    process.stdout.write(
+      `任务 ${precheck.taskIdentifier}（mission ${precheck.missionIdentifier} ↔ 序列 ${precheck.sequenceId}）\n`,
+    );
+    process.stdout.write(
+      `预检结论: ${precheck.isDispatchable ? "可单独派发（仅就两套记账而言）" : "不可单独派发"}\n`,
+    );
+    process.stdout.write(
+      `序列侧状态: ${precheck.sequenceStatus ?? "（无此任务）"} / mission 侧状态: ${
+        precheck.missionStatus ?? "（无此任务）"
+      }\n`,
+    );
+    for (const blockedReason of precheck.blockedReasons) {
+      process.stdout.write(`- 阻塞: ${blockedReason}\n`);
+    }
+    process.stdout.write(`注意: ${precheck.capabilities.note}\n`);
+    return EXIT_CODES.SUCCESS;
+  }
 
   let report: Awaited<ReturnType<TaskLedgerBridge["inspectAlignment"]>>;
   try {
