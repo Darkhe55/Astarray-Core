@@ -709,7 +709,16 @@ export class MissionOrchestrator {
         this.options.goalTaskGroupBeginPort !== undefined
       ) {
         this.goalTaskGroupCounter += 1;
-        const taskGroupIdentifier = `task-group-${String(this.goalTaskGroupCounter)}`;
+        /**
+         * R52（2026-10-29）：**组标识带运行时间前缀**（跨重启可追溯）。
+         *
+         * 旧格式 `task-group-<n>` 每次进程启动都从 1 开始，重启后无法区分"这是哪一次运行的组"。
+         * 新格式 `goal-group-<UTC 时间戳>-<n>`：同一进程内仍递增，跨重启按时间可排序、可对照。
+         * 只改标识生成，**不改组语义**（开始时调 begin、归零时调 finish）。
+         */
+        const taskGroupStartedAtIso = new Date().toISOString();
+        const taskGroupRunTag = taskGroupStartedAtIso.replace(/[-:TZ.]/g, "").slice(0, 14);
+        const taskGroupIdentifier = `goal-group-${taskGroupRunTag}-${String(this.goalTaskGroupCounter)}`;
         this.currentGoalTaskGroupIdentifier = taskGroupIdentifier;
         /** R51：记录组性质（provider 抛错 ⇒ 保守按 normal）。 */
         try {
@@ -725,7 +734,7 @@ export class MissionOrchestrator {
         try {
           await this.options.goalTaskGroupBeginPort({
             taskGroupIdentifier,
-            startedAtIso: new Date().toISOString(),
+            startedAtIso: taskGroupStartedAtIso,
           });
         } catch (error) {
           this.options.onUserEscalation(
