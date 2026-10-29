@@ -3845,3 +3845,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **不覆盖** `projectMissionCompletionGate` 的完整 mission 上下文（仍需人工 assist mission 验收）。
 > **验证**：脚本**从未执行**；仅 `node --check`（语法，exit 0）+ typecheck/eslint/build。
 > **下一轮**：转入 D 阶段 R14 —— 定位提示词最终装配出口，加**注入侧**扫描/标注（默认标注不阻断）。
+
+> **88 R14（D 阶段第 1 步）：提示词注入侧扫描标注（完成）**：`AssembledContextPrompt` 新增可选
+> `contentScan`；`assembleContextPrompt` 拼装完成后用 `buildReadSideContentScanLabel(promptText)`
+> 计算（结论/规则版本/时间，**不含正文**）；`createContextPromptProvider` 自动携带。
+> **只标注**：不改 `promptText`、不截断、**不阻断**；旧调用方忽略即可。
+> **未做**：**没有消费方**（worker/assistant 不读、不记录、不阻断）、标注**不进日志/事件**、
+> 与 ADR-0080 的模型请求出口扫描**未合并**；未跑"干净 ⇒ isClean / 命中 ⇒ 标注 false 且正文不变"。
+> **下一轮**：R15 —— 让装配路径**消费**该标注：写入一条运行诊断记录（事件/日志），
+> 仍不阻断、不改内容，使"这份上下文是否检查过"可事后核对。
