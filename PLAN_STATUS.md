@@ -4098,3 +4098,6 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 每次判定写文件（高频成本未测）、无导出/轮转；未运行"记录/超限/失败"任何一条。
 > **下一轮**：R36 —— 把 `closeExperiment` 接上（实验关闭后**停止新增目标派发**、保留任务与历史），
 > 并让 `goal-mode status` 显示关闭状态。
+>
+> **109a 推送状态（2026-10-29 R35）**：R35 提交**本地已提交但未推送** —— 连续 5 次 `git push` 失败
+> （`Could not read from remote repository`）。按纪律记录、下一轮合并重试；远端未改写。
