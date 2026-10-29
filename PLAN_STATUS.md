@@ -3836,3 +3836,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （依赖任务链状态）、无 UI；未跑"缺一任务/有 rejected/全 accepted"任何一条。
 > **下一轮**：C 阶段收尾 R13 —— 严格模式端到端演练**脚本**（不执行）：准备收据+裁决+任务链，
 > 覆盖"通过/缺收据/缺裁决/拒绝"四态，作为后续授权运行时的验收清单。
+
+> **87 R13（C 阶段收尾）：严格门禁验收演练脚本（完成，未执行）**：新增
+> `scripts/manual/strict-completion-drill.mjs`（临时 state 目录，驱动存储层）覆盖四态：
+> **齐备通过 / 缺收据 ⇒ 不足 / 缺裁决 ⇒ null / 同任务不同内容拒绝覆盖**；失败打印具体条目并退出 1。
+> 公共 SDK 增补导出 `CompletionReceiptStore` / `CompletionVerdictStore` / `evaluateCompletionReceipt`
+> 及类型（存储层 API，不改门禁行为）。**覆盖范围明确**：只覆盖存储层与"缺失即不足"，
+> **不覆盖** `projectMissionCompletionGate` 的完整 mission 上下文（仍需人工 assist mission 验收）。
+> **验证**：脚本**从未执行**；仅 `node --check`（语法，exit 0）+ typecheck/eslint/build。
+> **下一轮**：转入 D 阶段 R14 —— 定位提示词最终装配出口，加**注入侧**扫描/标注（默认标注不阻断）。
