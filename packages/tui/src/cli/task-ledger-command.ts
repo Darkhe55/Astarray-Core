@@ -17,6 +17,7 @@ import { TaskLedgerBridge } from "../../../core/src/orchestration/task-ledger-br
 import { TaskLedgerDivergenceJournal } from "../../../core/src/orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../../../core/src/orchestration/mission-sequence-binding-store.js";
 import { DeferredInsertionQueueStore } from "../../../core/src/orchestration/deferred-insertion-queue.js";
+import type { DeferredInsertionEntry } from "../../../core/src/orchestration/deferred-insertion-queue.js";
 import { TaskSequenceStatusController } from "../../../core/src/orchestration/task-sequence-controllers.js";
 import { TaskStore } from "../../../core/src/infra/task-store.js";
 import { EXIT_CODES, printJson } from "./json-output.js";
@@ -36,6 +37,8 @@ export interface TaskLedgerStatusCommandInput {
   readonly isListDeferredInsertions?: boolean;
   /** R27（2026-10-29）：只读生成"写回提案"（不执行写回）。 */
   readonly isProposeWriteBack?: boolean;
+  /** R28（2026-10-29）：一屏只读汇总（差异 + 提案 + 待办 + 丢弃计数）。 */
+  readonly isSummaryView?: boolean;
 }
 
 export async function executeTaskLedgerStatusCommand(
@@ -306,6 +309,93 @@ export async function executeTaskLedgerStatusCommand(
     for (const note of proposal.notes) {
       process.stdout.write(`注意: ${note}\n`);
     }
+    return EXIT_CODES.SUCCESS;
+  }
+
+  /**
+   * R28（2026-10-29）：`--summary` ⇒ **一屏只读汇总**（差异 + 写回提案 + 待消费队列 + 丢弃计数）。
+   * 只读；取数失败才 `USAGE_ERROR`，有差异/提案/待办仍返回 0（报告不是错误）。
+   */
+  if (input.isSummaryView === true) {
+    let summary: {
+      alignment: Awaited<ReturnType<TaskLedgerBridge["inspectAlignment"]>>;
+      proposal: Awaited<ReturnType<TaskLedgerBridge["buildWriteBackProposal"]>>;
+      pendingInsertions: readonly DeferredInsertionEntry[];
+      droppedConsumedCount: number;
+      lastDroppedAtIso: string | null;
+    };
+    try {
+      const alignment = await bridge.inspectAlignment({
+        missionIdentifier: input.missionIdentifier as string,
+        sequenceId: resolvedSequenceIdentifier as string,
+        ownerAgentInstanceId: resolvedOwnerAgentInstanceIdentifier as string,
+        viewer: { sourceKind: "user", actorId: "cli" },
+      });
+      const proposal = await bridge.buildWriteBackProposal({
+        missionIdentifier: input.missionIdentifier as string,
+        sequenceId: resolvedSequenceIdentifier as string,
+        ownerAgentInstanceId: resolvedOwnerAgentInstanceIdentifier as string,
+        viewer: { sourceKind: "user", actorId: "cli" },
+      });
+      const queueDocument = await new DeferredInsertionQueueStore({
+        baseDirectory: input.stateDirectory,
+      })
+        .read()
+        .catch(() => null);
+      summary = {
+        alignment,
+        proposal,
+        pendingInsertions:
+          queueDocument?.pending.filter(
+            (entry) => entry.missionIdentifier === input.missionIdentifier,
+          ) ?? [],
+        droppedConsumedCount: queueDocument?.droppedConsumedCount ?? 0,
+        lastDroppedAtIso: queueDocument?.lastDroppedAtIso ?? null,
+      };
+    } catch (error) {
+      if (input.isJsonOutput) {
+        printJson({ status: "failed", reason: (error as Error).message });
+      } else {
+        process.stdout.write(`生成汇总失败: ${(error as Error).message}\n`);
+      }
+      return EXIT_CODES.USAGE_ERROR;
+    }
+    const hasFindings =
+      summary.alignment.divergences.length > 0 ||
+      summary.proposal.entries.length > 0 ||
+      summary.pendingInsertions.length > 0 ||
+      summary.droppedConsumedCount > 0;
+    if (input.isJsonOutput) {
+      printJson({ status: hasFindings ? "attention" : "clean", ...summary });
+      return EXIT_CODES.SUCCESS;
+    }
+    process.stdout.write(
+      `===== 两套记账汇总（mission ${summary.alignment.missionIdentifier} ↔ 序列 ${summary.alignment.sequenceId}，revision ${String(summary.alignment.sequenceRevision)}）=====\n`,
+    );
+    process.stdout.write(
+      `1) 差异: ${summary.alignment.divergences.length === 0 ? "（无）" : ""}\n`,
+    );
+    for (const divergence of summary.alignment.divergences) {
+      process.stdout.write(`   - ${divergence}\n`);
+    }
+    process.stdout.write(
+      `2) 写回提案: ${summary.proposal.entries.length} 条（可执行: ${String(summary.proposal.isExecutable)}）\n`,
+    );
+    for (const entry of summary.proposal.entries) {
+      process.stdout.write(`   - ${entry.taskIdentifier} [${entry.proposedAction}]\n`);
+    }
+    process.stdout.write(
+      `3) 待消费推迟插入: ${summary.pendingInsertions.length} 条\n`,
+    );
+    process.stdout.write(
+      `4) 已消费历史截断: ${String(summary.droppedConsumedCount)} 条` +
+        (summary.lastDroppedAtIso === null
+          ? "（未截断）\n"
+          : `（最后丢弃于 ${summary.lastDroppedAtIso}）\n`),
+    );
+    process.stdout.write(
+      `结论: ${hasFindings ? "需要人工处理（以上均为只读报告）" : "无差异、无提案、无待办"}\n`,
+    );
     return EXIT_CODES.SUCCESS;
   }
 
