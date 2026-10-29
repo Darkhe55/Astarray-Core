@@ -928,6 +928,56 @@ export async function createApplicationRuntime(
   });
   const goalGateHydration = await goalGateCache.hydrate();
   /**
+   * GOAL-02 R4（2026-10-29）：**恢复前的目标模式对账**。
+   *
+   * 未绑定目标 ⇒ `resume`（不参与）；绑定但契约缺失 ⇒ `stay-paused`（不无契约运行）；
+   * 有状态 ⇒ 用 `evaluateResume`：在途组 ⇒ `reconcile-first`，暂停/需重规划 ⇒ `stay-paused`。
+   */
+  const missionGoalResumeReconciliation = async (
+    missionIdentifier: string,
+  ): Promise<{
+    readonly outcome: "resume" | "reconcile-first" | "stay-paused";
+    readonly detail: string;
+    readonly evidenceGaps?: readonly string[];
+  }> => {
+    const goalIdentifier = await goalMissionBindingStore
+      .readGoalIdentifier(missionIdentifier)
+      .catch(() => null);
+    if (goalIdentifier === null) {
+      return {
+        outcome: "resume",
+        detail: "该 mission 未绑定目标：目标模式不参与恢复对账。",
+      };
+    }
+    const contract = await goalContractStore.read(goalIdentifier).catch(() => null);
+    if (contract === null) {
+      return {
+        outcome: "stay-paused",
+        detail: `绑定目标 ${goalIdentifier} 的契约缺失或非法：拒绝恢复（不在无契约状态下续接）。`,
+        evidenceGaps: ["contract-missing"],
+      };
+    }
+    const decision = await goalModeStateStore.evaluateResume({
+      goalIdentifier,
+      contract,
+    });
+    if (decision.kind === "resume") {
+      return { outcome: "resume", detail: decision.detail };
+    }
+    if (decision.kind === "reconcile-first") {
+      return {
+        outcome: "reconcile-first",
+        detail: decision.detail,
+        evidenceGaps: [decision.inFlightTaskGroupIdentifier],
+      };
+    }
+    return {
+      outcome: "stay-paused",
+      detail: decision.detail,
+      evidenceGaps: decision.evidenceGaps,
+    };
+  };
+  /**
    * 接线缺口第 ④ 项（2026-10-28）：**时段变化检测器**。
    *
    * 默认关闭（`isWorkWindowResumeMonitorEnabled !== true` ⇒ 不排定时器）；
@@ -1642,6 +1692,8 @@ export async function createApplicationRuntime(
     missionRelationIndexStore,
     /** ALIGN-04-02：恢复前只读对账门禁（缺省不传 ⇒ 不发生门禁）。 */
     ...(missionRecoveryGate === undefined ? {} : { missionRecoveryGate }),
+    /** GOAL-02 R4：恢复前目标模式对账（未绑定目标时等价于不参与）。 */
+    missionGoalResumeReconciliation,
     /** ALIGN-04-05：按调用者构造的回访控制器（胶囊 → 节点回访）。 */
     contextRecallControllerFactory,
     /**
