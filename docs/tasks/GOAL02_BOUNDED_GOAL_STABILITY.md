@@ -107,3 +107,13 @@
 （目标模式不参与派发/恢复）。ADR-0094。
 
 **未做**：无 UI/CLI 调用激活入口；契约/绑定仍无写入方；强制模式仍缺省关；未运行验证。
+
+### R30–R32 补充（2026-10-29）
+
+- **R30**：控制面最小入口（`createGoalContract` / `bindMissionToGoal` / `unbindMissionFromGoal`
+  / `refreshGoalGateCache`），只走宿主代码，默认不激活、不阻断（ADR-0116）。
+- **R31**：`goal-mode status` 只读 CLI（契约数/绑定数/可还原/跳过原因），**无写命令**（ADR-0117）。
+- **R32**：端到端静态核对（[GOAL02_END_TO_END_GAPS_2026-10-29](../../reports/GOAL02_END_TO_END_GAPS_2026-10-29.md)）：
+  **决定性缺口 = `GoalModeStateStore` 无任何写入方** ⇒ hydrate 恒 `state-missing`、
+  `restoredCount=0`、解析器恒 null；`evaluateResume` 的拦截分支在生产上永不触发。
+  另：强制模式无入口、激活无 CLI/UI、判定不落盘、`closeExperiment` 无调用方。
