@@ -97,3 +97,6 @@ node dist/cli.js task-ledger status --mission <id> --summary
 ## 5. 状态
 
 草稿（R55）；定稿见 R58。**本文件不含任何运行验证结论**。
+
+> **状态更新（R58）**：已被 [DELIVERY_NOTE_2026-10-29](DELIVERY_NOTE_2026-10-29.md) 取代（定稿）；
+> 本文件仅保留为草稿历史。
