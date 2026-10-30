@@ -30,6 +30,8 @@ vi.mock("../../../packages/core/src/feedback-process/transport.js", () => {
     readonly handleInboundMessage = vi.fn();
     readonly requestReplay = vi.fn(async () => 0);
     readonly isDisconnected = vi.fn(() => false);
+    /** R67（2026-10-30）：实现新增心跳触发 flushPendingOutbox，夹具补齐（返回值不被消费）。 */
+    readonly flushPendingOutbox = vi.fn(async () => 0);
     readonly queryHealth = vi.fn(async () => ({
       isHealthy: true,
       processPid: 1,
@@ -57,6 +59,7 @@ type FakeClient = InstanceType<typeof ForkFeedbackClient> & {
   requestReplay: ReturnType<typeof vi.fn>;
   isDisconnected: ReturnType<typeof vi.fn>;
   queryHealth: ReturnType<typeof vi.fn>;
+  flushPendingOutbox: ReturnType<typeof vi.fn>;
 };
 
 class FakeChildProcess extends EventEmitter {
