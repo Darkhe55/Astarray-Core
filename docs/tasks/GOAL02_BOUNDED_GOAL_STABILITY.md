@@ -146,7 +146,7 @@
 
 ### R70 内核/UI 职责划分核对（2026-10-30）
 
-按"内核（公开仓）完成闭环职责、UI（私有仓）只做呈现与操作"核对：[GOAL02_KERNEL_UI_SPLIT_GAP_2026-10-30](../../reports/GOAL02_KERNEL_UI_SPLIT_GAP_2026-10-30.md)。
+按"内核（公开仓）完成闭环职责、UI（私有仓）只做呈现与操作"核对：[GOAL02_KERNEL_UI_SPLIT_GAP_2026-10-30](../reports/GOAL02_KERNEL_UI_SPLIT_GAP_2026-10-30.md)。
 
 **结论**：内核**尚不能闭合**。关键缺口 K1（目标设立入口）、K2（requirements↔任务映射）、
 K3（契约变更 API）、K7（完成判定耦合）、K8（失活/归档）、K10（运行中暂停）；
