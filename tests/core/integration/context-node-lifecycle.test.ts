@@ -32,6 +32,32 @@ async function listGraphOwners(): Promise<string[]> {
   }
 }
 
+/**
+ * R67（2026-10-30）：**按"谁写了 context-graphs"选 owner**，而不是 `owners[0]`。
+ *
+ * 实测（Assist）：`agent-memory/` 下同时有 `scheduler~...`（只有 `task-sequences`）与
+ * `worker~...`（有 `closure-capsules` + `context-graphs`）；字母序 `scheduler` 在前，
+ * 旧断言因此读错 owner 并报 ENOENT。产品行为正确，是测试假设"只有一个 owner"过期。
+ */
+async function findContextGraphOwner(): Promise<string> {
+  for (const owner of await listGraphOwners()) {
+    const graphDirectory = path.join(
+      stateDirectory,
+      "agent-memory",
+      owner,
+      "context-graphs",
+    );
+    const exists = await fs
+      .stat(graphDirectory)
+      .then(() => true)
+      .catch(() => false);
+    if (exists) {
+      return owner;
+    }
+  }
+  throw new Error("没有任何 owner 生成 context-graphs（产品未写图？）");
+}
+
 async function runMissionToTerminal(mode: "assist" | "devolve") {
   const application = await AstarrayApplicationFacade.create({
     stateDirectory,
@@ -75,7 +101,7 @@ describe("T09A-R1-03：产品任务节点收口", () => {
 
     const owners = await listGraphOwners();
     expect(owners.length).toBeGreaterThanOrEqual(1);
-    const owner = owners[0]!;
+    const owner = await findContextGraphOwner();
     const graphStore = new LocalContextGraphStore({ baseDirectory: stateDirectory });
     const graphs = await fs.readdir(
       path.join(stateDirectory, "agent-memory", owner, "context-graphs"),
@@ -111,7 +137,7 @@ describe("T09A-R1-03：产品任务节点收口", () => {
     expect(status, "任务未到达终态（实测 status=" + status + "）").toBe("done");
 
     const owners = await listGraphOwners();
-    const owner = owners[0]!;
+    const owner = await findContextGraphOwner();
     const graphStore = new LocalContextGraphStore({ baseDirectory: stateDirectory });
     const graphs = await fs.readdir(
       path.join(stateDirectory, "agent-memory", owner, "context-graphs"),
