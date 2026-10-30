@@ -50,3 +50,24 @@ npx vitest run tests/core/integration/context-node-lifecycle.test.ts
 走的是**假 run**，它对除 merge/merge-base 外的命令一律返回 `stdoutText: "ok"` ⇒ 被判为脏。
 **提交或丢弃 `RESUME02_...md` 不会改变这 3 条测试结果**。
 （真实运行中，未提交改动**确实会**阻止自动合并——那是产品行为，与此测试无关。）
+
+## 6. 修复结果（同日，R67）
+
+| 原失败 | 处理 | 结果 |
+|---|---|---|
+| merge 对账 ×3 | 夹具对 `git status` 返回**空 stdout**（干净工作区） | ✅ 3/3 通过 |
+| DLP 断言 | 改为当前规则标识 `vendor:openai-style-api-key` | ✅ 14/14 通过 |
+| feedback 夹具 | 假 client 补 `flushPendingOutbox` | ✅ 15/15 通过 |
+| context Assist | 按"**谁写了 context-graphs**"选 owner（实测 `scheduler~…` 只有 task-sequences，图在 `worker~…` 下） | ✅ 2/2 通过 |
+| model-binding / zip | **单独跑均通过**；并行满载时偶发失败（既有 flaky，未改） | ⚠️ 见下 |
+
+**全量复跑**：
+
+```powershell
+npx vitest run tests/core                     # 并行：约 2 条 flaky 失败（每次不同）
+npx vitest run tests/core --maxWorkers=2      # 低并发：467 files / 3541 tests 全部通过
+```
+
+**结论**：这 7 条失败**全部是测试夹具/owner 选择/并行 flakiness**，没有一条是产品缺陷，
+也没有一条由 R61–R66 的改动引入。**稳定的验收命令是 `--maxWorkers=2`**（仓库已有
+`npm run check:low-parallel` 封装）。
