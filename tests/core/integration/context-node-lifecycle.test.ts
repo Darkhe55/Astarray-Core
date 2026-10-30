@@ -136,7 +136,6 @@ describe("T09A-R1-03：产品任务节点收口", () => {
     // 失败时带上**实测状态**（本条曾因"30s 提前放弃"报出含糊的 expected 'running' to be 'done'）
     expect(status, "任务未到达终态（实测 status=" + status + "）").toBe("done");
 
-    const owners = await listGraphOwners();
     const owner = await findContextGraphOwner();
     const graphStore = new LocalContextGraphStore({ baseDirectory: stateDirectory });
     const graphs = await fs.readdir(
