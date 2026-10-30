@@ -31,6 +31,7 @@ import { resolvePublisherRecipientIdForTask } from "./task-publisher-feedback-ro
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { GoalGroupKind } from "./goal-dispatch-gate.js";
+import { resolveGoalTaskGroupKind } from "./goal-task-group-kind.js";
 import type { GuidanceControlQueue } from "../runtime-guidance/guidance-control-queue.js";
 
 /**
@@ -741,19 +742,14 @@ export class MissionOrchestrator {
         const startingTaskIdentifiers = actions
           .filter((action) => action.action === "start-task")
           .map((action) => action.taskId);
-        try {
-          this.currentGoalTaskGroupKind =
-            this.options.goalTaskGroupKindProvider?.({
-              taskIdentifiers: startingTaskIdentifiers,
-            }) ??
-            (startingTaskIdentifiers.some((taskIdentifier) =>
-              this.reworkedTaskIdentifiers.has(taskIdentifier),
-            )
-              ? "rework"
-              : "normal");
-        } catch {
-          this.currentGoalTaskGroupKind = "normal";
-        }
+        /** R61/R62：解析集中到纯函数，便于单测（ADR-0130/0131）。 */
+        this.currentGoalTaskGroupKind = resolveGoalTaskGroupKind({
+          taskIdentifiers: startingTaskIdentifiers,
+          reworkedTaskIdentifiers: this.reworkedTaskIdentifiers,
+          ...(this.options.goalTaskGroupKindProvider === undefined
+            ? {}
+            : { provider: this.options.goalTaskGroupKindProvider }),
+        });
         try {
           await this.options.goalTaskGroupBeginPort({
             taskGroupIdentifier,
