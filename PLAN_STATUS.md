@@ -4440,3 +4440,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ⑥ `context-node-lifecycle` 缺 `context-graphs` 目录（**待查：行为缺口还是断言过期**）；
 > ⑦ `model-binding-runtime-switch` 单独跑通过 ⇒ **并行 flaky**。
 > 报告 `docs/reports/FULL_SUITE_BASELINE_2026-10-30.md`（含建议）。**未修改任何测试/产品代码**。
+>
+> **141a 更正（R66）**：上段把 merge 对账 3 条失败归因为"工作树里的 `RESUME02_...md`"**错误**。
+> 复核后：测试**完全替换**了 `gitProcess`，实现新增的 `git status --porcelain --untracked-files=no`
+> 预检走假 run，而假 run 对非 merge/merge-base 命令一律返回 `stdoutText:"ok"` ⇒ 非空 ⇒ 判"脏"。
+> **提交/丢弃 `RESUME02_...md` 不会修复这 3 条**；正确修复是**改测试夹具**（status 返回空 stdout）。
+> 真实运行中未提交改动确实会阻止自动合并（产品行为，与测试无关）。
