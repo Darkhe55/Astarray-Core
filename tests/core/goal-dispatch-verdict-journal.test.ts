@@ -79,7 +79,9 @@ describe("GoalDispatchVerdictJournal 溢出归档", () => {
     const archiveText = await readFile(archivePath, "utf8");
     const archiveLines = archiveText.split(/\r?\n/).filter((line) => line !== "");
     expect(archiveLines).toHaveLength(1);
-    expect(JSON.parse(archiveLines[0]).missionIdentifier).toBe("mission-1");
+    const firstArchivedLine = archiveLines[0] ?? "";
+    expect(firstArchivedLine).not.toBe("");
+    expect(JSON.parse(firstArchivedLine).missionIdentifier).toBe("mission-1");
   });
 
   it("持续写入：每次溢出都追加归档，活动文件始终不超过上限", async () => {
