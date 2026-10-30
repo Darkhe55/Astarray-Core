@@ -31,7 +31,7 @@
 > 3. **GOAL-02 `groupKind` 的 `investigation` 信号**：`rework` 已有默认策略（R61，ADR-0130：
 >    retry/reassign/早停续跑 ⇒ `rework`），但**仓内仍无"调查组"的客观信号** ⇒ 默认策略永不产生
 >    `investigation`；`unblock` 后重跑也不算返工。
-> 4. **归档自身治理**：溢出记录已**先归档再裁剪**（R63，ADR-0132），活动视图仍有界；但**归档文件无上限/无压缩/无清理**。
+> 4. **归档历史保留**：溢出已归档（R63）且归档有**容量上限+轮转+保留份数**（R65，ADR-0134：默认 5000 行 / 保留 2 份）；但保留窗口外**仍会被删除**，且 `--include-archive` **不读轮转文件**。
 > 5. **组标识全局唯一**：已带运行时间前缀（R52，ADR-0127）可跨重启区分，但**同秒重启可撞名**、无 UUID。
 > 6. **扫描记录持久化/UI**：`prompt-scan-journal` 仅进程内；`goal-mode verdicts` 只读无 UI（ADR-0104/0120）。
 >
@@ -4424,3 +4424,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 非法时间/序号/令牌**抛错**（不静默兜底）。运行结果：
 > `npx vitest run tests/core/goal-task-group-identifier.test.ts` → **1 file / 6 tests passed**。
 > 仍未：非全局唯一（时间+计数+随机，无持久序列）、旧标识不迁移、编排器接线未集成测试。ADR-0133。
+
+> **140 窗口后补（R65）：归档容量轮转 + 保留份数（已运行通过）**：`GoalDispatchVerdictJournal` 新增
+> `maximumArchiveLines`（缺省 5000）与 `archiveRetentionCount`（缺省 2）：追加前超限 ⇒ 把当前归档重命名为
+> `dispatch-verdicts-archive-<UTC14>-<n>.jsonl` 并清理更旧份；**任何一步失败都不阻断写入**。
+> 运行结果：`npx vitest run tests/core/goal-dispatch-verdict-archive-governance.test.ts` →
+> **1 file / 2 tests passed**（①轮转后总行数不丢 ②轮转份数 ≤ 保留数）。
+> 仍未：**保留窗口外真正删除**（无审计）、多进程竞争、失败分支、`--include-archive` 不读轮转文件。ADR-0134。

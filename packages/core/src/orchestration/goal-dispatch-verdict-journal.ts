@@ -50,18 +50,96 @@ export class GoalDispatchVerdictJournal {
    * 归档**本身无上限/无压缩**（增长由外部治理）。
    */
   private readonly archiveFilePath: string;
+  private readonly directoryPath: string;
   private readonly maximumRecords: number;
+  /**
+   * R65（2026-10-30）：**归档治理**（容量上限 + 轮转 + 保留份数）。
+   *
+   * - 当前归档超过 `maximumArchiveLines` ⇒ 轮转为 `dispatch-verdicts-archive-<UTC14>-<n>.jsonl`；
+   * - 轮转文件只保留最近 `archiveRetentionCount` 份，更旧的**删除**（这是真正的删除，
+   *   调用方需知道：保留窗口外的历史仍会消失，只是比"200 条即丢"宽得多）。
+   */
+  private readonly maximumArchiveLines: number;
+  private readonly archiveRetentionCount: number;
   private readonly writeLock = new AsyncMutex();
 
-  constructor(options: { baseDirectory: string; maximumRecords?: number }) {
-    const directoryPath = path.join(options.baseDirectory, "goal-mode");
-    this.filePath = path.join(directoryPath, "dispatch-verdicts.json");
+  constructor(options: {
+    baseDirectory: string;
+    maximumRecords?: number;
+    maximumArchiveLines?: number;
+    archiveRetentionCount?: number;
+  }) {
+    this.directoryPath = path.join(options.baseDirectory, "goal-mode");
+    this.filePath = path.join(this.directoryPath, "dispatch-verdicts.json");
     this.backupFilePath = `${this.filePath}.bak`;
-    this.archiveFilePath = path.join(directoryPath, "dispatch-verdicts-archive.jsonl");
+    this.archiveFilePath = path.join(this.directoryPath, "dispatch-verdicts-archive.jsonl");
     this.maximumRecords = Math.max(
       1,
       options.maximumRecords ?? DEFAULT_MAXIMUM_GOAL_DISPATCH_VERDICT_RECORDS,
     );
+    this.maximumArchiveLines = Math.max(1, options.maximumArchiveLines ?? 5000);
+    this.archiveRetentionCount = Math.max(1, options.archiveRetentionCount ?? 2);
+  }
+
+  /** 轮转文件名前缀（用于识别、排序与清理；基名 `dispatch-verdicts-archive.jsonl` 不匹配）。 */
+  private static readonly ROTATED_ARCHIVE_PATTERN =
+    /^dispatch-verdicts-archive-\d{14}-\d+\.jsonl$/;
+
+  /** 读取当前归档行数（不存在 ⇒ 0）。 */
+  private async countArchiveLines(): Promise<number> {
+    try {
+      const { readFile } = await import("node:fs/promises");
+      const content = await readFile(this.archiveFilePath, "utf8");
+      return content.split(/\r?\n/).filter((line) => line !== "").length;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * 归档前检查容量：超限则**先轮转再裁剪旧轮转**（保留最近 N 份）。
+   *
+   * 返回是否发生了轮转；任何一步失败都不阻断写入（最坏是归档变大）。
+   */
+  private async rotateArchiveIfNeeded(incomingLineCount: number): Promise<boolean> {
+    const currentLineCount = await this.countArchiveLines();
+    if (currentLineCount === 0) {
+      return false;
+    }
+    if (currentLineCount + incomingLineCount <= this.maximumArchiveLines) {
+      return false;
+    }
+    try {
+      const { readdir, rename, unlink } = await import("node:fs/promises");
+      const runTag = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
+      let rotatedName = "";
+      for (let attempt = 1; attempt <= 100; attempt += 1) {
+        const candidate = `dispatch-verdicts-archive-${runTag}-${String(attempt)}.jsonl`;
+        const candidatePath = path.join(this.directoryPath, candidate);
+        const exists = await readdir(this.directoryPath)
+          .then((names) => names.includes(candidate))
+          .catch(() => false);
+        if (!exists) {
+          rotatedName = candidate;
+          await rename(this.archiveFilePath, candidatePath);
+          break;
+        }
+      }
+      if (rotatedName === "") {
+        return false;
+      }
+      /** 清理：只保留最近 N 份轮转文件（按名称排序 = 按时间排序）。 */
+      const rotatedFiles = (await readdir(this.directoryPath))
+        .filter((name) => GoalDispatchVerdictJournal.ROTATED_ARCHIVE_PATTERN.test(name))
+        .sort();
+      const excessCount = rotatedFiles.length - this.archiveRetentionCount;
+      for (const name of rotatedFiles.slice(0, Math.max(0, excessCount))) {
+        await unlink(path.join(this.directoryPath, name)).catch(() => undefined);
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async read(): Promise<GoalDispatchVerdictJournalDocument> {
@@ -115,6 +193,8 @@ export class GoalDispatchVerdictJournal {
       let archivedRecordCount = 0;
       if (overflowRecords.length > 0) {
         try {
+          /** R65：先按容量决定是否轮转（失败不阻断写入）。 */
+          await this.rotateArchiveIfNeeded(overflowRecords.length);
           const { appendFile } = await import("node:fs/promises");
           const jsonLines = overflowRecords
             .map((record) => JSON.stringify(record))
