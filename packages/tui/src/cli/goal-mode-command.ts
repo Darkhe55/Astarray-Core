@@ -121,6 +121,8 @@ export interface GoalModeVerdictsCommandInput {
   readonly isJsonOutput: boolean;
   /** R53（2026-10-29）：给了就**只读导出**全部保留记录为 JSONL（每行一条）。 */
   readonly exportPath?: string;
+  /** R63（2026-10-30）：导出时**一并包含已归档记录**（`dispatch-verdicts-archive.jsonl`）。 */
+  readonly includeArchive?: boolean;
 }
 
 /** R35：`goal-mode verdicts` —— 只读列出最近的派发判定记录（有界，不含正文）。 */
@@ -153,7 +155,23 @@ export async function executeGoalModeVerdictsCommand(
       return EXIT_CODES.USAGE_ERROR;
     }
     try {
-      const jsonLines = document.records.map((record) => JSON.stringify(record)).join("\n");
+      const archivedLines: string[] = [];
+      if (input.includeArchive === true) {
+        try {
+          const { readFile } = await import("node:fs/promises");
+          const archivePath = `${input.stateDirectory}/goal-mode/dispatch-verdicts-archive.jsonl`;
+          const archiveText = await readFile(archivePath, "utf8");
+          archivedLines.push(
+            ...archiveText.split(/\r?\n/).filter((line) => line.trim() !== ""),
+          );
+        } catch {
+          /** 没有归档文件 ⇒ 视为空（不报错）。 */
+        }
+      }
+      const jsonLines = [
+        ...archivedLines,
+        ...document.records.map((record) => JSON.stringify(record)),
+      ].join("\n");
       const { writeFile } = await import("node:fs/promises");
       await writeFile(exportPath, jsonLines === "" ? "" : `${jsonLines}\n`, "utf8");
     } catch (error) {

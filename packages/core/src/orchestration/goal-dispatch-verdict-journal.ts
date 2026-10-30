@@ -42,6 +42,14 @@ export const DEFAULT_MAXIMUM_GOAL_DISPATCH_VERDICT_RECORDS = 200;
 export class GoalDispatchVerdictJournal {
   private readonly filePath: string;
   private readonly backupFilePath: string;
+  /**
+   * R63（2026-10-30）：**溢出归档**（JSONL，追加写）。
+   *
+   * 此前超出上限的记录**直接丢弃**（只剩 `droppedRecordCount`）。现在把它们先追加到
+   * `dispatch-verdicts-archive.jsonl` 再从活动文件移除 —— 活动视图仍有界，历史不再凭空消失。
+   * 归档**本身无上限/无压缩**（增长由外部治理）。
+   */
+  private readonly archiveFilePath: string;
   private readonly maximumRecords: number;
   private readonly writeLock = new AsyncMutex();
 
@@ -49,6 +57,7 @@ export class GoalDispatchVerdictJournal {
     const directoryPath = path.join(options.baseDirectory, "goal-mode");
     this.filePath = path.join(directoryPath, "dispatch-verdicts.json");
     this.backupFilePath = `${this.filePath}.bak`;
+    this.archiveFilePath = path.join(directoryPath, "dispatch-verdicts-archive.jsonl");
     this.maximumRecords = Math.max(
       1,
       options.maximumRecords ?? DEFAULT_MAXIMUM_GOAL_DISPATCH_VERDICT_RECORDS,
@@ -93,19 +102,52 @@ export class GoalDispatchVerdictJournal {
 
   async record(
     entry: GoalDispatchVerdictEntry,
-  ): Promise<{ readonly droppedRecordCount: number }> {
+  ): Promise<{ readonly droppedRecordCount: number; readonly archivedRecordCount: number }> {
     return await this.writeLock.runExclusive(async () => {
       const document = await this.read();
       const nextRecords = [...document.records, entry];
-      const droppedThisTime = Math.max(0, nextRecords.length - this.maximumRecords);
+      const overflowCount = Math.max(0, nextRecords.length - this.maximumRecords);
+      const overflowRecords =
+        overflowCount === 0 ? [] : nextRecords.slice(0, overflowCount);
+      /**
+       * R63：**先归档、再裁剪**；归档失败则**不裁剪**（宁可活动文件超限，也不让记录消失）。
+       */
+      let archivedRecordCount = 0;
+      if (overflowRecords.length > 0) {
+        try {
+          const { appendFile } = await import("node:fs/promises");
+          const jsonLines = overflowRecords
+            .map((record) => JSON.stringify(record))
+            .join("\n");
+          await appendFile(this.archiveFilePath, `${jsonLines}\n`, "utf8");
+          archivedRecordCount = overflowRecords.length;
+        } catch {
+          archivedRecordCount = 0;
+        }
+      }
+      const remainingRecords =
+        overflowRecords.length > 0 && archivedRecordCount === overflowRecords.length
+          ? nextRecords.slice(-this.maximumRecords)
+          : nextRecords;
       await writeAtomicJson(this.filePath, {
         schemaVersion: 1,
         documentRevision: document.documentRevision + 1,
         totalRecordedCount: document.totalRecordedCount + 1,
-        droppedRecordCount: document.droppedRecordCount + droppedThisTime,
-        records: nextRecords.slice(-this.maximumRecords),
+        /** 只有**真正被丢弃**的才计数；已归档的不再算丢弃。 */
+        droppedRecordCount:
+          document.droppedRecordCount +
+          (overflowRecords.length > 0 && archivedRecordCount === overflowRecords.length
+            ? 0
+            : overflowRecords.length),
+        records: remainingRecords,
       } satisfies GoalDispatchVerdictJournalDocument);
-      return { droppedRecordCount: droppedThisTime };
+      return {
+        droppedRecordCount:
+          overflowRecords.length > 0 && archivedRecordCount === overflowRecords.length
+            ? 0
+            : overflowRecords.length,
+        archivedRecordCount,
+      };
     });
   }
 
