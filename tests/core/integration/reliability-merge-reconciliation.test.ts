@@ -70,6 +70,10 @@ describe("目标分支合并的对账与错误可见性（R3）", () => {
       gitProcess: {
         run: async (_path: string, gitArguments: string[], commandDescription: string) => {
           gitCalls.push({ gitArguments, commandDescription });
+          /** 工作区预检：干净工作区 ⇒ 空 stdout（否则会被判为"未提交改动"）。 */
+          if (gitArguments[0] === "status") {
+            return { commandDescription, stdoutText: "", stderrText: "", exitCode: 0, durationSeconds: 0.01 };
+          }
           if (gitArguments[0] === "merge") {
             throw new Error("git 命令超时（60 秒）: 目标分支合并集成分支");
           }
@@ -100,6 +104,10 @@ describe("目标分支合并的对账与错误可见性（R3）", () => {
     const { coordinator } = buildCoordinator({
       gitProcess: {
         run: async (_path: string, gitArguments: string[], commandDescription: string) => {
+          /** 工作区预检：空 stdout ⇒ 干净。 */
+          if (gitArguments[0] === "status") {
+            return { commandDescription, stdoutText: "", stderrText: "", exitCode: 0, durationSeconds: 0.01 };
+          }
           if (gitArguments[0] === "checkout" && gitArguments.includes("--detach")) {
             throw new Error("detach 失败（夹具）");
           }
@@ -122,9 +130,10 @@ describe("目标分支合并的对账与错误可见性（R3）", () => {
   it("③ 正常路径（合并与脱离都成功）→ 不得产生未决风险（不误报）", async () => {
     const { coordinator } = buildCoordinator({
       gitProcess: {
-        run: async (_path: string, _gitArguments: string[], commandDescription: string) => ({
+        run: async (_path: string, gitArguments: string[], commandDescription: string) => ({
           commandDescription,
-          stdoutText: "ok",
+          /** 工作区预检：空 stdout ⇒ 干净。 */
+          stdoutText: gitArguments[0] === "status" ? "" : "ok",
           stderrText: "",
           exitCode: 0,
           durationSeconds: 0.01,

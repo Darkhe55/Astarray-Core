@@ -209,7 +209,8 @@ describe("DLP 内容扫描（名称正常但内容疑似凭据）", () => {
       .catch((caught: unknown) => caught as DomainError)) as DomainError;
     expect(error.errorCode).toBe("sensitive-content-read-denied");
     expect(error.message).not.toContain("sk-");
-    expect(error.message).toContain("dlp:api-key");
+    /** 规则标识以注册表为准（重命名后不再固定为 `dlp:api-key`）。 */
+    expect(error.message).toContain("vendor:openai-style-api-key");
   });
 
   it("AWS 密钥/私钥块/连接串内容命中", async () => {
