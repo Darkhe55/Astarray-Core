@@ -4431,3 +4431,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 运行结果：`npx vitest run tests/core/goal-dispatch-verdict-archive-governance.test.ts` →
 > **1 file / 2 tests passed**（①轮转后总行数不丢 ②轮转份数 ≤ 保留数）。
 > 仍未：**保留窗口外真正删除**（无审计）、多进程竞争、失败分支、`--include-archive` 不读轮转文件。ADR-0134。
+
+> **141 窗口后补（R66）：全量 `tests/core` 基线（首次运行，7 失败 / 3534 通过）**：
+> `npx vitest run tests/core` → **5 files failed / 7 tests failed**，逐条核对后**无一由 R61–R65 引入**：
+> ①–③ merge 对账 3 条由**工作树不干净**触发（非本窗口的 `RESUME02_...md`，测试断言"必须干净"）；
+> ④ DLP 测试期望 `dlp:api-key`，实际规则已改名为 `vendor:openai-style-api-key`（**断言过期**）；
+> ⑤ feedback 测试假 client 缺 `flushPendingOutbox`（**夹具过期**）；
+> ⑥ `context-node-lifecycle` 缺 `context-graphs` 目录（**待查：行为缺口还是断言过期**）；
+> ⑦ `model-binding-runtime-switch` 单独跑通过 ⇒ **并行 flaky**。
+> 报告 `docs/reports/FULL_SUITE_BASELINE_2026-10-30.md`（含建议）。**未修改任何测试/产品代码**。
