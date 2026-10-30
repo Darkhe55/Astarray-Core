@@ -28,8 +28,9 @@
 >
 > 1. **按 taskId 真正派发**：`requestDispatchByTaskIdentifier` 仍显式拒绝；预检只表达缺什么（ADR-0110）。
 > 2. **写回执行端**：提案不可应用（无审批/审计入口，ADR-0114）。
-> 3. **GOAL-02 `groupKind` 判定策略**：**接入点已接（R51，ADR-0126）**，但仓内**没有"如何判定调查/返工"
->    的策略** ⇒ 生产未传 provider 时仍一律 `normal`，误判风险仍在。
+> 3. **GOAL-02 `groupKind` 的 `investigation` 信号**：`rework` 已有默认策略（R61，ADR-0130：
+>    retry/reassign/早停续跑 ⇒ `rework`），但**仓内仍无"调查组"的客观信号** ⇒ 默认策略永不产生
+>    `investigation`；`unblock` 后重跑也不算返工。
 > 4. **判定记录轮转**：**导出已完成（R53，ADR-0128）**；仍无轮转/归档（200 条之外只剩计数）。
 > 5. **组标识全局唯一**：已带运行时间前缀（R52，ADR-0127）可跨重启区分，但**同秒重启可撞名**、无 UUID。
 > 6. **扫描记录持久化/UI**：`prompt-scan-journal` 仅进程内；`goal-mode verdicts` 只读无 UI（ADR-0104/0120）。
