@@ -4400,3 +4400,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > "本次启动任务中任一属于返工 ⇒ `rework`，否则 `normal`"。**不按标题/模型自述判断**，
 > **不产生 `investigation`**（仓内没有该信号）；宿主 provider 仍可覆盖。
 > 未做：`unblock` 后重跑不算返工、集合只增不减、未运行任何一条判定。ADR-0130；ADR-0126 §6 同步。
+
+> **137 窗口后补（R62）：`groupKind` 解析抽成纯函数 + 6 个单测（已运行通过）**：
+> 抽出 `resolveGoalTaskGroupKind`（provider 优先 → 抛错回退 normal → 返工集合命中 ⇒ rework → 否则 normal；
+> 永不产生 investigation），`runLoop` 改为调用它（**无新增语义**）；新增
+> `tests/core/goal-task-group-kind.test.ts`（6 用例）。**运行结果**：
+> `npx vitest run tests/core/goal-task-group-kind.test.ts` → **1 file / 6 tests passed**（206ms）；
+> 另 `typecheck` 0、`eslint` 0、`build` 成功。**仍未**：编排器接线/集合写入/V 行为的集成验证；
+> **全量 `npm run test` 未运行**。ADR-0131；ADR-0130 §6 同步。

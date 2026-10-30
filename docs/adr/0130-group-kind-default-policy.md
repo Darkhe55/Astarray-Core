@@ -57,3 +57,9 @@ MissionOrchestrator.runLoop（组开始）
 
 **implemented-unverified**：未编写/未运行测试。
 已执行：`npm run typecheck` exit 0、`npx eslint <本批文件>` exit 0、`npm run build` 成功。
+
+## 6. 更新（R62，2026-10-30）
+
+§4 的"**未运行验证**"已部分过期：R62 把解析抽成纯函数 `resolveGoalTaskGroupKind` 并加了
+6 个单测，**已运行通过（6/6）**；但**编排器接线、retry/早停写入集合、V/停滞行为仍未测**，
+全量 `npm run test` 仍未运行。见 [ADR-0131](0131-group-kind-unit-test.md)。
