@@ -132,6 +132,7 @@ import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-diverg
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
 import { DeferredInsertionQueueStore } from "../orchestration/deferred-insertion-queue.js";
 import { GoalModeStateStore, GOAL_MODE_STATE_SCHEMA_VERSION } from "../orchestration/goal-mode-store.js";
+import type { GoalModeStatusView } from "../orchestration/goal-mode-store.js";
 import type { PersistedGoalModeState } from "../orchestration/goal-mode-store.js";
 import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
 import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdict-journal.js";
@@ -142,6 +143,8 @@ import { GoalMissionBindingStore } from "../orchestration/goal-mission-binding-s
 import { GoalGateCache } from "../orchestration/goal-gate-cache.js";
 import { resolveGoalModeActivation, computeGoalPotential } from "../orchestration/goal-contract.js";
 import { assessGoalRequirementsFromLocalState } from "../orchestration/goal-requirement-assessment.js";
+import { validateGoalContractChange } from "../orchestration/goal-contract.js";
+import type { GoalChangeProposer } from "../orchestration/goal-contract.js";
 import type { GoalContract } from "../orchestration/goal-contract.js";
 import type { GoalGateHydrationResult } from "../orchestration/goal-gate-cache.js";
 import { evaluateWorkWindowGate } from "../orchestration/work-window-gate.js";
@@ -285,6 +288,19 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R71：目标状态视图（无状态 ⇒ null）。 */
+  describeGoalStatus: (goalIdentifier: string) => Promise<GoalModeStatusView | null>;
+  /** R71：契约变更（合法来源 + revision 校验 + 预算不重置）。 */
+  updateGoalContract: (input: {
+    readonly contract: GoalContract;
+    readonly proposer: GoalChangeProposer;
+    readonly activation: Parameters<typeof resolveGoalModeActivation>[0];
+  }) => Promise<{ readonly revision: number }>;
+  /** R71：目标失活（关闭 + 解绑；历史保留，不删除文件）。 */
+  deactivateGoal: (input: {
+    readonly goalIdentifier: string;
+    readonly reason: string;
+  }) => Promise<{ readonly closedAtIso: string; readonly unboundMissionCount: number }>;
   refreshGoalGateCache: () => Promise<GoalGateHydrationResult>;
   experimentSettingsStore: ExperimentSettingsStore;
   toolPackageLifecycleService: ToolPackageLifecycleService;
@@ -1266,6 +1282,123 @@ export async function createApplicationRuntime(
    * 关闭的目标不再还原门禁 ⇒ 解析器对它返回 null ⇒ **不再新增目标派发**。
    * 已有任务与状态不受影响；没有任何"静默删除"。
    */
+  /**
+   * R71（2026-10-30）：**目标状态视图**（K9 接线）。
+   *
+   * `GoalModeStateStore.describeStatus` 此前**零调用方**；这里暴露给宿主/CLI 作为唯一事实来源。
+   * 返回 `null` 表示没有该目标的状态（不伪造）。
+   */
+  /**
+   * R71（2026-10-30）：**目标失活（K8 接线）**。
+   *
+   * "移除目标"在本仓库的语义是**失活**：置关闭标记 + 解绑所有 mission + 刷新门禁缓存，
+   * 使该目标**不再参与派发**；契约/状态/判定记录**全部保留**（卡 03 明确禁止清除历史与限制）。
+   * 不做文件删除 —— 真正删除属于产品决定，且会与卡冲突。
+   */
+  const deactivateGoal = async (input: {
+    readonly goalIdentifier: string;
+    readonly reason: string;
+  }): Promise<{ readonly closedAtIso: string; readonly unboundMissionCount: number }> => {
+    const closed = await closeGoalExperiment({
+      goalIdentifier: input.goalIdentifier,
+      reason: input.reason,
+    });
+    let unboundMissionCount = 0;
+    const bindings = await goalMissionBindingStore.list().catch(() => []);
+    for (const binding of bindings) {
+      if (binding.goalIdentifier !== input.goalIdentifier) {
+        continue;
+      }
+      const didUnbind = await goalMissionBindingStore
+        .unbind(binding.missionIdentifier)
+        .catch(() => false);
+      if (didUnbind) {
+        unboundMissionCount += 1;
+      }
+    }
+    await refreshGoalGateCache();
+    return { closedAtIso: closed.closedAtIso, unboundMissionCount };
+  };
+  /**
+   * R71（2026-10-30）：**契约变更（K3 接线）**。
+   *
+   * - 只接受 `source-publisher` / `authenticated-owner`；模型/三级 Agent 一律拒绝；
+   * - 校验 revision 严格 +1、supersedes 指向上一版、标识/所有者/来源引用不变、总权重不变；
+   * - **累计预算不重置**（保留 `consumedToolCalls`/`consumedCostUnits`）；
+   * - V 依据作废（`requiresReplanning: true` + 证据缺口），因为旧证据绑定旧 revision。
+   */
+  const updateGoalContract = async (input: {
+    readonly contract: GoalContract;
+    readonly proposer: GoalChangeProposer;
+    readonly activation: Parameters<typeof resolveGoalModeActivation>[0];
+  }): Promise<{ readonly revision: number }> => {
+    const previousContract = await goalContractStore
+      .read(input.contract.goalIdentifier)
+      .catch(() => null);
+    if (previousContract === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `目标 ${input.contract.goalIdentifier} 没有现存契约，无法变更（请先创建）。`,
+      );
+    }
+    const changeValidation = validateGoalContractChange({
+      previousContract,
+      nextContract: input.contract,
+      proposer: input.proposer,
+    });
+    if (!changeValidation.isAllowed) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        `目标契约变更被拒: ${changeValidation.reasons.join("；")}`,
+      );
+    }
+    await goalContractStore.saveActivated(input.contract, input.activation);
+    const previousState = await goalModeStateStore
+      .read(input.contract.goalIdentifier)
+      .catch(() => null);
+    if (previousState !== null && previousState.contractRevision !== previousContract.revision) {
+      throw new DomainError(
+        "journal-corrupted",
+        `状态 revision ${String(previousState.contractRevision)} 与当前契约 ${String(previousContract.revision)} 不一致：先对账再变更。`,
+      );
+    }
+    const baseSnapshot = new GoalDispatchGate(input.contract).createSnapshot();
+    const nextState: PersistedGoalModeState = {
+      schemaVersion: GOAL_MODE_STATE_SCHEMA_VERSION,
+      documentRevision: (previousState?.documentRevision ?? 0) + 1,
+      goalIdentifier: input.contract.goalIdentifier,
+      contractRevision: input.contract.revision,
+      ownerIdentifier: input.contract.ownerIdentifier,
+      sourceRequestReference: input.contract.sourceRequestReference,
+      /** 旧证据绑定旧 revision ⇒ 作废；累计预算按卡要求保留。 */
+      requirementBases: [],
+      lastPotentialValue: null,
+      currentTaskGroupIdentifier: previousState?.currentTaskGroupIdentifier ?? null,
+      currentTaskGroupStartedAtIso: previousState?.currentTaskGroupStartedAtIso ?? null,
+      consumedToolCalls: previousState?.consumedToolCalls ?? 0,
+      consumedCostUnits: previousState?.consumedCostUnits ?? 0,
+      pauseReason: previousState?.pauseReason ?? null,
+      evidenceGaps: ["契约已变更为新 revision：需按新契约重新评估（旧证据不适用于新版本）。"],
+      requiresReplanning: true,
+      isExperimentClosed: previousState?.isExperimentClosed ?? false,
+      closedAtIso: previousState?.closedAtIso ?? null,
+      gateSnapshot: {
+        ...baseSnapshot,
+        completedGroupCount: previousState?.gateSnapshot.completedGroupCount ?? 0,
+        consumedToolCalls: previousState?.consumedToolCalls ?? 0,
+      },
+      updatedAtIso: new Date().toISOString(),
+    };
+    await goalModeStateStore.write(nextState);
+    await refreshGoalGateCache();
+    return { revision: input.contract.revision };
+  };
+  const describeGoalStatus = async (
+    goalIdentifier: string,
+  ): Promise<GoalModeStatusView | null> =>
+    await goalModeStateStore
+      .describeStatus(goalIdentifier)
+      .catch(() => null);
   const closeGoalExperiment = async (input: {
     readonly goalIdentifier: string;
     readonly reason: string;
@@ -2538,6 +2671,9 @@ export async function createApplicationRuntime(
     bindMissionToGoal,
     unbindMissionFromGoal,
     closeGoalExperiment,
+    describeGoalStatus,
+    deactivateGoal,
+    updateGoalContract,
     refreshGoalGateCache,
     experimentSettingsStore,
     toolPackageLifecycleService,

@@ -1139,11 +1139,13 @@ goalModeCommand
 goalModeCommand
   .command("status")
   .description("显示契约数、mission 绑定数、可还原门禁数与 hydrate 跳过原因")
+  .option("--goal <goal-id>", "只看该目标的状态视图（无状态 ⇒ 退出码 2）")
   .option("--json", "JSON 输出")
-  .action(async (options: { json?: boolean }) => {
+  .action(async (options: { goal?: string; json?: boolean }) => {
     process.exitCode = await executeGoalModeStatusCommand({
       stateDirectory: defaultStateDirectory(),
       isJsonOutput: options.json === true,
+      ...(options.goal === undefined ? {} : { goalIdentifier: options.goal }),
     });
   });
 
