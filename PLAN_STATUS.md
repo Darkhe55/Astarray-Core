@@ -4446,3 +4446,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 预检走假 run，而假 run 对非 merge/merge-base 命令一律返回 `stdoutText:"ok"` ⇒ 非空 ⇒ 判"脏"。
 > **提交/丢弃 `RESUME02_...md` 不会修复这 3 条**；正确修复是**改测试夹具**（status 返回空 stdout）。
 > 真实运行中未提交改动确实会阻止自动合并（产品行为，与测试无关）。
+
+> **142 窗口后补（R67）：全量测试 7 失败已修复并验证（低并发全绿）**：
+> 修复 4 类**测试侧**问题（不改产品代码）：①merge 对账夹具对 `git status` 返回空 stdout（3 条）；
+> ②DLP 断言改用当前规则标识（1 条）；③feedback 假 client 补 `flushPendingOutbox`（1 条）；
+> ④context Assist 按"谁写了 context-graphs"选 owner（实测图在 `worker~…` 下，旧断言读 `scheduler~…`）。
+> **验证**：`npx vitest run tests/core --maxWorkers=2` → **467 files / 3541 tests 全部通过**（164s）；
+> 默认并行下仍有约 2 条 flaky（`model-binding` / `tool-package-zip`，**单独跑均通过**），未改。
+> **稳定验收用 `npm run check:low-parallel`**。报告更新于 `FULL_SUITE_BASELINE_2026-10-30.md` §6。
