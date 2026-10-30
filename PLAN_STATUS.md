@@ -4469,3 +4469,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 消除 `task-chain` 原子写在目录删除后 rename ENOENT 的 unhandled rejection（会污染无关用例）。
 > **验证**：`npx vitest run tests/core` 默认并行**连续 3 次全绿**（467 files / 3541 tests，约 37.9/37.6/37.8s）；
 > 此前连续 4 次中 3 次失败。ADR-0135。仍未证明"永不 flaky"，且未接 CI 多次复跑。
+
+> **144（R70）：GOAL-02 内核/UI 职责核对（完成，仅文档）**：报告
+> `docs/reports/GOAL02_KERNEL_UI_SPLIT_GAP_2026-10-30.md`。**结论：内核职责目前不能闭合**：
+> 关键缺口 **K1 目标设立入口**、**K2 requirements↔任务映射**、**K3 契约变更 API**、
+> **K7 完成判定耦合**、**K8 失活/归档**、**K10 运行中暂停**（门禁现在只在 mission 启动前评估）；
+> K4 安全不变量、K5 证据失效、K6 `pauseConditions`、K9 `describeStatus`、K11 预算取更严、K12 生命周期事件
+> 属"已实现未接线/低量级"。
+> **UI 侧**：`astarray-ui` 无目标模式任务卡（仅索引提及），且依赖的 K1/K8/K9/K12 尚不存在；本次未改动 UI 仓库。
+> 卡内 9 条验收条件仍无真实 mission 证据。**无代码改动**。
