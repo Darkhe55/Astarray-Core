@@ -31,7 +31,7 @@
 > 3. **GOAL-02 `groupKind` 的 `investigation` 信号**：`rework` 已有默认策略（R61，ADR-0130：
 >    retry/reassign/早停续跑 ⇒ `rework`），但**仓内仍无"调查组"的客观信号** ⇒ 默认策略永不产生
 >    `investigation`；`unblock` 后重跑也不算返工。
-> 4. **判定记录轮转**：**导出已完成（R53，ADR-0128）**；仍无轮转/归档（200 条之外只剩计数）。
+> 4. **归档自身治理**：溢出记录已**先归档再裁剪**（R63，ADR-0132），活动视图仍有界；但**归档文件无上限/无压缩/无清理**。
 > 5. **组标识全局唯一**：已带运行时间前缀（R52，ADR-0127）可跨重启区分，但**同秒重启可撞名**、无 UUID。
 > 6. **扫描记录持久化/UI**：`prompt-scan-journal` 仅进程内；`goal-mode verdicts` 只读无 UI（ADR-0104/0120）。
 >
@@ -4408,3 +4408,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `npx vitest run tests/core/goal-task-group-kind.test.ts` → **1 file / 6 tests passed**（206ms）；
 > 另 `typecheck` 0、`eslint` 0、`build` 成功。**仍未**：编排器接线/集合写入/V 行为的集成验证；
 > **全量 `npm run test` 未运行**。ADR-0131；ADR-0130 §6 同步。
+
+> **138 窗口后补（R63）：判定记录溢出归档 + 导出含归档（已运行通过）**：`GoalDispatchVerdictJournal.record`
+> 溢出时**先归档再裁剪**（`dispatch-verdicts-archive.jsonl` 追加写）；归档成功**不计入丢弃**，
+> **归档失败则不裁剪**（宁可超限不丢记录）并如实计入 `droppedRecordCount`；返回
+> `{droppedRecordCount, archivedRecordCount}`。CLI 新增 `goal-mode verdicts --export <path> --include-archive`
+> （归档行在前，缺文件视为空）。
+> **运行结果**：`npx vitest run tests/core/goal-dispatch-verdict-journal.test.ts` → **1 file / 2 tests passed**；
+> `typecheck`/`eslint`/`build` 全绿。
+> **仍未**：归档失败分支、运行期接线、`--include-archive` 导出均未验证；**归档本身无上限/压缩/清理**。
