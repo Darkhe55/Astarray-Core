@@ -84,10 +84,30 @@ describe("模型绑定切换", () => {
         taskIdentifier: "task-1",
         prompt: "使用绑定模型",
       });
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      /**
+       * R68（2026-10-30）：**轮询可观察结果**，不再固定等 20ms。
+       *
+       * 原写法在并行满载时会在 mission 还没创建 runtime 前断言 ⇒ 偶发失败（单独跑必过）。
+       * 断言本身没有放宽：仍然要求 `model-b` 被真正解析，且绑定记录了 mission。
+       */
+      const deadline = Date.now() + 10_000;
+      let observedModelB = false;
+      let observedAppliedMission = false;
+      while (Date.now() < deadline && !(observedModelB && observedAppliedMission)) {
+        observedModelB = resolvedModels.includes("model-b");
+        if (observedModelB) {
+          const bindings = await application.queryAgentModelBindings();
+          observedAppliedMission = Boolean(
+            bindings.bindings["session:session-1"]?.lastAppliedMissionId,
+          );
+        }
+        if (!observedModelB || !observedAppliedMission) {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+      }
       expect(resolvedModels).toContain("model-b");
-      const bindings = await application.queryAgentModelBindings();
-      expect(bindings.bindings["session:session-1"]?.lastAppliedMissionId).toBeTruthy();
+      const finalBindings = await application.queryAgentModelBindings();
+      expect(finalBindings.bindings["session:session-1"]?.lastAppliedMissionId).toBeTruthy();
     } finally {
       await application.shutdown();
     }

@@ -4,9 +4,26 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
+/**
+ * R69（2026-10-30）：**确定性崩溃模块**，替代 `non-existent-entry.js`。
+ *
+ * 原写法让子进程在模块解析阶段抛 `MODULE_NOT_FOUND`（stderr 打整段 Node 栈，
+ * 并行满载时会被 vitest 记为 unhandled error）。本函数写一个"启动即抛"的真实模块，
+ * 仍然触发崩溃-重启路径，但输出可预期、不依赖模块解析失败。
+ */
+function createCrashingModule(): { modulePath: string; cleanup: () => void } {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "astarray-supervisor-crash-"));
+  const modulePath = path.join(directory, "crash-entry.mjs");
+  writeFileSync(modulePath, "process.exit(1);\n", "utf8");
+  return {
+    modulePath,
+    cleanup: () => rmSync(directory, { recursive: true, force: true }),
+  };
+}
 
 import { FeedbackProcessSupervisor } from "../../../packages/core/src/feedback-process/process-supervisor.js";
 
@@ -19,8 +36,9 @@ const hasBuiltEntry = existsSync(distEntryPath);
 
 describe.skipIf(!hasBuiltEntry)("FeedbackProcessSupervisor", () => {
   it("modulePath 无效时反复重启直到达到上限并停止", async () => {
+    const crashingModule = createCrashingModule();
     const supervisor = new FeedbackProcessSupervisor({
-      modulePath: path.join(os.tmpdir(), "non-existent-entry.js"),
+      modulePath: crashingModule.modulePath,
       baseDirectory: path.join(os.tmpdir(), "astarray-supervisor-test"),
       maximumRestartAttempts: 3,
       restartBackoffMilliseconds: 10,
@@ -42,6 +60,7 @@ describe.skipIf(!hasBuiltEntry)("FeedbackProcessSupervisor", () => {
     }
     expect(supervisor.getRestartAttemptCount()).toBeGreaterThan(3);
     await supervisor.stop();
+    crashingModule.cleanup();
   });
 
   it("健康检查发现断开后触发重启", async () => {
@@ -163,8 +182,9 @@ describe.skipIf(!hasBuiltEntry)("FeedbackProcessSupervisor", () => {
       unhandledRejections.push(reason);
     };
     process.on("unhandledRejection", onUnhandledRejection);
+    const crashingModule = createCrashingModule();
     const supervisor = new FeedbackProcessSupervisor({
-      modulePath: path.join(os.tmpdir(), "non-existent-entry.js"),
+      modulePath: crashingModule.modulePath,
       baseDirectory: path.join(os.tmpdir(), "astarray-supervisor-rejection-test"),
       maximumRestartAttempts: 2,
       restartBackoffMilliseconds: 10,
@@ -177,6 +197,7 @@ describe.skipIf(!hasBuiltEntry)("FeedbackProcessSupervisor", () => {
     } finally {
       await Promise.race([supervisor.stop(), new Promise((resolve) => setTimeout(resolve, 2000))]);
       process.off("unhandledRejection", onUnhandledRejection);
+      crashingModule.cleanup();
     }
     expect(unhandledRejections).toEqual([]);
   }, 20_000);

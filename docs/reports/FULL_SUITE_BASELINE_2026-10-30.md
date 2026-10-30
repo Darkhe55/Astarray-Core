@@ -71,3 +71,15 @@ npx vitest run tests/core --maxWorkers=2      # 低并发：467 files / 3541 tes
 **结论**：这 7 条失败**全部是测试夹具/owner 选择/并行 flakiness**，没有一条是产品缺陷，
 也没有一条由 R61–R66 的改动引入。**稳定的验收命令是 `--maxWorkers=2`**（仓库已有
 `npm run check:low-parallel` 封装）。
+
+## 7. 默认并行 flaky 处理（R68/R69，同日）
+
+根因四类：①固定 20ms 等待；②外部进程/大模块导入超默认 5s；③崩溃夹具的 MODULE_NOT_FOUND 栈噪音；
+④**清理竞态**——`orchestrator-git-integration` 直接删临时目录，而 task-chain 原子写仍在飞 ⇒
+`rename` ENOENT 成为 unhandled rejection，污染无关用例。
+
+修复（测试侧）：轮询替代固定等待、外部进程与 CLI 导入加超时、崩溃夹具改静默 `process.exit(1)`、
+`afterEach` 先 `cancel()` 调度器再删目录。详见 [ADR-0135](../adr/0135-parallel-flakiness.md)。
+
+**验证**：`npx vitest run tests/core` 默认并行**连续 3 次全绿**（467 files / 3541 tests，约 38s/次）；
+修复前连续 4 次中 3 次失败。

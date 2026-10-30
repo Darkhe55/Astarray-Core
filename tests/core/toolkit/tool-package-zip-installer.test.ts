@@ -44,7 +44,8 @@ async function createZip(): Promise<{ zipPath: string; baseDirectory: string }> 
         zipPath.replace(/'/g, "''") +
         "' -Force",
     ],
-    { encoding: "utf8", windowsHide: true },
+    /** R68（2026-10-30）：外部 PowerShell 启动在并行满载下会变慢；给它明确上限，避免挂死。 */
+    { encoding: "utf8", windowsHide: true, timeout: 60_000 },
   );
   if (result.status !== 0) throw new Error(result.stderr);
   return { zipPath, baseDirectory: path.join(root, "state") };
@@ -69,7 +70,11 @@ describe("本地 zip 工具包安装", () => {
     const snapshot = await lifecycle.list();
     expect(snapshot.versions).toHaveLength(1);
     expect(snapshot.locks).toHaveLength(0);
-  });
+    /**
+     * R68（2026-10-30）：本用例要启动外部 powershell.exe 生成 zip；
+     * 冷启动 + 杀软扫描在并行满载下可能超过默认超时。断言未放宽，只给外部进程更宽上限。
+     */
+  }, 60_000);
 
   it("② 未确认拒绝安装", async () => {
     const { zipPath, baseDirectory } = await createZip();
@@ -77,5 +82,5 @@ describe("本地 zip 工具包安装", () => {
     await expect(installer.install({ zipPath, isConfirmed: false })).rejects.toThrow(
       "明确确认",
     );
-  });
+  }, 60_000);
 });
