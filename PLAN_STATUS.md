@@ -4417,3 +4417,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **运行结果**：`npx vitest run tests/core/goal-dispatch-verdict-journal.test.ts` → **1 file / 2 tests passed**；
 > `typecheck`/`eslint`/`build` 全绿。
 > **仍未**：归档失败分支、运行期接线、`--include-archive` 导出均未验证；**归档本身无上限/压缩/清理**。
+
+> **139 窗口后补（R64）：组标识追加 8 位随机令牌（已运行通过）**：格式改为
+> `goal-group-<UTC14>-<n>-<8 位小写十六进制>`，令牌缺省由 `randomUUID()` 派生 ⇒ 同秒重启+同序号
+> **不再撞名**；抽出纯函数 `buildGoalTaskGroupIdentifier` / `toGoalTaskGroupRunTag`，`runLoop` 调用；
+> 非法时间/序号/令牌**抛错**（不静默兜底）。运行结果：
+> `npx vitest run tests/core/goal-task-group-identifier.test.ts` → **1 file / 6 tests passed**。
+> 仍未：非全局唯一（时间+计数+随机，无持久序列）、旧标识不迁移、编排器接线未集成测试。ADR-0133。
