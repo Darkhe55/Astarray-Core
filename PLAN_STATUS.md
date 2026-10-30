@@ -4460,3 +4460,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 记录原因、下次合并重试；远端未改写。
 >
 > **更正（R67 结束）**：142a 已过时 —— 重试成功（`53133dad..3bc24e08`），修复报告与记录**均已推送**，`ahead=0`。
+
+> **143（R68/R69）：默认并行 flaky 已处理（连续 3 次全绿）**：修复 4 类**测试侧**问题（不改产品代码）：
+> ①`model-binding` 固定 20ms 等待 → **轮询可观察结果**（10s 上限，断言未放宽）；
+> ②外部进程/大模块导入超默认 5s（zip 的 PowerShell、usage/perf 的 CLI 动态导入）→ 用例超时 60s/30s；
+> ③`feedback-supervisor` 崩溃夹具改**临时静默崩溃模块**（`process.exit(1)`），去掉 MODULE_NOT_FOUND 栈噪音；
+> ④**关键**：`orchestrator-git-integration` 的 `afterEach` 先 `cancel()` 调度器**再删目录**，
+> 消除 `task-chain` 原子写在目录删除后 rename ENOENT 的 unhandled rejection（会污染无关用例）。
+> **验证**：`npx vitest run tests/core` 默认并行**连续 3 次全绿**（467 files / 3541 tests，约 37.9/37.6/37.8s）；
+> 此前连续 4 次中 3 次失败。ADR-0135。仍未证明"永不 flaky"，且未接 CI 多次复跑。

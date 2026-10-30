@@ -67,6 +67,16 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  /**
+   * R69（2026-10-30）：**先取消在跑的调度器，再删临时目录**。
+   *
+   * 原实现直接 `rm`：mission 收口时的 task-chain 原子写仍在飞行，
+   * 目标目录被删后 rename 抛 ENOENT ⇒ vitest 记为 unhandledRejection，
+   * 并行满载时会把**无关用例**标红。取消并等待其收口，让挂起的写先落地/失败。
+   */
+  for (const scheduler of activeSchedulers.splice(0)) {
+    await scheduler.cancel().catch(() => undefined);
+  }
   await fs.rm(temporaryRootDirectory, { recursive: true, force: true }).catch(() => {});
 });
 
@@ -227,6 +237,8 @@ function buildGitIntegrationOptions(isTargetMergeAllowed: boolean): {
   };
 }
 
+const activeSchedulers: AssistScheduler[] = [];
+
 function buildScheduler(options: BuildSchedulerOptions): AssistScheduler {
   const scheduler = new AssistScheduler({
     missionId: options.missionId,
@@ -296,6 +308,7 @@ function buildScheduler(options: BuildSchedulerOptions): AssistScheduler {
       options.escalationMessages.push(text);
     },
   });
+  activeSchedulers.push(scheduler);
   return scheduler;
 }
 

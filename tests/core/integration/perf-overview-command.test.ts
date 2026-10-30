@@ -231,5 +231,6 @@ describe("PERF-01-03：最小概览查询", () => {
       stderrWrite.mockRestore();
       stdoutWrite.mockRestore();
     }
-  });
+    /** R69（2026-10-30）：本用例要动态 import 整个 CLI 命令模块；并行满载时 5s 默认超时不够。断言未放宽。 */
+  }, 30_000);
 });
