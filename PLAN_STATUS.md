@@ -4478,3 +4478,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 属"已实现未接线/低量级"。
 > **UI 侧**：`astarray-ui` 无目标模式任务卡（仅索引提及），且依赖的 K1/K8/K9/K12 尚不存在；本次未改动 UI 仓库。
 > 卡内 9 条验收条件仍无真实 mission 证据。**无代码改动**。
+
+> **145（R71）：内核缺口第一批 K9+K8+K3（完成）**：①**K9** 暴露 `describeGoalStatus` + CLI
+> `goal-mode status --goal <id>`（无状态 ⇒ 退出码 2），`describeStatus` 第一次有调用方；
+> ②**K8** `deactivateGoal`（关闭 + 解绑所有绑定 mission + 刷新），**不删除文件**、历史保留（卡 03 要求）；
+> ③**K3** `validateGoalContractChange`（仅发布方/认证所有者；goal/owner/来源不可变；revision 恰好 +1；
+> supersedes 指向上一版；总权重不变）+ `updateGoalContract`（累计预算不重置、旧证据作废
+> `requiresReplanning:true`）。
+> **验证**：新单测 6/6 通过；`typecheck`/`lint`/`build` 全绿；`tests/core --maxWorkers=2` **467 files / 3547 tests**。
+> **仍缺**：K1/K2/K7/K10；K4/K5/K6/K11 **缺信号源**，需先设计再接线。ADR-0136。

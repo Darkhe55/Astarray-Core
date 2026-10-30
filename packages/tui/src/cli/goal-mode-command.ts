@@ -19,11 +19,61 @@ import { EXIT_CODES, printJson } from "./json-output.js";
 export interface GoalModeStatusCommandInput {
   readonly stateDirectory: string;
   readonly isJsonOutput: boolean;
+  /** R71（2026-10-30）：给了就只看该目标的**状态视图**（等价于宿主 describeGoalStatus）。 */
+  readonly goalIdentifier?: string;
 }
 
 export async function executeGoalModeStatusCommand(
   input: GoalModeStatusCommandInput,
 ): Promise<number> {
+  /**
+   * R71：`--goal <id>` ⇒ 只输出该目标的 `describeStatus` 视图（唯一事实来源；无状态 ⇒ 退出码 2）。
+   */
+  if (input.goalIdentifier !== undefined) {
+    const goalStateStore = new GoalModeStateStore({
+      baseDirectory: input.stateDirectory,
+    });
+    const statusView = await goalStateStore
+      .describeStatus(input.goalIdentifier)
+      .catch(() => null);
+    if (statusView === null) {
+      if (input.isJsonOutput) {
+        printJson({
+          status: "goal-not-found",
+          goalIdentifier: input.goalIdentifier,
+          note: "没有该目标的状态：尚未创建契约/状态，或已归档。",
+        });
+      } else {
+        process.stdout.write(
+          `没有目标 ${input.goalIdentifier} 的状态（尚未创建或已归档）。\n`,
+        );
+      }
+      return EXIT_CODES.USAGE_ERROR;
+    }
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-status", goalStatus: statusView });
+      return EXIT_CODES.SUCCESS;
+    }
+    process.stdout.write(`===== 目标状态（${statusView.goalIdentifier}）=====\n`);
+    process.stdout.write(`契约 revision: ${String(statusView.contractRevision)}\n`);
+    process.stdout.write(
+      `实验已关闭: ${statusView.isExperimentClosed ? "是" : "否"}；已暂停: ${statusView.isPaused ? "是" : "否"}\n`,
+    );
+    process.stdout.write(`暂停原因: ${statusView.pauseReason ?? "（无）"}\n`);
+    process.stdout.write(`需要重新规划: ${statusView.requiresReplanning ? "是" : "否"}\n`);
+    process.stdout.write(
+      `最近 V: ${statusView.lastPotentialValue === null ? "未知" : String(statusView.lastPotentialValue)}；依据条数: ${String(statusView.requirementBasisCount)}\n`,
+    );
+    process.stdout.write(
+      `证据缺口: ${String(statusView.evidenceGapCount)} 条；累计工具调用: ${String(statusView.consumedToolCalls)}\n`,
+    );
+    process.stdout.write(`下一检查点: ${statusView.nextCheckpoint}\n`);
+    process.stdout.write(
+      `稳定性保证: ${statusView.stabilityGuarantee}（本命令不提供、不宣称任何稳定性保证）\n`,
+    );
+    process.stdout.write(`更新时间: ${statusView.updatedAtIso}\n`);
+    return EXIT_CODES.SUCCESS;
+  }
   const contractStore = new GoalContractStore({ baseDirectory: input.stateDirectory });
   const bindingStore = new GoalMissionBindingStore({
     baseDirectory: input.stateDirectory,

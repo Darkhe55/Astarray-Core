@@ -153,3 +153,14 @@ K3（契约变更 API）、K7（完成判定耦合）、K8（失活/归档）、
 K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 
 **UI 侧**：`astarray-ui` 目前**没有目标模式任务卡**（仅在索引里提及），且依赖 K1/K8/K9/K12 尚不存在。
+
+### R71 内核缺口第一批（2026-10-30）
+
+- **K9 状态视图**：`runtime.describeGoalStatus` + CLI `goal-mode status --goal <id>`（无状态 ⇒ 2）。
+- **K8 失活**：`runtime.deactivateGoal`（关闭 + 解绑所有 mission + 刷新；**不删文件**，历史保留）。
+- **K3 契约变更**：`validateGoalContractChange`（来源/revision/supersedes/总权重）+ `runtime.updateGoalContract`
+  （累计预算不重置、旧证据作废并置 `requiresReplanning`）。
+- **测试**：`tests/core/goal-contract-change.test.ts` 6/6 通过。
+- **仍缺**：K1 目标设立入口、K2 requirements↔任务映射、K7 完成耦合、K10 运行中暂停；
+  K4/K5/K6/K11 因**缺信号源**（不变量违规检出、证据失效检测、pauseConditions 结构化语义、
+  任务总预算）暂不能诚实接线。ADR-0136。
