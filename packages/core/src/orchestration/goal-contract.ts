@@ -329,3 +329,62 @@ export function evaluateSafetyInvariants(input: {
     violatedInvariants,
   };
 }
+
+/**
+ * R71（2026-10-30）：**契约变更校验（K3）**。
+ *
+ * 卡 01 要求：版本变更必须来自**原任务发布方或认证所有者**；模型/三级 Agent 的"建议"一律拒绝；
+ * 变更不重置累计预算（由调用方保留计数）；变更不得降低判准（这里用"总权重不变"作为下限）。
+ *
+ * 纯函数：不读盘、不写盘、不派发。
+ */
+export function validateGoalContractChange(input: {
+  readonly previousContract: GoalContract;
+  readonly nextContract: GoalContract;
+  readonly proposer: GoalChangeProposer;
+}): { readonly isAllowed: boolean; readonly reasons: readonly string[] } {
+  const reasons: string[] = [];
+  if (input.proposer !== "source-publisher" && input.proposer !== "authenticated-owner") {
+    reasons.push(`变更来源非法（${input.proposer}）：只有原发布方/认证所有者可以修改目标。`);
+  }
+  const validation = validateGoalContract(input.nextContract);
+  if (!validation.isValid) {
+    reasons.push(`新契约本身非法：${validation.reasons.join("；")}`);
+  }
+  if (input.nextContract.goalIdentifier !== input.previousContract.goalIdentifier) {
+    reasons.push("变更不得更换 goalIdentifier（换了就是另一个目标）。");
+  }
+  if (input.nextContract.ownerIdentifier !== input.previousContract.ownerIdentifier) {
+    reasons.push("变更不得更换 ownerIdentifier。");
+  }
+  if (
+    input.nextContract.sourceRequestReference !==
+    input.previousContract.sourceRequestReference
+  ) {
+    reasons.push("变更不得更换原始要求引用（模型不得改写来源）。");
+  }
+  if (input.nextContract.revision !== input.previousContract.revision + 1) {
+    reasons.push(
+      `revision 必须恰好 +1（当前 ${String(input.previousContract.revision)} → ${String(input.nextContract.revision)}）。`,
+    );
+  }
+  if (input.nextContract.supersedesRevision !== input.previousContract.revision) {
+    reasons.push(
+      `supersedesRevision 必须等于被替代的 revision（${String(input.previousContract.revision)}）。`,
+    );
+  }
+  const previousWeightTotal = input.previousContract.requirements.reduce(
+    (total, requirement) => total + requirement.weight,
+    0,
+  );
+  const nextWeightTotal = input.nextContract.requirements.reduce(
+    (total, requirement) => total + requirement.weight,
+    0,
+  );
+  if (Math.abs(previousWeightTotal - nextWeightTotal) > 1e-9) {
+    reasons.push(
+      `变更不得改变总权重（${String(previousWeightTotal)} → ${String(nextWeightTotal)}）：降权重等于降判准。`,
+    );
+  }
+  return { isAllowed: reasons.length === 0, reasons };
+}
