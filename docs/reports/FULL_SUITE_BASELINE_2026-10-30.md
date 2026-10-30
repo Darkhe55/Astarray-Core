@@ -8,7 +8,7 @@
 
 | # | 测试 | 现象 | 归因 | 是否本窗口引入 |
 |---|---|---|---|---|
-| 1–3 | `tests/core/integration/reliability-merge-reconciliation.test.ts` ×3 | `unresolvedRisks` 含"共享仓库存在未提交改动" | 测试断言**工作树必须干净**；当前工作树有**非本窗口**的 `docs/tasks/RESUME02_EXPERIMENTAL_SMART_CONTINUATION.md` 改动 | ❌ 由该未提交文件导致（你此前就有，我未替你提交/丢弃） |
+| 1–3 | `tests/core/integration/reliability-merge-reconciliation.test.ts` ×3 | `unresolvedRisks` 含"共享仓库存在未提交改动" | **更正**：假 `gitProcess.run` 对除 merge/merge-base 外的所有命令都返回 `stdoutText: "ok"`，包括实现新增的 `git status --porcelain --untracked-files=no` 预检 ⇒ 非空输出被判定为"工作区脏" ⇒ `stale-human-change` ⇒ 记入风险。**与工作树里那份未提交文件无关**（git 被完全替换） | ❌ 测试夹具过期（未适配新增预检） |
 | 4 | `tests/core/unit/sensitive-content-access.test.ts` | 期望消息含 `dlp:api-key`，实际是 `vendor:openai-style-api-key` | **规则标识早已改名**，测试断言未同步 | ❌ 既存（与 DLP 规则注册表重构有关） |
 | 5 | `tests/core/unit/ar07-module-gaps-6.test.ts` | `activeClient.flushPendingOutbox is not a function` | 测试里的**假 client 缺方法**（实现新增了 `flushPendingOutbox`） | ❌ 既存测试夹具过期 |
 | 6 | `tests/core/integration/context-node-lifecycle.test.ts` | `ENOENT ... context-graphs` | Assist 路径**没有生成该目录**（需要单独查是行为缺口还是断言过期） | ❌ 与本轮改动无关（未触碰上下文图） |
@@ -33,7 +33,7 @@ npx vitest run tests/core/integration/context-node-lifecycle.test.ts
 
 | 项 | 建议 | 成本 |
 |---|---|---|
-| 1–3 merge 对账 | 你决定 `RESUME02_...md` 提交或丢弃后，这 3 条应恢复 | 低（你的决定） |
+| 1–3 merge 对账 | **修测试夹具**：在假 `gitProcess.run` 里对 `gitArguments[0] === "status"` 返回**空 stdout**（模拟干净工作区） | 低（仅测试） |
 | 4 DLP 规则名 | 把断言改为当前规则标识（`vendor:openai-style-api-key`），或断言"包含任一已知前缀" | 低 |
 | 5 feedback 夹具 | 给假 client 补 `flushPendingOutbox: () => Promise.resolve()` | 低 |
 | 6 context-graphs | 先查"Assist 是否应生成 context-graphs"——**可能是真缺口**，不能先改断言 | 中 |
@@ -42,3 +42,11 @@ npx vitest run tests/core/integration/context-node-lifecycle.test.ts
 ## 4. 状态
 
 **基线已记录**；未修改任何测试或产品代码。**这 7 条失败保持原样**，等你决定是否修。
+
+## 5. 更正（同日，用户追问后复核）
+
+最初把 1–3 归因为"工作树里那份未提交的 `RESUME02_...md`"。**该归因错误**：
+测试把 `gitProcess` 完全替换，实现里新增的 `git status --porcelain --untracked-files=no` 预检
+走的是**假 run**，它对除 merge/merge-base 外的命令一律返回 `stdoutText: "ok"` ⇒ 被判为脏。
+**提交或丢弃 `RESUME02_...md` 不会改变这 3 条测试结果**。
+（真实运行中，未提交改动**确实会**阻止自动合并——那是产品行为，与此测试无关。）
