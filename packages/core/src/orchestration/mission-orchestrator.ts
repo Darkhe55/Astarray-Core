@@ -32,6 +32,7 @@ import { evaluateCompletionReceipt } from "./completion-receipt.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { GoalGroupKind } from "./goal-dispatch-gate.js";
 import { resolveGoalTaskGroupKind } from "./goal-task-group-kind.js";
+import { buildGoalTaskGroupIdentifier } from "./goal-task-group-identifier.js";
 import type { GuidanceControlQueue } from "../runtime-guidance/guidance-control-queue.js";
 
 /**
@@ -729,8 +730,11 @@ export class MissionOrchestrator {
          * 只改标识生成，**不改组语义**（开始时调 begin、归零时调 finish）。
          */
         const taskGroupStartedAtIso = new Date().toISOString();
-        const taskGroupRunTag = taskGroupStartedAtIso.replace(/[-:TZ.]/g, "").slice(0, 14);
-        const taskGroupIdentifier = `goal-group-${taskGroupRunTag}-${String(this.goalTaskGroupCounter)}`;
+        /** R64：追加 8 位随机令牌，避免同秒重启+同序号撞名。 */
+        const taskGroupIdentifier = buildGoalTaskGroupIdentifier({
+          startedAtIso: taskGroupStartedAtIso,
+          sequenceNumber: this.goalTaskGroupCounter,
+        });
         this.currentGoalTaskGroupIdentifier = taskGroupIdentifier;
         /**
          * R51/R61：记录组性质。
