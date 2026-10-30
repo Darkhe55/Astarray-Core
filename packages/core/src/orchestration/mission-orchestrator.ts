@@ -406,6 +406,15 @@ export class MissionOrchestrator {
   private currentGoalTaskGroupIdentifier: string | null = null;
   /** R51：当前组性质（缺省 normal）。 */
   private currentGoalTaskGroupKind: GoalGroupKind = "normal";
+  /**
+   * R61（2026-10-30）：**本地可见的"返工"事实**。
+   *
+   * 只有两类客观事件会把任务加进来：
+   * - 主 Agent 指令 `retry`/`reassign`（`reassignTask`）；
+   * - 早停续跑（`releaseTaskBackToPending` 前）。
+   * 不按标题/模型自述判断；`investigation` 目前**没有本地信号**，不会由默认策略产生。
+   */
+  private readonly reworkedTaskIdentifiers = new Set<string>();
   private goalTaskGroupCounter = 0;
   private readonly inFlightWorkerPromises = new Set<Promise<void>>();
   /**
@@ -665,6 +674,8 @@ export class MissionOrchestrator {
   }
 
   async reassignTask(taskId: string): Promise<void> {
+    /** R61：retry/reassign ⇒ 该任务属于"返工"，由默认 groupKind 策略使用。 */
+    this.reworkedTaskIdentifiers.add(taskId);
     await this.dagScheduler.reassignTask(taskId);
     this.wake();
   }
@@ -720,14 +731,26 @@ export class MissionOrchestrator {
         const taskGroupRunTag = taskGroupStartedAtIso.replace(/[-:TZ.]/g, "").slice(0, 14);
         const taskGroupIdentifier = `goal-group-${taskGroupRunTag}-${String(this.goalTaskGroupCounter)}`;
         this.currentGoalTaskGroupIdentifier = taskGroupIdentifier;
-        /** R51：记录组性质（provider 抛错 ⇒ 保守按 normal）。 */
+        /**
+         * R51/R61：记录组性质。
+         *
+         * - 宿主提供 provider ⇒ 用它的返回值（抛错则保守 `normal`）；
+         * - 未提供 ⇒ **默认策略**：本次要启动的任务中任一属于"返工"（retry/reassign/早停续跑）
+         *   ⇒ `rework`；否则 `normal`。`investigation` 没有本地信号，默认策略**不会**产生。
+         */
+        const startingTaskIdentifiers = actions
+          .filter((action) => action.action === "start-task")
+          .map((action) => action.taskId);
         try {
           this.currentGoalTaskGroupKind =
             this.options.goalTaskGroupKindProvider?.({
-              taskIdentifiers: actions
-                .filter((action) => action.action === "start-task")
-                .map((action) => action.taskId),
-            }) ?? "normal";
+              taskIdentifiers: startingTaskIdentifiers,
+            }) ??
+            (startingTaskIdentifiers.some((taskIdentifier) =>
+              this.reworkedTaskIdentifiers.has(taskIdentifier),
+            )
+              ? "rework"
+              : "normal");
         } catch {
           this.currentGoalTaskGroupKind = "normal";
         }
@@ -1328,6 +1351,8 @@ export class MissionOrchestrator {
     ) {
       const nextResumeAttempt = (this.resumeAttemptsByTask.get(taskId) ?? 0) + 1;
       this.resumeAttemptsByTask.set(taskId, nextResumeAttempt);
+      /** R61：早停续跑同样是"返工"（同一任务被再次执行）。 */
+      this.reworkedTaskIdentifiers.add(taskId);
       this.earlyStopObservationsByTask.delete(taskId);
       await this.dagScheduler.releaseTaskBackToPending(taskId).catch(() => null);
       this.options.onUserEscalation(
