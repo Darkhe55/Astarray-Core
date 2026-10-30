@@ -4392,3 +4392,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 记录：`docs/reports/SCRIPT_RUN_EVIDENCE_2026-10-29.md`；ADR-0102/0107 追加执行记录；
 > 总表/交付说明/最终报告状态同步。**仍只覆盖存储层与规则命中层**：
 > `npm run test` / `check` / 真实 mission 验收**仍未运行**；`block` 默认值仍无足够数据。
+
+> **136 窗口后补（R61）：`groupKind` 默认策略（完成，未运行验证）**：此前 R51 只有接入点，
+> 生产恒 `normal`。现在编排器内部维护 `reworkedTaskIdentifiers`，仅在**两类客观事件**写入：
+> ①主 Agent 指令 `retry`/`reassign`（`reassignTask`）；②早停续跑分支；默认判定为
+> "本次启动任务中任一属于返工 ⇒ `rework`，否则 `normal`"。**不按标题/模型自述判断**，
+> **不产生 `investigation`**（仓内没有该信号）；宿主 provider 仍可覆盖。
+> 未做：`unblock` 后重跑不算返工、集合只增不减、未运行任何一条判定。ADR-0130；ADR-0126 §6 同步。

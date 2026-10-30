@@ -41,3 +41,9 @@ MissionOrchestrator.runLoop                       mission-orchestrator.ts
 
 **implemented-unverified**：未编写/未运行测试。
 已执行：`npm run typecheck` exit 0、`npx eslint <本批文件>` exit 0、`npm run build` 成功。
+
+## 6. 更新（R61，2026-10-30）
+
+本文 §4 的"**没有默认实现**"已过期：R61 增加了默认策略（只看 `retry`/`reassign`/早停续跑
+三类客观事件 ⇒ `rework`，否则 `normal`；**不产生 `investigation`**），见
+[ADR-0130](0130-group-kind-default-policy.md)。宿主 provider 仍可覆盖。
