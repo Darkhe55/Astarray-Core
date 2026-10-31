@@ -1707,6 +1707,11 @@ export class MissionOrchestrator {
   private isMissionFinished = false;
 
   private async finishMission(status: "done" | "cancelled" | "blocked"): Promise<void> {
+    if (process.env.ASTARRAY_TRACE_MISSION_STATUS === "1") {
+      process.stderr.write(
+        `[FTERM] mission=${this.options.missionId} requested=${status} hasFailed=${String(this.hasFailedTask)} finished=${String(this.isMissionFinished)}\n`,
+      );
+    }
     if (this.isMissionFinished) {
       return;
     }

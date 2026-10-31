@@ -180,6 +180,20 @@ export class MissionManager {
     missionId: string,
     status: MissionSummary["status"],
   ): Promise<void> {
+    /**
+     * R89（2026-11-01）：**终态写入追踪**（诊断开关，缺省关闭）。
+     *
+     * `ASTARRAY_TRACE_MISSION_STATUS=1` 时，每次写终态都把调用栈打到 stderr，
+     * 用于定位"治理停止被写成 cancelled"的写入者。
+     */
+    if (
+      process.env.ASTARRAY_TRACE_MISSION_STATUS === "1" &&
+      ["done", "cancelled", "blocked"].includes(status)
+    ) {
+      process.stderr.write(
+        `[MSTATUS] mission=${missionId} status=${status}\n${new Error("trace").stack ?? ""}\n`,
+      );
+    }
     await this.summaryWriteMutex.runExclusive(async () => {
       const summary = await this.readSummary(missionId);
       if (summary === null) {

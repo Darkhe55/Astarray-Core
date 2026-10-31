@@ -3393,14 +3393,27 @@ export class MainController {
           ? {}
           : { diagnosticEventPort: this.options.diagnosticEventPort }),
       },
+
       onReportToMain: (message) => {
         if (message.payload.kind !== "instruction") {
           return;
         }
         if (message.payload.instructionText.startsWith("任务完成状态:")) {
-          const status = message.payload.instructionText.includes("done")
-            ? "done"
-            : "cancelled";
+          /**
+           * R89（2026-11-01）：**如实解析编排器报的终态**。
+           *
+           * 旧实现用 `includes("done") ? done : cancelled`，把 `blocked` 一律当成 cancelled
+           * （trace 实证：FTERM requested=blocked → MSTATUS cancelled）。
+           */
+          const reportedStatusText = message.payload.instructionText
+            .replace("任务完成状态:", "")
+            .trim();
+          const status =
+            reportedStatusText === "done"
+              ? "done"
+              : reportedStatusText === "blocked"
+                ? "blocked"
+                : "cancelled";
           /**
            * 接线缺口第 ② 项（2026-10-28）：**先过完成门禁，再判 done**。
            *

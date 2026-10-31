@@ -4632,3 +4632,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 目标 `consumedToolCalls: 1`。
 > **验证**：全量 471 files / 3588 tests（含 main-controller 10/10、G5 2/2）；typecheck/lint/build 绿。
 > **仍未解决**：持久化 `summary.json` 仍为 `cancelled`（未观测到的写入路径；临时日志未捕获）。ADR-0152。
+
+> **163（R89）：治理停止被写成 cancelled 的真凶已定位并修复（完成）**：加 `ASTARRAY_TRACE_MISSION_STATUS=1`
+> 追踪（`[MSTATUS]` + 栈、`[FTERM] requested=`），实证"编排器 requested=blocked，落库 cancelled"。
+> 真凶：assist `onReportToMain` 用 `includes("done") ? done : cancelled` 解析终态 ⇒ **blocked 被当成 cancelled**。
+> 改为显式解析 `任务完成状态: <status>`（done/blocked/其他=cancelled）。
+> **真实复跑**（goal-k10p）：CLI **`blocked`**、`summary.json` **`blocked`**（首次一致）；目标 `isPaused`、`consumedToolCalls: 1`。
+> **验证**：全量 471 files / 3588 tests；typecheck/lint/build 绿。ADR-0153。
+> **遗留**：`permissionAsk` 映射遗留；accepted 裁决与模型自主提议未跑。
