@@ -298,14 +298,27 @@ const application = await AstarrayApplicationFacade.create({
         failWith(new Error(`目标模式未激活: ${activation.reason}`), EXIT_CODES.USAGE_ERROR);
       }
     }
-    const accepted = await application.submitTask({
-      sessionId: "cli-run",
-      taskIdentifier: "cli-task",
-      prompt: options.prompt,
-      ...(options.goalIdentifier === undefined
-        ? {}
-        : { goalIdentifier: options.goalIdentifier }),
-    });
+    let accepted: Awaited<ReturnType<typeof application.submitTask>>;
+    try {
+      accepted = await application.submitTask({
+        sessionId: "cli-run",
+        taskIdentifier: "cli-task",
+        prompt: options.prompt,
+        ...(options.goalIdentifier === undefined
+          ? {}
+          : { goalIdentifier: options.goalIdentifier }),
+      });
+    } catch (error) {
+      /**
+       * R88（2026-11-01）：**提交失败要干净收口**（不打印 Node 栈）。
+       *
+       * 典型场景：目标门禁在启动前阻断派发（mission 已记录 blocked）。
+       */
+      logToStderr(
+        `astarray: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return EXIT_CODES.USAGE_ERROR;
+    }
     const timeoutMilliseconds =
       options.timeoutSeconds === undefined ? null : options.timeoutSeconds * 1_000;
     const decisionPort =
