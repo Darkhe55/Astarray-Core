@@ -4548,3 +4548,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （可算 V ⇒ `recordEvidenceInvalidation`；不可算 ⇒ 只 `pause`）。**`recordEvidenceInvalidation` 首次有调用方**。
 > **验证**：单测 3/3；`typecheck`/`lint` 绿。
 > **未做**：**无检测器**（谁判定失效仍属外部职责）、无集成测试、只到要求粒度、旧证据引用被覆盖。ADR-0144。
+
+> **推送记录（R79）**：`be06ac03` 已本地提交，`git push` 连续 5 次失败
+> （`Please make sure you have the correct access rights and the repository exists.`），
+> 按纪律记为待重试，与下一检查点合并推送。工作区 `ahead=1`。
