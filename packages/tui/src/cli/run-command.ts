@@ -84,6 +84,19 @@ export interface RunCommandOptions {
   providerRequestTimeoutMilliseconds?: number;
   /** permission-ask 交互裁决端口（默认：TTY 逐次询问；非 TTY fail-closed）。 */
   permissionDecisionPort?: PermissionAskDecisionPort;
+  /**
+   * R81（2026-10-31）：**本次 mission 归属的目标**（创建时绑定）。
+   *
+   * 给出时本次运行会先以"用户显式请求"激活目标模式；是否阻断由
+   * `--goal-enforce` 决定（缺省只观察）。
+   */
+  goalIdentifier?: string;
+  /** R81：强制模式（门禁不通过 ⇒ 阻断派发/停止调度；缺省只观察）。 */
+  isGoalEnforcementEnabled?: boolean;
+  /** R81：完成耦合（目标证据不齐 ⇒ 不判 done）。 */
+  isGoalCompletionRequired?: boolean;
+  /** R81：任务级工具调用预算（与目标上限取更严）。 */
+  missionToolCallBudget?: number | null;
 }
 
 export async function executeRunCommand(options: RunCommandOptions): Promise<number> {
@@ -175,6 +188,15 @@ const application = await AstarrayApplicationFacade.create({
     concurrency: runConfig.concurrency,
     failureThreshold: runConfig.toolFailureThreshold,
     maximumLoopIterations: 8,
+    ...(options.isGoalEnforcementEnabled === undefined
+      ? {}
+      : { isGoalModeEnforcementEnabled: options.isGoalEnforcementEnabled }),
+    ...(options.isGoalCompletionRequired === undefined
+      ? {}
+      : { isGoalCompletionRequired: options.isGoalCompletionRequired }),
+    ...(options.missionToolCallBudget === undefined
+      ? {}
+      : { missionToolCallBudget: options.missionToolCallBudget }),
     statusPollIntervalMilliseconds: 25,
     // T04：产品入口使用独立反馈进程（AGENTS.md：反馈工具不得退化为进程内定时器/协程）。
     // mock 离线路径保持进程内，避免测试期无谓 fork 抖动。
@@ -259,10 +281,30 @@ const application = await AstarrayApplicationFacade.create({
       });
       return EXIT_CODES.SUCCESS;
     }
+    /**
+     * R81：**先激活、再带目标提交**。
+     *
+     * 激活条件全部来自命令行显式动作（用户执行本命令 + 显式 `--goal`）；
+     * 未给 `--goal` ⇒ 不激活、行为不变。
+     */
+    if (options.goalIdentifier !== undefined) {
+      const activation = application.activateGoalMode({
+        isExplicitUserRequest: true,
+        isAuthenticatedUser: true,
+        isExplicitlyEnabled: true,
+        requestedBy: "user",
+      });
+      if (!activation.isActive) {
+        failWith(new Error(`目标模式未激活: ${activation.reason}`), EXIT_CODES.USAGE_ERROR);
+      }
+    }
     const accepted = await application.submitTask({
       sessionId: "cli-run",
       taskIdentifier: "cli-task",
       prompt: options.prompt,
+      ...(options.goalIdentifier === undefined
+        ? {}
+        : { goalIdentifier: options.goalIdentifier }),
     });
     const timeoutMilliseconds =
       options.timeoutSeconds === undefined ? null : options.timeoutSeconds * 1_000;

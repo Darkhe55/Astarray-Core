@@ -650,6 +650,9 @@ import type {
   ProviderRuntimeRegistry,
 } from "./runtime/provider-runtime-registry.js";
 import type { ApplicationRuntime } from "./application/application-runtime.js";
+import type { GoalContract } from "./orchestration/goal-contract.js";
+import type { GoalContractProposalDraft } from "./orchestration/goal-contract-proposal.js";
+import type { GoalModeStatusView } from "./orchestration/goal-mode-store.js";
 import type { BackupDeletionAuthorizationControlPort } from "./core/types.js";
 import type { InstallationGateUserPort } from "./tools/installation-gate-guard.js";
 
@@ -2082,6 +2085,16 @@ export interface PublicApplicationOptions {
   }>;
   /** Provider 运行时注册表（嵌入方注入；runtime=provider 且未提供则稳定失败）。 */
   providerRuntimeRegistry?: ProviderRuntimeRegistry;
+  /**
+   * R81（2026-10-31）：**目标模式开关透传**（缺省全关，不改变现有行为）。
+   *
+   * - `isGoalModeEnforcementEnabled`：门禁不通过时**阻断**派发（缺省只观察）；
+   * - `isGoalCompletionRequired`：完成前要求目标证据齐备；
+   * - `missionToolCallBudget`：任务级工具调用预算（与目标上限取更严）。
+   */
+  isGoalModeEnforcementEnabled?: boolean;
+  isGoalCompletionRequired?: boolean;
+  missionToolCallBudget?: number | null;
   /** 可选流式输出钩子（headless 写 stderr；不暴露内部字段）。 */
   streamOutput?: (missionIdentifier: string | null, text: string) => void;
   /** 显式对话模式（GUI 聊天）：无工具/产物时不要求完成控制事件。 */
@@ -2476,6 +2489,13 @@ interface TaskRecord {
  * 稳定应用 facade：CLI/TUI/外部消费者共用同一主控制器。
  * 本 facade 不实现第二套权限/任务/Provider 逻辑。
  */
+/** R81：目标模式激活输入（与运行时同构；门面不复制判定规则）。 */
+interface GoalModeActivationInput {
+  readonly isExplicitUserRequest: boolean;
+  readonly isAuthenticatedUser: boolean;
+  readonly isExplicitlyEnabled: boolean;
+  readonly requestedBy: "user" | "model" | "tertiary-agent";
+}
 export class AstarrayApplicationFacade implements PublicApplicationService {
   /** 从公开 exports 创建应用；运行资源由应用层创建。 */
   static async create(
@@ -2712,6 +2732,15 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         ? {}
         : { progressGuardTaskTotalCallBudget: options.progressGuardTaskTotalCallBudget }),
       isHighRigorEnforcementEnabled: options.isHighRigorEnforcementEnabled ?? false,
+      ...(options.isGoalModeEnforcementEnabled === undefined
+        ? {}
+        : { isGoalModeEnforcementEnabled: options.isGoalModeEnforcementEnabled }),
+      ...(options.isGoalCompletionRequired === undefined
+        ? {}
+        : { isGoalCompletionRequired: options.isGoalCompletionRequired }),
+      ...(options.missionToolCallBudget === undefined
+        ? {}
+        : { missionToolCallBudget: options.missionToolCallBudget }),
       isCheckpointResumeEnabled: options.isCheckpointResumeEnabled ?? false,
       streamOutput: options.streamOutput ?? (() => {}),
       // GUI-02-01 片①：权限询问的绝对身份透传（可选；未提供则不传字段）。
@@ -5471,6 +5500,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
      * 必须是核心登记里**存在且未回收**的 Agent；否则 fail-closed。
      */
     targetAgentInstanceIdentifier?: string;
+    /**
+     * R81（2026-10-31）：本次 mission **归属的目标**（创建时绑定）。
+     *
+     * 门禁在 mission 启动时评估，因此必须在创建时绑定；目标不存在 ⇒ 提交失败。
+     */
+    goalIdentifier?: string;
   }): Promise<PublicTaskResult> {
     this.assertOpen();
     this.requireSession(input.sessionId);
@@ -5596,6 +5631,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           ...(input.targetAgentInstanceIdentifier === undefined
             ? {}
             : { targetAgentInstanceIdentifier: input.targetAgentInstanceIdentifier }),
+          ...(input.goalIdentifier === undefined
+            ? {}
+            : { goalIdentifier: input.goalIdentifier }),
         },
       );
     } catch (error) {
@@ -6397,6 +6435,113 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
     return { outcome: result.outcome, ledger: result.ledger };
   }
+  /**
+   * R81（2026-10-31）：**目标模式公开入口**（宿主/UI/CLI 共用；不复制内部规则）。
+   *
+   * 约束不变：激活与确认必须来自**用户**显式动作；模型只能提议。
+   * 所有方法直接委托 `ApplicationRuntime`，门面不实现第二套逻辑。
+   */
+  activateGoalMode(input: {
+    readonly isExplicitUserRequest: boolean;
+    readonly isAuthenticatedUser: boolean;
+    readonly isExplicitlyEnabled: boolean;
+    readonly requestedBy: "user" | "model" | "tertiary-agent";
+  }): { readonly isActive: boolean; readonly reason: string } {
+    this.assertOpen();
+    return this.runtime.activateGoalMode(input);
+  }
+
+  getGoalModeActivation(): { readonly isActive: boolean; readonly reason: string } {
+    this.assertOpen();
+    return this.runtime.getGoalModeActivation();
+  }
+
+  proposeGoalContract(input: {
+    readonly draft: GoalContractProposalDraft;
+    readonly sourceRequestReference: string;
+    readonly expiresInSeconds?: number;
+  }): Promise<{ readonly proposalIdentifier: string; readonly expiresAtIso: string }> {
+    this.assertOpen();
+    return this.runtime.proposeGoalContract(input);
+  }
+
+  confirmGoalContract(input: {
+    readonly proposalIdentifier: string;
+    readonly goalIdentifier: string;
+    readonly ownerIdentifier: string;
+    readonly activation: GoalModeActivationInput;
+    readonly isUserConfirmation: boolean;
+  }): Promise<{ readonly goalIdentifier: string; readonly revision: number }> {
+    this.assertOpen();
+    return this.runtime.confirmGoalContract(input);
+  }
+
+  createGoalContract(input: {
+    readonly contract: GoalContract;
+    readonly activation: GoalModeActivationInput;
+  }): Promise<{ readonly isActive: boolean; readonly reason: string }> {
+    this.assertOpen();
+    return this.runtime.createGoalContract(input);
+  }
+
+  bindMissionToGoal(input: {
+    readonly missionIdentifier: string;
+    readonly goalIdentifier: string;
+  }): Promise<{ readonly goalIdentifier: string }> {
+    this.assertOpen();
+    return this.runtime.bindMissionToGoal(input);
+  }
+
+  unbindMissionFromGoal(
+    missionIdentifier: string,
+  ): Promise<{ readonly didUnbind: boolean }> {
+    this.assertOpen();
+    return this.runtime.unbindMissionFromGoal(missionIdentifier);
+  }
+
+  describeGoalStatus(
+    goalIdentifier: string,
+  ): Promise<GoalModeStatusView | null> {
+    this.assertOpen();
+    return this.runtime.describeGoalStatus(goalIdentifier);
+  }
+
+  deactivateGoal(input: {
+    readonly goalIdentifier: string;
+    readonly reason: string;
+  }): Promise<{ readonly closedAtIso: string; readonly unboundMissionCount: number }> {
+    this.assertOpen();
+    return this.runtime.deactivateGoal(input);
+  }
+
+  closeGoalExperiment(input: {
+    readonly goalIdentifier: string;
+    readonly reason: string;
+  }): Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }> {
+    this.assertOpen();
+    return this.runtime.closeGoalExperiment(input);
+  }
+
+  bindRequirementTaskMapping(input: {
+    readonly goalIdentifier: string;
+    readonly requirementIdentifier: string;
+    readonly taskNodeIdentifiers: readonly string[];
+  }): Promise<{ readonly mappingCount: number; readonly documentRevision: number }> {
+    this.assertOpen();
+    return this.runtime.bindRequirementTaskMapping(input);
+  }
+
+  invalidateGoalEvidence(input: {
+    readonly goalIdentifier: string;
+    readonly requirementIdentifiers: readonly string[];
+    readonly reason: string;
+  }): Promise<{
+    readonly potentialValueAfterInvalidation: number | null;
+    readonly invalidatedRequirementIdentifiers: readonly string[];
+  }> {
+    this.assertOpen();
+    return this.runtime.invalidateGoalEvidence(input);
+  }
 
   async shutdown(): Promise<void> {
     if (this.isClosedFlag) {
@@ -6748,7 +6893,6 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
-
 
 
 
