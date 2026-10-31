@@ -226,6 +226,17 @@ export interface MainControllerOptions {
   goalTaskGroupKindProvider?: (input: {
     readonly taskIdentifiers: readonly string[];
   }) => GoalGroupKind;
+  /**
+   * R74（2026-10-31）：**目标完成判定端口**（可选；缺省不参与）。
+   *
+   * 装配后：mission 准备判 `done` 时先问目标；不满足 ⇒ **降级为 blocked** 并升级原因。
+   * `isApplicable:false`（未绑定/实验关闭）⇒ 不影响收口。
+   */
+  missionCompletionGoalPort?: (missionIdentifier: string) => Promise<{
+    readonly isAllowed: boolean;
+    readonly isApplicable: boolean;
+    readonly reasons: readonly string[];
+  }>;
   goalTaskGroupStatePort?: {
     begin(input: {
       readonly missionIdentifier: string;
@@ -3104,6 +3115,10 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R74：目标完成判定（缺省不传 ⇒ 不耦合）。 */
+      ...(this.options.missionCompletionGoalPort === undefined
+        ? {}
+        : { missionCompletionGoalPort: this.options.missionCompletionGoalPort }),
       /** R51：组性质（缺省不传 ⇒ normal）。 */
       ...(this.options.goalTaskGroupKindProvider === undefined
         ? {}
@@ -3323,6 +3338,10 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R74：目标完成判定（缺省不传 ⇒ 不耦合）。 */
+      ...(this.options.missionCompletionGoalPort === undefined
+        ? {}
+        : { missionCompletionGoalPort: this.options.missionCompletionGoalPort }),
       /** R51：组性质（缺省不传 ⇒ normal）。 */
       ...(this.options.goalTaskGroupKindProvider === undefined
         ? {}

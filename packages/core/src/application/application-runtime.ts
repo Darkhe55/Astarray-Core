@@ -137,6 +137,7 @@ import type { PersistedGoalModeState } from "../orchestration/goal-mode-store.js
 import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
 import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdict-journal.js";
 import { GoalRequirementMappingStore } from "../orchestration/goal-requirement-mapping-store.js";
+import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
 import {
   GoalContractProposalStore,
   GOAL_PROPOSAL_SCHEMA_VERSION,
@@ -473,6 +474,13 @@ export interface ApplicationRuntimeOptions {
    */
   goalDispatchGateResolver?: (missionIdentifier: string) => GoalDispatchGate | null;
   isGoalModeEnforcementEnabled?: boolean;
+  /**
+   * R74（2026-10-31）：**目标完成耦合开关**（缺省 false ⇒ 不参与）。
+   *
+   * 开启后：mission 准备判 `done` 时，若已绑定目标且目标未完成（证据不齐/V≠0/暂停等）⇒
+   * **不判完成**，置 blocked 并升级原因。
+   */
+  isGoalCompletionRequired?: boolean;
   /**
    * R51（2026-10-29）：**组性质提供者**（可选）。
    *
@@ -1583,6 +1591,46 @@ export async function createApplicationRuntime(
     });
     return { goalIdentifier: input.goalIdentifier, revision: contract.revision };
   };
+  /**
+   * R74（2026-10-31）：**目标完成判定端口（K7）**。
+   *
+   * 未绑定目标 ⇒ `isApplicable:false`（不参与）；契约/状态缺失 ⇒ 不通过并给原因；
+   * 实验已关闭 ⇒ 不适用（目标不再治理收口）。**只读**，不改状态。
+   */
+  const missionCompletionGoalPort = async (
+    missionIdentifier: string,
+  ): Promise<{
+    readonly isAllowed: boolean;
+    readonly isApplicable: boolean;
+    readonly reasons: readonly string[];
+  }> => {
+    const goalIdentifier = await goalMissionBindingStore
+      .readGoalIdentifier(missionIdentifier)
+      .catch(() => null);
+    if (goalIdentifier === null) {
+      return {
+        isAllowed: true,
+        isApplicable: false,
+        reasons: ["该 mission 未绑定目标：完成判定不适用。"],
+      };
+    }
+    const [contract, state] = await Promise.all([
+      goalContractStore.read(goalIdentifier).catch(() => null),
+      goalModeStateStore.read(goalIdentifier).catch(() => null),
+    ]);
+    if (contract === null || state === null) {
+      return {
+        isAllowed: false,
+        isApplicable: true,
+        reasons: [
+          contract === null
+            ? `目标 ${goalIdentifier} 契约缺失`
+            : `目标 ${goalIdentifier} 状态缺失`,
+        ],
+      };
+    }
+    return evaluateGoalCompletion({ contract, state });
+  };
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -2390,6 +2438,10 @@ export async function createApplicationRuntime(
     missionSequenceBindingStore,
     /** R24：推迟插入队列（控制器入队；尚不消费）。 */
     deferredInsertionQueueStore,
+    /** R74：目标完成耦合（缺省不传 ⇒ 不参与）。 */
+    ...(options.isGoalCompletionRequired === true
+      ? { missionCompletionGoalPort }
+      : {}),
     /** R34：目标组开始/结束（只在已绑定目标且 revision 一致时写状态）。 */
     goalTaskGroupStatePort,
     /** R51：组性质提供者（缺省不传 ⇒ normal；调查/返工不计入停滞）。 */
