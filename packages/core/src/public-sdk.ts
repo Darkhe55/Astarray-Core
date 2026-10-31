@@ -5479,6 +5479,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    * 提交任务：委托调度并返回 accepted + mission 标识；不提前发 task-finished。
    * 同一会话内相同 idempotencyKey 不重复执行；不同会话相互隔离。
    */
+  /**
+   * R87（2026-11-01）：**原始 mission 摘要状态**（不做公开状态映射）。
+   *
+   * 映射层会把短暂 blocked 报成 running（续跑语义），CLI 关闭前需要原始值判断"终态是否已落库"。
+   */
+  async queryMissionRawStatus(missionIdentifier: string): Promise<string> {
+    this.assertOpen();
+    const missionStatus = (await this.runtime.controller.queryMissionStatus(
+      missionIdentifier,
+    )) as { summary?: { status?: string } | null };
+    return missionStatus.summary?.status ?? "running";
+  }
   async submitTask(input: {
     sessionId: string;
     taskIdentifier: string;
@@ -6900,7 +6912,6 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
-
 
 
 
