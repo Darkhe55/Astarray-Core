@@ -137,6 +137,14 @@ import type { PersistedGoalModeState } from "../orchestration/goal-mode-store.js
 import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
 import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdict-journal.js";
 import { GoalRequirementMappingStore } from "../orchestration/goal-requirement-mapping-store.js";
+import {
+  GoalContractProposalStore,
+  GOAL_PROPOSAL_SCHEMA_VERSION,
+  DEFAULT_GOAL_PROPOSAL_LIFETIME_SECONDS,
+  validateGoalProposal,
+  buildGoalContractFromProposal,
+} from "../orchestration/goal-contract-proposal.js";
+import type { GoalContractProposal, GoalContractProposalDraft } from "../orchestration/goal-contract-proposal.js";
 import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
 import { CompletionVerdictStore } from "../orchestration/completion-verdict-store.js";
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
@@ -289,6 +297,20 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R73：目标提案（只落提案，需用户确认后才生成契约）。 */
+  proposeGoalContract: (input: {
+    readonly draft: GoalContractProposalDraft;
+    readonly sourceRequestReference: string;
+    readonly expiresInSeconds?: number;
+  }) => Promise<{ readonly proposalIdentifier: string; readonly expiresAtIso: string }>;
+  /** R73：用户确认提案（生成 revision 1 契约；模型不得代替确认）。 */
+  confirmGoalContract: (input: {
+    readonly proposalIdentifier: string;
+    readonly goalIdentifier: string;
+    readonly ownerIdentifier: string;
+    readonly activation: Parameters<typeof resolveGoalModeActivation>[0];
+    readonly isUserConfirmation: boolean;
+  }) => Promise<{ readonly goalIdentifier: string; readonly revision: number }>;
   /** R72：要求 ↔ 任务节点映射（不改契约 revision；revision 变化后旧映射失效）。 */
   bindRequirementTaskMapping: (input: {
     readonly goalIdentifier: string;
@@ -1036,6 +1058,10 @@ export async function createApplicationRuntime(
   const goalMissionBindingStore = new GoalMissionBindingStore({
     baseDirectory: stateDirectory,
   });
+  /** R73（K1）：目标提案存储（只落提案，确认后才生成契约）。 */
+  const goalContractProposalStore = new GoalContractProposalStore({
+    baseDirectory: stateDirectory,
+  });
   /** R72（K2）：要求 ↔ 任务节点映射（独立于契约 revision）。 */
   const goalRequirementMappingStore = new GoalRequirementMappingStore({
     baseDirectory: stateDirectory,
@@ -1457,6 +1483,105 @@ export async function createApplicationRuntime(
       mappingCount: document.mappings.length,
       documentRevision: document.documentRevision,
     };
+  };
+  /**
+   * R73（2026-10-31）：**目标提案（K1 第一步）**。
+   *
+   * 只落提案，不落契约、不绑定、不派发。`sourceRequestReference` 必须由宿主注入
+   * （模型不能自填"用户说过"）。
+   */
+  const proposeGoalContract = async (input: {
+    readonly draft: GoalContractProposalDraft;
+    readonly sourceRequestReference: string;
+    readonly expiresInSeconds?: number;
+  }): Promise<{ readonly proposalIdentifier: string; readonly expiresAtIso: string }> => {
+    const createdAtIso = new Date().toISOString();
+    const lifetimeSeconds = Math.max(
+      1,
+      Math.trunc(input.expiresInSeconds ?? DEFAULT_GOAL_PROPOSAL_LIFETIME_SECONDS),
+    );
+    const proposal: GoalContractProposal = {
+      schemaVersion: GOAL_PROPOSAL_SCHEMA_VERSION,
+      proposalIdentifier: `goal-proposal-${randomUUID()}`,
+      sourceRequestReference: input.sourceRequestReference,
+      draft: input.draft,
+      createdAtIso,
+      expiresAtIso: new Date(
+        Date.parse(createdAtIso) + lifetimeSeconds * 1000,
+      ).toISOString(),
+      confirmedAtIso: null,
+      confirmedGoalIdentifier: null,
+    };
+    const validation = validateGoalProposal({ proposal, nowIso: createdAtIso });
+    if (!validation.isValid) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `目标提案无效: ${validation.reasons.join("；")}`,
+      );
+    }
+    await goalContractProposalStore.save(proposal);
+    return {
+      proposalIdentifier: proposal.proposalIdentifier,
+      expiresAtIso: proposal.expiresAtIso,
+    };
+  };
+  /**
+   * R73（2026-10-31）：**用户确认（K1 第二步）**。
+   *
+   * 必须 `isUserConfirmation === true` 且通过激活判定；过期/已确认给别的目标一律拒绝。
+   * 确认后才生成契约（revision 1）并写初始状态。
+   */
+  const confirmGoalContract = async (input: {
+    readonly proposalIdentifier: string;
+    readonly goalIdentifier: string;
+    readonly ownerIdentifier: string;
+    readonly activation: Parameters<typeof resolveGoalModeActivation>[0];
+    readonly isUserConfirmation: boolean;
+  }): Promise<{ readonly goalIdentifier: string; readonly revision: number }> => {
+    if (input.isUserConfirmation !== true) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "目标必须由用户显式确认，模型/宿主不得代替确认。",
+      );
+    }
+    const proposal = await goalContractProposalStore
+      .read(input.proposalIdentifier)
+      .catch(() => null);
+    if (proposal === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `提案不存在: ${input.proposalIdentifier}`,
+      );
+    }
+    if (proposal.confirmedAtIso !== null) {
+      if (proposal.confirmedGoalIdentifier !== input.goalIdentifier) {
+        throw new DomainError(
+          "journal-corrupted",
+          `提案已确认给目标 ${String(proposal.confirmedGoalIdentifier)}，拒绝再生成第二个目标。`,
+        );
+      }
+      return { goalIdentifier: input.goalIdentifier, revision: 1 };
+    }
+    const nowIso = new Date().toISOString();
+    const validation = validateGoalProposal({ proposal, nowIso });
+    if (!validation.isValid) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `目标提案不可确认: ${validation.reasons.join("；")}`,
+      );
+    }
+    const contract = buildGoalContractFromProposal({
+      proposal,
+      goalIdentifier: input.goalIdentifier,
+      ownerIdentifier: input.ownerIdentifier,
+    });
+    await createGoalContract({ contract, activation: input.activation });
+    await goalContractProposalStore.markConfirmed({
+      proposalIdentifier: input.proposalIdentifier,
+      confirmedGoalIdentifier: input.goalIdentifier,
+      confirmedAtIso: nowIso,
+    });
+    return { goalIdentifier: input.goalIdentifier, revision: contract.revision };
   };
   const describeGoalStatus = async (
     goalIdentifier: string,
@@ -2737,6 +2862,8 @@ export async function createApplicationRuntime(
     unbindMissionFromGoal,
     closeGoalExperiment,
     describeGoalStatus,
+    proposeGoalContract,
+    confirmGoalContract,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,

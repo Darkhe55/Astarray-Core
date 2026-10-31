@@ -4495,3 +4495,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 无映射回退契约静态字段（`assessGoalRequirementsFromLocalState` 新增可选参数）。
 > **验证**：单测 5/5；`typecheck`/`lint`/`build` 全绿。
 > **未做**：**无自动映射**（需宿主/规划器写入）、无单节点解绑、运行时接线未集成测试。ADR-0137。
+
+> **147（R73）：K1 目标提案 + 用户确认（内核入口完成）**：新增 `goal-contract-proposal.ts`
+> （`GoalContractProposal`、`validateGoalProposal`、`buildGoalContractFromProposal`、
+> `GoalContractProposalStore`：`goal-mode/proposals/<id>.json`，**一份提案只能生一个目标**，
+> 重复同目标幂等、换目标 `journal-corrupted`）。运行时 `proposeGoalContract`（默认 30 分钟过期，
+> 来源引用必须 harness 注入）与 `confirmGoalContract`（**必须 `isUserConfirmation:true`** + 激活判定；
+> 过期/已确认别目标拒绝；通过后 revision 1 契约 + 初始状态）。
+> **验证**：单测 7/7；`typecheck`/`lint` 绿。
+> **未做**：**未注册为 agent 工具**（模型仍不能在对话中主动提议）、无 UI/列表/撤回、运行时接线未集成测试。ADR-0138。

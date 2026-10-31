@@ -173,3 +173,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   无映射回退契约静态字段。
 - **测试**：`tests/core/goal-requirement-mapping.test.ts` 5/5 通过。
 - **未做**：无自动映射（须宿主/规划器显式写入）、无单节点解绑、运行时接线未集成测试。ADR-0137。
+
+### R73 目标提案与用户确认（K1，2026-10-31）
+
+- `proposeGoalContract`：只落提案（默认 30 分钟过期；`sourceRequestReference` 由 harness 注入），
+  不落契约/不绑定/不派发。
+- `confirmGoalContract`：必须 `isUserConfirmation:true` + 通过激活判定；过期/已确认给别的目标一律拒绝；
+  通过后生成 revision 1 契约并写初始状态（任务节点留空给 K2）。
+- **测试**：`tests/core/goal-contract-proposal.test.ts` 7/7 通过。
+- **未做**：**未注册为 agent 工具**（模型还不能在对话里主动提议）、无 UI/提案列表/撤回、
+  运行时接线未集成测试。ADR-0138。
