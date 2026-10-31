@@ -12,6 +12,7 @@
  * 本模块是纯契约与纯计算：不读盘、不派发、不联网。
  */
 import { DomainError } from "../core/errors.js";
+import { isKnownGoalPauseCondition } from "./goal-pause-condition-catalog.js";
 
 /** 目标契约版本（字段变动即递增）。 */
 export const GOAL_CONTRACT_SCHEMA_VERSION = 1;
@@ -88,6 +89,12 @@ export function validateGoalContract(contract: GoalContract): GoalContractValida
   }
   if (contract.sourceRequestReference.trim() === "") {
     reasons.push("缺少原始要求引用");
+  }
+  /** R76（K6）：暂停条件必须是**可评估的有限枚举**，未知字符串一律拒绝。 */
+  for (const pauseCondition of contract.pauseConditions) {
+    if (!isKnownGoalPauseCondition(pauseCondition)) {
+      reasons.push(`未知的暂停条件: ${pauseCondition}（必须是可评估的枚举值）`);
+    }
   }
   if (contract.requirements.length === 0) {
     reasons.push("目标至少需要一条要求");

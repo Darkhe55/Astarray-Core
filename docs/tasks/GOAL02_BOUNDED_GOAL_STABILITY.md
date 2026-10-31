@@ -202,3 +202,12 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   复用 `observeGoalDispatchGate`（判定照常落盘/输出）。
 - **默认（强制关）不装配**：行为不变，只观察。
 - **未做**：无集成测试、无节流（每轮都查）、停止后无"恢复"入口；依赖 V/暂停准确性。ADR-0140。
+
+### R76 暂停条件收窄为可评估枚举（K6，2026-10-31）
+
+- 暂停条件从自由文本改为有限枚举：`budget-exhausted` / `deadline-passed` / `stagnation` /
+  `requires-replanning`；**未知条件由契约校验拒绝**。
+- 纯评估 `evaluateGoalPauseConditions`：只评估已声明条件，返回原因与触发项。
+- 组结束（V 计算后）用**门禁实时计数**评估，触发 ⇒ `gate.pause(...)`，状态/快照自然带暂停原因。
+- **测试**：`tests/core/goal-pause-conditions.test.ts` 8/8 通过。
+- **未做**：`maximumWallClockSeconds` 未评估（无可靠目标开始时间）、无集成测试、暂停不自动恢复。ADR-0141。
