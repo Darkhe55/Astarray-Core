@@ -95,6 +95,14 @@ export class GoalDispatchGate {
   private pauseReason: string | null = null;
   private evidenceGaps: string[] = [];
   private consumedToolCalls = 0;
+  /**
+   * R77（2026-10-31）：**外部（任务/调度）工具预算**（K11）。
+   *
+   * 目标契约有目标级上限；宿主可再给一个"任务总预算"。两者都存在时**取更严**。
+   * 注意：外部值**不持久化**（它属于运行时配置），重启后需重新注入。
+   */
+  private externalToolCallBudget: number | null = null;
+  private externalBudgetSource: string | null = null;
   private requiresReplanning = false;
 
   constructor(private readonly contract: GoalContract) {}
@@ -251,12 +259,18 @@ export class GoalDispatchGate {
         evidenceGaps: [],
       };
     }
-    const maximumToolCalls = this.contract.resourceLimits.maximumToolCalls;
+    const maximumToolCalls = this.effectiveMaximumToolCalls();
     if (maximumToolCalls !== null && this.consumedToolCalls >= maximumToolCalls) {
+      const budgetSource =
+        this.externalToolCallBudget !== null &&
+        (this.contract.resourceLimits.maximumToolCalls === null ||
+          this.externalToolCallBudget <= this.contract.resourceLimits.maximumToolCalls)
+          ? `任务预算（${String(this.externalToolCallBudget)}，来源 ${this.externalBudgetSource ?? "宿主"}）`
+          : "目标预算";
       return {
         isAllowed: false,
         reasonCode: "budget-exhausted",
-        detail: `目标工具调用预算已用尽（${this.consumedToolCalls}/${maximumToolCalls}）。`,
+        detail: `工具调用预算已用尽（${this.consumedToolCalls}/${maximumToolCalls}，取更严：${budgetSource}）。`,
         evidenceGaps: [],
       };
     }
@@ -294,6 +308,35 @@ export class GoalDispatchGate {
       toolName: GOAL_MISSION_DISPATCH_PSEUDO_TOOL_NAME,
       nowIso: input.nowIso,
     });
+  }
+
+  /**
+   * R77（K11）：**注入外部工具预算**（任务/调度级）。
+   *
+   * 与契约上限取更严；`null` ⇒ 清除外部预算（只按契约）。
+   */
+  applyExternalBudgetLimit(input: {
+    readonly maximumToolCalls: number | null;
+    readonly source: string;
+  }): void {
+    this.externalToolCallBudget =
+      input.maximumToolCalls === null
+        ? null
+        : Math.max(0, Math.trunc(input.maximumToolCalls));
+    this.externalBudgetSource =
+      input.maximumToolCalls === null ? null : input.source;
+  }
+
+  /** 目标上限与外部上限中**更严**的那个；都为空 ⇒ null。 */
+  private effectiveMaximumToolCalls(): number | null {
+    const contractLimit = this.contract.resourceLimits.maximumToolCalls;
+    if (this.externalToolCallBudget === null) {
+      return contractLimit;
+    }
+    if (contractLimit === null) {
+      return this.externalToolCallBudget;
+    }
+    return Math.min(contractLimit, this.externalToolCallBudget);
   }
 
   /** 记录一次真实工具调用消耗（由工具执行层调用，不由模型上报）。 */

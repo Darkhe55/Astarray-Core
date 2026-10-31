@@ -211,3 +211,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - 组结束（V 计算后）用**门禁实时计数**评估，触发 ⇒ `gate.pause(...)`，状态/快照自然带暂停原因。
 - **测试**：`tests/core/goal-pause-conditions.test.ts` 8/8 通过。
 - **未做**：`maximumWallClockSeconds` 未评估（无可靠目标开始时间）、无集成测试、暂停不自动恢复。ADR-0141。
+
+### R77 预算取更严（K11，2026-10-31）
+
+- 门禁新增 `applyExternalBudgetLimit`：有效上限 = **min(契约上限, 外部任务预算)**；
+  拒绝时注明"取更严"与更严一方来源。
+- `GoalGateCache` 接受 `externalToolCallBudget`，hydrate 还原门禁后注入；运行时选项
+  `missionToolCallBudget`（**不持久化**，重启需重新注入）。
+- **测试**：`tests/core/goal-budget-stricter.test.ts` 5/5 通过。
+- **未做**：外部预算需宿主注入（未从 `maximumLoopIterations` 推导）、只覆盖工具调用数、
+  无集成测试。ADR-0142。
