@@ -328,6 +328,30 @@ const application = await AstarrayApplicationFacade.create({
         ),
     });
     await refreshTerminalTaskFailure();
+    /**
+     * R87（2026-11-01）：**关闭前等待 mission 终态落库**。
+     *
+     * CLI 一旦看到任务失败就会走 shutdown；若此时编排器还没写终态，
+     * `cancel()` 会先把 mission 写成 `cancelled`，把治理停止的 `blocked` 覆盖掉。
+     * 这里最多等 3 秒，让终态先落库（不改变"失败即返回"的语义）。
+     */
+    if (
+      accepted.missionIdentifier !== null &&
+      finalStatus !== "done"
+    ) {
+      const terminalStatuses = new Set(["done", "cancelled", "blocked", "failed"]);
+      const missionTerminalDeadline = Date.now() + 3_000;
+      while (Date.now() < missionTerminalDeadline) {
+        const rawStatus = await application
+          .queryMissionRawStatus(accepted.missionIdentifier)
+          .catch(() => "running");
+        if (terminalStatuses.has(rawStatus)) {
+          finalStatus = rawStatus === "failed" ? "blocked" : rawStatus;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
     let permissionAskOutcome: string | null = null;
 
     /**

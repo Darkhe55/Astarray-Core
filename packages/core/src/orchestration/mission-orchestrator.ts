@@ -469,6 +469,13 @@ export class MissionOrchestrator {
   private gitIntegrationSession: GitIntegrationReport | null = null;
   private gitIntegrationSessionStarted = false;
   private stopping = false;
+  /**
+   * R87（2026-11-01）：**是否已有任务失败**（用于关闭时的终态判定）。
+   *
+   * `cancel()` 由宿主关闭触发；若本次 mission 已有失败任务，终态应是 `blocked`
+   * 而不是 `cancelled` —— 否则"预算耗尽/门禁失败"会被关闭流程写成"用户取消"。
+   */
+  private hasFailedTask = false;
   private wakeResolve: (() => void) | null = null;
   private runPromise: Promise<void> | null = null;
   /** T12-02：租约会话状态。 */
@@ -723,7 +730,7 @@ export class MissionOrchestrator {
       if (this.missionLeaseStore !== null) {
         await this.renewLeaseTick();
         if (this.stopping) {
-          await this.finishMission("cancelled");
+          await this.finishMission(this.hasFailedTask ? "blocked" : "cancelled");
           return;
         }
       }
@@ -1522,6 +1529,7 @@ export class MissionOrchestrator {
          * - 立即结束 mission，不再尝试"重试越过预算"。
          */
         if (outcome.failureCode === "tool-budget-exhausted") {
+          this.hasFailedTask = true;
           await this.dagScheduler.finishTask(taskId, "failed", null);
           this.options.onUserEscalation(
             `目标工具调用预算已用尽，mission 停止：${outcome.failureReason}`,
@@ -1537,6 +1545,7 @@ export class MissionOrchestrator {
           await this.finishMission("blocked");
           break;
         }
+        this.hasFailedTask = true;
         await this.dagScheduler.finishTask(taskId, "failed", null);
         this.options.onUserEscalation(
           `任务 ${taskId} 失败：${outcome.failureReason}（状态：${outcome.stateSummary}）`,
