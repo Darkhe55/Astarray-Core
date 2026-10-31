@@ -91,11 +91,12 @@ describe("K4 安全不变量", () => {
       recordedAtIso: "2026-10-31T00:00:00.000Z",
     });
     gate.recordGroupCompletion({
+      groupIdentifier: "group-1",
+      outcome: "completed",
       groupKind: "normal",
-      potentialValue: 0,
-      evidenceGaps: [],
-      completedAtIso: "2026-10-31T00:01:00.000Z",
+      potentialValueAfterGroup: 0,
       recordedBy: "local-verifier",
+      recordedAtIso: "2026-10-31T00:01:00.000Z",
     });
     const verdict = checkDispatch(gate);
     expect(verdict.isAllowed).toBe(false);
