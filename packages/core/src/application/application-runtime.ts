@@ -483,6 +483,13 @@ export interface ApplicationRuntimeOptions {
    */
   isGoalCompletionRequired?: boolean;
   /**
+   * R77（2026-10-31）：**任务/调度级工具调用预算**（K11，可选；缺省 null ⇒ 不设外部上限）。
+   *
+   * 与目标契约里的 `maximumToolCalls` **取更严**（两者都有时用较小值）。
+   * **不持久化**：重启后需要重新注入，否则只剩目标级上限。
+   */
+  missionToolCallBudget?: number | null;
+  /**
    * R51（2026-10-29）：**组性质提供者**（可选）。
    *
    * 只依据本次组将启动的任务标识返回 `normal` / `investigation` / `rework`；
@@ -1079,6 +1086,14 @@ export async function createApplicationRuntime(
     bindingStore: goalMissionBindingStore,
     contractStore: goalContractStore,
     stateStore: goalModeStateStore,
+    /** R77（K11）：任务/调度级预算（可选）；与契约目标上限取更严。 */
+    externalToolCallBudget:
+      options.missionToolCallBudget === undefined
+        ? null
+        : {
+            maximumToolCalls: options.missionToolCallBudget,
+            source: "runtime.missionToolCallBudget",
+          },
   });
   const goalGateHydration = await goalGateCache.hydrate();
   /**
