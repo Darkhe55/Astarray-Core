@@ -4487,3 +4487,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `requiresReplanning:true`）。
 > **验证**：新单测 6/6 通过；`typecheck`/`lint`/`build` 全绿；`tests/core --maxWorkers=2` **467 files / 3547 tests**。
 > **仍缺**：K1/K2/K7/K10；K4/K5/K6/K11 **缺信号源**，需先设计再接线。ADR-0136。
+
+> **146（R72）：K2 要求↔任务节点映射（完成）**：新增 `goal-requirement-mapping-store.ts`
+> （`<state>/goal-mode/requirement-mappings/<goal>.json`；绑定/覆盖/去重；**空数组=清除**；
+> 记录写入时契约 revision，不一致 ⇒ `readForContractRevision` 返回 null 视为失效、**不迁移**）；
+> 运行时 `bindRequirementTaskMapping`（契约/要求存在性校验）；组结束算 V 时**动态映射优先**，
+> 无映射回退契约静态字段（`assessGoalRequirementsFromLocalState` 新增可选参数）。
+> **验证**：单测 5/5；`typecheck`/`lint`/`build` 全绿。
+> **未做**：**无自动映射**（需宿主/规划器写入）、无单节点解绑、运行时接线未集成测试。ADR-0137。

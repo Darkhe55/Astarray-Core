@@ -164,3 +164,12 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **仍缺**：K1 目标设立入口、K2 requirements↔任务映射、K7 完成耦合、K10 运行中暂停；
   K4/K5/K6/K11 因**缺信号源**（不变量违规检出、证据失效检测、pauseConditions 结构化语义、
   任务总预算）暂不能诚实接线。ADR-0136。
+
+### R72 要求 ↔ 任务节点映射（K2，2026-10-31）
+
+- 新增 `GoalRequirementMappingStore`（`goal-mode/requirement-mappings/<goal>.json`）：绑定/覆盖/清除，
+  记录写入时的契约 revision；revision 不一致 ⇒ 映射失效（不迁移）。
+- 运行时 `bindRequirementTaskMapping`（校验契约与要求存在）；组结束算 V 时优先使用动态映射，
+  无映射回退契约静态字段。
+- **测试**：`tests/core/goal-requirement-mapping.test.ts` 5/5 通过。
+- **未做**：无自动映射（须宿主/规划器显式写入）、无单节点解绑、运行时接线未集成测试。ADR-0137。
