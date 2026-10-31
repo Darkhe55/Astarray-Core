@@ -4696,3 +4696,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `appendBoundedInvariantViolation`（只留最近 N 条）；写状态使用它。
 > **验证**：单测 6/6；全量 **471 files / 3596 tests**；typecheck/lint/build 绿。
 > **未做**：丢弃不归档、上限不可配置、真实长跑未演练。ADR-0161。
+
+> **172（R99）：每三组进展检查单测（完成）**：新增 `goal-progress-stagnation.test.ts` 4/4——
+> 普通组三次检查 V 未降 ⇒ 暂停（第 12 组触发，pauseReason 含"连续"）；返工组不计 stagnation；
+> V 实际下降清零；**模型伪造 recordedBy 被拒**。
+> **验证**：全量 **471 files / 3600 tests**（首次 3600）；lint 绿。
+> **未做**：真实多组 mission（缺分解器）；停滞/预算/墙钟暂停叠加未测。ADR-0162。
