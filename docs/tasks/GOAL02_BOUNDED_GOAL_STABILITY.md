@@ -183,3 +183,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **测试**：`tests/core/goal-contract-proposal.test.ts` 7/7 通过。
 - **未做**：**未注册为 agent 工具**（模型还不能在对话里主动提议）、无 UI/提案列表/撤回、
   运行时接线未集成测试。ADR-0138。
+
+### R74 目标完成耦合（K7，2026-10-31）
+
+- 纯判定 `evaluateGoalCompletion`：实验关闭 ⇒ 不适用；revision 不一致/需重规划/暂停 ⇒ 拒绝；
+  每条要求须 `valid` 且剩余量 0；多余依据拒绝；`lastPotentialValue` 必须为 0。
+- 运行时端口 `missionCompletionGoalPort`（仅 `isGoalCompletionRequired === true` 时装配）：
+  未绑定 ⇒ 不参与；契约/状态缺失 ⇒ 拒绝。
+- `finishMission("done")` 先问目标，不通过 ⇒ **降级 blocked** + 升级原因（不先判完成后回滚）。
+- **测试**：`tests/core/goal-completion-requirement.test.ts` 5/5 通过。
+- **未做**：**默认关**；无集成测试；依赖 K2 映射（无映射时开启会几乎阻断所有完成）。ADR-0139。

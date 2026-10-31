@@ -243,6 +243,16 @@ export interface MissionOrchestratorOptions {
    * 在"有 start-task 动作且无在途任务"时开始一次；在在途任务归零时结束一次。
    * 结束**不推进 V**（V 计算尚未接线）—— 只清空在途组标记，避免恢复时误判 `reconcile-first`。
    */
+  /**
+   * R74（2026-10-31）：**目标完成判定端口**（可选；缺省不参与）。
+   *
+   * 返回 `isApplicable:false` ⇒ 视为"目标不治理本 mission"（如未绑定/实验已关闭），不影响收口。
+   */
+  missionCompletionGoalPort?: (missionIdentifier: string) => Promise<{
+    readonly isAllowed: boolean;
+    readonly isApplicable: boolean;
+    readonly reasons: readonly string[];
+  }>;
   goalTaskGroupBeginPort?: (input: {
     readonly taskGroupIdentifier: string;
     readonly startedAtIso: string;
@@ -1595,6 +1605,30 @@ export class MissionOrchestrator {
   }
 
   private async finishMission(status: "done" | "cancelled" | "blocked"): Promise<void> {
+    /**
+     * R74（2026-10-31）：**目标完成耦合（K7）**，可选。
+     *
+     * 只在装配了 port 且准备判 `done` 时检查；不满足 ⇒ **降级为 blocked** 并升级原因，
+     * 绝不"先判完成再回滚"。
+     */
+    if (status === "done" && this.options.missionCompletionGoalPort !== undefined) {
+      try {
+        const goalDecision = await this.options.missionCompletionGoalPort(
+          this.options.missionId,
+        );
+        if (!goalDecision.isAllowed && goalDecision.isApplicable) {
+          status = "blocked";
+          this.options.onUserEscalation(
+            `目标未完成，不标记完成: ${goalDecision.reasons.join("；")}`,
+          );
+        }
+      } catch (error) {
+        status = "blocked";
+        this.options.onUserEscalation(
+          `目标完成校验失败: ${(error as Error).message}`,
+        );
+      }
+    }
     // T05B：mission 完成且 Git 集成装配时，运行集成门禁并按门禁合入目标分支
     const gitIntegration = this.options.gitIntegration;
     if (

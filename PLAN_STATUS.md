@@ -4504,3 +4504,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 过期/已确认别目标拒绝；通过后 revision 1 契约 + 初始状态）。
 > **验证**：单测 7/7；`typecheck`/`lint` 绿。
 > **未做**：**未注册为 agent 工具**（模型仍不能在对话中主动提议）、无 UI/列表/撤回、运行时接线未集成测试。ADR-0138。
+
+> **148（R74）：K7 目标完成耦合（完成，默认关）**：新增纯判定 `evaluateGoalCompletion`
+> （实验关闭 ⇒ 不适用；revision 不一致/需重规划/暂停/依据缺失/非 valid/剩余量非 0/多余依据/V≠0 ⇒ 拒绝）；
+> 运行时端口 `missionCompletionGoalPort`（**仅 `isGoalCompletionRequired === true` 时装配**；
+> 未绑定 ⇒ 不参与；契约/状态缺失 ⇒ 拒绝）；`finishMission("done")` 先问目标，
+> 不通过 ⇒ **降级 blocked + 升级原因**（不先判完成后回滚）。
+> **验证**：单测 5/5；`typecheck`/`lint` 绿。
+> **未做**：**默认关**、无集成测试、依赖 K2 映射（无映射时开启会几乎阻断所有完成）。ADR-0139。
