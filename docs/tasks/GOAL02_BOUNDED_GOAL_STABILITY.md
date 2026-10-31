@@ -270,3 +270,10 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **测试**：`goal-invariant-violation.test.ts` 5/5（新增恢复只接受已声明标识 + 恢复后派发被拒）；
   全量 471 files / 3595 tests。
 - **未做**：真实重启未演练；写入 fire-and-forget 可能丢一条；违规列表无上限。ADR-0160。
+
+### R98 违规列表有界（2026-11-01）
+
+- `GOAL_INVARIANT_VIOLATION_LIMIT = 200` + `appendBoundedInvariantViolation`（只留最近 N 条）；
+  运行时写状态使用它，与判定记录口径一致。
+- **测试**：`goal-invariant-violation.test.ts` 6/6（新增有界用例）；全量 471 files / 3596 tests。
+- **未做**：丢弃不归档、上限不可配置、真实长跑未演练。ADR-0161。

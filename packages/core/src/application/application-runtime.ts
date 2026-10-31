@@ -141,6 +141,7 @@ import {
   GOAL_PROPOSAL_TOOL_DESCRIPTOR,
   GOAL_PROPOSAL_TOOL_NAME,
 } from "../tools/goal-proposal-tool.js";
+import { appendBoundedInvariantViolation } from "../orchestration/goal-invariant-catalog.js";
 import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
 import { evaluateGoalPauseConditions } from "../orchestration/goal-pause-conditions.js";
 import { buildInvalidatedGoalState } from "../orchestration/goal-evidence-invalidation.js";
@@ -2869,14 +2870,15 @@ export async function createApplicationRuntime(
           .write({
             ...state,
             documentRevision: state.documentRevision + 1,
-            invariantViolations: [
-              ...(state.invariantViolations ?? []),
+            /** R98：有界（只保留最近 200 条）。 */
+            invariantViolations: appendBoundedInvariantViolation(
+              state.invariantViolations ?? [],
               {
                 invariantCode: violation.invariantCode,
                 detail: violation.detail,
                 recordedAtIso,
               },
-            ],
+            ),
             updatedAtIso: recordedAtIso,
           })
           .catch(() => undefined);

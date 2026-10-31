@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { GoalDispatchGate } from "../../packages/core/src/orchestration/goal-dispatch-gate.js";
 import { validateGoalContract } from "../../packages/core/src/orchestration/goal-contract.js";
 import type { GoalContract } from "../../packages/core/src/orchestration/goal-contract.js";
+import { appendBoundedInvariantViolation } from "../../packages/core/src/orchestration/goal-invariant-catalog.js";
 
 function buildContract(overrides: Partial<GoalContract> = {}): GoalContract {
   return {
@@ -121,6 +122,19 @@ describe("K4 安全不变量", () => {
     ]);
     expect(gate.getRecordedInvariantViolations()).toHaveLength(1);
     expect(checkDispatch(gate).isAllowed).toBe(false);
+  });
+
+  it("违规列表有界（只保留最近 N 条）", () => {
+    const violations = appendBoundedInvariantViolation(
+      [
+        { invariantCode: "tool.permission-denied", detail: "a", recordedAtIso: "1" },
+        { invariantCode: "tool.permission-denied", detail: "b", recordedAtIso: "2" },
+      ],
+      { invariantCode: "tool.permission-denied", detail: "c", recordedAtIso: "3" },
+      2,
+    );
+    expect(violations).toHaveLength(2);
+    expect(violations.map((entry) => entry.detail)).toEqual(["b", "c"]);
   });
 
   it("契约校验：未知不变量标识被拒，已知标识合法", () => {
