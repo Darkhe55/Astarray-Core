@@ -4512,3 +4512,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 不通过 ⇒ **降级 blocked + 升级原因**（不先判完成后回滚）。
 > **验证**：单测 5/5；`typecheck`/`lint` 绿。
 > **未做**：**默认关**、无集成测试、依赖 K2 映射（无映射时开启会几乎阻断所有完成）。ADR-0139。
+
+> **149（R75）：K10 组边界门禁复查（完成，仅强制模式生效）**：编排器新增
+> `goalGroupBoundaryGatePort`：`runLoop` 每个安全点（无在途任务）复查；不通过 ⇒ 升级 + `finishMission("blocked")`
+> + **停止调度**；端口抛错**同样停止**。控制器仅在 `isGoalModeEnforcementEnabled === true` 时装配，
+> 复用 `observeGoalDispatchGate`（判定仍落盘/输出）；**默认关 ⇒ 行为不变**。
+> **验证**：`typecheck`/`lint`/`build` 绿；**无集成测试/无节流**。ADR-0140。

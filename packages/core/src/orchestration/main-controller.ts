@@ -2203,6 +2203,37 @@ export class MainController {
   }
 
   /**
+   * R75（2026-10-31）：**组边界门禁复查（K10）**——只在**强制模式开启**时装配。
+   *
+   * 复用启动前那道 `observeGoalDispatchGate`（含判定落盘与流式输出）；
+   * 未开启强制 ⇒ 不装配（继续只观察），避免未验证就停真实任务。
+   */
+  private buildGoalGroupBoundaryGatePort(missionIdentifier: string): {
+    goalGroupBoundaryGatePort?: () => Promise<{
+      readonly isAllowed: boolean;
+      readonly reasons: readonly string[];
+    }>;
+  } {
+    if (this.options.isGoalModeEnforcementEnabled !== true) {
+      return {};
+    }
+    if (this.options.goalDispatchGateResolver === undefined) {
+      return {};
+    }
+    return {
+      goalGroupBoundaryGatePort: async () => {
+        const observation = this.observeGoalDispatchGate(missionIdentifier);
+        return {
+          isAllowed: !observation.isBlocked,
+          reasons: observation.isBlocked
+            ? [observation.detail ?? "目标门禁未通过"]
+            : [],
+        };
+      },
+    };
+  }
+
+  /**
    * R34（2026-10-29）：把目标组端口按 mission 绑定成编排器可用的闭包。
    *
    * 未装配端口 ⇒ 返回空对象（调度器行为不变）。
@@ -3115,6 +3146,8 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R75：组边界门禁复查（仅强制模式装配）。 */
+      ...this.buildGoalGroupBoundaryGatePort(missionId),
       /** R74：目标完成判定（缺省不传 ⇒ 不耦合）。 */
       ...(this.options.missionCompletionGoalPort === undefined
         ? {}
@@ -3338,6 +3371,8 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R75：组边界门禁复查（仅强制模式装配）。 */
+      ...this.buildGoalGroupBoundaryGatePort(missionId),
       /** R74：目标完成判定（缺省不传 ⇒ 不耦合）。 */
       ...(this.options.missionCompletionGoalPort === undefined
         ? {}

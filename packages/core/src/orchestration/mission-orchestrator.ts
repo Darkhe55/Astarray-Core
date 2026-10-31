@@ -253,6 +253,17 @@ export interface MissionOrchestratorOptions {
     readonly isApplicable: boolean;
     readonly reasons: readonly string[];
   }>;
+  /**
+   * R75（2026-10-31）：**组边界的门禁复查端口（K10）**。
+   *
+   * 与启动前那道门禁不同：这里在**每个安全点（无在途任务）**复查一次，
+   * 不通过 ⇒ 停止本 mission 的继续调度并置 blocked + 升级原因。
+   * 缺省不传 ⇒ 不参与（行为不变）。
+   */
+  goalGroupBoundaryGatePort?: () => Promise<{
+    readonly isAllowed: boolean;
+    readonly reasons: readonly string[];
+  }>;
   goalTaskGroupBeginPort?: (input: {
     readonly taskGroupIdentifier: string;
     readonly startedAtIso: string;
@@ -718,6 +729,33 @@ export class MissionOrchestrator {
           this.options.onUserEscalation(
             `组边界消费推迟插入失败: ${(error as Error).message}`,
           );
+        }
+      }
+      /**
+       * R75（K10）：**组边界门禁复查**（无在途任务时）。
+       *
+       * 目标暂停/需重规划/超范围/超期 ⇒ 不再继续调度，置 blocked 并升级原因。
+       * 端口抛错 ⇒ 保守停止（宁可停，不误跑）。
+       */
+      if (
+        this.inFlightTaskIds.size === 0 &&
+        this.options.goalGroupBoundaryGatePort !== undefined
+      ) {
+        try {
+          const gateDecision = await this.options.goalGroupBoundaryGatePort();
+          if (!gateDecision.isAllowed) {
+            this.options.onUserEscalation(
+              `目标门禁在组边界拒绝继续调度: ${gateDecision.reasons.join("；")}`,
+            );
+            await this.finishMission("blocked");
+            return;
+          }
+        } catch (error) {
+          this.options.onUserEscalation(
+            `目标门禁组边界复查失败，已停止调度: ${(error as Error).message}`,
+          );
+          await this.finishMission("blocked");
+          return;
         }
       }
       const actions = await this.dagScheduler.scheduleRound();
