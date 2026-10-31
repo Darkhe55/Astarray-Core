@@ -4702,3 +4702,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > V 实际下降清零；**模型伪造 recordedBy 被拒**。
 > **验证**：全量 **471 files / 3600 tests**（首次 3600）；lint 绿。
 > **未做**：真实多组 mission（缺分解器）；停滞/预算/墙钟暂停叠加未测。ADR-0162。
+
+> **173（R100）：模型任务分解接入 CLI（完成，真实两节点）**：门面透传 `isModelTaskPlanningEnabled`；
+> CLI `run --model-planning`；规划器提示词注入**可用工具名**（修复"写 write_file ⇒ 未注册 ⇒ 降级"）。
+> **真实证据**：`mission-d5901d26` tasks=**2**（T-01 → T-02 依赖），`taskPlanningOutcome: "model"`；
+> 该 mission 因模型未发完成控制事件失败（模型行为，非分解缺陷）。
+> **验证**：全量 **471 files / 3600 tests**；lint 绿。
+> **未做**：多组完成 + 每三组检查真实演练；规划质量仅校验工具名；projectSummary 为空。ADR-0163。

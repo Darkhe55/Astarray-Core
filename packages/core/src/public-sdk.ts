@@ -2092,6 +2092,12 @@ export interface PublicApplicationOptions {
    * - `isGoalCompletionRequired`：完成前要求目标证据齐备；
    * - `missionToolCallBudget`：任务级工具调用预算（与目标上限取更严）。
    */
+  /**
+   * R100（2026-11-01）：**模型任务分解**（缺省关；开启后由规划器产出多节点任务）。
+   *
+   * 需要 provider 运行时的 worker 工厂；mock 下保持单节点。
+   */
+  isModelTaskPlanningEnabled?: boolean;
   isGoalModeEnforcementEnabled?: boolean;
   isGoalCompletionRequired?: boolean;
   missionToolCallBudget?: number | null;
@@ -2732,6 +2738,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         ? {}
         : { progressGuardTaskTotalCallBudget: options.progressGuardTaskTotalCallBudget }),
       isHighRigorEnforcementEnabled: options.isHighRigorEnforcementEnabled ?? false,
+      ...(options.isModelTaskPlanningEnabled === undefined
+        ? {}
+        : { isModelTaskPlanningEnabled: options.isModelTaskPlanningEnabled }),
       ...(options.isGoalModeEnforcementEnabled === undefined
         ? {}
         : { isGoalModeEnforcementEnabled: options.isGoalModeEnforcementEnabled }),

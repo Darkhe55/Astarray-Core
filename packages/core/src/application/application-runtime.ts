@@ -2678,6 +2678,7 @@ export async function createApplicationRuntime(
     options.isModelTaskPlanningEnabled === true &&
     planningWorkerRuntimeFactory !== undefined
       ? createModelBackedTaskDecompositionProvider({
+          availableToolNames: registry.getFullDescriptors().map((descriptor) => descriptor.name),
           runtimeFactory: (plannerAgentInstanceIdentifier) =>
             planningWorkerRuntimeFactory(
               plannerAgentInstanceIdentifier,
