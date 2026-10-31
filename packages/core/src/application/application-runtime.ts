@@ -304,6 +304,14 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R93：登记 Agent 身份（演练/宿主用；只写身份与隶属）。 */
+  registerAgentIdentity: (input: {
+    readonly agentInstanceId: string;
+    readonly agentRole: "main" | "secondary" | "tertiary" | "quaternary";
+    readonly missionId: string | null;
+    readonly owningSecondaryAgentInstanceId: string | null;
+    readonly boundTaskBundleId?: string | null;
+  }) => void;
   /** R91：任命执行/测试/验收三级个体（复用既有门禁规则）。 */
   appointIndependentReview: (input: {
     readonly appointmentIdentifier: string;
@@ -1801,6 +1809,28 @@ export async function createApplicationRuntime(
    *
    * 门禁规则不变：执行/测试/验收身份互斥、直属上级校验、证据不得全是自报。
    */
+  /**
+   * R93（2026-11-01）：**演练/宿主用 Agent 身份登记**（②）。
+   *
+   * 只写 `RegisteredAgentDirectory`（身份与隶属），不创建记忆/上下文；
+   * 独立验收门禁据此校验"验收者直属任命次级 + 同 mission + 三级角色"。
+   */
+  const registerAgentIdentity = (input: {
+    readonly agentInstanceId: string;
+    readonly agentRole: "main" | "secondary" | "tertiary" | "quaternary";
+    readonly missionId: string | null;
+    readonly owningSecondaryAgentInstanceId: string | null;
+    readonly boundTaskBundleId?: string | null;
+  }): void => {
+    registeredAgentDirectory.registerAgent({
+      agentInstanceId: input.agentInstanceId,
+      agentRole: input.agentRole,
+      missionId: input.missionId,
+      owningSecondaryAgentInstanceId: input.owningSecondaryAgentInstanceId,
+      boundTaskBundleId: input.boundTaskBundleId ?? null,
+      registeredAtIso: new Date().toISOString(),
+    });
+  };
   const appointIndependentReview = (input: {
     readonly appointmentIdentifier: string;
     readonly missionIdentifier: string;
@@ -2599,6 +2629,8 @@ export async function createApplicationRuntime(
    */
   const controllerHolder: { current: MainController | null } = { current: null };
   const controller = new MainController({
+    /** R93（②）：独立验收门禁需要裁决存储，否则裁决只校验、不落盘（身份目录在下方已传）。 */
+    completionVerdictStore,
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
        *
@@ -3295,6 +3327,7 @@ export async function createApplicationRuntime(
     invalidateGoalEvidence,
     appointIndependentReview,
     recordIndependentVerdict,
+    registerAgentIdentity,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,
