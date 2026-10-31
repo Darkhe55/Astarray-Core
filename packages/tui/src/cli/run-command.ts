@@ -97,6 +97,8 @@ export interface RunCommandOptions {
   isGoalCompletionRequired?: boolean;
   /** R81：任务级工具调用预算（与目标上限取更严）。 */
   missionToolCallBudget?: number | null;
+  /** R100：模型任务分解（缺省关；开启后规划器可产出多节点）。 */
+  isModelTaskPlanningEnabled?: boolean;
 }
 
 export async function executeRunCommand(options: RunCommandOptions): Promise<number> {
@@ -188,6 +190,9 @@ const application = await AstarrayApplicationFacade.create({
     concurrency: runConfig.concurrency,
     failureThreshold: runConfig.toolFailureThreshold,
     maximumLoopIterations: 8,
+    ...(options.isModelTaskPlanningEnabled === true
+      ? { isModelTaskPlanningEnabled: true }
+      : {}),
     ...(options.isGoalEnforcementEnabled === undefined
       ? {}
       : { isGoalModeEnforcementEnabled: options.isGoalEnforcementEnabled }),

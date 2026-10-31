@@ -284,3 +284,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   V 下降清零；模型伪造 `recordedBy` 被拒。
 - 全量 471 files / **3600 tests** 通过（首次达到 3600）。
 - **未做**：真实多组 mission（缺分解器）；停滞与预算/墙钟暂停叠加未测。ADR-0162。
+
+### R100 模型任务分解接入（2026-11-01）
+
+- 门面新增 `isModelTaskPlanningEnabled` 透传；CLI `run --model-planning`。
+- 规划器提示词注入**可用工具名**（`registry.getFullDescriptors()`），修掉"模型发明 write_file ⇒
+  本地契约判未注册工具 ⇒ 降级单节点"的实测问题。
+- **真实证据**：`mission-d5901d26` 产出 **2 节点**（T-01、T-02 依赖 T-01），
+  `taskPlanningOutcome: "model"`（非降级）；该 mission 因模型未发完成控制事件而失败（非分解问题）。
+- **测试**：全量 471 files / 3600 tests。
+- **未做**：多组完成 + 每三组检查的真实演练；规划质量只校验工具名；`projectSummary` 仍为空。ADR-0163。
