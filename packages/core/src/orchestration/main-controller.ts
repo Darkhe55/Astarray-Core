@@ -257,6 +257,13 @@ export interface MainControllerOptions {
     readonly missionIdentifier: string;
     readonly goalIdentifier: string;
   }) => Promise<void>;
+  /**
+   * R84（2026-10-31）：**工具执行前的目标预算**（可选；缺省不参与）。
+   *
+   * 返回该 mission 的**有效上限**（目标上限与任务预算取更严）；`null` ⇒ 不限制。
+   * 控制器按进程内计数在**每次工具执行前**检查，避免"先执行后记账"导致的超限。
+   */
+  goalToolCallBudgetForMission?: (missionIdentifier: string) => number | null;
   goalTaskGroupStatePort?: {
     begin(input: {
       readonly missionIdentifier: string;
@@ -681,6 +688,13 @@ export interface T08cRoutingFacade {
 }
 
 export class MainController {
+  /**
+   * R84：**进程内**工具调用计数（预算守卫用；不持久化）。
+   *
+   * 与收据计数分开：收据是"事后事实"，这里是"执行前闸门"。
+   */
+  private readonly missionToolCallCountsByMission = new Map<string, number>();
+
   private readonly activeOrchestrators = new Map<
     string,
     { scheduler: AssistScheduler | DevolveScheduler; mode: AgentMode }
@@ -3165,9 +3179,19 @@ export class MainController {
     /**
      * 清单第 ⑥ 项（2026-10-28）：目标门禁**只读观察**（缺省不参与；强制需显式开关）。
      */
-    if (this.observeGoalDispatchGate(missionId).isBlocked) {
+    const goalGateObservation = this.observeGoalDispatchGate(missionId);
+    if (goalGateObservation.isBlocked) {
       void this.options.missionManager.updateMissionStatus(missionId, "blocked");
-      return;
+      /**
+       * R84：**在提交处显式失败**，而不是留下一个"看似 running"的 mission。
+       *
+       * 早停续跑期间 mission 也会短暂 blocked，状态字段不能作为终态信号；
+       * 启动被门禁拦住必须让调用方拿到错误。
+       */
+      throw new DomainError(
+        "invalid-task-chain",
+        `目标门禁阻断派发：${goalGateObservation.detail ?? "未通过目标门禁"}`,
+      );
     }
     const initialChain = this.buildInitialChain(missionId, taskNodes);
     const scheduler = new AssistScheduler({
@@ -3384,9 +3408,19 @@ export class MainController {
     /**
      * 清单第 ⑥ 项（2026-10-28）：目标门禁**只读观察**（缺省不参与；强制需显式开关）。
      */
-    if (this.observeGoalDispatchGate(missionId).isBlocked) {
+    const goalGateObservation = this.observeGoalDispatchGate(missionId);
+    if (goalGateObservation.isBlocked) {
       void this.options.missionManager.updateMissionStatus(missionId, "blocked");
-      return;
+      /**
+       * R84：**在提交处显式失败**，而不是留下一个"看似 running"的 mission。
+       *
+       * 早停续跑期间 mission 也会短暂 blocked，状态字段不能作为终态信号；
+       * 启动被门禁拦住必须让调用方拿到错误。
+       */
+      throw new DomainError(
+        "invalid-task-chain",
+        `目标门禁阻断派发：${goalGateObservation.detail ?? "未通过目标门禁"}`,
+      );
     }
     const initialChain = this.buildInitialChain(missionId, taskNodes);
     const scheduler = new DevolveScheduler({
@@ -3669,7 +3703,8 @@ export class MainController {
             innerToolPort,
           });
     const reportInvariantViolation = this.options.onGoalInvariantViolation;
-    if (reportInvariantViolation === undefined) {
+    const toolBudgetForMission = this.options.goalToolCallBudgetForMission;
+    if (reportInvariantViolation === undefined && toolBudgetForMission === undefined) {
       return portWithCheckpointing;
     }
     /**
@@ -3679,6 +3714,24 @@ export class MainController {
      */
     return {
       execute: async (toolName, argumentsJson, callId, cancellationSignal) => {
+        /**
+         * R84：**执行前预算守卫**（进程内计数；不以"事后收据"为准）。
+         *
+         * 达到上限即拒绝，错误码用独立的 `tool-budget-exhausted`（不冒充权限拒绝）。
+         */
+        if (toolBudgetForMission !== undefined) {
+          const budgetLimit = toolBudgetForMission(missionId);
+          if (budgetLimit !== null) {
+            const usedBeforeCall = this.missionToolCallCountsByMission.get(missionId) ?? 0;
+            if (usedBeforeCall >= budgetLimit) {
+              throw new DomainError(
+                "tool-budget-exhausted",
+                `目标工具调用预算已用尽（已执行 ${String(usedBeforeCall)}，上限 ${String(budgetLimit)}）：拒绝执行 ${toolName}。`,
+              );
+            }
+            this.missionToolCallCountsByMission.set(missionId, usedBeforeCall + 1);
+          }
+        }
         try {
           return await portWithCheckpointing.execute(
             toolName,
@@ -3688,6 +3741,7 @@ export class MainController {
           );
         } catch (error) {
           if (
+            reportInvariantViolation !== undefined &&
             error instanceof DomainError &&
             error.errorCode === "tool-permission-denied"
           ) {

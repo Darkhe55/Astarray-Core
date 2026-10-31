@@ -6724,6 +6724,13 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     if (summaryStatus === "failed") {
       return "failed";
     }
+    /**
+     * R84 修正（2026-10-31）：**不在此处把 blocked 当终态**。
+     *
+     * 早停续跑期间 mission 会短暂处于 blocked（`onMissionGateBlocked`），随后继续并完成；
+     * 若这里直接返回 blocked，轮询方会提前收口（G5 续跑用例实测失败）。
+     * 启动前的门禁阻断改为**在提交处抛出**，调用方拿到明确错误而不是误报 running。
+     */
     const tasks = missionStatus.taskChain?.tasks ?? [];
     if (tasks.some((task) => task.status === "blocked" || task.status === "failed")) {
       return "blocked";
