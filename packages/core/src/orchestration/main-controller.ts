@@ -1261,8 +1261,30 @@ export class MainController {
   async cancelMission(missionId: string): Promise<void> {
     const active = this.activeOrchestrators.get(missionId);
     if (active !== undefined) {
+      /**
+       * R88（2026-11-01）：**终态由编排器独占写入**。
+       *
+       * 控制器只发停止信号并等待编排器收口（它会按"是否已有失败任务"写 blocked/cancelled）；
+       * 这里再写 cancelled 会与编排器竞争，把治理停止覆盖成"用户取消"。
+       */
       await active.scheduler.cancel();
+      /**
+       * 编排器负责写终态；但**测试替身/异常路径**可能没有真正收口。
+       * 若收口后仍非终态，这里补写 cancelled（仍然走终态单点，不覆盖已有终态）。
+       */
+      const current = await this.options.missionManager
+        .getMissionStatus(missionId)
+        .catch(() => null);
+      const currentStatus = current?.summary?.status ?? null;
+      if (
+        currentStatus === null ||
+        !["done", "cancelled", "blocked"].includes(currentStatus)
+      ) {
+        await this.finalizeMissionStatus(missionId, "cancelled");
+      }
+      return;
     }
+    /** 没有活动编排器 ⇒ 没有别的写入者，此时由控制器补终态是安全的。 */
     await this.finalizeMissionStatus(missionId, "cancelled");
   }
 
