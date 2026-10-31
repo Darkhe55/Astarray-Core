@@ -47,6 +47,31 @@ export function evaluateGoalPauseConditions(input: {
     }
   }
 
+  /**
+   * R95（2026-11-01）：**墙钟预算**（`maximumWallClockSeconds`）。
+   *
+   * 只在状态里有 `goalStartedAtIso` 时评估；缺失 ⇒ 不评估（不猜开始时间）。
+   */
+  if (
+    declaredConditions.has("budget-exhausted") &&
+    contract.resourceLimits.maximumWallClockSeconds !== null &&
+    typeof state.goalStartedAtIso === "string"
+  ) {
+    const startedAtMilliseconds = Date.parse(state.goalStartedAtIso);
+    const nowMilliseconds = Date.parse(input.nowIso);
+    if (
+      !Number.isNaN(startedAtMilliseconds) &&
+      !Number.isNaN(nowMilliseconds) &&
+      nowMilliseconds - startedAtMilliseconds >=
+        contract.resourceLimits.maximumWallClockSeconds * 1_000
+    ) {
+      triggeredConditions.push("budget-exhausted");
+      reasons.push(
+        `墙钟预算已用尽（已 ${String(Math.floor((nowMilliseconds - startedAtMilliseconds) / 1_000))} 秒 / 上限 ${String(contract.resourceLimits.maximumWallClockSeconds)} 秒）。`,
+      );
+    }
+  }
+
   if (declaredConditions.has("deadline-passed") && contract.deadlineIso !== null) {
     const nowMilliseconds = Date.parse(input.nowIso);
     const deadlineMilliseconds = Date.parse(contract.deadlineIso);

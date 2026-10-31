@@ -138,6 +138,40 @@ describe("evaluateGoalPauseConditions", () => {
     expect(decision.triggeredConditions).toContain("stagnation");
   });
 
+  it("墙钟预算：有开始时间且超限 ⇒ 触发 budget-exhausted", () => {
+    const decision = evaluateGoalPauseConditions({
+      contract: buildContract({
+        pauseConditions: ["budget-exhausted"],
+        resourceLimits: {
+          maximumToolCalls: null,
+          maximumWallClockSeconds: 60,
+          maximumCostUnits: null,
+        },
+      }),
+      state: buildState({ goalStartedAtIso: "2026-10-31T00:00:00.000Z" }),
+      nowIso: "2026-10-31T00:02:00.000Z",
+    });
+    expect(decision.shouldPause).toBe(true);
+    expect(decision.triggeredConditions).toContain("budget-exhausted");
+    expect(decision.reasons.join("；")).toContain("墙钟预算");
+  });
+
+  it("墙钟预算：没有开始时间 ⇒ 不评估（不猜）", () => {
+    const decision = evaluateGoalPauseConditions({
+      contract: buildContract({
+        pauseConditions: ["budget-exhausted"],
+        resourceLimits: {
+          maximumToolCalls: null,
+          maximumWallClockSeconds: 1,
+          maximumCostUnits: null,
+        },
+      }),
+      state: buildState(),
+      nowIso: "2026-10-31T00:02:00.000Z",
+    });
+    expect(decision.shouldPause).toBe(false);
+  });
+
   it("requires-replanning：状态标记需要重规划时触发", () => {
     const decision = evaluateGoalPauseConditions({
       contract: buildContract({ pauseConditions: ["requires-replanning"] }),

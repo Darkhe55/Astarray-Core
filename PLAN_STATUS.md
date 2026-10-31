@@ -4674,3 +4674,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `evidenceReference: task-ledger:T-001`。
 > **验证**：全量 471 files / 3591 tests；typecheck/lint/build 绿。
 > **限制**：需显式重算（未接事件自动触发）；内存门禁未同步（本场景无活动门禁）；多组 mission 未验证。ADR-0157。
+
+> **168（R95）：墙钟预算评估（K6 收尾，完成）**：目标状态新增可选 `goalStartedAtIso`（创建契约写入；
+> 旧状态缺失 ⇒ 不评估、不猜）；`evaluateGoalPauseConditions` 在声明 `budget-exhausted` 且
+> `maximumWallClockSeconds` 非空时按"已用 ≥ 上限"触发暂停（原因含秒数/上限）。
+> **验证**：单测 10/10（新增 2 条：超限触发、无开始时间不评估）；全量 **471 files / 3593 tests**；typecheck/lint/build 绿。
+> **未做**：派发前不按墙钟阻断；无集成测试。ADR-0158。

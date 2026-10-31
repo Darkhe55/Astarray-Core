@@ -243,3 +243,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **测试**：`tests/core/goal-evidence-invalidation.test.ts` 3/3 通过。
 - **未做**：**仍无检测器**（"何时失效"由宿主/未来检测器决定）、无集成测试、只到"要求粒度"、
   旧证据引用被覆盖。ADR-0144。
+
+### R95 墙钟预算评估（K6 收尾，2026-11-01）
+
+- 状态新增可选 `goalStartedAtIso`（创建契约时写入；旧状态缺失 ⇒ **不猜**、不评估墙钟）。
+- `evaluateGoalPauseConditions` 在 `budget-exhausted` 声明且 `maximumWallClockSeconds` 非空、
+  且状态有开始时间时，按 `now - started >= 上限` 触发暂停（原因写明已用秒数/上限）。
+- **测试**：`goal-pause-conditions.test.ts` 10/10（新增超限触发、无开始时间不评估两条）。
+- **未做**：派发前门禁仍只查绝对截止（`deadlineIso`），未按墙钟在派发时阻断；无集成测试。ADR-0158。
+
+> R80–R94 的检查点记录见 `PLAN_STATUS.md` 154–167 与 `docs/adr/0145`–`0157`（卡片此处不再重复）。
