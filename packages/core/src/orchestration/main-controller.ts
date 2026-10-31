@@ -248,6 +248,15 @@ export interface MainControllerOptions {
     readonly isApplicable: boolean;
     readonly reasons: readonly string[];
   }>;
+  /**
+   * R81（2026-10-31）：**mission 创建时的目标绑定端口**（可选）。
+   *
+   * 由运行时实现（写绑定 + 刷新门禁缓存）；缺省 ⇒ 不接受 `goalIdentifier`。
+   */
+  bindMissionGoalPort?: (input: {
+    readonly missionIdentifier: string;
+    readonly goalIdentifier: string;
+  }) => Promise<void>;
   goalTaskGroupStatePort?: {
     begin(input: {
       readonly missionIdentifier: string;
@@ -785,6 +794,12 @@ export class MainController {
        * `missionId` / 进程 ID / 角色名推导会话身份。
        */
       readonly conversationIdentifier?: string;
+      /**
+       * R81（2026-10-31）：**本次 mission 归属的目标**（创建时绑定，供启动前门禁使用）。
+       *
+       * 绑定必须发生在 launch 之前，否则门禁在启动时看不到目标。
+       */
+      readonly goalIdentifier?: string;
     },
   ): Promise<string> {
     /**
@@ -957,6 +972,25 @@ export class MainController {
     });
     if (preparedLease !== null && preparedLease !== undefined) {
       this.options.missionRuntimeRegistry?.register(preparedLease);
+    }
+    /**
+     * R81：**先绑定目标，再启动**。
+     *
+     * 门禁在 `launch*Mission` 里评估；事后绑定对本次派发生效不了。
+     * 未装配端口却给了目标 ⇒ 直接拒绝（不静默忽略）。
+     */
+    const requestedGoalIdentifier = options?.goalIdentifier?.trim();
+    if (requestedGoalIdentifier !== undefined && requestedGoalIdentifier !== "") {
+      if (this.options.bindMissionGoalPort === undefined) {
+        throw new DomainError(
+          "invalid-task-chain",
+          "运行时不接受目标绑定（未装配 bindMissionGoalPort）：拒绝在无目标上下文的情况下启动。",
+        );
+      }
+      await this.options.bindMissionGoalPort({
+        missionIdentifier: missionId,
+        goalIdentifier: requestedGoalIdentifier,
+      });
     }
     if (mode === "assist") {
       this.launchAssistMission(missionId, taskNodes);
@@ -3737,4 +3771,3 @@ export class MainController {
     }
   }
 }
-

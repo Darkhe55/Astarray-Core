@@ -4562,3 +4562,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **阻断**：目标模式 API 只在 `ApplicationRuntime`，公开 SDK/CLI 无写入入口；`submitTask` 不能带 `goalIdentifier`，
 > 而门禁在启动时评估 ⇒ **"目标驱动 mission"目前无法真实跑通**。
 > 报告 `docs/reports/GOAL02_REAL_MISSION_ACCEPTANCE_2026-10-31.md`。无代码改动。
+
+> **155（R81）：目标模式公开入口 + 目标驱动真实复跑（完成）**：
+> ① `submitTask`/`handleUserMessage` 支持 `goalIdentifier`，控制器在 **launch 前**经
+> `bindMissionGoalPort` 绑定（未装配端口却给目标 ⇒ 拒绝）；② 公开 SDK 暴露 12 个目标方法
+> （activate/propose/confirm/create/bind/unbind/status/deactivate/close/map/invalidate）；
+> ③ 创建选项透传 `isGoalModeEnforcementEnabled`/`isGoalCompletionRequired`/`missionToolCallBudget`；
+> ④ CLI 新增 `goal-mode propose|confirm --yes|bind|map` 与 `run --goal/--goal-enforce/--goal-require-completion/--goal-budget`。
+> **真实复跑**：propose/confirm/status/map 全部成功；`run --goal` 的 mission **创建时绑定**（bindings 三条）；
+> 判定落盘 `isEnforced=false`；`--goal-require-completion` 真实拒绝：
+> `目标未完成，不标记完成: 要求 req-1 证据不足（unverified）。；V 仍为 1，不是 0。`
+> **未验证**：`--goal-enforce` 组边界停止、正向完成（缺 accepted 裁决）、模型自主提议。ADR-0145。
+> provider 变化：unisound 401、sensenova 429、改用 stepfun `step-3.5-flash` 成功。

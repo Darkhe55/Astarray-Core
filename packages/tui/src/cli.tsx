@@ -24,6 +24,10 @@ import { executeTaskLedgerStatusCommand } from "./cli/task-ledger-command.js";
 import {
   executeGoalModeStatusCommand,
   executeGoalModeVerdictsCommand,
+  executeGoalModeProposeCommand,
+  executeGoalModeConfirmCommand,
+  executeGoalModeBindCommand,
+  executeGoalModeMapCommand,
 } from "./cli/goal-mode-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
@@ -195,6 +199,10 @@ program
     "Provider 单次请求超时秒数（缺省 30；长任务需放宽）",
   )
   .option("--perf-collect", "采集本进程性能样本（默认关闭；仅 run 命令，R73）")
+  .option("--goal <goal-id>", "把本次 mission 绑定到该目标（创建时绑定；需已存在目标契约）")
+  .option("--goal-enforce", "强制模式：目标门禁不通过 ⇒ 阻断派发/停止调度（缺省只观察）")
+  .option("--goal-require-completion", "完成耦合：目标证据不齐 ⇒ 不判 done")
+  .option("--goal-budget <count>", "任务级工具调用预算（与目标上限取更严）")
   .option(
     "--conversation",
     "对话模式：无工具调用、无产物时纯文本回复不要求完成控制事件",
@@ -215,6 +223,10 @@ program
         providerRequestTimeoutSeconds?: string;
         perfCollect?: boolean;
         conversation?: boolean;
+        goal?: string;
+        goalEnforce?: boolean;
+        goalRequireCompletion?: boolean;
+        goalBudget?: string;
       },
     ) => {
       /**
@@ -255,6 +267,14 @@ program
         stateDirectory: defaultStateDirectory(),
         isPerfCollectionEnabled: options.perfCollect === true,
   isConversationMode: options.conversation === true,
+        ...(options.goal === undefined ? {} : { goalIdentifier: options.goal }),
+        ...(options.goalEnforce === true ? { isGoalEnforcementEnabled: true } : {}),
+        ...(options.goalRequireCompletion === true
+          ? { isGoalCompletionRequired: true }
+          : {}),
+        ...(options.goalBudget === undefined
+          ? {}
+          : { missionToolCallBudget: Number(options.goalBudget) }),
         timeoutSeconds,
         ...(options.providerEndpoint !== undefined
           ? { providerEndpoint: options.providerEndpoint }
@@ -1136,6 +1156,94 @@ goalModeCommand
     });
   });
 
+/** R81：从 stdin 读文本（提案 JSON 用；空输入 ⇒ 空串，由校验拒绝）。 */
+async function readStdinText(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+goalModeCommand
+  .command("propose")
+  .description("提交目标提案（不落契约；需用户 confirm）——从文件或 stdin 读 JSON")
+  .requiredOption("--source <reference>", "原始要求引用（由 harness 注入，模型不可自填）")
+  .option("--file <path>", "提案 JSON 文件；缺省从 stdin 读")
+  .option("--ttl-seconds <seconds>", "提案有效期（缺省 1800）")
+  .option("--json", "JSON 输出")
+  .action(async (options: { source: string; file?: string; ttlSeconds?: string; json?: boolean }) => {
+    const { readFile } = await import("node:fs/promises");
+    const draftJson =
+      options.file === undefined
+        ? await readStdinText()
+        : await readFile(options.file, "utf8");
+    process.exitCode = await executeGoalModeProposeCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      draftJson,
+      sourceRequestReference: options.source,
+      ...(options.ttlSeconds === undefined
+        ? {}
+        : { expiresInSeconds: Number(options.ttlSeconds) }),
+    });
+  });
+
+goalModeCommand
+  .command("confirm <proposal-id>")
+  .description("用户显式确认提案，生成 revision 1 契约（必须 --yes）")
+  .requiredOption("--goal <goal-id>", "目标标识")
+  .requiredOption("--owner <user-id>", "目标所有者（认证用户）")
+  .option("--yes", "确认这是用户的显式确认动作")
+  .option("--json", "JSON 输出")
+  .action(async (
+    proposalIdentifier: string,
+    options: { goal: string; owner: string; yes?: boolean; json?: boolean },
+  ) => {
+    process.exitCode = await executeGoalModeConfirmCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      proposalIdentifier,
+      goalIdentifier: options.goal,
+      ownerIdentifier: options.owner,
+      isConfirmed: options.yes === true,
+    });
+  });
+
+goalModeCommand
+  .command("map")
+  .description("把一条要求映射到任务节点（K2；不改契约 revision）")
+  .requiredOption("--goal <goal-id>", "目标标识")
+  .requiredOption("--requirement <requirement-id>", "要求标识")
+  .requiredOption("--tasks <task-id...>", "任务节点标识（可多个）")
+  .option("--json", "JSON 输出")
+  .action(async (options: {
+    goal: string;
+    requirement: string;
+    tasks: string[];
+    json?: boolean;
+  }) => {
+    process.exitCode = await executeGoalModeMapCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      goalIdentifier: options.goal,
+      requirementIdentifier: options.requirement,
+      taskNodeIdentifiers: options.tasks,
+    });
+  });
+
+goalModeCommand
+  .command("bind <mission-id>")
+  .description("把已存在的 mission 绑定到目标（事后绑定，不改变本次派发结论）")
+  .requiredOption("--goal <goal-id>", "目标标识")
+  .option("--json", "JSON 输出")
+  .action(async (missionIdentifier: string, options: { goal: string; json?: boolean }) => {
+    process.exitCode = await executeGoalModeBindCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      missionIdentifier,
+      goalIdentifier: options.goal,
+    });
+  });
 goalModeCommand
   .command("status")
   .description("显示契约数、mission 绑定数、可还原门禁数与 hydrate 跳过原因")

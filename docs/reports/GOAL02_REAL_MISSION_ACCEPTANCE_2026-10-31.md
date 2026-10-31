@@ -105,3 +105,54 @@ astarray: 已按精确参数 allow-once 授权 createProjectFile（作用域授�
 - 基础管线真实实跑：**已验证**（mission done + 产物 + 收据）；
 - GOAL-02 端到端：**未验证**（入口缺失，见 §5）；
 - 本次**无代码改动**（只新建 `test/` 测试目录与本文档）。
+
+## 8. R81 复跑：目标模式公开入口（2026-10-31 19:0x）
+
+R81 接上入口后同一 `test/` 目录复跑。
+
+### 8.1 入口真实执行
+
+```
+node dist/cli.js goal-mode propose --source "user-message:acceptance-1" --file proposal.json
+→ {"status":"goal-proposal-created","proposalIdentifier":"goal-proposal-b14281ab-…"}
+
+node dist/cli.js goal-mode confirm goal-proposal-b14281ab-… --goal goal-acceptance-1 --owner user-local --yes
+→ {"status":"goal-contract-created","goalIdentifier":"goal-acceptance-1","revision":1}
+
+node dist/cli.js goal-mode status --goal goal-acceptance-1
+→ 契约 revision 1、未暂停、V=null、下一检查点"下三个已结束任务组后检查一次进展"、stabilityGuarantee:"none"
+
+node dist/cli.js goal-mode map --goal goal-acceptance-1 --requirement req-1 --tasks T-001
+→ {"status":"goal-requirement-mapped","mappingCount":1}
+```
+
+### 8.2 创建时绑定 + 判定落盘
+
+`run --goal goal-acceptance-1 …`（真实 provider）后：
+
+`test/state/goal-mode/mission-bindings.json` 出现三条绑定（含失败/重试的 mission），说明**绑定发生在启动前**；
+`goal-mode verdicts` 对应的记录为 `isAllowed:true, isEnforced:false`（只观察、未阻断）。
+
+### 8.3 K7 完成耦合真实拒绝
+
+映射 `req-1 → T-001` 后，`run --goal … --goal-require-completion` 的真实输出：
+
+```
+astarray: [需要用户] 目标未完成，不标记完成: 要求 req-1 证据不足（unverified）。；V 仍为 1，不是 0。
+```
+
+即：任务本身执行完，但目标证据不齐 ⇒ **不判 done**（符合 K7 设计）。
+
+### 8.4 provider 情况变化（如实）
+
+- unisound 的 `prov-unisound-1` 于本次复跑时返回 **401**（此前 18:26 可用）⇒ 疑似 key 过期/轮换；
+- sensenova 返回 **429**（tpm/rpm 限流）；
+- 改用 **stepfun** `prov-live-1` + `step-3.5-flash` 成功。
+- 期间一次 mission 因模型改用 `writeFileTemporary`（审批的是 `createProjectFile`）触发"必需操作未成功"而失败；
+  换成首轮成功措辞后正常 —— **属于模型选工具差异，不是目标模式缺陷**。
+
+### 8.5 仍未验证
+
+- `--goal-enforce` 的**组边界停止**（需"运行中目标被暂停"的场景）；
+- **正向完成**（`req-1` 需要 accepted 独立裁决；当前单任务流程不产生裁决 ⇒ V 恒为 1）；
+- 模型在对话中**自主提议目标**（未注册工具）。
