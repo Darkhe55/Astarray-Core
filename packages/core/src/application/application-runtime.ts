@@ -1429,6 +1429,7 @@ export async function createApplicationRuntime(
         requirementBases: nextRequirementBases,
         lastPotentialValue: nextPotentialValue,
         consumedToolCalls: nextConsumedToolCalls,
+        groupKind: input.groupKind,
       });
     },
   };
