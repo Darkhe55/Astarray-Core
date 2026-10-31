@@ -4574,3 +4574,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `目标未完成，不标记完成: 要求 req-1 证据不足（unverified）。；V 仍为 1，不是 0。`
 > **未验证**：`--goal-enforce` 组边界停止、正向完成（缺 accepted 裁决）、模型自主提议。ADR-0145。
 > provider 变化：unisound 401、sensenova 429、改用 stepfun `step-3.5-flash` 成功。
+
+> **156（R82）：正向完成第一次跑通（完成）**：① 修正组结束顺序——先 `handleWorkerOutcome` 落 done、
+> 再 `maybeFinishGoalTaskGroup`（否则 V 永远看到 pending）；② `deterministic-check` 谓词允许
+> "done + 验证收据（verified completion event + artifactPaths 非空）"记 0，证据来源**如实标注**
+> （有裁决 ⇒ independent-acceptance；否则 deterministic-check），`independent-acceptance` 谓词仍只认裁决。
+> **真实复跑**：`mission-6ed57632` 在 `--goal-require-completion` 下 **status done**；
+> `goal-mode status` 显示 **V=0**、依据 1 条、消耗 1 次工具调用；收据与 `hello5.md` 均正确。
+> **验证**：新单测 4/4；`tests/core --maxWorkers=2` **471 files / 3588 tests** 全通过；typecheck/lint/build 绿。
+> **仍未验证**：`--goal-enforce` 组边界停止、accepted 裁决路径、产物内容未校验。ADR-0146。

@@ -33,6 +33,14 @@ export interface AssessGoalRequirementsInput {
    * 给了且该要求有映射 ⇒ 用它；否则回退契约里的静态 `taskNodeIdentifiers`。
    */
   readonly taskNodeIdentifiersByRequirement?: ReadonlyMap<string, readonly string[]>;
+  /**
+   * R82（2026-10-31）：**有验证收据的任务**（`hasVerifiedCompletionControlEvent` 且至少一个产物）。
+   *
+   * 用于 `deterministic-check` 谓词：本地可核对"任务完成 + 收据 + 产物"即记 0，
+   * 不必强依赖独立验收裁决（卡允许"确定性判据或独立验收"二者其一）。
+   * 未提供 ⇒ 行为不变（仍只认 accepted 裁决）。
+   */
+  readonly taskIdentifiersWithVerifiedReceipt?: ReadonlySet<string>;
 }
 
 export function assessGoalRequirementsFromLocalState(
@@ -60,8 +68,18 @@ export function assessGoalRequirementsFromLocalState(
         );
         continue;
       }
-      if (!input.taskIdentifiersWithAcceptedVerdict.has(taskIdentifier)) {
-        missingTaskIdentifiers.push(`${taskIdentifier}(缺 accepted 裁决)`);
+      const hasAcceptedVerdict = input.taskIdentifiersWithAcceptedVerdict.has(
+        taskIdentifier,
+      );
+      const hasVerifiedReceipt =
+        requirement.completionPredicateKind === "deterministic-check" &&
+        (input.taskIdentifiersWithVerifiedReceipt?.has(taskIdentifier) ?? false);
+      if (!hasAcceptedVerdict && !hasVerifiedReceipt) {
+        missingTaskIdentifiers.push(
+          requirement.completionPredicateKind === "deterministic-check"
+            ? `${taskIdentifier}(缺 accepted 裁决或验证收据)`
+            : `${taskIdentifier}(缺 accepted 裁决)`,
+        );
       }
     }
     if (missingTaskIdentifiers.length > 0) {
@@ -73,13 +91,26 @@ export function assessGoalRequirementsFromLocalState(
         },
       } satisfies LocalGoalRequirementAssessment;
     }
+    /**
+     * R82：证据来源如实标注——**全部**任务都有 accepted 裁决才叫独立验收；
+     * 否则是"确定性判据"（done + 验证收据 + 产物）。
+     */
+    const areAllTasksAccepted = boundTaskIdentifiers.every((taskIdentifier) =>
+      input.taskIdentifiersWithAcceptedVerdict.has(taskIdentifier),
+    );
     return {
       requirementIdentifier: requirement.requirementIdentifier,
-      evidence: {
-        kind: "valid",
-        evidenceKind: "independent-acceptance",
-        evidenceReference: `task-ledger:${boundTaskIdentifiers.join(",")}`,
-      },
+      evidence: areAllTasksAccepted
+        ? {
+            kind: "valid",
+            evidenceKind: "independent-acceptance",
+            evidenceReference: `task-ledger:${boundTaskIdentifiers.join(",")}`,
+          }
+        : {
+            kind: "valid",
+            evidenceKind: "deterministic-check",
+            evidenceReference: `completion-receipt:${boundTaskIdentifiers.join(",")}`,
+          },
     } satisfies LocalGoalRequirementAssessment;
   });
 }
