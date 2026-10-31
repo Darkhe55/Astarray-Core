@@ -1218,12 +1218,52 @@ export class MainController {
     );
   }
 
+  /**
+   * R86（2026-10-31）：**mission 终态单点写入**。
+   *
+   * 终态（done/cancelled/blocked/failed）只能由这里落库：已是终态且新状态不同 ⇒ 忽略并记录，
+   * 避免"先 blocked 后被 cancelled 覆盖"（实测：预算治理停止后终态变成 cancelled）。
+   * 同状态重复写入是幂等的。
+   */
+  private async finalizeMissionStatus(
+    missionId: string,
+    status: "done" | "cancelled" | "blocked",
+  ): Promise<void> {
+    const current = await this.options.missionManager
+      .getMissionStatus(missionId)
+      .catch(() => null);
+    const currentStatus = current?.summary?.status ?? null;
+    if (
+      currentStatus !== null &&
+      currentStatus !== status &&
+      ["done", "cancelled", "blocked"].includes(currentStatus) &&
+      /** `done` 可以被真实完成覆盖"中断型 blocked"（早停续跑后完成）；其余终态不可覆盖。 */
+      status !== "done"
+    ) {
+      this.options.streamOutput(
+        missionId,
+        `[终态] 忽略 ${status}：mission 已是 ${currentStatus}（终态不可覆盖）。`,
+      );
+      return;
+    }
+    await this.options.missionManager.updateMissionStatus(missionId, status);
+  }
+
+  /**
+   * R86：本进程内该 mission **已执行**的工具调用数（预算守卫的计数）。
+   *
+   * 用于治理停止时把"已消耗"写进目标状态（失败组不写收据计数）。
+   */
+  getMissionExecutedToolCallCount(missionId: string): number {
+    return this.missionToolCallCountsByMission.get(missionId) ?? 0;
+  }
+
   async cancelMission(missionId: string): Promise<void> {
     const active = this.activeOrchestrators.get(missionId);
     if (active !== undefined) {
       await active.scheduler.cancel();
     }
-    await this.options.missionManager.updateMissionStatus(missionId, "cancelled");
+    await this.finalizeMissionStatus(missionId, "cancelled");
   }
 
   getActiveMissionIds(): string[] {
@@ -3186,7 +3226,7 @@ export class MainController {
      */
     const goalGateObservation = this.observeGoalDispatchGate(missionId);
     if (goalGateObservation.isBlocked) {
-      void this.options.missionManager.updateMissionStatus(missionId, "blocked");
+      void this.finalizeMissionStatus(missionId, "blocked");
       /**
        * R84：**在提交处显式失败**，而不是留下一个"看似 running"的 mission。
        *
@@ -3245,6 +3285,10 @@ export class MainController {
           }),      onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
+        /**
+         * R86：这里是**中断**（早停/门禁失败），不是终态：不能走终态单点，
+         * 否则续跑完成后无法再写 done（G5 实测卡死）。
+         */
         void this.options.missionManager
           .updateMissionStatus(missionId, "blocked")
           .then(async () => {
@@ -3350,10 +3394,7 @@ export class MainController {
                   missionId,
                   `[完成门禁] 拒绝标记 done：${completionGate.blockedReasons.join("；")}`,
                 );
-                void this.options.missionManager.updateMissionStatus(
-                  missionId,
-                  "blocked",
-                );
+                void this.finalizeMissionStatus(missionId, "blocked");
                 return;
               }
               this.options.missionRuntimeRegistry?.release(missionId);
@@ -3361,7 +3402,7 @@ export class MainController {
               void this.registerMissionArtifacts(missionId);
               /** ALIGN-02-07：任务收口 ⇒ 事件唤醒（让依赖解锁/补位不再靠轮询）。 */
               this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
-              await this.options.missionManager.updateMissionStatus(missionId, status);
+              await this.finalizeMissionStatus(missionId, status);
               try {
                 await this.ingestMissionTerminalReport(missionId, status);
               } catch {
@@ -3375,8 +3416,7 @@ export class MainController {
           void this.registerMissionArtifacts(missionId);
           /** ALIGN-02-07：任务收口 ⇒ 事件唤醒（让依赖解锁/补位不再靠轮询）。 */
           this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
-          return this.options.missionManager
-            .updateMissionStatus(missionId, status)
+          return this.finalizeMissionStatus(missionId, status)
             .then(async () => {
               /**
                * ALIGN-01-06：终态写入报告索引（只读索引，不注入上下文）。
@@ -3419,7 +3459,7 @@ export class MainController {
      */
     const goalGateObservation = this.observeGoalDispatchGate(missionId);
     if (goalGateObservation.isBlocked) {
-      void this.options.missionManager.updateMissionStatus(missionId, "blocked");
+      void this.finalizeMissionStatus(missionId, "blocked");
       /**
        * R84：**在提交处显式失败**，而不是留下一个"看似 running"的 mission。
        *
@@ -3484,8 +3524,7 @@ export class MainController {
           }),      onMissionGateBlocked: (failureReason) => {
         this.options.missionRuntimeRegistry?.release(missionId);
         this.options.streamOutput(missionId, `[需要用户] ${failureReason}`);
-        void this.options.missionManager
-          .updateMissionStatus(missionId, "blocked")
+        void this.finalizeMissionStatus(missionId, "blocked")
           .catch(() => {});
       },
       ...(this.options.isConversationMode === true ? { isConversationMode: true } : {}),
@@ -3549,7 +3588,7 @@ export class MainController {
          * ALIGN-01-06：devolve 没有下级报告 ⇒ 只更新 mission 终态，
          * 不往"主 Agent 只读报告索引"写一条伪下级报告。
          */
-        void this.options.missionManager.updateMissionStatus(missionId, status);
+        void this.finalizeMissionStatus(missionId, status);
         this.options.onMissionFinished?.(missionId, status);
         /** ALIGN-02-07：终态事件唤醒调度。 */
         this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
@@ -3597,9 +3636,7 @@ export class MainController {
         this.options.missionRuntimeRegistry?.release(missionId);
       this.activeOrchestrators.delete(missionId);
       this.options.streamOutput(missionId, `[mission-locked] ${error.message}`);
-      void this.options.missionManager
-        .updateMissionStatus(missionId, "blocked")
-        .catch(() => {});
+      void this.finalizeMissionStatus(missionId, "blocked").catch(() => {});
       /**
        * DIAG-01（2026-11-08，第 114 轮）：**调度启动失败**此前只输出一行消息并把 mission 置 blocked，
        * 诊断存储**学不到**发生了什么 ⇒ 按 `stage: "dispatch"` 上报。

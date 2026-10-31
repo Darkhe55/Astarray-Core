@@ -4609,3 +4609,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `evidenceGapCount: 1`（修复前不会暂停）。
 > **验证**：G5 2/2；全量 471 files / 3588 tests；typecheck/lint/build 绿。
 > **仍未解决**：mission 终态仍 `cancelled`（目标暂停已落盘）、`consumedToolCalls` 仍 0、边界停止状态仍 `cancelled`。ADR-0149。
+
+> **160（R86）：终态单点写入 + 目标状态合并（部分完成）**：①`finalizeMissionStatus` 终态不可互相覆盖，
+> **`done` 例外**（可覆盖中断型 blocked）；②`onMissionGateBlocked` 中断路径**不**走终态单点
+> （否则早停续跑写不了 done，**G5 曾稳定失败 45s**）；③`finishTaskGroup` 改为**合并磁盘最新状态**
+> （保留 pauseReason/缺口/requiresReplanning，consumed 取 max）；④失败组用控制器计数补齐已执行。
+> **真实复跑**（goal-k10g）：`isPaused: true`、`consumedToolCalls: 1`（修复前 0）、pauseReason/缺口保留。
+> **验证**：G5 2/2；全量 471 files / 3588 tests；typecheck/lint/build 绿。
+> **仍未解决**：mission 终态仍 `cancelled`（CLI 失败后立即 shutdown，cancel 先落库，治理 blocked 被拒）——收口时序未改。ADR-0150。

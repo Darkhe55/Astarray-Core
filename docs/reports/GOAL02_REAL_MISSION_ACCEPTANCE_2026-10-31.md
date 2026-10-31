@@ -253,3 +253,18 @@ goal-mode status → isPaused: true
 验证：G5 2/2；全量 471 files / 3588 tests；typecheck/lint/build 绿。
 
 **仍未解决**：mission 终态仍 `cancelled`（目标暂停已正确落盘）；任务失败时 `consumedToolCalls` 仍 0（与"已执行 1"不一致）；边界停止输出状态仍 `cancelled`。
+
+## 13. R86 终态单点写入 + 目标状态合并（2026-10-31 21:3x-21:4x）
+
+- `finalizeMissionStatus`：终态不可互相覆盖；**`done` 例外**（可覆盖"中断型 blocked"）；
+- `onMissionGateBlocked`（早停/门禁失败）**不**走终态单点（否则续跑完成写不了 done）；
+- `GoalModeStateStore.finishTaskGroup` 改为**以磁盘最新状态合并**（保留 pauseReason/缺口/requiresReplanning，
+  consumed 取 max），并让失败组用控制器计数补齐"已执行"。
+
+真实复跑（goal-k10g，上限 1）：`isPaused: true`、`consumedToolCalls: 1`（修复前 0）、
+`pauseReason` 与 `evidenceGapCount` 均保留。
+
+回归教训：G5 早停续跑曾稳定失败（45s running），原因就是"中断 blocked 被当终态"；修后 2/2 通过。
+
+**仍未解决**：mission 终态仍 `cancelled`（CLI 任务失败后立即 shutdown → scheduler.cancel 先落 cancelled，
+治理 blocked 被终态单点拒绝）；根因是收口时序，未在 CLI 层调整。
