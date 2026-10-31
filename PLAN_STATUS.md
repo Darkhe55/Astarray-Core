@@ -4591,3 +4591,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `[需要用户] …拒绝继续调度`、hello7.md 已保留、`isEnforced:true`、`reasonCode:goal-paused`）。
 > **发现未修**：`run` 输出状态与真实不符（running/cancelled vs blocked）、预算 2/1、一次 unhandled（重跑消失）。
 > **验证**：`tests/core --maxWorkers=2` 3588 全通过（其中一次 exit 1 因 unhandled，重跑 exit 0）。ADR-0147。
+
+> **158（R84）：修复 R83 报告两条不一致（完成）**：①启动门禁阻断改为**置 blocked + 抛出**
+> `invalid-task-chain`（复跑 `status: blocked`，不再误报 `running`）。**注**：先试过把
+> `summary.status==="blocked"` 直接映射为 blocked，导致 **G5 早停续跑稳定失败**（续跑期间短暂 blocked），
+> 已回退并注释；②预算改为**执行前守卫**：新错误码 `tool-budget-exhausted`、控制器进程内计数、
+> 门禁 `getEffectiveMaximumToolCalls()`（取更严）。复跑：`已执行 1，上限 1：拒绝执行 createProjectFile`，
+> `hello9.md` 未创建（修复前第二次调用仍会执行，事后统计 2/1）。
+> **验证**：G5 2/2；全量 471 files / 3588 tests（一次瞬时 e2e01 失败，单跑通过）；typecheck/lint/build 绿。
+> **未修**：预算耗尽的 mission 终态为 `cancelled`（应 blocked）且目标不自动暂停；短暂 blocked 仍对外可见。ADR-0148。
