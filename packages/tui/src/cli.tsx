@@ -205,6 +205,7 @@ program
   .option("--goal-enforce", "强制模式：目标门禁不通过 ⇒ 阻断派发/停止调度（缺省只观察）")
   .option("--goal-require-completion", "完成耦合：目标证据不齐 ⇒ 不判 done")
   .option("--goal-budget <count>", "任务级工具调用预算（与目标上限取更严）")
+  .option("--model-planning", "启用模型任务分解（规划器产出多节点；缺省单节点）")
   .option(
     "--conversation",
     "对话模式：无工具调用、无产物时纯文本回复不要求完成控制事件",
@@ -229,6 +230,7 @@ program
         goalEnforce?: boolean;
         goalRequireCompletion?: boolean;
         goalBudget?: string;
+        modelPlanning?: boolean;
       },
     ) => {
       /**
@@ -277,6 +279,9 @@ program
         ...(options.goalBudget === undefined
           ? {}
           : { missionToolCallBudget: Number(options.goalBudget) }),
+        ...(options.modelPlanning === true
+          ? { isModelTaskPlanningEnabled: true }
+          : {}),
         timeoutSeconds,
         ...(options.providerEndpoint !== undefined
           ? { providerEndpoint: options.providerEndpoint }

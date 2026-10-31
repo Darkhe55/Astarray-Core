@@ -32,6 +32,8 @@ export type TaskDecompositionDraftProvider = (
 export interface ModelBackedTaskDecompositionProviderOptions {
   readonly runtimeFactory: (plannerAgentInstanceIdentifier: string) => AgentRuntime;
   readonly budgetMilliseconds?: number;
+  /** R100：可用工具名（规划器只能从这里选；空数组也要明说）。 */
+  readonly availableToolNames?: readonly string[];
 }
 
 /** 规划运行时需要一个任务节点占位（不是真实执行节点，不会进入任务链）。 */
@@ -72,7 +74,8 @@ export function createModelBackedTaskDecompositionProvider(
           '格式：{"nodes":[{"id":"T-01","description":"做什么","dependsOn":[],' +
           '"acceptanceCriteria":"怎样算完成","toolNames":[]}]}\n' +
           "要求：节点不超过 12 个；id 只能含字母数字._-；dependsOn 只能引用已出现的 id；" +
-          "每个节点必须有可核对的 acceptanceCriteria；不要输出 sourceKind/priorityTier 等权威字段。",
+          "每个节点必须有可核对的 acceptanceCriteria；不要输出 sourceKind/priorityTier 等权威字段。\n" +
+          `可用工具名（toolNames 只能从这里选；没有合适工具就用空数组）：${(options.availableToolNames ?? []).join(", ") || "（无）"}`, 
         userPrompt:
           `用户任务：${request.instructionText}\n` +
           (request.projectSummary === null
