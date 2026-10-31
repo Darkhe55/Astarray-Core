@@ -156,3 +156,26 @@ astarray: [需要用户] 目标未完成，不标记完成: 要求 req-1 证据�
 - `--goal-enforce` 的**组边界停止**（需"运行中目标被暂停"的场景）；
 - **正向完成**（`req-1` 需要 accepted 独立裁决；当前单任务流程不产生裁决 ⇒ V 恒为 1）；
 - 模型在对话中**自主提议目标**（未注册工具）。
+
+## 9. R82 正向完成（2026-10-31 19:19）
+
+修正两处后重跑，**第一次正向完成**：
+
+- 顺序：`handleWorkerOutcome`（任务 done 落账）→ `maybeFinishGoalTaskGroup`（此时 V 才看得到 done）；
+- 证据：`deterministic-check` 谓词允许"任务 done + 验证收据（hasVerifiedCompletionControlEvent + artifactPaths 非空）"记 0。
+
+```
+run --goal goal-acceptance-1 --goal-require-completion …
+→ {"missionId":"mission-6ed57632","mode":"assist","status":"done"}
+
+goal-mode status --goal goal-acceptance-1
+→ lastPotentialValue: 0, requirementBasisCount: 1, consumedToolCalls: 1, stabilityGuarantee: "none"
+
+completion-receipts/mission-6ed57632/T-001.json
+→ hasVerifiedCompletionControlEvent: true, toolCallCount: 1, artifactPaths: ["hello5.md"]
+
+test/workspace/hello5.md → 内容正确
+```
+
+**意义**：K1（提案/确认）→ K2（映射）→ 启动前绑定 → V=0 → K7 完成耦合放行，整条链路真实跑通。
+仍未实跑：`--goal-enforce` 的组边界停止、accepted 裁决路径。

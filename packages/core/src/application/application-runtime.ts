@@ -1274,6 +1274,8 @@ export async function createApplicationRuntime(
           missionTasks.map((task) => [task.id, task.status]),
         );
         const acceptedVerdictTaskIdentifiers = new Set<string>();
+        /** R82：有"验证完成控制事件 + 至少一个产物"收据的任务（确定性判据证据）。 */
+        const verifiedReceiptTaskIdentifiers = new Set<string>();
         let receiptToolCallTotal = 0;
         for (const task of missionTasks) {
           if (task.status !== "done") {
@@ -1290,6 +1292,13 @@ export async function createApplicationRuntime(
             .catch(() => null);
           if (receipt !== null && Number.isFinite(receipt.toolCallCount)) {
             receiptToolCallTotal += Math.max(0, Math.trunc(receipt.toolCallCount));
+          }
+          if (
+            receipt !== null &&
+            receipt.hasVerifiedCompletionControlEvent === true &&
+            receipt.artifactPaths.length > 0
+          ) {
+            verifiedReceiptTaskIdentifiers.add(task.id);
           }
         }
         /** R72（K2）：动态映射优先；revision 变化后旧映射失效 ⇒ 回退契约静态字段。 */
@@ -1310,6 +1319,7 @@ export async function createApplicationRuntime(
           missionTaskStatusByTaskIdentifier,
           taskIdentifiersWithAcceptedVerdict: acceptedVerdictTaskIdentifiers,
           taskNodeIdentifiersByRequirement,
+          taskIdentifiersWithVerifiedReceipt: verifiedReceiptTaskIdentifiers,
         });
         const potentialResult = computeGoalPotential({ contract, assessments });
         const gate = goalGateCache.resolve(input.missionIdentifier);
