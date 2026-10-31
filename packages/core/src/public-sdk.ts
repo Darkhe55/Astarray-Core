@@ -5484,6 +5484,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *
    * 映射层会把短暂 blocked 报成 running（续跑语义），CLI 关闭前需要原始值判断"终态是否已落库"。
    */
+  /** R93：登记 Agent 身份（演练/宿主用；只写身份与隶属，不创建记忆）。 */
+  registerAgentIdentity(input: {
+    readonly agentInstanceId: string;
+    readonly agentRole: "main" | "secondary" | "tertiary" | "quaternary";
+    readonly missionId: string | null;
+    readonly owningSecondaryAgentInstanceId: string | null;
+    readonly boundTaskBundleId?: string | null;
+  }): void {
+    this.assertOpen();
+    this.runtime.registerAgentIdentity(input);
+  }
+
   /** R91：任命执行/测试/验收（复用既有门禁规则；不复制判定）。 */
   appointIndependentReview(input: {
     readonly appointmentIdentifier: string;

@@ -4657,3 +4657,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 的 `sourceRequestReference: "mission:mission-a8100852"`、目标文本/要求来自模型、`confirmedAtIso: null`（待用户确认）。
 > **验证**：新单测 3/3；全量 **471 files / 3591 tests**；typecheck/lint/build 绿。ADR-0155。
 > **未做**：②三 Agent 身份 + accepted 裁决演练（需夹具）；提案重复/展示限制。
+
+> **166（R93）：三 Agent 身份 + 独立裁决真实演练（②，部分完成）**：发现并修复接线缺口——
+> `MainController` 未收到 `completionVerdictStore` ⇒ 裁决只校验、**不落盘**；已传。
+> 新增 `registerAgentIdentity`（运行时 + SDK，只写身份/隶属）；演练脚本登记 3 个 tertiary、任命、记裁决。
+> **真实证据**：`test/drill-state/completion-verdicts/mission-drill-1/T-001.json` 为 `verdict:"accepted"`、
+> 验收者 `tertiary:accept-1`、理由非自报（首次运行"成功但无文件"即缺口实证）。
+> **验证**：全量 471 files / 3591 tests；typecheck/lint/build 绿。
+> **未完成**：accepted 裁决 → V=0 的端到端（V 在组结束算，裁决只能在任务完成后写；需多组 mission 或重算入口）。
