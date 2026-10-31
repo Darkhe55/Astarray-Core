@@ -1224,6 +1224,7 @@ export async function createApplicationRuntime(
         sourceRequestReference: input.contract.sourceRequestReference,
         requirementBases: [],
         lastPotentialValue: null,
+        goalStartedAtIso: new Date().toISOString(),
         currentTaskGroupIdentifier: null,
         currentTaskGroupStartedAtIso: null,
         consumedToolCalls: 0,
