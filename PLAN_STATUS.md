@@ -4533,3 +4533,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：单测 5/5；`typecheck`/`lint`/`build` 全绿。
 > **未做**：未从 `maximumLoopIterations` 自动推导任务预算（语义不同）、只覆盖工具调用数、
 > 成本/时长未联动、无集成测试。ADR-0142。
+
+> **152（R78）：K4 安全不变量（完成，默认不阻断）**：`nonViolableInvariants` 收窄为枚举
+> （`tool.permission-denied`/`scope.project-boundary`/`storage.protected-write`/`installation.gate`；
+> 未知拒绝）；门禁 `recordInvariantViolation`（**仅声明时记录**）+ `assertDispatchAllowed` ⇒
+> `safety-invariant-violated`，**独立于 V**；唯一生产者 = 工具端口装饰捕获 `tool-permission-denied`
+> （原错误照常抛出）。**验证**：单测 4/4；`typecheck`/`lint` 绿。
+> **未做**：其余 3 个标识无生产者、违规不持久化、无集成测试、语义偏保守。ADR-0143。

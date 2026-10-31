@@ -13,6 +13,7 @@
  */
 import { DomainError } from "../core/errors.js";
 import { isKnownGoalPauseCondition } from "./goal-pause-condition-catalog.js";
+import { isKnownGoalInvariantCode } from "./goal-invariant-catalog.js";
 
 /** 目标契约版本（字段变动即递增）。 */
 export const GOAL_CONTRACT_SCHEMA_VERSION = 1;
@@ -91,6 +92,12 @@ export function validateGoalContract(contract: GoalContract): GoalContractValida
     reasons.push("缺少原始要求引用");
   }
   /** R76（K6）：暂停条件必须是**可评估的有限枚举**，未知字符串一律拒绝。 */
+  /** R78（K4）：不可违反项必须是**可核对的不变量标识**，自由文本无法与本地违规信号匹配。 */
+  for (const invariantCode of contract.nonViolableInvariants) {
+    if (!isKnownGoalInvariantCode(invariantCode)) {
+      reasons.push(`未知的不变量标识: ${invariantCode}（必须是可核对的枚举值）`);
+    }
+  }
   for (const pauseCondition of contract.pauseConditions) {
     if (!isKnownGoalPauseCondition(pauseCondition)) {
       reasons.push(`未知的暂停条件: ${pauseCondition}（必须是可评估的枚举值）`);

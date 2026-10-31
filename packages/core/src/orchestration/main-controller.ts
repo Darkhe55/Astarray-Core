@@ -232,6 +232,17 @@ export interface MainControllerOptions {
    * 装配后：mission 准备判 `done` 时先问目标；不满足 ⇒ **降级为 blocked** 并升级原因。
    * `isApplicable:false`（未绑定/实验关闭）⇒ 不影响收口。
    */
+  /**
+   * R78（2026-10-31）：**不变量违规上报端口（K4）**（可选；缺省不参与）。
+   *
+   * 目前唯一的生产者是工具端口装饰：工具被权限门禁拒绝 ⇒ 上报 `tool.permission-denied`。
+   * 是否真的阻断派发仍由契约是否声明该不变量 + 强制模式决定。
+   */
+  onGoalInvariantViolation?: (input: {
+    readonly missionIdentifier: string;
+    readonly invariantCode: string;
+    readonly detail: string;
+  }) => void;
   missionCompletionGoalPort?: (missionIdentifier: string) => Promise<{
     readonly isAllowed: boolean;
     readonly isApplicable: boolean;
@@ -3614,15 +3625,48 @@ export class MainController {
       missionId,
     );
     const buildCheckpointingPort = this.options.buildRecoveryCheckpointingToolPort;
-    if (buildCheckpointingPort === undefined) {
-      return innerToolPort;
+    const portWithCheckpointing =
+      buildCheckpointingPort === undefined
+        ? innerToolPort
+        : buildCheckpointingPort({
+            missionId,
+            task,
+            agentInstanceId: agentInstanceId ?? `worker:${task.id}`,
+            innerToolPort,
+          });
+    const reportInvariantViolation = this.options.onGoalInvariantViolation;
+    if (reportInvariantViolation === undefined) {
+      return portWithCheckpointing;
     }
-    return buildCheckpointingPort({
-      missionId,
-      task,
-      agentInstanceId: agentInstanceId ?? `worker:${task.id}`,
-      innerToolPort,
-    });
+    /**
+     * R78（K4）：**不变量违规检出**——只检出工具权限拒绝（唯一现存的本地拒绝信号）。
+     *
+     * 记录后仍**照常抛出原错误**（不改变工具层行为）；是否阻断由目标门禁决定。
+     */
+    return {
+      execute: async (toolName, argumentsJson, callId, cancellationSignal) => {
+        try {
+          return await portWithCheckpointing.execute(
+            toolName,
+            argumentsJson,
+            callId,
+            cancellationSignal,
+          );
+        } catch (error) {
+          if (
+            error instanceof DomainError &&
+            error.errorCode === "tool-permission-denied"
+          ) {
+            reportInvariantViolation({
+              missionIdentifier: missionId,
+              invariantCode: "tool.permission-denied",
+              detail: `${toolName}: ${error.message}`,
+            });
+          }
+          throw error;
+        }
+      },
+    };
   }
 
   /**

@@ -53,7 +53,8 @@ export type GoalDispatchVerdict =
         | "scope-violation"
         | "budget-exhausted"
         | "deadline-passed"
-        | "requires-replanning";
+        | "requires-replanning"
+        | "safety-invariant-violated";
       readonly detail: string;
       readonly evidenceGaps: readonly string[];
     };
@@ -96,11 +97,16 @@ export class GoalDispatchGate {
   private evidenceGaps: string[] = [];
   private consumedToolCalls = 0;
   /**
-   * R77（2026-10-31）：**外部（任务/调度）工具预算**（K11）。
+   * R78（K4）：**已记录的不变量违规**（本地检出）。
    *
-   * 目标契约有目标级上限；宿主可再给一个"任务总预算"。两者都存在时**取更严**。
-   * 注意：外部值**不持久化**（它属于运行时配置），重启后需重新注入。
+   * 只保存"标识 + 说明 + 时间"；不因 V 下降而清除（安全不变量独立于进展）。
+   * 不写入快照 ⇒ 重启后丢失（需重新检出），这是已知限制。
    */
+  private readonly recordedInvariantViolations: {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[] = [];
   private externalToolCallBudget: number | null = null;
   private externalBudgetSource: string | null = null;
   private requiresReplanning = false;
@@ -207,6 +213,17 @@ export class GoalDispatchGate {
         evidenceGaps: [...this.evidenceGaps],
       };
     }
+    if (this.recordedInvariantViolations.length > 0) {
+      const violation = this.recordedInvariantViolations[0]!;
+      return {
+        isAllowed: false,
+        reasonCode: "safety-invariant-violated",
+        detail: `不可违反项 ${violation.invariantCode} 已被违反：${violation.detail}`,
+        evidenceGaps: this.recordedInvariantViolations.map(
+          (recorded) => `${recorded.invariantCode}: ${recorded.detail}`,
+        ),
+      };
+    }
     if (this.requiresReplanning) {
       return {
         isAllowed: false,
@@ -308,6 +325,37 @@ export class GoalDispatchGate {
       toolName: GOAL_MISSION_DISPATCH_PSEUDO_TOOL_NAME,
       nowIso: input.nowIso,
     });
+  }
+
+  /**
+   * R78（K4）：**记录一次不变量违规**（由本地检出源调用，模型不可调用）。
+   *
+   * 只有契约**声明了**该标识时才会记录（未声明的违规不改变目标行为）。
+   * 记录后 `assertDispatchAllowed` 会拒绝派发（是否真的阻断仍由强制模式决定）。
+   */
+  recordInvariantViolation(input: {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }): boolean {
+    if (!this.contract.nonViolableInvariants.includes(input.invariantCode)) {
+      return false;
+    }
+    this.recordedInvariantViolations.push({
+      invariantCode: input.invariantCode,
+      detail: input.detail,
+      recordedAtIso: input.recordedAtIso,
+    });
+    return true;
+  }
+
+  /** 当前已记录的不变量违规（只读副本）。 */
+  getRecordedInvariantViolations(): readonly {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[] {
+    return [...this.recordedInvariantViolations];
   }
 
   /**

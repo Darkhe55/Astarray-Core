@@ -2479,6 +2479,19 @@ export async function createApplicationRuntime(
     missionSequenceBindingStore,
     /** R24：推迟插入队列（控制器入队；尚不消费）。 */
     deferredInsertionQueueStore,
+    /**
+     * R78（K4）：**不变量违规上报**（工具权限拒绝 ⇒ 记录到目标门禁）。
+     *
+     * 只在契约声明 `tool.permission-denied` 且强制模式开启时才会真的阻断派发。
+     */
+    onGoalInvariantViolation: (violation) => {
+      const gate = goalGateCache.resolve(violation.missionIdentifier);
+      gate?.recordInvariantViolation({
+        invariantCode: violation.invariantCode,
+        detail: violation.detail,
+        recordedAtIso: new Date().toISOString(),
+      });
+    },
     /** R74：目标完成耦合（缺省不传 ⇒ 不参与）。 */
     ...(options.isGoalCompletionRequired === true
       ? { missionCompletionGoalPort }
