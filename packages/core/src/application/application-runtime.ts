@@ -137,6 +137,10 @@ import type { PersistedGoalModeState } from "../orchestration/goal-mode-store.js
 import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
 import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdict-journal.js";
 import { GoalRequirementMappingStore } from "../orchestration/goal-requirement-mapping-store.js";
+import {
+  GOAL_PROPOSAL_TOOL_DESCRIPTOR,
+  GOAL_PROPOSAL_TOOL_NAME,
+} from "../tools/goal-proposal-tool.js";
 import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
 import { evaluateGoalPauseConditions } from "../orchestration/goal-pause-conditions.js";
 import { buildInvalidatedGoalState } from "../orchestration/goal-evidence-invalidation.js";
@@ -3004,8 +3008,8 @@ export async function createApplicationRuntime(
       workspaceRootPath?: string,
       projectIdentifier?: string,
       missionIdentifier?: string,
-    ) =>
-      new ScopeGatedToolPort(
+    ) => {
+      const policyPort = new ScopeGatedToolPort(
         createPolicyWrapperForAgent({
           agentInstanceId: agentInstanceId ?? `worker:${task.id}`,
           allowedToolNames,
@@ -3018,7 +3022,102 @@ export async function createApplicationRuntime(
           ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
         }),
         scopeAuthorizationGate,
-      ),
+      );
+      /**
+       * R92（2026-11-01，③-B）：**目标提议工具**的执行分派。
+       *
+       * - 仅目标模式已激活时可用；
+       * - 只**落提案**（`proposeGoalContract`），绝不创建契约、不启用目标模式；
+       * - 来源引用用 `mission:<id>`（由本地派生，模型无法伪造"用户说过"）。
+       */
+      return {
+        execute: async (toolName, argumentsJson, callId, cancellationSignal) => {
+          if (toolName !== GOAL_PROPOSAL_TOOL_NAME) {
+            return policyPort.execute(
+              toolName,
+              argumentsJson,
+              callId,
+              cancellationSignal,
+            );
+          }
+          if (!isGoalModeActivated) {
+            return {
+              kind: "error",
+              callId,
+              errorCode: "goal-mode-not-active",
+              errorMessage: "目标模式未激活：不能提议目标。",
+              isIdempotencyConfirmed: false,
+              sideEffectStatus: "none",
+            };
+          }
+          if (missionIdentifier === undefined) {
+            return {
+              kind: "error",
+              callId,
+              errorCode: "mission-context-missing",
+              errorMessage: "缺少 mission 上下文：无法为提案生成来源引用。",
+              isIdempotencyConfirmed: false,
+              sideEffectStatus: "none",
+            };
+          }
+          let parsedArguments: {
+            objectiveText?: unknown;
+            requirements?: unknown;
+          };
+          try {
+            parsedArguments = JSON.parse(argumentsJson) as typeof parsedArguments;
+          } catch {
+            return {
+              kind: "error",
+              callId,
+              errorCode: "invalid-arguments",
+              errorMessage: "proposeGoal 参数不是合法 JSON。",
+              isIdempotencyConfirmed: false,
+              sideEffectStatus: "none",
+            };
+          }
+          const draft: GoalContractProposalDraft = {
+            objectiveText:
+              typeof parsedArguments.objectiveText === "string"
+                ? parsedArguments.objectiveText
+                : "",
+            requirements: Array.isArray(parsedArguments.requirements)
+              ? (parsedArguments.requirements as GoalContractProposalDraft["requirements"])
+              : [],
+            scope: { projectIdentifiers: [], allowedToolNames: null },
+            nonViolableInvariants: [],
+            resourceLimits: {
+              maximumToolCalls: null,
+              maximumWallClockSeconds: null,
+              maximumCostUnits: null,
+            },
+            deadlineIso: null,
+            pauseConditions: [],
+          };
+          try {
+            const proposal = await proposeGoalContract({
+              draft,
+              sourceRequestReference: `mission:${missionIdentifier}`,
+            });
+            return {
+              kind: "success",
+              callId,
+              outputText: `目标提案已创建: ${proposal.proposalIdentifier}（需用户确认；owner 确认后才生成契约）`,
+              isSideEffectFree: false,
+            };
+          } catch (error) {
+            return {
+              kind: "error",
+              callId,
+              errorCode: "goal-proposal-invalid",
+              errorMessage: (error as Error).message,
+              isIdempotencyConfirmed: false,
+              sideEffectStatus: "none",
+            };
+          }
+        },
+      };
+    },
     buildRecoveryCheckpointingToolPort,
     // T06B/ADR-0014：思索模式本地只读白名单（查看项目文件、检索文本和查询只读任务状态）。
     // 只暴露白名单工具描述符；权限裁决与策略引擎在派发与真实执行两个时点 fail-closed。
@@ -3067,10 +3166,19 @@ export async function createApplicationRuntime(
     ...(options.isHighRigorEnforcementEnabled === true
       ? { isHighRigorEnforcementEnabled: true }
       : {}),
-    resolveToolDescriptors: (task: TaskDependencyNode): ToolDescriptor[] =>
-      task.toolNames
+    resolveToolDescriptors: (task: TaskDependencyNode): ToolDescriptor[] => {
+      const descriptors = task.toolNames
         .map((toolName) => registry.getDescriptor(toolName))
-        .filter((descriptor): descriptor is ToolDescriptor => descriptor !== undefined),
+        .filter((descriptor): descriptor is ToolDescriptor => descriptor !== undefined);
+      /**
+       * R92（③-B）：目标模式激活时，模型**额外**看到 `proposeGoal`（只能提议）。
+       * 未激活时不暴露（避免"能调但一定失败"的工具面）。
+       */
+      if (isGoalModeActivated) {
+        descriptors.push(GOAL_PROPOSAL_TOOL_DESCRIPTOR);
+      }
+      return descriptors;
+    },
     requireCompletionControlEvent: options.requireCompletionControlEvent ?? false,
     isConversationMode: options.isConversationMode === true,
     // 产物对账必须使用与工具写入一致的工作区根（2026-10-02）。
