@@ -489,3 +489,37 @@ export async function executeGoalModeInvalidateCommand(
     await application.shutdown();
   }
 }
+
+/** R94：`goal-mode recompute` —— 按当前证据（含已落盘的 accepted 裁决）重算 V。 */
+export interface GoalModeRecomputeCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly goalIdentifier: string;
+  readonly missionIdentifier: string;
+}
+
+export async function executeGoalModeRecomputeCommand(
+  input: GoalModeRecomputeCommandInput,
+): Promise<number> {
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.recomputeGoalPotential({
+      goalIdentifier: input.goalIdentifier,
+      missionIdentifier: input.missionIdentifier,
+    });
+    if (input.isJsonOutput) {
+      printJson({ ...result, statusLabel: "goal-potential-recomputed" });
+    } else {
+      process.stdout.write(
+        `V 重算: ${result.status === "computed" ? String(result.potentialValue) : result.status}${result.reason === null ? "" : `（${result.reason}）`}\n`,
+      );
+    }
+    return result.status === "skipped" ? EXIT_CODES.USAGE_ERROR : EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
+}

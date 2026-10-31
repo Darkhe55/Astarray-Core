@@ -304,6 +304,15 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R94：按当前证据重算 V（裁决落盘后使用；不改门禁/暂停）。 */
+  recomputeGoalPotential: (input: {
+    readonly goalIdentifier: string;
+    readonly missionIdentifier: string;
+  }) => Promise<{
+    readonly status: "computed" | "unknown" | "skipped";
+    readonly potentialValue: number | null;
+    readonly reason: string | null;
+  }>;
   /** R93：登记 Agent 身份（演练/宿主用；只写身份与隶属）。 */
   registerAgentIdentity: (input: {
     readonly agentInstanceId: string;
@@ -1859,6 +1868,106 @@ export async function createApplicationRuntime(
   }): Promise<void> => {
     await controller.recordAcceptanceVerdict(input);
   };
+  /**
+   * R94（2026-11-01，方案 B）：**按当前证据重算 V**。
+   *
+   * 组结束才计算 V，而 accepted 裁决只能在任务完成后记录；本入口让宿主在
+   * "裁决落盘后"重算一次，不改变任何门禁/暂停状态，只更新 V 与依据。
+   *
+   * 纯读任务链/收据/裁决 + 已有映射；不派发、不写任务链。
+   */
+  const recomputeGoalPotential = async (input: {
+    readonly goalIdentifier: string;
+    readonly missionIdentifier: string;
+  }): Promise<{
+    readonly status: "computed" | "unknown" | "skipped";
+    readonly potentialValue: number | null;
+    readonly reason: string | null;
+  }> => {
+    const [contract, state] = await Promise.all([
+      goalContractStore.read(input.goalIdentifier).catch(() => null),
+      goalModeStateStore.read(input.goalIdentifier).catch(() => null),
+    ]);
+    if (contract === null || state === null) {
+      return { status: "skipped", potentialValue: null, reason: "契约或状态缺失" };
+    }
+    if (state.contractRevision !== contract.revision) {
+      return { status: "skipped", potentialValue: null, reason: "revision 不一致" };
+    }
+    const missionStatus = await missionManager.getMissionStatus(input.missionIdentifier);
+    const missionTasks = missionStatus.taskChain?.tasks ?? [];
+    const missionTaskStatusByTaskIdentifier = new Map(
+      missionTasks.map((task) => [task.id, task.status]),
+    );
+    const acceptedVerdictTaskIdentifiers = new Set<string>();
+    const verifiedReceiptTaskIdentifiers = new Set<string>();
+    for (const task of missionTasks) {
+      if (task.status !== "done") {
+        continue;
+      }
+      const verdictRecord = await completionVerdictStore
+        .read(input.missionIdentifier, task.id)
+        .catch(() => null);
+      if (verdictRecord !== null && verdictRecord.verdict === "accepted") {
+        acceptedVerdictTaskIdentifiers.add(task.id);
+      }
+      const receipt = await completionReceiptStore
+        .read(input.missionIdentifier, task.id)
+        .catch(() => null);
+      if (
+        receipt !== null &&
+        receipt.hasVerifiedCompletionControlEvent === true &&
+        receipt.artifactPaths.length > 0
+      ) {
+        verifiedReceiptTaskIdentifiers.add(task.id);
+      }
+    }
+    const mappingDocument = await goalRequirementMappingStore
+      .readForContractRevision(input.goalIdentifier, contract.revision)
+      .catch(() => null);
+    const assessments = assessGoalRequirementsFromLocalState({
+      contract,
+      missionTaskStatusByTaskIdentifier,
+      taskIdentifiersWithAcceptedVerdict: acceptedVerdictTaskIdentifiers,
+      taskNodeIdentifiersByRequirement: new Map(
+        (mappingDocument?.mappings ?? []).map((mapping) => [
+          mapping.requirementIdentifier,
+          mapping.taskNodeIdentifiers,
+        ]),
+      ),
+      taskIdentifiersWithVerifiedReceipt: verifiedReceiptTaskIdentifiers,
+    });
+    const potentialResult = computeGoalPotential({ contract, assessments });
+    if (potentialResult.status === "unknown") {
+      return {
+        status: "unknown",
+        potentialValue: null,
+        reason: potentialResult.reason,
+      };
+    }
+    const nextBases = potentialResult.assessments.map((assessment) => ({
+      requirementIdentifier: assessment.requirementIdentifier,
+      weight: assessment.weight,
+      evidence: assessment.evidence,
+      remainingContribution: assessment.remainingContribution,
+    }));
+    await goalModeStateStore.write({
+      ...state,
+      documentRevision: state.documentRevision + 1,
+      requirementBases: nextBases,
+      lastPotentialValue: potentialResult.potentialValue,
+      gateSnapshot: {
+        ...state.gateSnapshot,
+        lastPotentialValue: potentialResult.potentialValue,
+      },
+      updatedAtIso: new Date().toISOString(),
+    });
+    return {
+      status: "computed",
+      potentialValue: potentialResult.potentialValue,
+      reason: null,
+    };
+  };
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -3328,6 +3437,7 @@ export async function createApplicationRuntime(
     appointIndependentReview,
     recordIndependentVerdict,
     registerAgentIdentity,
+    recomputeGoalPotential,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,

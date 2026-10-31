@@ -5484,6 +5484,19 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *
    * 映射层会把短暂 blocked 报成 running（续跑语义），CLI 关闭前需要原始值判断"终态是否已落库"。
    */
+  /** R94：按当前证据重算 V（裁决落盘后使用）。 */
+  recomputeGoalPotential(input: {
+    readonly goalIdentifier: string;
+    readonly missionIdentifier: string;
+  }): Promise<{
+    readonly status: "computed" | "unknown" | "skipped";
+    readonly potentialValue: number | null;
+    readonly reason: string | null;
+  }> {
+    this.assertOpen();
+    return this.runtime.recomputeGoalPotential(input);
+  }
+
   /** R93：登记 Agent 身份（演练/宿主用；只写身份与隶属，不创建记忆）。 */
   registerAgentIdentity(input: {
     readonly agentInstanceId: string;
