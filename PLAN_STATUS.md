@@ -4648,3 +4648,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （复用既有三身份互斥/直属上级/证据非自报规则）；**未真实演练**（需三个已登记 Agent 实例）。
 > ③**模型自主提议工具未做**：需新增工具描述符 + 执行接线 + 允许工具集放行，不做占位工具。
 > **验证**：全量 471 files / 3588 tests；typecheck/lint/build 绿。ADR-0154。
+
+> **165（R92）：模型自主提议工具（③）完成并真实跑通**：新增 `proposeGoal` 描述符
+> （`mutationKind:none`、权限映射 `project.read`）；目标模式激活时经 `resolveToolDescriptors` 暴露；
+> `buildWorkerToolPort` 拦截执行 → **只落提案**（`proposeGoalContract`），来源引用本地派生 `mission:<id>`；
+> 未激活/缺 mission/参数非法分别返回结构化错误。
+> **真实证据**：`run --goal goal-k10r` → `status: done`；`goal-mode/proposals/goal-proposal-f5d88156-….json`
+> 的 `sourceRequestReference: "mission:mission-a8100852"`、目标文本/要求来自模型、`confirmedAtIso: null`（待用户确认）。
+> **验证**：新单测 3/3；全量 **471 files / 3591 tests**；typecheck/lint/build 绿。ADR-0155。
+> **未做**：②三 Agent 身份 + accepted 裁决演练（需夹具）；提案重复/展示限制。
