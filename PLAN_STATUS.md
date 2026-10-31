@@ -4540,3 +4540,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `safety-invariant-violated`，**独立于 V**；唯一生产者 = 工具端口装饰捕获 `tool-permission-denied`
 > （原错误照常抛出）。**验证**：单测 4/4；`typecheck`/`lint` 绿。
 > **未做**：其余 3 个标识无生产者、违规不持久化、无集成测试、语义偏保守。ADR-0143。
+
+> **153（R79）：K5 证据失效内核入口（完成；检测器仍在外侧）**：新增纯变换
+> `buildInvalidatedGoalState`（指定要求 ⇒ `invalidated` + 原因、剩余量回权重、**用 computeGoalPotential 重算 V**、
+> `unreliable` ⇒ `null`、置 `requiresReplanning`/暂停/缺口、快照与 revision 同步；未知要求抛错）；
+> 运行时 `invalidateGoalEvidence` 写状态并**同步所有已绑定 mission 的门禁**
+> （可算 V ⇒ `recordEvidenceInvalidation`；不可算 ⇒ 只 `pause`）。**`recordEvidenceInvalidation` 首次有调用方**。
+> **验证**：单测 3/3；`typecheck`/`lint` 绿。
+> **未做**：**无检测器**（谁判定失效仍属外部职责）、无集成测试、只到要求粒度、旧证据引用被覆盖。ADR-0144。
