@@ -221,3 +221,15 @@ goal-mode verdicts → isEnforced: true；最后 reasonCode: "goal-paused"
 2. 预算计数 `consumed=2 / max=1`（先执行后检查）；
 3. 一次全量测试跑出现 1 条 unhandled error（测试全过，重跑 exit 0，未定位）；
 4. `reasonCode` 只有 `goal-paused`，预算细节只在 detail。
+
+## 11. R84 修复两条不一致（2026-10-31 21:0x）
+
+1. **启动阻断不再误报 running**：`launch*Mission` 门禁拒绝 ⇒ 置 blocked + **抛出** `invalid-task-chain`；
+   复跑：`status: "blocked"`（修复前 `running`）。
+   *尝试直接改状态映射会让 G5 早停续跑稳定失败（短暂 blocked），已回退并注释说明。*
+2. **预算执行前守卫**：新错误码 `tool-budget-exhausted` + 控制器进程内计数 + 门禁有效上限；
+   复跑：`目标工具调用预算已用尽（已执行 1，上限 1）：拒绝执行 createProjectFile`，`hello9.md` 未创建。
+
+验证：G5 2/2 通过；全量 471 files / 3588 tests（一次瞬时 e2e01 失败，单跑通过）；typecheck/lint/build 绿。
+
+仍未解决：预算耗尽的任务失败使 mission 显示 `cancelled`（应为 blocked）且目标不自动暂停；短暂 blocked 对外可见；`permissionAsk` 映射遗留；边界停止仍显示 `cancelled`。

@@ -375,6 +375,11 @@ export class GoalDispatchGate {
       input.maximumToolCalls === null ? null : input.source;
   }
 
+  /** R84：对外暴露"有效上限"（目标与外部取更严），供工具执行前的预算守卫使用。 */
+  getEffectiveMaximumToolCalls(): number | null {
+    return this.effectiveMaximumToolCalls();
+  }
+
   /** 目标上限与外部上限中**更严**的那个；都为空 ⇒ null。 */
   private effectiveMaximumToolCalls(): number | null {
     const contractLimit = this.contract.resourceLimits.maximumToolCalls;

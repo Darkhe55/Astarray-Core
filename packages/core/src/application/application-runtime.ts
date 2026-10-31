@@ -2577,6 +2577,11 @@ export async function createApplicationRuntime(
      *
      * 只在契约声明 `tool.permission-denied` 且强制模式开启时才会真的阻断派发。
      */
+    /** R84：工具执行前的预算（有效上限；未绑定/无门禁 ⇒ null）。 */
+    goalToolCallBudgetForMission: (missionIdentifier) => {
+      const gate = goalGateCache.resolve(missionIdentifier);
+      return gate === null ? null : gate.getEffectiveMaximumToolCalls();
+    },
     /** R81：mission 创建时绑定目标（必须在 launch 前完成）。 */
     bindMissionGoalPort: async (input) => {
       await goalMissionBindingStore.bind({

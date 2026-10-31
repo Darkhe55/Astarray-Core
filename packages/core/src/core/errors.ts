@@ -13,6 +13,12 @@ export type DomainErrorCode =
   | "work-window-resting"
   | "tool-not-found"
   | "tool-permission-denied"
+  /**
+   * R84（2026-10-31）：**目标工具调用预算已用尽**（工具执行前拒绝，不是权限策略拒绝）。
+   *
+   * 与 `tool-permission-denied` 分开：前者是预算，后者是权限；混用会误触发安全不变量。
+   */
+  | "tool-budget-exhausted"
   | "permission-ask-pending"
   /**
    * GUI-02-01（2026-10-11）请求实体相关错误码。
