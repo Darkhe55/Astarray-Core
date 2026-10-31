@@ -87,6 +87,8 @@ const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
 
 /** 内置工具 → 权限映射（注册校验与执行裁决用）。 */
 const DEFAULT_TOOL_CAPABILITY_MAPPINGS: Record<string, string[]> = {
+  /** R92：目标提议只写本地提案（需用户确认后才生效），按最低风险归入项目读取能力。 */
+  proposeGoal: ["project.read"],
   readFile: ["project.read"],
   listDirectory: ["project.read"],
   writeFileTemporary: ["project.create"],
