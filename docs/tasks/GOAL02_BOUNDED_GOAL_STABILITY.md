@@ -232,3 +232,14 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **测试**：`tests/core/goal-invariant-violation.test.ts` 4/4 通过。
 - **未做**：其余三个标识**无生产者**；违规**不持久化**；无集成测试；语义偏保守
   （任何权限拒绝都算）。ADR-0143。
+
+### R79 证据失效的内核写入点（K5，2026-10-31）
+
+- 纯变换 `buildInvalidatedGoalState`：指定要求 ⇒ `invalidated` + 原因、剩余量回权重、**重算 V**
+  （`unreliable` ⇒ `null` 不给伪数字）、置 `requiresReplanning`/暂停原因/缺口、快照同步、revision+1；
+  未知要求抛错（不静默忽略）。
+- 运行时 `invalidateGoalEvidence`：写状态 + **同步所有已绑定 mission 的门禁**
+  （V 可算 ⇒ `recordEvidenceInvalidation`；不可算 ⇒ 只 `pause`）。
+- **测试**：`tests/core/goal-evidence-invalidation.test.ts` 3/3 通过。
+- **未做**：**仍无检测器**（"何时失效"由宿主/未来检测器决定）、无集成测试、只到"要求粒度"、
+  旧证据引用被覆盖。ADR-0144。

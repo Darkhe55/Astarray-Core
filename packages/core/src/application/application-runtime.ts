@@ -139,6 +139,7 @@ import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdi
 import { GoalRequirementMappingStore } from "../orchestration/goal-requirement-mapping-store.js";
 import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
 import { evaluateGoalPauseConditions } from "../orchestration/goal-pause-conditions.js";
+import { buildInvalidatedGoalState } from "../orchestration/goal-evidence-invalidation.js";
 import {
   GoalContractProposalStore,
   GOAL_PROPOSAL_SCHEMA_VERSION,
@@ -299,6 +300,15 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R79：标记证据失效（外部变化时由宿主/检测器调用；内核唯一写入点）。 */
+  invalidateGoalEvidence: (input: {
+    readonly goalIdentifier: string;
+    readonly requirementIdentifiers: readonly string[];
+    readonly reason: string;
+  }) => Promise<{
+    readonly potentialValueAfterInvalidation: number | null;
+    readonly invalidatedRequirementIdentifiers: readonly string[];
+  }>;
   /** R73：目标提案（只落提案，需用户确认后才生成契约）。 */
   proposeGoalContract: (input: {
     readonly draft: GoalContractProposalDraft;
@@ -1672,6 +1682,79 @@ export async function createApplicationRuntime(
     }
     return evaluateGoalCompletion({ contract, state });
   };
+  /**
+   * R79（2026-10-31）：**证据失效（K5 的生产者入口）**。
+   *
+   * 由宿主/检测器在"外部变化导致证据不再成立"时调用：
+   * 1. 纯变换状态（指定要求 ⇒ `invalidated`、按权重重算 V、置 `requiresReplanning` + 暂停原因 + 缺口）；
+   * 2. 持久化；
+   * 3. 同步所有**已绑定** mission 的内存门禁（V 可算 ⇒ `recordEvidenceInvalidation`；
+   *    不可算（unreliable 谓词）⇒ 只 `pause`，不伪造数字）。
+   *
+   * **谁来判定"失效"仍是外部职责**：本方法只提供内核侧的唯一写入点。
+   */
+  const invalidateGoalEvidence = async (input: {
+    readonly goalIdentifier: string;
+    readonly requirementIdentifiers: readonly string[];
+    readonly reason: string;
+  }): Promise<{
+    readonly potentialValueAfterInvalidation: number | null;
+    readonly invalidatedRequirementIdentifiers: readonly string[];
+  }> => {
+    const [contract, state] = await Promise.all([
+      goalContractStore.read(input.goalIdentifier).catch(() => null),
+      goalModeStateStore.read(input.goalIdentifier).catch(() => null),
+    ]);
+    if (contract === null || state === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `目标 ${input.goalIdentifier} 缺少契约或状态，无法标记证据失效。`,
+      );
+    }
+    const nowIso = new Date().toISOString();
+    let invalidation: ReturnType<typeof buildInvalidatedGoalState>;
+    try {
+      invalidation = buildInvalidatedGoalState({
+        contract,
+        state,
+        requirementIdentifiers: input.requirementIdentifiers,
+        reason: input.reason,
+        nowIso,
+      });
+    } catch (error) {
+      throw new DomainError("invalid-task-chain", (error as Error).message);
+    }
+    await goalModeStateStore.write(invalidation.nextState);
+    const bindings = await goalMissionBindingStore.list().catch(() => []);
+    for (const binding of bindings) {
+      if (binding.goalIdentifier !== input.goalIdentifier) {
+        continue;
+      }
+      const gate = goalGateCache.resolve(binding.missionIdentifier);
+      if (gate === null) {
+        continue;
+      }
+      if (invalidation.potentialValueAfterInvalidation === null) {
+        gate.pause(
+          `证据失效导致需要重新规划：${input.reason}`,
+          invalidation.nextState.evidenceGaps,
+        );
+        continue;
+      }
+      gate.recordEvidenceInvalidation({
+        requirementIdentifiers: invalidation.invalidatedRequirementIdentifiers,
+        reason: input.reason,
+        potentialValueAfterInvalidation:
+          invalidation.potentialValueAfterInvalidation,
+        recordedAtIso: nowIso,
+      });
+    }
+    return {
+      potentialValueAfterInvalidation: invalidation.potentialValueAfterInvalidation,
+      invalidatedRequirementIdentifiers:
+        invalidation.invalidatedRequirementIdentifiers,
+    };
+  };
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -2970,6 +3053,7 @@ export async function createApplicationRuntime(
     describeGoalStatus,
     proposeGoalContract,
     confirmGoalContract,
+    invalidateGoalEvidence,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,
