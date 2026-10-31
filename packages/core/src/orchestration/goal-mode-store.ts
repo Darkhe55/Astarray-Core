@@ -156,18 +156,41 @@ export class GoalModeStateStore {
     readonly lastPotentialValue: number | null;
     readonly consumedToolCalls: number;
   }): Promise<PersistedGoalModeState> {
+    /**
+     * R86（2026-10-31）：**以磁盘上的最新状态为基线**合并，而不是覆盖。
+     *
+     * 组结束时可能已有并发写入（例如预算耗尽先暂停了目标、或证据失效）。
+     * 用开始时读到的 `input.state` 直接覆盖，会清掉 `pauseReason`、把 `consumedToolCalls`
+     * 归零、把 `requiresReplanning` 抹掉（实测：治理停止后状态回退）。
+     */
+    const current = (await this.read(input.state.goalIdentifier)) ?? input.state;
+    const mergedEvidenceGaps = [
+      ...new Set([...current.evidenceGaps, ...input.gateSnapshot.evidenceGaps]),
+    ];
     const next: PersistedGoalModeState = {
-      ...input.state,
-      documentRevision: input.state.documentRevision + 1,
+      ...current,
+      documentRevision: current.documentRevision + 1,
       currentTaskGroupIdentifier: null,
       currentTaskGroupStartedAtIso: null,
-      gateSnapshot: input.gateSnapshot,
+      gateSnapshot: {
+        ...input.gateSnapshot,
+        pauseReason: input.gateSnapshot.pauseReason ?? current.pauseReason,
+        evidenceGaps: mergedEvidenceGaps,
+        requiresReplanning:
+          input.gateSnapshot.requiresReplanning || current.requiresReplanning,
+        consumedToolCalls: Math.max(
+          input.gateSnapshot.consumedToolCalls,
+          current.consumedToolCalls,
+          input.consumedToolCalls,
+        ),
+      },
       requirementBases: input.requirementBases,
       lastPotentialValue: input.lastPotentialValue,
-      consumedToolCalls: input.consumedToolCalls,
-      pauseReason: input.gateSnapshot.pauseReason,
-      evidenceGaps: [...input.gateSnapshot.evidenceGaps],
-      requiresReplanning: input.gateSnapshot.requiresReplanning,
+      consumedToolCalls: Math.max(input.consumedToolCalls, current.consumedToolCalls),
+      pauseReason: input.gateSnapshot.pauseReason ?? current.pauseReason,
+      evidenceGaps: mergedEvidenceGaps,
+      requiresReplanning:
+        input.gateSnapshot.requiresReplanning || current.requiresReplanning,
       updatedAtIso: input.finishedAtIso,
     };
     await this.write(next);

@@ -1368,7 +1368,7 @@ export async function createApplicationRuntime(
             remainingContribution: assessment.remainingContribution,
           }));
           nextPotentialValue = potentialResult.potentialValue;
-          nextConsumedToolCalls = receiptToolCallTotal;
+          nextConsumedToolCalls = Math.max(state.consumedToolCalls, receiptToolCallTotal);
         }
       } catch {
         /** V 计算失败 ⇒ 不写伪值；下面仍只清在途标记。 */
@@ -2604,13 +2604,22 @@ export async function createApplicationRuntime(
           isPaused: true,
           pauseReason: reason,
         };
+      const executedToolCallCount = controller.getMissionExecutedToolCallCount(
+        missionIdentifier,
+      );
       await goalModeStateStore.write({
         ...state,
         documentRevision: state.documentRevision + 1,
+        /** R86：失败组不写收据计数 ⇒ 用进程内"已执行"数补齐（取较大值，不回退）。 */
+        consumedToolCalls: Math.max(state.consumedToolCalls, executedToolCallCount),
         pauseReason: reason,
         evidenceGaps: [...state.evidenceGaps, reason],
         gateSnapshot: {
           ...snapshot,
+          consumedToolCalls: Math.max(
+            snapshot.consumedToolCalls,
+            executedToolCallCount,
+          ),
           evidenceGaps: [...snapshot.evidenceGaps, reason],
         },
         updatedAtIso: new Date().toISOString(),
