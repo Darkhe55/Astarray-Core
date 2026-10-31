@@ -46,6 +46,8 @@ export interface PersistedGoalModeState {
    * 可选：旧状态没有该字段 ⇒ 不评估墙钟（不猜开始时间）。
    */
   readonly goalStartedAtIso?: string | null;
+  /** R96：最近结束组的性质（旧状态缺失 ⇒ null；不推断）。 */
+  readonly lastTaskGroupKind?: string | null;
   /** 当前组（非 null 表示恢复时需要先对账）。 */
   readonly currentTaskGroupIdentifier: string | null;
   readonly currentTaskGroupStartedAtIso: string | null;
@@ -99,6 +101,8 @@ export interface GoalModeStatusView {
    * 可选：旧状态没有该字段 ⇒ 不评估墙钟（不猜开始时间）。
    */
   readonly goalStartedAtIso?: string | null;
+  /** R96：最近结束组的性质（缺失 ⇒ null）。 */
+  readonly lastTaskGroupKind?: string | null;
   readonly requirementBasisCount: number;
   readonly evidenceGapCount: number;
   readonly consumedToolCalls: number;
@@ -172,13 +176,9 @@ export class GoalModeStateStore {
     readonly gateSnapshot: GoalGateSnapshot;
     readonly requirementBases: readonly PersistedGoalRequirementBasis[];
     readonly lastPotentialValue: number | null;
-  /**
-   * R95（2026-11-01）：**目标开始时间**（首次创建契约时写入；用于评估墙钟预算）。
-   *
-   * 可选：旧状态没有该字段 ⇒ 不评估墙钟（不猜开始时间）。
-   */
-  readonly goalStartedAtIso?: string | null;
     readonly consumedToolCalls: number;
+    /** R96：本组性质（供状态视图/审计）。 */
+    readonly groupKind?: string | null;
   }): Promise<PersistedGoalModeState> {
     /**
      * R86（2026-10-31）：**以磁盘上的最新状态为基线**合并，而不是覆盖。
@@ -211,6 +211,7 @@ export class GoalModeStateStore {
       requirementBases: input.requirementBases,
       lastPotentialValue: input.lastPotentialValue,
       consumedToolCalls: Math.max(input.consumedToolCalls, current.consumedToolCalls),
+      lastTaskGroupKind: input.groupKind ?? current.lastTaskGroupKind ?? null,
       pauseReason: input.gateSnapshot.pauseReason ?? current.pauseReason,
       evidenceGaps: mergedEvidenceGaps,
       requiresReplanning:
@@ -327,6 +328,7 @@ export class GoalModeStateStore {
       pauseReason: state.pauseReason,
       requiresReplanning: state.requiresReplanning,
       lastPotentialValue: state.lastPotentialValue,
+      lastTaskGroupKind: state.lastTaskGroupKind ?? null,
       requirementBasisCount: state.requirementBases.length,
       evidenceGapCount: state.evidenceGaps.length,
       consumedToolCalls: state.consumedToolCalls,

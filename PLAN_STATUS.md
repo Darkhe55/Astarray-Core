@@ -4680,3 +4680,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `maximumWallClockSeconds` 非空时按"已用 ≥ 上限"触发暂停（原因含秒数/上限）。
 > **验证**：单测 10/10（新增 2 条：超限触发、无开始时间不评估）；全量 **471 files / 3593 tests**；typecheck/lint/build 绿。
 > **未做**：派发前不按墙钟阻断；无集成测试。ADR-0158。
+
+> **169（R96）：组性质持久化（完成，单测）**：状态新增可选 `lastTaskGroupKind`（缺失不推断）；组结束写入并保留
+> 暂停原因/缺口/`requiresReplanning`/消耗；`describeStatus` 暴露该字段。
+> **验证**：单测 1/1；全量 **471 files / 3594 tests**；typecheck/lint/build 绿。
+> **未做**：真实 mission 落盘未复跑（组性质提供者只在单测路径）、无历史列表。ADR-0159。

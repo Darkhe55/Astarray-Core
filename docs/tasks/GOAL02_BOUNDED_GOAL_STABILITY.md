@@ -253,3 +253,11 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **未做**：派发前门禁仍只查绝对截止（`deadlineIso`），未按墙钟在派发时阻断；无集成测试。ADR-0158。
 
 > R80–R94 的检查点记录见 `PLAN_STATUS.md` 154–167 与 `docs/adr/0145`–`0157`（卡片此处不再重复）。
+
+### R96 组性质持久化（2026-11-01）
+
+- 状态新增可选 `lastTaskGroupKind`（旧状态缺失 ⇒ null，不推断）；`finishTaskGroup` 接收 `groupKind`
+  并在合并写回时保留暂停原因/缺口/`requiresReplanning`/消耗。
+- `describeStatus` 返回该字段（CLI `goal-mode status` / SDK 可见）。
+- **测试**：`goal-mode-store-group-kind.test.ts` 1/1；全量 471 files / 3594 tests。
+- **未做**：真实 mission 落盘未复跑（性质提供者 R61 仍只在单测路径）、无历史列表。ADR-0159。
