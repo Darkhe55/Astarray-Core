@@ -453,3 +453,39 @@ export async function executeGoalModeMapCommand(
     await application.shutdown();
   }
 }
+
+/** R83：`goal-mode invalidate` —— 标记证据失效（K5 内核入口的 CLI；暂停 + 需重新规划）。 */
+export interface GoalModeInvalidateCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly goalIdentifier: string;
+  readonly requirementIdentifiers: readonly string[];
+  readonly reason: string;
+}
+
+export async function executeGoalModeInvalidateCommand(
+  input: GoalModeInvalidateCommandInput,
+): Promise<number> {
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.invalidateGoalEvidence({
+      goalIdentifier: input.goalIdentifier,
+      requirementIdentifiers: input.requirementIdentifiers,
+      reason: input.reason,
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-evidence-invalidated", ...result });
+    } else {
+      process.stdout.write(`已标记证据失效: ${result.invalidatedRequirementIdentifiers.join(", ")}\n`);
+      process.stdout.write(`失效后 V: ${result.potentialValueAfterInvalidation === null ? "未知" : String(result.potentialValueAfterInvalidation)}\n`);
+      process.stdout.write("目标已暂停并标记需要重新规划（--goal-enforce 下会阻断派发/停止调度）。\n");
+    }
+    return EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
+}

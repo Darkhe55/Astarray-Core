@@ -179,3 +179,45 @@ test/workspace/hello5.md → 内容正确
 
 **意义**：K1（提案/确认）→ K2（映射）→ 启动前绑定 → V=0 → K7 完成耦合放行，整条链路真实跑通。
 仍未实跑：`--goal-enforce` 的组边界停止、accepted 裁决路径。
+
+## 10. R83 目标暂停 + 组边界停止（2026-10-31 20:4x）
+
+新增 `goal-mode invalidate`（K5 内核入口的 CLI）后，构造"目标被暂停"并跑强制模式。
+
+### 10.1 K5 失效 ⇒ 暂停
+
+```
+goal-mode invalidate --goal goal-acceptance-1 --requirement req-1 --reason "…hello5.md 被外部删除"
+→ potentialValueAfterInvalidation: 1
+goal-mode status → isPaused: true, requiresReplanning: true, V: 1, gap: 1,
+                    nextCheckpoint: "重新规划后设置新检查点"
+```
+
+### 10.2 K10 启动前阻断
+
+```
+run … --goal goal-acceptance-1 --goal-enforce
+→ [目标门禁] 阻断派发：证据失效导致需要重新规划：…
+→ mission-89855721 status=blocked（复核），任务 pending，hello6.md 未创建
+```
+
+### 10.3 K10 组边界停止
+
+`goal-k10`（`maximumToolCalls:1`、`pauseConditions:["budget-exhausted"]`、`req-1→T-001`）：
+
+```
+run … --goal goal-k10 --goal-enforce
+→ [目标门禁] 阻断派发：工具调用预算已用尽（2/1）。
+→ [需要用户] 目标门禁在组边界拒绝继续调度: 工具调用预算已用尽（2/1）。
+→ status: cancelled；hello7.md 已生成（停止前任务已完成）
+goal-mode status goal-k10 → isPaused: true, pauseReason: "工具调用预算已用尽（2/1）。",
+                            V: 0, consumedToolCalls: 2
+goal-mode verdicts → isEnforced: true；最后 reasonCode: "goal-paused"
+```
+
+### 10.4 发现的不一致（未修）
+
+1. `run` 的输出状态：启动前阻断返回 `running`、组边界停止返回 `cancelled`，真实状态是 `blocked`；
+2. 预算计数 `consumed=2 / max=1`（先执行后检查）；
+3. 一次全量测试跑出现 1 条 unhandled error（测试全过，重跑 exit 0，未定位）；
+4. `reasonCode` 只有 `goal-paused`，预算细节只在 detail。

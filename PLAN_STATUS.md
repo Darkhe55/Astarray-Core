@@ -4583,3 +4583,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `goal-mode status` 显示 **V=0**、依据 1 条、消耗 1 次工具调用；收据与 `hello5.md` 均正确。
 > **验证**：新单测 4/4；`tests/core --maxWorkers=2` **471 files / 3588 tests** 全通过；typecheck/lint/build 绿。
 > **仍未验证**：`--goal-enforce` 组边界停止、accepted 裁决路径、产物内容未校验。ADR-0146。
+
+> **157（R83）：目标暂停 + 组边界停止真实验收（完成）**：新增 `goal-mode invalidate`
+> （K5 入口暴露到 CLI）。真实复跑：①失效 ⇒ `isPaused/requiresReplanning/V=1/缺口1`；
+> ②`--goal-enforce` 对暂停目标**启动前阻断**（`[目标门禁] 阻断派发…`，mission **blocked**、无副作用）；
+> ③预算 1 次的目标在**组边界停止**（`[目标门禁] 阻断派发：工具调用预算已用尽（2/1）`、
+> `[需要用户] …拒绝继续调度`、hello7.md 已保留、`isEnforced:true`、`reasonCode:goal-paused`）。
+> **发现未修**：`run` 输出状态与真实不符（running/cancelled vs blocked）、预算 2/1、一次 unhandled（重跑消失）。
+> **验证**：`tests/core --maxWorkers=2` 3588 全通过（其中一次 exit 1 因 unhandled，重跑 exit 0）。ADR-0147。
