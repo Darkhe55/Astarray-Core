@@ -28,6 +28,7 @@ import {
   executeGoalModeConfirmCommand,
   executeGoalModeBindCommand,
   executeGoalModeMapCommand,
+  executeGoalModeInvalidateCommand,
 } from "./cli/goal-mode-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
@@ -1228,6 +1229,28 @@ goalModeCommand
       goalIdentifier: options.goal,
       requirementIdentifier: options.requirement,
       taskNodeIdentifiers: options.tasks,
+    });
+  });
+
+goalModeCommand
+  .command("invalidate")
+  .description("标记证据失效（暂停目标 + 需重新规划；K5 内核入口）")
+  .requiredOption("--goal <goal-id>", "目标标识")
+  .requiredOption("--requirement <requirement-id...>", "失效的要求标识（可多个）")
+  .requiredOption("--reason <text>", "失效原因（外部变化的可核对描述）")
+  .option("--json", "JSON 输出")
+  .action(async (options: {
+    goal: string;
+    requirement: string[];
+    reason: string;
+    json?: boolean;
+  }) => {
+    process.exitCode = await executeGoalModeInvalidateCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      goalIdentifier: options.goal,
+      requirementIdentifiers: options.requirement,
+      reason: options.reason,
     });
   });
 
