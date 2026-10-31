@@ -233,3 +233,23 @@ goal-mode verdicts → isEnforced: true；最后 reasonCode: "goal-paused"
 验证：G5 2/2 通过；全量 471 files / 3588 tests（一次瞬时 e2e01 失败，单跑通过）；typecheck/lint/build 绿。
 
 仍未解决：预算耗尽的任务失败使 mission 显示 `cancelled`（应为 blocked）且目标不自动暂停；短暂 blocked 对外可见；`permissionAsk` 映射遗留；边界停止仍显示 `cancelled`。
+
+## 12. R85 预算耗尽 = 治理停止（2026-10-31 21:2x）
+
+- `WorkerOutcome.failure` 增加 `failureCode`；worker 从工具 errorCode 取值，orchestrator 的 catch 也从 `DomainError.errorCode` 取值；
+- failureCode 为 `tool-budget-exhausted` ⇒ 任务 failed（事实）+ 升级 + `onGoalBudgetExhausted` + `finishMission("blocked")`；
+- 运行时暂停目标并**落状态**（pauseReason/缺口/快照/revision）；
+- `finishMission` 幂等，循环退出不再用 `cancelled` 覆盖已定终态。
+
+真实复跑（goal-k10c，上限 1）：
+
+```
+[目标门禁] 阻断派发：目标工具调用预算已用尽（已执行 1，上限 1）：拒绝执行 writeFileTemporary。
+[需要用户] 目标门禁在组边界拒绝继续调度: …
+goal-mode status → isPaused: true
+                   pauseReason: "目标工具调用预算已用尽（已执行 1，上限 1）：拒绝执行 writeFileTemporary。"
+```
+
+验证：G5 2/2；全量 471 files / 3588 tests；typecheck/lint/build 绿。
+
+**仍未解决**：mission 终态仍 `cancelled`（目标暂停已正确落盘）；任务失败时 `consumedToolCalls` 仍 0（与"已执行 1"不一致）；边界停止输出状态仍 `cancelled`。
