@@ -136,6 +136,7 @@ import type { GoalModeStatusView } from "../orchestration/goal-mode-store.js";
 import type { PersistedGoalModeState } from "../orchestration/goal-mode-store.js";
 import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
 import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdict-journal.js";
+import { GoalRequirementMappingStore } from "../orchestration/goal-requirement-mapping-store.js";
 import { CompletionReceiptStore } from "../orchestration/completion-receipt-store.js";
 import { CompletionVerdictStore } from "../orchestration/completion-verdict-store.js";
 import { GoalContractStore } from "../orchestration/goal-contract-store.js";
@@ -288,6 +289,12 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R72：要求 ↔ 任务节点映射（不改契约 revision；revision 变化后旧映射失效）。 */
+  bindRequirementTaskMapping: (input: {
+    readonly goalIdentifier: string;
+    readonly requirementIdentifier: string;
+    readonly taskNodeIdentifiers: readonly string[];
+  }) => Promise<{ readonly mappingCount: number; readonly documentRevision: number }>;
   /** R71：目标状态视图（无状态 ⇒ null）。 */
   describeGoalStatus: (goalIdentifier: string) => Promise<GoalModeStatusView | null>;
   /** R71：契约变更（合法来源 + revision 校验 + 预算不重置）。 */
@@ -1029,6 +1036,10 @@ export async function createApplicationRuntime(
   const goalMissionBindingStore = new GoalMissionBindingStore({
     baseDirectory: stateDirectory,
   });
+  /** R72（K2）：要求 ↔ 任务节点映射（独立于契约 revision）。 */
+  const goalRequirementMappingStore = new GoalRequirementMappingStore({
+    baseDirectory: stateDirectory,
+  });
   const goalGateCache = new GoalGateCache({
     bindingStore: goalMissionBindingStore,
     contractStore: goalContractStore,
@@ -1221,10 +1232,24 @@ export async function createApplicationRuntime(
             receiptToolCallTotal += Math.max(0, Math.trunc(receipt.toolCallCount));
           }
         }
+        /** R72（K2）：动态映射优先；revision 变化后旧映射失效 ⇒ 回退契约静态字段。 */
+        const requirementMappingDocument = await goalRequirementMappingStore
+          .readForContractRevision(goalIdentifier, contract.revision)
+          .catch(() => null);
+        const taskNodeIdentifiersByRequirement = new Map<
+          string,
+          readonly string[]
+        >(
+          (requirementMappingDocument?.mappings ?? []).map((mapping) => [
+            mapping.requirementIdentifier,
+            mapping.taskNodeIdentifiers,
+          ]),
+        );
         const assessments = assessGoalRequirementsFromLocalState({
           contract,
           missionTaskStatusByTaskIdentifier,
           taskIdentifiersWithAcceptedVerdict: acceptedVerdictTaskIdentifiers,
+          taskNodeIdentifiersByRequirement,
         });
         const potentialResult = computeGoalPotential({ contract, assessments });
         const gate = goalGateCache.resolve(input.missionIdentifier);
@@ -1392,6 +1417,46 @@ export async function createApplicationRuntime(
     await goalModeStateStore.write(nextState);
     await refreshGoalGateCache();
     return { revision: input.contract.revision };
+  };
+  /**
+   * R72（2026-10-31）：**要求 ↔ 任务节点映射（K2）**。
+   *
+   * 只改映射、不改契约 revision；映射记录写入时的契约 revision，revision 变化后旧映射**自动失效**
+   * （`readForContractRevision` 返回 null，评估回退到契约静态字段）。
+   */
+  const bindRequirementTaskMapping = async (input: {
+    readonly goalIdentifier: string;
+    readonly requirementIdentifier: string;
+    readonly taskNodeIdentifiers: readonly string[];
+  }): Promise<{ readonly mappingCount: number; readonly documentRevision: number }> => {
+    const contract = await goalContractStore
+      .read(input.goalIdentifier)
+      .catch(() => null);
+    if (contract === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `目标 ${input.goalIdentifier} 没有契约，无法建立要求映射。`,
+      );
+    }
+    const requirementExists = contract.requirements.some(
+      (requirement) => requirement.requirementIdentifier === input.requirementIdentifier,
+    );
+    if (!requirementExists) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `要求 ${input.requirementIdentifier} 不在目标契约中。`,
+      );
+    }
+    const document = await goalRequirementMappingStore.setMapping({
+      goalIdentifier: input.goalIdentifier,
+      contractRevision: contract.revision,
+      requirementIdentifier: input.requirementIdentifier,
+      taskNodeIdentifiers: input.taskNodeIdentifiers,
+    });
+    return {
+      mappingCount: document.mappings.length,
+      documentRevision: document.documentRevision,
+    };
   };
   const describeGoalStatus = async (
     goalIdentifier: string,
@@ -2672,6 +2737,7 @@ export async function createApplicationRuntime(
     unbindMissionFromGoal,
     closeGoalExperiment,
     describeGoalStatus,
+    bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,
     refreshGoalGateCache,

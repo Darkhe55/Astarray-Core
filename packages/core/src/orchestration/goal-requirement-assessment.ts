@@ -27,13 +27,21 @@ export interface AssessGoalRequirementsInput {
   readonly missionTaskStatusByTaskIdentifier: ReadonlyMap<string, string>;
   /** 已有 accepted 独立裁决的任务（来自 `CompletionVerdictStore`）。 */
   readonly taskIdentifiersWithAcceptedVerdict: ReadonlySet<string>;
+  /**
+   * R72（K2）：**动态映射优先**（来自 `GoalRequirementMappingStore`）。
+   *
+   * 给了且该要求有映射 ⇒ 用它；否则回退契约里的静态 `taskNodeIdentifiers`。
+   */
+  readonly taskNodeIdentifiersByRequirement?: ReadonlyMap<string, readonly string[]>;
 }
 
 export function assessGoalRequirementsFromLocalState(
   input: AssessGoalRequirementsInput,
 ): LocalGoalRequirementAssessment[] {
   return input.contract.requirements.map((requirement) => {
-    const boundTaskIdentifiers = requirement.taskNodeIdentifiers;
+    const boundTaskIdentifiers =
+      input.taskNodeIdentifiersByRequirement?.get(requirement.requirementIdentifier) ??
+      requirement.taskNodeIdentifiers;
     if (boundTaskIdentifiers.length === 0) {
       return {
         requirementIdentifier: requirement.requirementIdentifier,
