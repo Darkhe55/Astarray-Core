@@ -4640,3 +4640,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **真实复跑**（goal-k10p）：CLI **`blocked`**、`summary.json` **`blocked`**（首次一致）；目标 `isPaused`、`consumedToolCalls: 1`。
 > **验证**：全量 471 files / 3588 tests；typecheck/lint/build 绿。ADR-0153。
 > **遗留**：`permissionAsk` 映射遗留；accepted 裁决与模型自主提议未跑。
+
+> **164（R90/R91）：「全做」三项的进展（部分完成）**：①**修复**治理停止伪造权限询问——`run` 裁决循环在
+> `permissionAsk === null` 时直接 break（此前会空跑裁决并返回 `requires-human-resubmission`）；
+> 真实复跑：`status: blocked` 且**无 permissionAsk 字段**，`summary.json` 也是 blocked。
+> ②**暴露独立验收裁决面**：运行时 + 公开 SDK 新增 `appointIndependentReview` / `recordIndependentVerdict`
+> （复用既有三身份互斥/直属上级/证据非自报规则）；**未真实演练**（需三个已登记 Agent 实例）。
+> ③**模型自主提议工具未做**：需新增工具描述符 + 执行接线 + 允许工具集放行，不做占位工具。
+> **验证**：全量 471 files / 3588 tests；typecheck/lint/build 绿。ADR-0154。

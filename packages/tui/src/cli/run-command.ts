@@ -391,7 +391,12 @@ const application = await AstarrayApplicationFacade.create({
         // 不得一见 running 就收口（否则授权后的重跑从未被等待）。
         adjudicationRound === 0 ? 0 : AUTHORIZATION_RETRY_WINDOW_MILLISECONDS,
       );
-      // 任务已明确失败且没有待裁决询问：不得再等待（否则会无谓挂起直到超时）。
+      /**
+       * R90（2026-11-01）：**没有待裁决询问就直接收口**，不要空跑裁决。
+       *
+       * 旧实现只在"任务 failed"时 break；治理停止（blocked、没有权限询问）会继续调用
+       * 裁决层并得到 `requires-human-resubmission`，从而在输出里伪造一个不存在的权限询问。
+       */
       if (permissionAsk === null) {
         const currentTask = await application.queryTask({
           sessionId: "cli-run",
@@ -399,8 +404,8 @@ const application = await AstarrayApplicationFacade.create({
         });
         if (currentTask.status === "failed") {
           finalStatus = "blocked";
-          break;
         }
+        break;
       }
       const decision = await runPermissionAskAdjudication({
         ask: permissionAsk,
