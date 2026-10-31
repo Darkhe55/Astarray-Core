@@ -40,6 +40,12 @@ export interface PersistedGoalModeState {
   /** V 的逐项依据（不是只有一个数字）。 */
   readonly requirementBases: readonly PersistedGoalRequirementBasis[];
   readonly lastPotentialValue: number | null;
+  /**
+   * R95（2026-11-01）：**目标开始时间**（首次创建契约时写入；用于评估墙钟预算）。
+   *
+   * 可选：旧状态没有该字段 ⇒ 不评估墙钟（不猜开始时间）。
+   */
+  readonly goalStartedAtIso?: string | null;
   /** 当前组（非 null 表示恢复时需要先对账）。 */
   readonly currentTaskGroupIdentifier: string | null;
   readonly currentTaskGroupStartedAtIso: string | null;
@@ -60,6 +66,12 @@ export type GoalResumeDecision =
       readonly kind: "resume";
       readonly detail: string;
       readonly lastPotentialValue: number | null;
+  /**
+   * R95（2026-11-01）：**目标开始时间**（首次创建契约时写入；用于评估墙钟预算）。
+   *
+   * 可选：旧状态没有该字段 ⇒ 不评估墙钟（不猜开始时间）。
+   */
+  readonly goalStartedAtIso?: string | null;
     }
   | {
       readonly kind: "reconcile-first";
@@ -81,6 +93,12 @@ export interface GoalModeStatusView {
   readonly pauseReason: string | null;
   readonly requiresReplanning: boolean;
   readonly lastPotentialValue: number | null;
+  /**
+   * R95（2026-11-01）：**目标开始时间**（首次创建契约时写入；用于评估墙钟预算）。
+   *
+   * 可选：旧状态没有该字段 ⇒ 不评估墙钟（不猜开始时间）。
+   */
+  readonly goalStartedAtIso?: string | null;
   readonly requirementBasisCount: number;
   readonly evidenceGapCount: number;
   readonly consumedToolCalls: number;
@@ -154,6 +172,12 @@ export class GoalModeStateStore {
     readonly gateSnapshot: GoalGateSnapshot;
     readonly requirementBases: readonly PersistedGoalRequirementBasis[];
     readonly lastPotentialValue: number | null;
+  /**
+   * R95（2026-11-01）：**目标开始时间**（首次创建契约时写入；用于评估墙钟预算）。
+   *
+   * 可选：旧状态没有该字段 ⇒ 不评估墙钟（不猜开始时间）。
+   */
+  readonly goalStartedAtIso?: string | null;
     readonly consumedToolCalls: number;
   }): Promise<PersistedGoalModeState> {
     /**
