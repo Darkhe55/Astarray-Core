@@ -4526,3 +4526,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：单测 8/8；`typecheck`/`lint` 绿。
 > **未做**：`maximumWallClockSeconds` 未评估（缺可靠开始时间）、无集成测试、暂停不自动恢复。
 > **行为变化**：以前可写任意暂停条件文本，现在会被拒绝（仓内无生产契约）。ADR-0141。
+
+> **151（R77）：K11 预算取更严（完成）**：门禁 `applyExternalBudgetLimit`（有效上限 =
+> **min(契约上限, 任务预算)**；拒绝时注明"取更严"及来源）；`GoalGateCache` hydrate 后注入；
+> 运行时选项 `missionToolCallBudget`（**不持久化**，重启需重新注入）。
+> **验证**：单测 5/5；`typecheck`/`lint`/`build` 全绿。
+> **未做**：未从 `maximumLoopIterations` 自动推导任务预算（语义不同）、只覆盖工具调用数、
+> 成本/时长未联动、无集成测试。ADR-0142。

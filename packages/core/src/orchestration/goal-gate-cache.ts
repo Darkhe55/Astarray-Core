@@ -48,6 +48,15 @@ export class GoalGateCache {
       readonly bindingStore: GoalMissionBindingStore;
       readonly contractStore: GoalContractStore;
       readonly stateStore: GoalModeStateStore;
+      /**
+       * R77（K11）：**外部（任务/调度）工具预算**（可选）。
+       *
+       * 与契约上限**取更严**；不持久化（属于运行时配置，重启需重新注入）。
+       */
+      readonly externalToolCallBudget?: {
+        readonly maximumToolCalls: number | null;
+        readonly source: string;
+      } | null;
     },
   ) {}
 
@@ -119,6 +128,12 @@ export class GoalGateCache {
           contract,
           state.gateSnapshot,
         );
+        if (
+          this.options.externalToolCallBudget !== undefined &&
+          this.options.externalToolCallBudget !== null
+        ) {
+          gate.applyExternalBudgetLimit(this.options.externalToolCallBudget);
+        }
         this.gatesByMission.set(binding.missionIdentifier, gate);
       } catch {
         issues.push({
