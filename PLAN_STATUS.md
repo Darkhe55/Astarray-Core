@@ -4691,3 +4691,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 违规仍独立于 V。
 > **验证**：单测 5/5；全量 **471 files / 3595 tests**；typecheck/lint/build 绿。
 > **未做**：真实重启未演练；写入 fire-and-forget；无上限。ADR-0160。
+
+> **171（R98）：不变量违规列表有界（完成）**：`GOAL_INVARIANT_VIOLATION_LIMIT=200` +
+> `appendBoundedInvariantViolation`（只留最近 N 条）；写状态使用它。
+> **验证**：单测 6/6；全量 **471 files / 3596 tests**；typecheck/lint/build 绿。
+> **未做**：丢弃不归档、上限不可配置、真实长跑未演练。ADR-0161。

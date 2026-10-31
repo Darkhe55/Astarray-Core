@@ -29,3 +29,31 @@ const KNOWN_INVARIANT_CODES = new Set<string>(GOAL_INVARIANT_CODES);
 export function isKnownGoalInvariantCode(value: string): boolean {
   return KNOWN_INVARIANT_CODES.has(value);
 }
+
+/**
+ * R98（2026-11-01）：**违规记录上限**（有界，避免长跑目标状态无限增长）。
+ *
+ * 与判定记录一致：只保留最近 N 条；旧记录被丢弃（不是归档，保留"最近事实"）。
+ */
+export const GOAL_INVARIANT_VIOLATION_LIMIT = 200;
+
+export function appendBoundedInvariantViolation(
+  existing: readonly {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[],
+  violation: {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  },
+  limit: number = GOAL_INVARIANT_VIOLATION_LIMIT,
+): {
+  readonly invariantCode: string;
+  readonly detail: string;
+  readonly recordedAtIso: string;
+}[] {
+  const combined = [...existing, violation];
+  return combined.length <= limit ? combined : combined.slice(combined.length - limit);
+}
