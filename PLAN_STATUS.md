@@ -4552,3 +4552,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **推送记录（R79）**：`be06ac03` 已本地提交，`git push` 连续 5 次失败
 > （`Please make sure you have the correct access rights and the repository exists.`），
 > 按纪律记为待重试，与下一检查点合并推送。工作区 `ahead=1`。
+
+> **154（R80）：首次真实 mission 实跑（基础管线通过；目标模式端到端被入口缺失阻断）**：
+> 在 `test/workspace`（独立测试目录，未入库）用真实 provider（unisound `u2`）跑通
+> 文件创建任务：`mission-f9a43378` **done**，`hello.md` 内容正确，
+> 完成收据 `completion-receipts/mission-f9a43378/T-001.json` 落盘（`toolCallCount:1`、`artifactPaths:["hello.md"]`）。
+> 走过的弯路如实记录：端点必须给完整 `/chat/completions`（只给 `/v1` ⇒ 404）；非交互需 stdin `allow-once`；
+> provider 默认 30s 超时需放宽。
+> **阻断**：目标模式 API 只在 `ApplicationRuntime`，公开 SDK/CLI 无写入入口；`submitTask` 不能带 `goalIdentifier`，
+> 而门禁在启动时评估 ⇒ **"目标驱动 mission"目前无法真实跑通**。
+> 报告 `docs/reports/GOAL02_REAL_MISSION_ACCEPTANCE_2026-10-31.md`。无代码改动。
