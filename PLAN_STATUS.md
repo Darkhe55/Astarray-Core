@@ -4624,3 +4624,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **真实复跑**（goal-k10i）：CLI 输出 **`status: blocked`**（修复前 `cancelled`）。
 > **验证**：全量 471 files / 3588 tests；typecheck/lint/build 绿；G5 2/2。
 > **仍未解决**：持久化 `summary.json` 仍是 `cancelled`（cancel 先写、blocked 被忽略），公开查询随后会读到 cancelled。ADR-0151。
+
+> **162（R88）：取消语义收口（部分完成）**：①`cancelMission` 不再抢先写终态（有活动编排器时只停并等待，
+> 编排器按 `hasFailedTask` 写 blocked/cancelled；收口后仍非终态才补写，且走终态单点）；
+> ②`run` 提交失败只打印一行错误 + `USAGE_ERROR` 退出（**不再打印 Node 栈**）。
+> **真实复跑**：启动阻断输出 `任务提交失败: 目标门禁阻断派发：…`（干净）；预算耗尽 `status: blocked`、
+> 目标 `consumedToolCalls: 1`。
+> **验证**：全量 471 files / 3588 tests（含 main-controller 10/10、G5 2/2）；typecheck/lint/build 绿。
+> **仍未解决**：持久化 `summary.json` 仍为 `cancelled`（未观测到的写入路径；临时日志未捕获）。ADR-0152。
