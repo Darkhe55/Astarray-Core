@@ -260,6 +260,16 @@ export interface MissionOrchestratorOptions {
    * 不通过 ⇒ 停止本 mission 的继续调度并置 blocked + 升级原因。
    * 缺省不传 ⇒ 不参与（行为不变）。
    */
+  /**
+   * R85（2026-10-31）：**目标预算耗尽**（治理停止）端口。
+   *
+   * 调用方：orchestrator 在失败码为 `tool-budget-exhausted` 时；实现方：运行时
+   * （暂停目标门禁 + 落状态）。缺省 ⇒ 只停止 mission，不暂停目标。
+   */
+  onGoalBudgetExhausted?: (
+    missionIdentifier: string,
+    reason: string,
+  ) => Promise<void> | void;
   goalGroupBoundaryGatePort?: () => Promise<{
     readonly isAllowed: boolean;
     readonly reasons: readonly string[];
@@ -832,7 +842,15 @@ export class MissionOrchestrator {
         await this.sleepUntilWake();
       }
     }
-    await this.finishMission("cancelled");
+    /**
+     * R85：循环自然退出时**不得覆盖**已经写定的终态。
+     *
+     * 预算耗尽等治理停止会先 `finishMission("blocked")`；若无条件再写 cancelled，
+     * 对外看到的终态就错了。
+     */
+    if (!this.isMissionFinished) {
+      await this.finishMission("cancelled");
+    }
   }
 
   /**
@@ -1196,6 +1214,10 @@ export class MissionOrchestrator {
           failureReason:
             error instanceof Error ? error.message : "运行时异常",
           stateSummary: "运行时异常终止",
+          /** R85：保留结构化错误码（预算耗尽要按治理停止处理）。 */
+          ...(error instanceof DomainError
+            ? { failureCode: error.errorCode }
+            : {}),
         }, agentInstanceId);
         await this.maybeFinishGoalTaskGroup("interrupted");
       }
@@ -1491,6 +1513,30 @@ export class MissionOrchestrator {
         break;
       }
       case "failure":
+        /**
+         * R85（2026-10-31）：**治理停止**（预算耗尽）与普通任务失败分开。
+         *
+         * - 任务照常置 failed（事实）；
+         * - mission 置 blocked（不是 cancelled/failed）；
+         * - 目标暂停（端口负责落状态）+ 升级原因；
+         * - 立即结束 mission，不再尝试"重试越过预算"。
+         */
+        if (outcome.failureCode === "tool-budget-exhausted") {
+          await this.dagScheduler.finishTask(taskId, "failed", null);
+          this.options.onUserEscalation(
+            `目标工具调用预算已用尽，mission 停止：${outcome.failureReason}`,
+          );
+          try {
+            await this.options.onGoalBudgetExhausted?.(
+              this.options.missionId,
+              outcome.failureReason,
+            );
+          } catch {
+            // 目标暂停落盘失败不得阻塞停止
+          }
+          await this.finishMission("blocked");
+          break;
+        }
         await this.dagScheduler.finishTask(taskId, "failed", null);
         this.options.onUserEscalation(
           `任务 ${taskId} 失败：${outcome.failureReason}（状态：${outcome.stateSummary}）`,
@@ -1648,7 +1694,14 @@ export class MissionOrchestrator {
     return result.status === 0;
   }
 
+  /** R85：是否已经收口（防止后续 "cancelled" 覆盖已定的 blocked/done）。 */
+  private isMissionFinished = false;
+
   private async finishMission(status: "done" | "cancelled" | "blocked"): Promise<void> {
+    if (this.isMissionFinished) {
+      return;
+    }
+    this.isMissionFinished = true;
     /**
      * R74（2026-10-31）：**目标完成耦合（K7）**，可选。
      *

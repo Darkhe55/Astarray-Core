@@ -62,6 +62,12 @@ export type WorkerOutcome =
       toolName: string | null;
       failureReason: string;
       stateSummary: string;
+      /**
+       * R85（2026-10-31）：**结构化失败码**（来自工具结果的 errorCode）。
+       *
+       * 用于把"治理停止"（如 `tool-budget-exhausted`）与普通任务失败区分开。
+       */
+      failureCode?: string;
     }
   | {
       outcome: "ambiguous";
@@ -234,6 +240,8 @@ export class WorkerAgent {
   private readonly cancellationController = new AbortController();
   private readonly toolCallsByCallId = new Map<string, string>();
   private lastToolCall: { toolName: string; argumentsJson: string } | null = null;
+  /** R85：最近一次工具失败的 errorCode（用于结构化失败码，成功后清空）。 */
+  private lastToolFailureCode: string | null = null;
   private readonly outputTextChunks: string[] = [];
   /** 本轮尚未被同工具成功调用覆盖的写操作失败。 */
   private readonly unresolvedMutatingToolFailures = new Set<string>();
@@ -634,6 +642,7 @@ export class WorkerAgent {
             continue;
           }
           if (event.result === "error") {
+            this.lastToolFailureCode = event.errorCode ?? null;
             const thresholdReached = this.options.failureCounter.recordFailure(toolName);
             if (thresholdReached) {
               toolFailureThresholdHit.add(toolName);
@@ -642,6 +651,7 @@ export class WorkerAgent {
               this.unresolvedMutatingToolFailures.add(toolName);
             }
           } else {
+            this.lastToolFailureCode = null;
             this.options.failureCounter.recordSuccess(toolName);
             this.unresolvedMutatingToolFailures.delete(toolName);
             /** G3（第 138 轮）：**所有**成功工具都登记（含非变更类）。 */
@@ -776,6 +786,9 @@ export class WorkerAgent {
               toolName: null,
               failureReason: event.detail,
               stateSummary: summarize(this.outputTextChunks),
+              ...(this.lastToolFailureCode === null
+                ? {}
+                : { failureCode: this.lastToolFailureCode }),
             };
           }
           break;
