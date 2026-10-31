@@ -28,7 +28,20 @@ async function createStateDirectory(): Promise<string> {
 }
 afterEach(async () => {
   vi.restoreAllMocks();
-  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  /**
+   * R76（2026-10-31）：Windows 上并发落盘可能仍持有目录句柄 ⇒ rm 报 EBUSY。
+   * 用 maxRetries/retryDelay 让 Node 自己重试（只对 EBUSY/EPERM 等生效），不吞掉真正错误。
+   */
+  await Promise.all(
+    temporaryDirectories.splice(0).map((directory) =>
+      rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 50,
+      }),
+    ),
+  );
 });
 
 function createBridge(stateDirectory: string) {
@@ -132,5 +145,4 @@ describe("EVENT-01 事件源桥", () => {
     await expect(bridge.flush()).resolves.toBeUndefined();
   });
 });
-
 
