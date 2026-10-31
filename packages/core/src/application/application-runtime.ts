@@ -300,6 +300,33 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R91：任命执行/测试/验收三级个体（复用既有门禁规则）。 */
+  appointIndependentReview: (input: {
+    readonly appointmentIdentifier: string;
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly taskRevision: number;
+    readonly riskLevel: "low" | "high";
+    readonly appointingSecondaryAgentInstanceIdentifier: string;
+    readonly implementationAgentInstanceIdentifier: string;
+    readonly testingAgentInstanceIdentifier: string;
+    readonly acceptanceAgentInstanceIdentifier: string;
+    readonly allowsSharedTestAndAcceptance?: boolean;
+  }) => { readonly appointmentIdentifier: string };
+  /** R91：记录独立验收裁决（证据不得全是自报；写入完成裁决存储）。 */
+  recordIndependentVerdict: (input: {
+    readonly appointmentIdentifier: string;
+    readonly verdict: {
+      readonly acceptingAgentInstanceIdentifier: string;
+      readonly boundTaskIdentifier: string;
+      readonly boundTaskRevision: number;
+      readonly boundCommitHash: string | null;
+      readonly verdict: "rework" | "merge-ready" | "blocked-human-review";
+      readonly evidenceReferences: readonly string[];
+      readonly reason: string;
+      readonly createdAtIso?: string;
+    };
+  }) => Promise<void>;
   /** R79：标记证据失效（外部变化时由宿主/检测器调用；内核唯一写入点）。 */
   invalidateGoalEvidence: (input: {
     readonly goalIdentifier: string;
@@ -1765,6 +1792,39 @@ export async function createApplicationRuntime(
         invalidation.invalidatedRequirementIdentifiers,
     };
   };
+  /**
+   * R91（2026-11-01）：**独立验收裁决的控制面入口**（复用既有 four-layer 路由门禁）。
+   *
+   * 门禁规则不变：执行/测试/验收身份互斥、直属上级校验、证据不得全是自报。
+   */
+  const appointIndependentReview = (input: {
+    readonly appointmentIdentifier: string;
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly taskRevision: number;
+    readonly riskLevel: "low" | "high";
+    readonly appointingSecondaryAgentInstanceIdentifier: string;
+    readonly implementationAgentInstanceIdentifier: string;
+    readonly testingAgentInstanceIdentifier: string;
+    readonly acceptanceAgentInstanceIdentifier: string;
+    readonly allowsSharedTestAndAcceptance?: boolean;
+  }): { readonly appointmentIdentifier: string } =>
+    controller.appointExecutionAndReview(input);
+  const recordIndependentVerdict = async (input: {
+    readonly appointmentIdentifier: string;
+    readonly verdict: {
+      readonly acceptingAgentInstanceIdentifier: string;
+      readonly boundTaskIdentifier: string;
+      readonly boundTaskRevision: number;
+      readonly boundCommitHash: string | null;
+      readonly verdict: "rework" | "merge-ready" | "blocked-human-review";
+      readonly evidenceReferences: readonly string[];
+      readonly reason: string;
+      readonly createdAtIso?: string;
+    };
+  }): Promise<void> => {
+    await controller.recordAcceptanceVerdict(input);
+  };
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -3125,6 +3185,8 @@ export async function createApplicationRuntime(
     proposeGoalContract,
     confirmGoalContract,
     invalidateGoalEvidence,
+    appointIndependentReview,
+    recordIndependentVerdict,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,

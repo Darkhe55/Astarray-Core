@@ -5484,6 +5484,40 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *
    * 映射层会把短暂 blocked 报成 running（续跑语义），CLI 关闭前需要原始值判断"终态是否已落库"。
    */
+  /** R91：任命执行/测试/验收（复用既有门禁规则；不复制判定）。 */
+  appointIndependentReview(input: {
+    readonly appointmentIdentifier: string;
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly taskRevision: number;
+    readonly riskLevel: "low" | "high";
+    readonly appointingSecondaryAgentInstanceIdentifier: string;
+    readonly implementationAgentInstanceIdentifier: string;
+    readonly testingAgentInstanceIdentifier: string;
+    readonly acceptanceAgentInstanceIdentifier: string;
+    readonly allowsSharedTestAndAcceptance?: boolean;
+  }): { readonly appointmentIdentifier: string } {
+    this.assertOpen();
+    return this.runtime.appointIndependentReview(input);
+  }
+
+  /** R91：记录独立验收裁决（写入完成裁决存储；证据不得全是自报）。 */
+  recordIndependentVerdict(input: {
+    readonly appointmentIdentifier: string;
+    readonly verdict: {
+      readonly acceptingAgentInstanceIdentifier: string;
+      readonly boundTaskIdentifier: string;
+      readonly boundTaskRevision: number;
+      readonly boundCommitHash: string | null;
+      readonly verdict: "rework" | "merge-ready" | "blocked-human-review";
+      readonly evidenceReferences: readonly string[];
+      readonly reason: string;
+      readonly createdAtIso?: string;
+    };
+  }): Promise<void> {
+    this.assertOpen();
+    return this.runtime.recordIndependentVerdict(input);
+  }
   async queryMissionRawStatus(missionIdentifier: string): Promise<string> {
     this.assertOpen();
     const missionStatus = (await this.runtime.controller.queryMissionStatus(
