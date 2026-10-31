@@ -2567,6 +2567,15 @@ export async function createApplicationRuntime(
      *
      * 只在契约声明 `tool.permission-denied` 且强制模式开启时才会真的阻断派发。
      */
+    /** R81：mission 创建时绑定目标（必须在 launch 前完成）。 */
+    bindMissionGoalPort: async (input) => {
+      await goalMissionBindingStore.bind({
+        missionIdentifier: input.missionIdentifier,
+        goalIdentifier: input.goalIdentifier,
+        boundAtIso: new Date().toISOString(),
+      });
+      await refreshGoalGateCache();
+    },
     onGoalInvariantViolation: (violation) => {
       const gate = goalGateCache.resolve(violation.missionIdentifier);
       gate?.recordInvariantViolation({

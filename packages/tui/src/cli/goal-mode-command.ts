@@ -15,6 +15,7 @@ import { GoalModeStateStore } from "../../../core/src/orchestration/goal-mode-st
 import { GoalGateCache } from "../../../core/src/orchestration/goal-gate-cache.js";
 import { GoalDispatchVerdictJournal } from "../../../core/src/orchestration/goal-dispatch-verdict-journal.js";
 import { EXIT_CODES, printJson } from "./json-output.js";
+import { AstarrayApplicationFacade } from "../../../core/src/public-sdk.js";
 
 export interface GoalModeStatusCommandInput {
   readonly stateDirectory: string;
@@ -273,4 +274,182 @@ export async function executeGoalModeVerdictsCommand(
     "注意: isEnforced=false 表示只观察未阻断（强制模式缺省关）。\n",
   );
   return EXIT_CODES.SUCCESS;
+}
+/**
+ * R81（2026-10-31）：`goal-mode propose` —— **模型/宿主提交提案**（不落契约）。
+ *
+ * 提案只是候选：必须由用户 `confirm` 后才生成契约。`sourceRequestReference` 必须显式给出
+ * （由 harness 注入），模型不能自填"用户说过"。
+ */
+export interface GoalModeProposeCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly draftJson: string;
+  readonly sourceRequestReference: string;
+  readonly expiresInSeconds?: number;
+}
+
+export async function executeGoalModeProposeCommand(
+  input: GoalModeProposeCommandInput,
+): Promise<number> {
+  let draft: unknown;
+  try {
+    draft = JSON.parse(input.draftJson);
+  } catch (error) {
+    process.stderr.write(`提案 JSON 无法解析: ${(error as Error).message}\n`);
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.proposeGoalContract({
+      draft: draft as never,
+      sourceRequestReference: input.sourceRequestReference,
+      ...(input.expiresInSeconds === undefined
+        ? {}
+        : { expiresInSeconds: input.expiresInSeconds }),
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-proposal-created", ...result });
+    } else {
+      process.stdout.write(`提案已创建: ${result.proposalIdentifier}\n`);
+      process.stdout.write(`过期时间: ${result.expiresAtIso}\n`);
+      process.stdout.write("确认后才生成目标契约：goal-mode confirm <proposal-id> --goal <id> --owner <user> --yes\n");
+    }
+    return EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
+}
+
+/**
+ * R81：`goal-mode confirm` —— **用户显式确认**提案，生成 revision 1 契约。
+ *
+ * 必须 `--yes`；CLI 以"用户显式请求 + 已认证 + 显式开启"激活目标模式（模型不能代替）。
+ */
+export interface GoalModeConfirmCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly proposalIdentifier: string;
+  readonly goalIdentifier: string;
+  readonly ownerIdentifier: string;
+  readonly isConfirmed: boolean;
+}
+
+export async function executeGoalModeConfirmCommand(
+  input: GoalModeConfirmCommandInput,
+): Promise<number> {
+  if (input.isConfirmed !== true) {
+    process.stderr.write("拒绝确认：必须显式传 --yes（模型/脚本不得代替用户确认）。\n");
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const activation = application.activateGoalMode({
+      isExplicitUserRequest: true,
+      isAuthenticatedUser: true,
+      isExplicitlyEnabled: true,
+      requestedBy: "user",
+    });
+    if (!activation.isActive) {
+      process.stderr.write(`目标模式未激活: ${activation.reason}\n`);
+      return EXIT_CODES.USAGE_ERROR;
+    }
+    const result = await application.confirmGoalContract({
+      proposalIdentifier: input.proposalIdentifier,
+      goalIdentifier: input.goalIdentifier,
+      ownerIdentifier: input.ownerIdentifier,
+      activation: {
+        isExplicitUserRequest: true,
+        isAuthenticatedUser: true,
+        isExplicitlyEnabled: true,
+        requestedBy: "user",
+      },
+      isUserConfirmation: true,
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-contract-created", ...result });
+    } else {
+      process.stdout.write(`目标契约已创建: ${result.goalIdentifier}（revision ${String(result.revision)}）\n`);
+    }
+    return EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
+}
+
+/** R81：`goal-mode bind` —— 把一个**已存在**的 mission 绑定到目标（事后绑定；仅用于修复/补登记）。 */
+export interface GoalModeBindCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly missionIdentifier: string;
+  readonly goalIdentifier: string;
+}
+
+export async function executeGoalModeBindCommand(
+  input: GoalModeBindCommandInput,
+): Promise<number> {
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.bindMissionToGoal({
+      missionIdentifier: input.missionIdentifier,
+      goalIdentifier: input.goalIdentifier,
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-bound", missionIdentifier: input.missionIdentifier, ...result });
+    } else {
+      process.stdout.write(`mission ${input.missionIdentifier} 已绑定到目标 ${result.goalIdentifier}\n`);
+      process.stdout.write("注意：事后绑定不会改变本次派发的门禁结论（门禁在启动时评估）。\n");
+    }
+    return EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
+}
+
+/** R81：`goal-mode map` —— 把某条要求映射到任务节点（K2；不改契约 revision）。 */
+export interface GoalModeMapCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly goalIdentifier: string;
+  readonly requirementIdentifier: string;
+  readonly taskNodeIdentifiers: readonly string[];
+}
+
+export async function executeGoalModeMapCommand(
+  input: GoalModeMapCommandInput,
+): Promise<number> {
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.bindRequirementTaskMapping({
+      goalIdentifier: input.goalIdentifier,
+      requirementIdentifier: input.requirementIdentifier,
+      taskNodeIdentifiers: input.taskNodeIdentifiers,
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-requirement-mapped", ...result });
+    } else {
+      process.stdout.write(
+        `已映射 ${input.requirementIdentifier} → ${input.taskNodeIdentifiers.join(", ")}（共 ${String(result.mappingCount)} 条）\n`,
+      );
+    }
+    return EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
 }
