@@ -1176,15 +1176,20 @@ export class MissionOrchestrator {
       try {
         const outcome = await worker.run();
         this.inFlightTaskIds.delete(action.taskId);
+        /**
+         * R82（2026-10-31）：**先落任务结果，再结束目标组**。
+         *
+         * 顺序错了 V 会永远看到"任务还没 done"：组结束时的本地评估读的是任务链持久状态，
+         * 而 `handleWorkerOutcome` 才是把 done 写进去的那一步。
+         */
+        await this.handleWorkerOutcome(action.taskId, outcome, agentInstanceId);
         /** R34：在途归零 ⇒ 结束本组（只清标记，不推进 V）。 */
         await this.maybeFinishGoalTaskGroup(
           outcome.outcome === "success" ? "completed" : "interrupted",
         );
-        await this.handleWorkerOutcome(action.taskId, outcome, agentInstanceId);
       } catch (error) {
         // 运行时/工具异常必须收敛为任务失败，不得变成未处理拒绝（T07D-R2-02）。
         this.inFlightTaskIds.delete(action.taskId);
-        await this.maybeFinishGoalTaskGroup("interrupted");
         await this.handleWorkerOutcome(action.taskId, {
           outcome: "failure",
           toolName: null,
@@ -1192,6 +1197,7 @@ export class MissionOrchestrator {
             error instanceof Error ? error.message : "运行时异常",
           stateSummary: "运行时异常终止",
         }, agentInstanceId);
+        await this.maybeFinishGoalTaskGroup("interrupted");
       }
     })();
     this.inFlightWorkerPromises.add(workerPromise);
