@@ -128,6 +128,8 @@ export class GoalGateCache {
           contract,
           state.gateSnapshot,
         );
+        /** R97：恢复已持久化的安全不变量违规（只接受契约声明的标识）。 */
+        gate.restoreInvariantViolations(state.invariantViolations ?? []);
         if (
           this.options.externalToolCallBudget !== undefined &&
           this.options.externalToolCallBudget !== null
