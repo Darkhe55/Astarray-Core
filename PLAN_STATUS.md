@@ -4665,3 +4665,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 验收者 `tertiary:accept-1`、理由非自报（首次运行"成功但无文件"即缺口实证）。
 > **验证**：全量 471 files / 3591 tests；typecheck/lint/build 绿。
 > **未完成**：accepted 裁决 → V=0 的端到端（V 在组结束算，裁决只能在任务完成后写；需多组 mission 或重算入口）。
+
+> **167（R94）：裁决后 V 重算（方案 B，完成并真实跑通）**：新增 `recomputeGoalPotential`
+> （运行时 + SDK + CLI `goal-mode recompute`）：只读任务链/收据/裁决 + 映射，复用既有评估与 V 计算，
+> 写回依据与 V（不改暂停/门禁；`unreliable` ⇒ unknown 不写伪值）。
+> **真实链路**：`mission-a21df78c`（`independent-acceptance`）done 后 V=1 → 记录 accepted 裁决
+> （三身份任命、非自报证据）→ `recompute` **V=0**，证据来源 `independent-acceptance`、
+> `evidenceReference: task-ledger:T-001`。
+> **验证**：全量 471 files / 3591 tests；typecheck/lint/build 绿。
+> **限制**：需显式重算（未接事件自动触发）；内存门禁未同步（本场景无活动门禁）；多组 mission 未验证。ADR-0157。

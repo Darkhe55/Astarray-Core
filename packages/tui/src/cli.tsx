@@ -29,6 +29,7 @@ import {
   executeGoalModeBindCommand,
   executeGoalModeMapCommand,
   executeGoalModeInvalidateCommand,
+  executeGoalModeRecomputeCommand,
 } from "./cli/goal-mode-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
@@ -1229,6 +1230,21 @@ goalModeCommand
       goalIdentifier: options.goal,
       requirementIdentifier: options.requirement,
       taskNodeIdentifiers: options.tasks,
+    });
+  });
+
+goalModeCommand
+  .command("recompute")
+  .description("按当前证据（含 accepted 裁决）重算 V")
+  .requiredOption("--goal <goal-id>", "目标标识")
+  .requiredOption("--mission <mission-id>", "证据所属 mission")
+  .option("--json", "JSON 输出")
+  .action(async (options: { goal: string; mission: string; json?: boolean }) => {
+    process.exitCode = await executeGoalModeRecomputeCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      goalIdentifier: options.goal,
+      missionIdentifier: options.mission,
     });
   });
 
