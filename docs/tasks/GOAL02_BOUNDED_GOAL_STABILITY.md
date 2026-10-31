@@ -221,3 +221,14 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **测试**：`tests/core/goal-budget-stricter.test.ts` 5/5 通过。
 - **未做**：外部预算需宿主注入（未从 `maximumLoopIterations` 推导）、只覆盖工具调用数、
   无集成测试。ADR-0142。
+
+### R78 安全不变量结构化 + 权限拒绝接入（K4，2026-10-31）
+
+- `nonViolableInvariants` 收窄为枚举：`tool.permission-denied` / `scope.project-boundary` /
+  `storage.protected-write` / `installation.gate`；未知标识由契约校验拒绝。
+- 门禁 `recordInvariantViolation`（只有声明时才记录）+ `assertDispatchAllowed` ⇒
+  `safety-invariant-violated`；**独立于 V**（不因 V 下降清除）。
+- 生产者（当前唯一）：工具端口装饰捕获 `tool-permission-denied` ⇒ 上报；原错误照常抛出。
+- **测试**：`tests/core/goal-invariant-violation.test.ts` 4/4 通过。
+- **未做**：其余三个标识**无生产者**；违规**不持久化**；无集成测试；语义偏保守
+  （任何权限拒绝都算）。ADR-0143。
