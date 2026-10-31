@@ -4617,3 +4617,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **真实复跑**（goal-k10g）：`isPaused: true`、`consumedToolCalls: 1`（修复前 0）、pauseReason/缺口保留。
 > **验证**：G5 2/2；全量 471 files / 3588 tests；typecheck/lint/build 绿。
 > **仍未解决**：mission 终态仍 `cancelled`（CLI 失败后立即 shutdown，cancel 先落库，治理 blocked 被拒）——收口时序未改。ADR-0150。
+
+> **161（R87）：关闭时序修复（CLI 已正确，持久化仍有残留）**：①orchestrator 记录 `hasFailedTask`（治理/普通失败都置真），
+> 关闭时终态用 `blocked` 而非 `cancelled`；②CLI `run` 在 shutdown 前最多等 **3 秒**原始 mission 状态落终态
+> （新增 `queryMissionRawStatus`，绕过公开映射）。
+> **真实复跑**（goal-k10i）：CLI 输出 **`status: blocked`**（修复前 `cancelled`）。
+> **验证**：全量 471 files / 3588 tests；typecheck/lint/build 绿；G5 2/2。
+> **仍未解决**：持久化 `summary.json` 仍是 `cancelled`（cancel 先写、blocked 被忽略），公开查询随后会读到 cancelled。ADR-0151。
