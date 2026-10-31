@@ -4600,3 +4600,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `hello9.md` 未创建（修复前第二次调用仍会执行，事后统计 2/1）。
 > **验证**：G5 2/2；全量 471 files / 3588 tests（一次瞬时 e2e01 失败，单跑通过）；typecheck/lint/build 绿。
 > **未修**：预算耗尽的 mission 终态为 `cancelled`（应 blocked）且目标不自动暂停；短暂 blocked 仍对外可见。ADR-0148。
+
+> **159（R85）：预算耗尽按治理停止处理（部分完成）**：①`WorkerOutcome.failure` 增加 `failureCode`
+> （worker 从工具 errorCode、orchestrator catch 从 DomainError.errorCode 取值）；
+> ②`tool-budget-exhausted` 分流：任务 failed（事实）+ 升级 + `onGoalBudgetExhausted` + `finishMission("blocked")`；
+> ③运行时暂停目标并**落状态**（pauseReason/缺口/快照/revision）；④`finishMission` 幂等，避免 `cancelled` 覆盖已定终态。
+> **真实复跑**（goal-k10c，上限 1）：`isPaused: true`，`pauseReason: "目标工具调用预算已用尽（已执行 1，上限 1）：…"`，
+> `evidenceGapCount: 1`（修复前不会暂停）。
+> **验证**：G5 2/2；全量 471 files / 3588 tests；typecheck/lint/build 绿。
+> **仍未解决**：mission 终态仍 `cancelled`（目标暂停已落盘）、`consumedToolCalls` 仍 0、边界停止状态仍 `cancelled`。ADR-0149。

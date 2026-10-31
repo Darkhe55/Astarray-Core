@@ -257,6 +257,11 @@ export interface MainControllerOptions {
     readonly missionIdentifier: string;
     readonly goalIdentifier: string;
   }) => Promise<void>;
+  /** R85：目标预算耗尽（治理停止）时暂停目标并落状态（可选）。 */
+  onGoalBudgetExhausted?: (
+    missionIdentifier: string,
+    reason: string,
+  ) => Promise<void> | void;
   /**
    * R84（2026-10-31）：**工具执行前的目标预算**（可选；缺省不参与）。
    *
@@ -3215,6 +3220,10 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R85：预算耗尽 ⇒ 暂停目标（治理停止）。 */
+      ...(this.options.onGoalBudgetExhausted === undefined
+        ? {}
+        : { onGoalBudgetExhausted: this.options.onGoalBudgetExhausted }),
       /** R75：组边界门禁复查（仅强制模式装配）。 */
       ...this.buildGoalGroupBoundaryGatePort(missionId),
       /** R74：目标完成判定（缺省不传 ⇒ 不耦合）。 */
@@ -3450,6 +3459,10 @@ export class MainController {
       completionReceiptStore: this.options.completionReceiptStore ?? null,
       /** R34：目标组开始/结束（只更新在途组标记；不推进 V）。 */
       ...this.buildGoalTaskGroupPorts(missionId),
+      /** R85：预算耗尽 ⇒ 暂停目标（治理停止）。 */
+      ...(this.options.onGoalBudgetExhausted === undefined
+        ? {}
+        : { onGoalBudgetExhausted: this.options.onGoalBudgetExhausted }),
       /** R75：组边界门禁复查（仅强制模式装配）。 */
       ...this.buildGoalGroupBoundaryGatePort(missionId),
       /** R74：目标完成判定（缺省不传 ⇒ 不耦合）。 */

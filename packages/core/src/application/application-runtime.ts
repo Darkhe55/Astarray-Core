@@ -2577,7 +2577,45 @@ export async function createApplicationRuntime(
      *
      * 只在契约声明 `tool.permission-denied` 且强制模式开启时才会真的阻断派发。
      */
-    /** R84：工具执行前的预算（有效上限；未绑定/无门禁 ⇒ null）。 */
+    /**
+     * R85（2026-10-31）：**预算耗尽 ⇒ 暂停目标 + 落状态**（治理停止，不是普通失败）。
+     *
+     * 门禁 `pause()`（内存）+ 状态写入（持久）同时做，避免"重启后又变回未暂停"。
+     */
+    onGoalBudgetExhausted: async (missionIdentifier, reason) => {
+      const goalIdentifier = await goalMissionBindingStore
+        .readGoalIdentifier(missionIdentifier)
+        .catch(() => null);
+      if (goalIdentifier === null) {
+        return;
+      }
+      const [contract, state] = await Promise.all([
+        goalContractStore.read(goalIdentifier).catch(() => null),
+        goalModeStateStore.read(goalIdentifier).catch(() => null),
+      ]);
+      if (contract === null || state === null) {
+        return;
+      }
+      const gate = goalGateCache.resolve(missionIdentifier);
+      gate?.pause(reason, [reason]);
+      const snapshot =
+        gate?.createSnapshot() ?? {
+          ...state.gateSnapshot,
+          isPaused: true,
+          pauseReason: reason,
+        };
+      await goalModeStateStore.write({
+        ...state,
+        documentRevision: state.documentRevision + 1,
+        pauseReason: reason,
+        evidenceGaps: [...state.evidenceGaps, reason],
+        gateSnapshot: {
+          ...snapshot,
+          evidenceGaps: [...snapshot.evidenceGaps, reason],
+        },
+        updatedAtIso: new Date().toISOString(),
+      });
+    },    /** R84：工具执行前的预算（有效上限；未绑定/无门禁 ⇒ null）。 */
     goalToolCallBudgetForMission: (missionIdentifier) => {
       const gate = goalGateCache.resolve(missionIdentifier);
       return gate === null ? null : gate.getEffectiveMaximumToolCalls();
