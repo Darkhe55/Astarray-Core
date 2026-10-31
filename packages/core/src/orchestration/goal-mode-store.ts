@@ -48,6 +48,12 @@ export interface PersistedGoalModeState {
   readonly goalStartedAtIso?: string | null;
   /** R96：最近结束组的性质（旧状态缺失 ⇒ null；不推断）。 */
   readonly lastTaskGroupKind?: string | null;
+  /** R97：已记录的安全不变量违规（重启后恢复；缺失 ⇒ 空）。 */
+  readonly invariantViolations?: readonly {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[];
   /** 当前组（非 null 表示恢复时需要先对账）。 */
   readonly currentTaskGroupIdentifier: string | null;
   readonly currentTaskGroupStartedAtIso: string | null;

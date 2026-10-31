@@ -349,6 +349,34 @@ export class GoalDispatchGate {
     return true;
   }
 
+  /**
+   * R97（2026-11-01）：**从持久状态恢复不变量违规**（重启后仍然生效）。
+   *
+   * 只接受契约已声明的标识；重复恢复是幂等的。
+   */
+  restoreInvariantViolations(
+    violations: readonly {
+      readonly invariantCode: string;
+      readonly detail: string;
+      readonly recordedAtIso: string;
+    }[],
+  ): void {
+    for (const violation of violations) {
+      if (!this.contract.nonViolableInvariants.includes(violation.invariantCode)) {
+        continue;
+      }
+      const exists = this.recordedInvariantViolations.some(
+        (recorded) =>
+          recorded.invariantCode === violation.invariantCode &&
+          recorded.detail === violation.detail &&
+          recorded.recordedAtIso === violation.recordedAtIso,
+      );
+      if (!exists) {
+        this.recordedInvariantViolations.push({ ...violation });
+      }
+    }
+  }
+
   /** 当前已记录的不变量违规（只读副本）。 */
   getRecordedInvariantViolations(): readonly {
     readonly invariantCode: string;

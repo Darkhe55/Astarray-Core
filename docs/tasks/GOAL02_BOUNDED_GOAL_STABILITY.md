@@ -261,3 +261,12 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - `describeStatus` 返回该字段（CLI `goal-mode status` / SDK 可见）。
 - **测试**：`goal-mode-store-group-kind.test.ts` 1/1；全量 471 files / 3594 tests。
 - **未做**：真实 mission 落盘未复跑（性质提供者 R61 仍只在单测路径）、无历史列表。ADR-0159。
+
+### R97 不变量违规持久化（2026-11-01）
+
+- 状态新增可选 `invariantViolations[]`；`onGoalInvariantViolation` 内存记录 + 异步写状态（失败不阻塞工具）。
+- `GoalGateCache.hydrate` 还原门禁后 `restoreInvariantViolations`：只接受契约声明的标识、重复恢复幂等；
+  违规仍独立于 V。
+- **测试**：`goal-invariant-violation.test.ts` 5/5（新增恢复只接受已声明标识 + 恢复后派发被拒）；
+  全量 471 files / 3595 tests。
+- **未做**：真实重启未演练；写入 fire-and-forget 可能丢一条；违规列表无上限。ADR-0160。

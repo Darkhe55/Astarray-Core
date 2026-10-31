@@ -2846,12 +2846,41 @@ export async function createApplicationRuntime(
       await refreshGoalGateCache();
     },
     onGoalInvariantViolation: (violation) => {
+      const recordedAtIso = new Date().toISOString();
       const gate = goalGateCache.resolve(violation.missionIdentifier);
       gate?.recordInvariantViolation({
         invariantCode: violation.invariantCode,
         detail: violation.detail,
-        recordedAtIso: new Date().toISOString(),
+        recordedAtIso,
       });
+      /** R97：同时写入目标状态，重启后由 hydrate 恢复（缺失不推断）。 */
+      void (async () => {
+        const goalIdentifier = await goalMissionBindingStore
+          .readGoalIdentifier(violation.missionIdentifier)
+          .catch(() => null);
+        if (goalIdentifier === null) {
+          return;
+        }
+        const state = await goalModeStateStore.read(goalIdentifier).catch(() => null);
+        if (state === null) {
+          return;
+        }
+        await goalModeStateStore
+          .write({
+            ...state,
+            documentRevision: state.documentRevision + 1,
+            invariantViolations: [
+              ...(state.invariantViolations ?? []),
+              {
+                invariantCode: violation.invariantCode,
+                detail: violation.detail,
+                recordedAtIso,
+              },
+            ],
+            updatedAtIso: recordedAtIso,
+          })
+          .catch(() => undefined);
+      })();
     },
     /** R74：目标完成耦合（缺省不传 ⇒ 不参与）。 */
     ...(options.isGoalCompletionRequired === true

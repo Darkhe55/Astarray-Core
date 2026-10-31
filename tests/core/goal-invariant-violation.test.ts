@@ -103,6 +103,26 @@ describe("K4 安全不变量", () => {
     expect(gate.getRecordedInvariantViolations()).toHaveLength(1);
   });
 
+  it("持久化恢复：只接受已声明标识，恢复后派发被拒", () => {
+    const gate = new GoalDispatchGate(
+      buildContract({ nonViolableInvariants: ["tool.permission-denied"] }),
+    );
+    gate.restoreInvariantViolations([
+      {
+        invariantCode: "tool.permission-denied",
+        detail: "writeFile: 拒绝",
+        recordedAtIso: "2026-10-31T00:00:00.000Z",
+      },
+      {
+        invariantCode: "installation.gate",
+        detail: "未声明的标识应被忽略",
+        recordedAtIso: "2026-10-31T00:00:01.000Z",
+      },
+    ]);
+    expect(gate.getRecordedInvariantViolations()).toHaveLength(1);
+    expect(checkDispatch(gate).isAllowed).toBe(false);
+  });
+
   it("契约校验：未知不变量标识被拒，已知标识合法", () => {
     const invalid = validateGoalContract(
       buildContract({ nonViolableInvariants: ["不要写坏东西"] }),

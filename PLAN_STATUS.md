@@ -4685,3 +4685,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 暂停原因/缺口/`requiresReplanning`/消耗；`describeStatus` 暴露该字段。
 > **验证**：单测 1/1；全量 **471 files / 3594 tests**；typecheck/lint/build 绿。
 > **未做**：真实 mission 落盘未复跑（组性质提供者只在单测路径）、无历史列表。ADR-0159。
+
+> **170（R97）：安全不变量违规持久化（完成，单测）**：状态新增 `invariantViolations[]`；
+> 违规记录时异步落盘（不阻塞工具）；`hydrate` 恢复后只接受**契约已声明**的标识、重复恢复幂等；
+> 违规仍独立于 V。
+> **验证**：单测 5/5；全量 **471 files / 3595 tests**；typecheck/lint/build 绿。
+> **未做**：真实重启未演练；写入 fire-and-forget；无上限。ADR-0160。
