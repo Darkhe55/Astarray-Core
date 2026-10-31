@@ -138,6 +138,7 @@ import { GoalDispatchGate } from "../orchestration/goal-dispatch-gate.js";
 import { GoalDispatchVerdictJournal } from "../orchestration/goal-dispatch-verdict-journal.js";
 import { GoalRequirementMappingStore } from "../orchestration/goal-requirement-mapping-store.js";
 import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
+import { evaluateGoalPauseConditions } from "../orchestration/goal-pause-conditions.js";
 import {
   GoalContractProposalStore,
   GOAL_PROPOSAL_SCHEMA_VERSION,
@@ -1299,6 +1300,31 @@ export async function createApplicationRuntime(
             recordedBy: "local-verifier",
             recordedAtIso: input.finishedAtIso,
           });
+          /**
+           * R76（K6）：**暂停条件**（只评估契约里声明的枚举条件）。
+           *
+           * 用门禁的实时计数（组数/检查次数/消耗）而不是陈旧的持久状态；
+           * 触发 ⇒ 门禁 `pause()`，随后的快照与状态都会带上暂停原因。
+           */
+          const gateRuntimeState = gate.getState();
+          const pauseDecision = evaluateGoalPauseConditions({
+            contract,
+            state: {
+              ...state,
+              consumedToolCalls: gateRuntimeState.consumedToolCalls,
+              gateSnapshot: {
+                ...state.gateSnapshot,
+                checksSinceLastReduction: gateRuntimeState.checksSinceLastReduction,
+              },
+            },
+            nowIso: input.finishedAtIso,
+          });
+          if (pauseDecision.shouldPause) {
+            gate.pause(
+              pauseDecision.reasons.join("；"),
+              pauseDecision.reasons,
+            );
+          }
           nextGateSnapshot = gate.createSnapshot();
           nextRequirementBases = potentialResult.assessments.map((assessment) => ({
             requirementIdentifier: assessment.requirementIdentifier,

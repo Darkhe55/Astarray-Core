@@ -4518,3 +4518,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > + **停止调度**；端口抛错**同样停止**。控制器仅在 `isGoalModeEnforcementEnabled === true` 时装配，
 > 复用 `observeGoalDispatchGate`（判定仍落盘/输出）；**默认关 ⇒ 行为不变**。
 > **验证**：`typecheck`/`lint`/`build` 绿；**无集成测试/无节流**。ADR-0140。
+
+> **150（R76）：K6 暂停条件收窄（完成）**：新增 `goal-pause-condition-catalog.ts`
+> （`budget-exhausted` / `deadline-passed` / `stagnation` / `requires-replanning`；未知值**契约校验拒绝**）
+> 与 `goal-pause-conditions.ts`（纯评估，只评估已声明条件）；组结束用**门禁实时计数**评估，
+> 触发 ⇒ `gate.pause(reason, reasons)`，随后的快照/状态带暂停原因。
+> **验证**：单测 8/8；`typecheck`/`lint` 绿。
+> **未做**：`maximumWallClockSeconds` 未评估（缺可靠开始时间）、无集成测试、暂停不自动恢复。
+> **行为变化**：以前可写任意暂停条件文本，现在会被拒绝（仓内无生产契约）。ADR-0141。
