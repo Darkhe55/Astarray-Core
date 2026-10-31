@@ -193,3 +193,12 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - `finishMission("done")` 先问目标，不通过 ⇒ **降级 blocked** + 升级原因（不先判完成后回滚）。
 - **测试**：`tests/core/goal-completion-requirement.test.ts` 5/5 通过。
 - **未做**：**默认关**；无集成测试；依赖 K2 映射（无映射时开启会几乎阻断所有完成）。ADR-0139。
+
+### R75 组边界门禁复查（K10，2026-10-31）
+
+- 编排器 `goalGroupBoundaryGatePort`：每个安全点（无在途任务）复查一次；不通过 ⇒
+  `onUserEscalation` + `finishMission("blocked")` + 停止调度；**抛错同样保守停止**。
+- 控制器仅在 **`isGoalModeEnforcementEnabled === true`** 且装配 resolver 时提供端口，
+  复用 `observeGoalDispatchGate`（判定照常落盘/输出）。
+- **默认（强制关）不装配**：行为不变，只观察。
+- **未做**：无集成测试、无节流（每轮都查）、停止后无"恢复"入口；依赖 V/暂停准确性。ADR-0140。
