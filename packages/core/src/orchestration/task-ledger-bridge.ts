@@ -20,6 +20,8 @@ import type { ActorIdentity } from "./task-sequence-controllers.js";
 export interface TaskSequenceLedgerNodeView {
   readonly taskId: string;
   readonly status: string;
+  /** R122：序列节点可带外部引用（如 `mission:<id>`），用于识别"整 mission 节点"。 */
+  readonly externalReference?: string | null;
 }
 
 export interface TaskSequenceLedgerPort {
@@ -473,6 +475,75 @@ export class TaskLedgerBridge {
       risk: string;
       requiresHumanApproval: true;
     }[] = [];
+    /**
+     * R122（2026-11-01）：**整 mission 节点**。
+     *
+     * 真实数据里序列通常只有 1 个节点 `task-mission-<id>`（externalReference=`mission:<id>`），
+     * 而 mission 链有多个 `T-xx`。两者**没有共同 id**，按 taskId 逐条比对会全部误报。
+     * 当序列恰好一个节点且它是本 mission 的节点时，按"mission 整体"对齐。
+     */
+    const missionNode =
+      snapshot.nodes.length === 1
+        ? snapshot.nodes.find(
+            (node) =>
+              node.externalReference === `mission:${input.missionIdentifier}` ||
+              node.taskId === `task-mission-${input.missionIdentifier}`,
+          ) ?? null
+        : null;
+    const missionTasks = missionStatus.taskChain?.tasks ?? [];
+    const isMissionAllDone =
+      missionTasks.length > 0 && missionTasks.every((task) => task.status === "done");
+    if (missionNode !== null) {
+      if (missionNode.status === "done") {
+        return {
+          missionIdentifier: input.missionIdentifier,
+          sequenceId: input.sequenceId,
+          sequenceRevision: snapshot.revision,
+          generatedAtIso: new Date().toISOString(),
+          isExecutable: false,
+          entries: [],
+          notes: [
+            "mission 与序列状态一致（整 mission 节点已 done）：无需写回。",
+            "本提案只读生成，不写任何文件、不改任何状态。",
+          ],
+        };
+      }
+      if (!isMissionAllDone) {
+        entries.push({
+          taskIdentifier: missionNode.taskId,
+          sequenceStatus: missionNode.status,
+          missionStatus: missionTasks.map((task) => `${task.id}:${task.status}`).join(","),
+          proposedAction: "needs-human-review",
+          rationale: "mission 尚未全部完成，但序列整 mission 节点未 done：无法安全地单向推导。",
+          risk: "自动写回可能把未完成的 mission 标成完成。",
+          requiresHumanApproval: true,
+        });
+      } else {
+        entries.push({
+          taskIdentifier: missionNode.taskId,
+          sequenceStatus: missionNode.status,
+          missionStatus: "done",
+          proposedAction: "mark-sequence-done",
+          rationale:
+            "mission 全部任务已 done，序列整 mission 节点未 done：把完成状态回写序列是最小改动。",
+          risk: "若序列侧仍有其它未完成的依赖者，提前置 done 会让下游 ready 判定失真。",
+          requiresHumanApproval: true,
+        });
+      }
+      return {
+        missionIdentifier: input.missionIdentifier,
+        sequenceId: input.sequenceId,
+        sequenceRevision: snapshot.revision,
+        generatedAtIso: new Date().toISOString(),
+        isExecutable: false,
+        entries,
+        notes: [
+          "按整 mission 节点对齐（序列仅一个节点且 externalReference 指向本 mission）。",
+          "本提案只读生成，不写任何文件、不改任何状态。",
+          "所有条目都需要人工批准；执行写回需显式入口。",
+        ],
+      };
+    }
     const allTaskIdentifiers = [
       ...new Set([
         ...report.sequenceTaskIdentifiers,

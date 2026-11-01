@@ -4843,3 +4843,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 在真实数据不可达（结构性缺口），端到端靠夹具对齐。
 > **验证**：CLI 测试 2/2；全量 **471 files / 3620 tests**（首轮两条瞬时失败，重跑 exit 0）；typecheck/lint/build 绿。
 > **未做**：真实数据不可达、批准无身份校验、批量非原子、无 --dry-run。ADR-0180。
+
+> **194（R122）：两套记账"整 mission 节点"对齐（完成，真实数据跑通）**：真实序列只有 1 个节点
+> `task-mission-<id>`（`externalReference=mission:<id>`），与 mission 的 `T-0x` 无共同 id。
+> 新增对齐：单节点且属本 mission ⇒ 按整 mission 处理（全部 done + 节点未 done ⇒ `mark-sequence-done`，
+> 目标为序列节点 id；未全部 done ⇒ 需人工；节点已 done ⇒ 无条目）。
+> **真实数据**：`mission-90bc56fb` 提案→CLI 应用成功，序列 revision 2→4、节点 done、审计追加、mission 未变。
+> **验证**：单测 7/7；全量 **471 files / 3623 tests**；typecheck/lint/build 绿。ADR-0181。
+> **未做**：无持久 id 映射表（依赖 externalReference + 单节点形态）、多节点序列仍误报、其它动作人工。
