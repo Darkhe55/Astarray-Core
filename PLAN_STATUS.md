@@ -4803,3 +4803,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `mission-9d01d418` **done**（T-01/T-02 均 done）。
 > **验证**：单测 4/4；全量 **471 files / 3612 tests**（首轮两条瞬时失败，重跑 exit 0）；typecheck/lint/build 绿。
 > **未做**：重试不改提示词、计数仅内存、未造"重试后仍失败"实跑。ADR-0176。
+
+> **188（R116）：真实 12+ 组停滞（无预置，完成）**：`goal-realstg`（V 恒为 1）+ 4 次真实 mission
+> ⇒ groupCount 4/7/10/14、checks 0/1/2/3，第四次 **paused**（"连续 3 次进展检查 V 未下降"）；
+> `--goal-enforce` 下下一单被启动前阻断（退出码 2、无文件）。
+> **验证**：全量 471 files / 3612 tests；typecheck/lint/build 绿。
+> **注意**：14 组（非恰好 12）、构造性目标、investigation 无信号。ADR-0177。
