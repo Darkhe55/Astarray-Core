@@ -1343,10 +1343,16 @@ export async function createApplicationRuntime(
           if (receipt !== null && Number.isFinite(receipt.toolCallCount)) {
             receiptToolCallTotal += Math.max(0, Math.trunc(receipt.toolCallCount));
           }
+          /**
+           * R103（2026-11-01）：**只读任务没有产物**也算确定性证据。
+           *
+           * 旧条件要求 `artifactPaths.length > 0`，导致"读取/核对"类任务永远 unverified
+           * （多组正向实测：T-02 done 但 V 仍为 1）。收据里的完成控制事件已由本地校验，
+           * 产物对账在结案门禁另做，不在这里重复要求。
+           */
           if (
             receipt !== null &&
-            receipt.hasVerifiedCompletionControlEvent === true &&
-            receipt.artifactPaths.length > 0
+            receipt.hasVerifiedCompletionControlEvent === true
           ) {
             verifiedReceiptTaskIdentifiers.add(task.id);
           }
@@ -1919,8 +1925,7 @@ export async function createApplicationRuntime(
         .catch(() => null);
       if (
         receipt !== null &&
-        receipt.hasVerifiedCompletionControlEvent === true &&
-        receipt.artifactPaths.length > 0
+        receipt.hasVerifiedCompletionControlEvent === true
       ) {
         verifiedReceiptTaskIdentifiers.add(task.id);
       }
