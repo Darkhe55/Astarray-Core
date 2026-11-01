@@ -32,6 +32,7 @@ import {
   executeGoalModeRecomputeCommand,
   executeGoalModeViolationsCommand,
   executeGoalModeReconcileCommand,
+  executeGoalModeReconcileTaskCommand,
 } from "./cli/goal-mode-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
@@ -1237,6 +1238,28 @@ goalModeCommand
       goalIdentifier: options.goal,
       requirementIdentifier: options.requirement,
       taskNodeIdentifiers: options.tasks,
+    });
+  });
+
+goalModeCommand
+  .command("reconcile-task")
+  .description("操作者核对副作用后把在途任务重新排队（不重放已完成动作）")
+  .requiredOption("--mission <mission-id>", "mission 标识")
+  .requiredOption("--task <task-id>", "任务标识")
+  .requiredOption("--note <text>", "对账说明")
+  .option("--json", "JSON 输出")
+  .action(async (options: {
+    mission: string;
+    task: string;
+    note: string;
+    json?: boolean;
+  }) => {
+    process.exitCode = await executeGoalModeReconcileTaskCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      missionIdentifier: options.mission,
+      taskIdentifier: options.task,
+      note: options.note,
     });
   });
 
