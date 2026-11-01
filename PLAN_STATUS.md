@@ -4856,3 +4856,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `docs/reports/STATE_OVERVIEW_2026-11-01.md`——基线（HEAD `f585b6c2`、ahead 0、
 > 471 files / 3623 tests）、R101–R122 能力表、仍缺清单、工作区**用户未提交文件**（7 项，未暂存）。
 > 无代码改动；不处理用户文件。
+
+> **196（R123）：持久任务映射 + 多节点写回（完成）**：新增 `MissionTaskSequenceMapStore`
+> （`task-ledger/mission-task-maps.json`，改绑拒绝/幂等/原子写）、提案按映射逐对比较、
+> CLI `task-ledger bind-task-map`（校验两侧真实存在）。
+> **端到端**：双节点夹具 `mission-wb2` 绑定 T-01→node-a、T-02→node-b ⇒ 提案 2 条
+> `mark-sequence-done` ⇒ 应用后 node-a/node-b 均 done（revision 2→6）。
+> **验证**：单测 2/2；全量 **471 files / 3625 tests**；typecheck/lint/build 绿。ADR-0182。
+> **未做**：映射需人工登记（发布端未自动写）、无反向查询、过期不自动清理、批量非原子。

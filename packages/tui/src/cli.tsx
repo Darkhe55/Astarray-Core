@@ -21,6 +21,7 @@ import { executeObsPerfRotateCommand } from "./cli/obs-perf-rotate-command.js";
 // 清单第 ① 项出口（2026-10-28）：两套记账的只读对账视图。
 import {
   executeTaskLedgerApplyWriteBackCommand,
+  executeTaskLedgerBindTaskMapCommand,
   executeTaskLedgerStatusCommand,
 } from "./cli/task-ledger-command.js";
 // F 阶段 R31（2026-10-29）：目标模式的只读状态视图（不提供写命令）。
@@ -1083,6 +1084,34 @@ historyCommand
 const taskLedgerCommand = program
   .command("task-ledger")
   .description("两套记账对账与差异历史（只读；不改任何一边）");
+
+taskLedgerCommand
+  .command("bind-task-map")
+  .description("登记 mission 任务 ↔ 序列节点 的显式映射（写回提案按映射对齐）")
+  .requiredOption("--mission <mission-id>", "mission 标识")
+  .option("--sequence <sequence-id>", "序列标识（缺省用绑定索引）")
+  .option("--owner <agent-instance-id>", "序列 owner（缺省用绑定索引）")
+  .requiredOption("--mission-task <task-id>", "mission 任务标识（如 T-01）")
+  .requiredOption("--sequence-task <task-id>", "序列节点标识")
+  .option("--json", "JSON 输出")
+  .action(async (options: {
+    mission: string;
+    sequence?: string;
+    owner?: string;
+    missionTask: string;
+    sequenceTask: string;
+    json?: boolean;
+  }) => {
+    process.exitCode = await executeTaskLedgerBindTaskMapCommand({
+      stateDirectory: defaultStateDirectory(),
+      missionIdentifier: options.mission,
+      sequenceIdentifier: options.sequence,
+      ownerAgentInstanceIdentifier: options.owner,
+      missionTaskIdentifier: options.missionTask,
+      sequenceTaskIdentifier: options.sequenceTask,
+      isJsonOutput: options.json === true,
+    });
+  });
 
 taskLedgerCommand
   .command("apply-writeback")

@@ -16,6 +16,7 @@ import { MissionManager } from "../../../core/src/orchestration/mission-manager.
 import { TaskLedgerBridge } from "../../../core/src/orchestration/task-ledger-bridge.js";
 import { TaskLedgerDivergenceJournal } from "../../../core/src/orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../../../core/src/orchestration/mission-sequence-binding-store.js";
+import { MissionTaskSequenceMapStore } from "../../../core/src/orchestration/mission-task-sequence-map-store.js";
 import { DeferredInsertionQueueStore } from "../../../core/src/orchestration/deferred-insertion-queue.js";
 import type { DeferredInsertionEntry } from "../../../core/src/orchestration/deferred-insertion-queue.js";
 import {
@@ -203,6 +204,9 @@ export async function executeTaskLedgerStatusCommand(
     baseDirectory: input.stateDirectory,
   });
   const statusController = new TaskSequenceStatusController(sequenceStore);
+  const taskMapStore = new MissionTaskSequenceMapStore({
+    baseDirectory: input.stateDirectory,
+  });
   const bridge = new TaskLedgerBridge({
     sequenceLedger: {
       getSnapshot: (snapshotInput) => statusController.getSnapshot(snapshotInput),
@@ -210,6 +214,9 @@ export async function executeTaskLedgerStatusCommand(
     missionTaskChain: {
       getMissionStatus: (missionIdentifier) =>
         missionManager.getMissionStatus(missionIdentifier),
+    },
+    taskMappings: {
+      listForMission: (mapInput) => taskMapStore.listForMission(mapInput),
     },
   });
 
@@ -512,6 +519,9 @@ export async function executeTaskLedgerApplyWriteBackCommand(
   const statusController = new TaskSequenceStatusController(sequenceStore);
   const manageController = new TaskSequenceManageController(sequenceStore);
   const actor = { sourceKind: "user" as const, actorId: input.approvedBy };
+  const taskMapStore = new MissionTaskSequenceMapStore({
+    baseDirectory: input.stateDirectory,
+  });
   const bridge = new TaskLedgerBridge({
     sequenceLedger: {
       getSnapshot: (snapshotInput) => statusController.getSnapshot(snapshotInput),
@@ -519,6 +529,9 @@ export async function executeTaskLedgerApplyWriteBackCommand(
     missionTaskChain: {
       getMissionStatus: (missionIdentifier) =>
         missionManager.getMissionStatus(missionIdentifier),
+    },
+    taskMappings: {
+      listForMission: (mapInput) => taskMapStore.listForMission(mapInput),
     },
     sequenceTransition: {
       transitionTaskStatus: (transitionInput) =>
@@ -574,6 +587,102 @@ export async function executeTaskLedgerApplyWriteBackCommand(
         `- 跳过 ${skipped.taskIdentifier}（${skipped.proposedAction}）：${skipped.reason}\n`,
       );
     }
+  }
+  return EXIT_CODES.SUCCESS;
+}
+
+/** R123：`task-ledger bind-task-map` —— 登记 mission 任务 ↔ 序列节点 的显式映射。 */
+export interface TaskLedgerBindTaskMapCommandInput {
+  readonly stateDirectory: string;
+  readonly missionIdentifier: string;
+  readonly sequenceIdentifier?: string;
+  readonly ownerAgentInstanceIdentifier?: string;
+  readonly missionTaskIdentifier: string;
+  readonly sequenceTaskIdentifier: string;
+  readonly isJsonOutput: boolean;
+}
+
+export async function executeTaskLedgerBindTaskMapCommand(
+  input: TaskLedgerBindTaskMapCommandInput,
+): Promise<number> {
+  const bindingStore = new MissionSequenceBindingStore({
+    baseDirectory: input.stateDirectory,
+  });
+  const binding = await bindingStore
+    .readForMission(input.missionIdentifier)
+    .catch(() => null);
+  const sequenceIdentifier = input.sequenceIdentifier ?? binding?.sequenceIdentifier;
+  const ownerAgentInstanceIdentifier =
+    input.ownerAgentInstanceIdentifier ?? binding?.ownerAgentInstanceIdentifier;
+  if (sequenceIdentifier === undefined || ownerAgentInstanceIdentifier === undefined) {
+    const message = `index-missing: mission ${input.missionIdentifier} 没有可用的序列绑定（请显式给 --sequence/--owner）`;
+    if (input.isJsonOutput) {
+      printJson({ status: "index-missing", message });
+    } else {
+      process.stderr.write(`${message}\n`);
+    }
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const taskStore = new TaskStore({ baseDirectory: input.stateDirectory });
+  const missionManager = new MissionManager(taskStore, input.stateDirectory);
+  const missionStatus = await missionManager.getMissionStatus(input.missionIdentifier);
+  const hasMissionTask = (missionStatus.taskChain?.tasks ?? []).some(
+    (task) => task.id === input.missionTaskIdentifier,
+  );
+  if (!hasMissionTask) {
+    const message = `invalid-task-chain: mission ${input.missionIdentifier} 没有任务 ${input.missionTaskIdentifier}`;
+    if (input.isJsonOutput) {
+      printJson({ status: "invalid-task-chain", message });
+    } else {
+      process.stderr.write(`${message}\n`);
+    }
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const sequenceStore = new AgentTaskSequenceStore({
+    baseDirectory: input.stateDirectory,
+  });
+  const statusController = new TaskSequenceStatusController(sequenceStore);
+  const snapshot = await statusController.getSnapshot({
+    ownerAgentInstanceId: ownerAgentInstanceIdentifier,
+    sequenceId: sequenceIdentifier,
+    viewer: { sourceKind: "user", actorId: "user-local" },
+  });
+  const hasSequenceNode = snapshot.nodes.some(
+    (node) => node.taskId === input.sequenceTaskIdentifier,
+  );
+  if (!hasSequenceNode) {
+    const message = `invalid-task-chain: 序列 ${sequenceIdentifier} 没有节点 ${input.sequenceTaskIdentifier}`;
+    if (input.isJsonOutput) {
+      printJson({ status: "invalid-task-chain", message });
+    } else {
+      process.stderr.write(`${message}\n`);
+    }
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const taskMapStore = new MissionTaskSequenceMapStore({
+    baseDirectory: input.stateDirectory,
+  });
+  const result = await taskMapStore.bind({
+    missionIdentifier: input.missionIdentifier,
+    sequenceIdentifier,
+    ownerAgentInstanceIdentifier,
+    missionTaskIdentifier: input.missionTaskIdentifier,
+    sequenceTaskIdentifier: input.sequenceTaskIdentifier,
+  });
+  if (input.isJsonOutput) {
+    printJson({
+      status: result.didWrite ? "bound" : "already-bound",
+      missionIdentifier: input.missionIdentifier,
+      sequenceIdentifier,
+      missionTaskIdentifier: input.missionTaskIdentifier,
+      sequenceTaskIdentifier: input.sequenceTaskIdentifier,
+    });
+  } else {
+    process.stdout.write(
+      result.didWrite
+        ? `已登记映射：${input.missionTaskIdentifier} ↔ ${input.sequenceTaskIdentifier}\n`
+        : `映射已存在：${input.missionTaskIdentifier} ↔ ${input.sequenceTaskIdentifier}\n`,
+    );
   }
   return EXIT_CODES.SUCCESS;
 }
