@@ -4814,3 +4814,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `docs/reports/GOAL02_FINAL_DELIVERY_2026-11-01.md`——交付概览、**真实 mission 证据表**（14 项）、
 > 自动化验证（471 files / 3612 tests）、验收条件对照、剩余 6 项、明确不宣称项。
 > 本卡收口完成；无代码改动。
+
+> **190（R118）：`--include-archive` 读轮转文件（完成，§B4 收口）**：新增
+> `readRotatedJsonlLines`（从旧到新：`.N`→`.1`→主文件；缺失跳过、空行忽略），接入
+> `goal-mode verdicts --include-archive --export` 与 `goal-mode violations --include-archive`。
+> **验证**：单测 2/2；真实 CLI 夹具 `archivedCount=2`（主文件 + `.1`）；全量 **471 files / 3614 tests**；
+> typecheck/lint/build 绿。ADR-0178。
+> **未做**：只读 2 份轮转、导出不标注来源文件、归档不按目标过滤。

@@ -11,6 +11,8 @@
  */
 import path from "node:path";
 
+import { readRotatedJsonlLines } from "../../../core/src/orchestration/rotated-jsonl-reader.js";
+
 import { GoalContractStore } from "../../../core/src/orchestration/goal-contract-store.js";
 import { GoalMissionBindingStore } from "../../../core/src/orchestration/goal-mission-binding-store.js";
 import { GoalModeStateStore } from "../../../core/src/orchestration/goal-mode-store.js";
@@ -211,12 +213,10 @@ export async function executeGoalModeVerdictsCommand(
       const archivedLines: string[] = [];
       if (input.includeArchive === true) {
         try {
-          const { readFile } = await import("node:fs/promises");
+          /** R118：连轮转文件一起读（从旧到新）。 */
           const archivePath = `${input.stateDirectory}/goal-mode/dispatch-verdicts-archive.jsonl`;
-          const archiveText = await readFile(archivePath, "utf8");
-          archivedLines.push(
-            ...archiveText.split(/\r?\n/).filter((line) => line.trim() !== ""),
-          );
+          const rotated = await readRotatedJsonlLines({ archivePath });
+          archivedLines.push(...rotated.lines);
         } catch {
           /** 没有归档文件 ⇒ 视为空（不报错）。 */
         }
@@ -555,14 +555,14 @@ export async function executeGoalModeViolationsCommand(
     readonly recordedAtIso: string;
   }[] = [];
   if (input.includeArchive) {
-    const { readFile } = await import("node:fs/promises");
     const archivePath = path.join(
       input.stateDirectory,
       "goal-mode",
       "invariant-violations-archive.jsonl",
     );
-    const archiveText = await readFile(archivePath, "utf8").catch(() => "");
-    for (const line of archiveText.split(/\r?\n/)) {
+    /** R118：连轮转文件一起读（从旧到新）。 */
+    const rotated = await readRotatedJsonlLines({ archivePath });
+    for (const line of rotated.lines) {
       const trimmed = line.trim();
       if (trimmed === "") {
         continue;
