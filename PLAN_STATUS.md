@@ -4729,3 +4729,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `goal-mg3` 未暂停、consumed=2、groupCount=3、`lastTaskGroupKind=normal`。
 > **验证**：全量 471 files / 3600 tests；lint 绿。ADR-0166。
 > **未做**：停滞暂停（需 9 组）、真实 rework 组；证据强度下降已记录。
+
+> **推送记录（R103）**：`4fe63ac0` 之后的多组正向提交已本地提交，`git push` 连续 5 次失败
+> （`Please make sure you have the correct access rights and the repository exists.`，网络/SSH），
+> 按纪律记录待重试；当前 `ahead=1`。
