@@ -9,6 +9,8 @@
  *
  * **本命令不提供任何写入口**：创建契约、绑定 mission、激活目标模式都只能由宿主代码调用。
  */
+import path from "node:path";
+
 import { GoalContractStore } from "../../../core/src/orchestration/goal-contract-store.js";
 import { GoalMissionBindingStore } from "../../../core/src/orchestration/goal-mission-binding-store.js";
 import { GoalModeStateStore } from "../../../core/src/orchestration/goal-mode-store.js";
@@ -522,4 +524,79 @@ export async function executeGoalModeRecomputeCommand(
   } finally {
     await application.shutdown();
   }
+}
+
+/** R107（2026-11-01）：`goal-mode violations` —— 只读查看不变量违规（持久状态 + 可选归档）。 */
+export interface GoalModeViolationsCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly goalIdentifier: string;
+  readonly recentCount: number;
+  readonly includeArchive: boolean;
+}
+
+export async function executeGoalModeViolationsCommand(
+  input: GoalModeViolationsCommandInput,
+): Promise<number> {
+  const stateStore = new GoalModeStateStore({ baseDirectory: input.stateDirectory });
+  const state = await stateStore.read(input.goalIdentifier).catch(() => null);
+  if (state === null) {
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-not-found", goalIdentifier: input.goalIdentifier });
+    } else {
+      process.stdout.write(`没有目标 ${input.goalIdentifier} 的状态。\n`);
+    }
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const persisted = [...(state.invariantViolations ?? [])];
+  const archived: {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[] = [];
+  if (input.includeArchive) {
+    const { readFile } = await import("node:fs/promises");
+    const archivePath = path.join(
+      input.stateDirectory,
+      "goal-mode",
+      "invariant-violations-archive.jsonl",
+    );
+    const archiveText = await readFile(archivePath, "utf8").catch(() => "");
+    for (const line of archiveText.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (trimmed === "") {
+        continue;
+      }
+      try {
+        archived.push(JSON.parse(trimmed) as never);
+      } catch {
+        // 坏行不阻塞其余记录（只读展示）
+      }
+    }
+  }
+  const recentPersisted = persisted.slice(-input.recentCount);
+  const recentArchived = archived.slice(-input.recentCount);
+  if (input.isJsonOutput) {
+    printJson({
+      status: "goal-violations",
+      goalIdentifier: input.goalIdentifier,
+      persistedCount: persisted.length,
+      archivedCount: archived.length,
+      recentPersisted,
+      recentArchived,
+    });
+  } else {
+    process.stdout.write(`目标 ${input.goalIdentifier} 违规：持久 ${String(persisted.length)} 条`);
+    if (input.includeArchive) {
+      process.stdout.write(`，归档 ${String(archived.length)} 条`);
+    }
+    process.stdout.write("\n");
+    for (const entry of recentPersisted) {
+      process.stdout.write(`- [持久] ${entry.recordedAtIso} ${entry.invariantCode}: ${entry.detail}\n`);
+    }
+    for (const entry of recentArchived) {
+      process.stdout.write(`- [归档] ${entry.recordedAtIso} ${entry.invariantCode}: ${entry.detail}\n`);
+    }
+  }
+  return EXIT_CODES.SUCCESS;
 }

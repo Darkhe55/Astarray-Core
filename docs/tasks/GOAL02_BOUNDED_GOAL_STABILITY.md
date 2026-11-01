@@ -367,3 +367,11 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   `<state>/goal-mode/invariant-violations-archive.jsonl`（失败不阻塞）。
 - **测试**：`goal-invariant-violation.test.ts` 7/7（新增分区用例）；全量 471 files / **3601 tests**。
 - **未做**：归档无读取入口/轮转/重试；真实超 200 条未演练。ADR-0168。
+
+### R107 违规只读查看（2026-11-01）
+
+- 新增 `goal-mode violations --goal <id> [--recent N] [--include-archive]`：读持久违规 + 可选归档
+  （JSONL 坏行跳过），只读、不改状态。
+- **真实夹具验证**：`goal-viol` 1 条持久 + 1 条归档，输出 `persistedCount=1, archivedCount=1`。
+- **测试**：全量 471 files / 3601 tests。
+- **未做**：归档轮转/按目标过滤、自动化测试、文本排版。ADR-0169。

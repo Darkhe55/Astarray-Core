@@ -30,6 +30,7 @@ import {
   executeGoalModeMapCommand,
   executeGoalModeInvalidateCommand,
   executeGoalModeRecomputeCommand,
+  executeGoalModeViolationsCommand,
 } from "./cli/goal-mode-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
@@ -1235,6 +1236,28 @@ goalModeCommand
       goalIdentifier: options.goal,
       requirementIdentifier: options.requirement,
       taskNodeIdentifiers: options.tasks,
+    });
+  });
+
+goalModeCommand
+  .command("violations")
+  .description("只读查看目标的不变量违规（持久 + 可选归档）")
+  .requiredOption("--goal <goal-id>", "目标标识")
+  .option("--recent <count>", "显示最近多少条", "20")
+  .option("--include-archive", "一并读取已归档记录")
+  .option("--json", "JSON 输出")
+  .action(async (options: {
+    goal: string;
+    recent?: string;
+    includeArchive?: boolean;
+    json?: boolean;
+  }) => {
+    process.exitCode = await executeGoalModeViolationsCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      goalIdentifier: options.goal,
+      recentCount: options.recent === undefined ? 20 : Number(options.recent),
+      includeArchive: options.includeArchive === true,
     });
   });
 
