@@ -5498,6 +5498,22 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *
    * `instructionText` 必须是 JSON：`{"action":"retry","taskId":"T-001"}`。
    */
+  /**
+   * R126：按 taskId 优先派发（仅同进程、运行中的 mission）。
+   *
+   * 只调整可运行任务之间的顺序，不绕过依赖；拒绝时返回具体原因。
+   */
+  dispatchMissionTask(
+    missionIdentifier: string,
+    taskIdentifier: string,
+  ): {
+    readonly outcome: "accepted" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  } {
+    this.assertOpen();
+    return this.runtime.dispatchMissionTask(missionIdentifier, taskIdentifier);
+  }
   sendMissionInstruction(missionIdentifier: string, instructionText: string): void {
     this.assertOpen();
     this.runtime.sendMissionInstruction(missionIdentifier, instructionText);

@@ -40,3 +40,22 @@ describe("调度器指令入口", () => {
     }
   });
 });
+
+describe("按 taskId 派发（门面层）", () => {
+  it("mission 不在本进程运行 ⇒ 明确拒绝（不伪造派发）", async () => {
+    const stateDirectory = await mkdtemp(path.join(tmpdir(), "astarray-dispatch-"));
+    directories.push(stateDirectory);
+    const application = await AstarrayApplicationFacade.create({
+      stateDirectory,
+      mode: "assist",
+      runtime: "mock",
+    });
+    try {
+      const decision = application.dispatchMissionTask("mission-none", "T-01");
+      expect(decision.outcome).toBe("refused");
+      expect(decision.reasonCode).toBe("mission-not-active");
+    } finally {
+      await application.shutdown();
+    }
+  });
+});

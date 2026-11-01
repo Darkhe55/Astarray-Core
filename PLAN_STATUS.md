@@ -4879,3 +4879,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **真实证据**：mission-1afe51bc 落盘 1 条（clean），`scan-records` 读回。
 > **验证**：单测 2/2；全量 **471 files / 3629 tests**；typecheck/lint/build 绿。ADR-0184。
 > **未做**：fire-and-forget 可能丢尾、无轮转、无过滤查询、无 UI、接收器为全局单例。
+
+> **199（R126）：按 taskId 派发（有界实现，§B1 部分收口）**：`DagScheduler.preferTaskDispatch`
+> 在可运行任务间优先启动指定 taskId（校验存在/pending/依赖全 done/未运行），编排器 `wake()`、
+> 控制器限同进程运行中 mission（否则 `mission-not-active`）、门面暴露；**无 CLI**（同进程限制）。
+> **验证**：调度器单测 3/3；门面单测 2/2；全量 **471 files / 3633 tests**；typecheck/lint/build 绿。ADR-0185。
+> **仍不支持**：乱序派发（依赖未完成）、抢占、跨进程、派发事件回执；`requestDispatchByTaskIdentifier` 仍拒绝。
