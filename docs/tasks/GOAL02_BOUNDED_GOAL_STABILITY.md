@@ -457,3 +457,14 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - 控制器 `applyTaskLedgerWriteBack` 接 `TaskSequenceManageController.transitionTaskStatus`（自带审计）。
 - **测试**：单测 4/4；全量 471 files / 3618 tests。
 - **未做**：无 CLI 入口、无真实序列端到端、批准无身份校验、批量非原子。ADR-0179。
+
+### R121 写回 CLI 与真实存储端到端（2026-11-01）
+
+- 新增 `task-ledger apply-writeback --mission … --approved-by … --expected-revision …`：
+  绑定索引补全 → 现生成提案 → revision 校验 → 应用（只 `mark-sequence-done`）。
+- **真实存储端到端**（夹具 `mission-wb`）：T-01 done、序列 revision 2→4、审计追加；
+  旧 revision 再应用 ⇒ `stale-revision`。
+- **发现**：真实 mission 的 `T-01` 与序列的 `task-mission-<id>` **无共同 id** ⇒ `mark-sequence-done`
+  在真实数据不可达（结构性缺口 ADR-0052/0110），本次靠夹具对齐才走到该分支。
+- **测试**：CLI 测试 2/2；全量 471 files / 3620 tests。
+- **未做**：真实数据不可达、批准无身份校验、批量非原子、无 --dry-run。ADR-0180。

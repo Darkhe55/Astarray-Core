@@ -19,7 +19,10 @@ import {
 } from "./cli/observability-command.js";
 import { executeObsPerfRotateCommand } from "./cli/obs-perf-rotate-command.js";
 // 清单第 ① 项出口（2026-10-28）：两套记账的只读对账视图。
-import { executeTaskLedgerStatusCommand } from "./cli/task-ledger-command.js";
+import {
+  executeTaskLedgerApplyWriteBackCommand,
+  executeTaskLedgerStatusCommand,
+} from "./cli/task-ledger-command.js";
 // F 阶段 R31（2026-10-29）：目标模式的只读状态视图（不提供写命令）。
 import {
   executeGoalModeStatusCommand,
@@ -1080,6 +1083,34 @@ historyCommand
 const taskLedgerCommand = program
   .command("task-ledger")
   .description("两套记账对账与差异历史（只读；不改任何一边）");
+
+taskLedgerCommand
+  .command("apply-writeback")
+  .description("人工批准后应用写回提案（只执行 mark-sequence-done；revision 双重校验）")
+  .requiredOption("--mission <mission-id>", "mission 标识")
+  .option("--sequence <sequence-id>", "序列标识（缺省用绑定索引）")
+  .option("--owner <agent-instance-id>", "序列 owner（缺省用绑定索引）")
+  .requiredOption("--approved-by <user>", "批准人（必需，人工）")
+  .requiredOption("--expected-revision <n>", "期望的序列 revision（防旧提案覆盖）")
+  .option("--json", "JSON 输出")
+  .action(async (options: {
+    mission: string;
+    sequence?: string;
+    owner?: string;
+    approvedBy: string;
+    expectedRevision: string;
+    json?: boolean;
+  }) => {
+    process.exitCode = await executeTaskLedgerApplyWriteBackCommand({
+      stateDirectory: defaultStateDirectory(),
+      missionIdentifier: options.mission,
+      sequenceIdentifier: options.sequence,
+      ownerAgentInstanceIdentifier: options.owner,
+      approvedBy: options.approvedBy,
+      expectedSequenceRevision: Number(options.expectedRevision),
+      isJsonOutput: options.json === true,
+    });
+  });
 
 taskLedgerCommand
   .command("status")
