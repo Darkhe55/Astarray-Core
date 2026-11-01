@@ -4851,3 +4851,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **真实数据**：`mission-90bc56fb` 提案→CLI 应用成功，序列 revision 2→4、节点 done、审计追加、mission 未变。
 > **验证**：单测 7/7；全量 **471 files / 3623 tests**；typecheck/lint/build 绿。ADR-0181。
 > **未做**：无持久 id 映射表（依赖 externalReference + 单节点形态）、多节点序列仍误报、其它动作人工。
+
+> **195（R123）：仓库状态总览（只读盘点）**：新增
+> `docs/reports/STATE_OVERVIEW_2026-11-01.md`——基线（HEAD `f585b6c2`、ahead 0、
+> 471 files / 3623 tests）、R101–R122 能力表、仍缺清单、工作区**用户未提交文件**（7 项，未暂存）。
+> 无代码改动；不处理用户文件。
