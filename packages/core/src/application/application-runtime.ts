@@ -306,6 +306,12 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R108：在途组对账（操作者核对副作用后收口，不重放工具）。 */
+  reconcileGoalTaskGroup: (input: {
+    readonly goalIdentifier: string;
+    readonly taskGroupIdentifier: string;
+    readonly note: string;
+  }) => Promise<{ readonly reconciled: boolean }>;
   /** R94：按当前证据重算 V（裁决落盘后使用；不改门禁/暂停）。 */
   recomputeGoalPotential: (input: {
     readonly goalIdentifier: string;
@@ -1977,6 +1983,53 @@ export async function createApplicationRuntime(
       reason: null,
     };
   };
+  /**
+   * R108（2026-11-01）：**在途组对账（操作者动作）**。
+   *
+   * 进程被强杀后，状态里会留下 `currentTaskGroupIdentifier`，恢复时按 `reconcile-first` 拒绝重跑
+   * （避免重复副作用）。本入口让操作者在**核对过副作用**后显式收口该组：
+   * 只清在途标记并记录对账说明，不重放任何工具、不推进 V。
+   */
+  const reconcileGoalTaskGroup = async (input: {
+    readonly goalIdentifier: string;
+    readonly taskGroupIdentifier: string;
+    readonly note: string;
+  }): Promise<{ readonly reconciled: boolean }> => {
+    const state = await goalModeStateStore
+      .read(input.goalIdentifier)
+      .catch(() => null);
+    if (state === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `目标 ${input.goalIdentifier} 没有状态，无法对账。`,
+      );
+    }
+    if (state.currentTaskGroupIdentifier !== input.taskGroupIdentifier) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `在途组不匹配：状态为 ${String(state.currentTaskGroupIdentifier)}，请求 ${input.taskGroupIdentifier}。`,
+      );
+    }
+    if (input.note.trim() === "") {
+      throw new DomainError(
+        "invalid-task-chain",
+        "对账必须给出说明（核对过哪些副作用/为什么可以继续）。",
+      );
+    }
+    await goalModeStateStore.write({
+      ...state,
+      documentRevision: state.documentRevision + 1,
+      currentTaskGroupIdentifier: null,
+      currentTaskGroupStartedAtIso: null,
+      evidenceGaps: [
+        ...state.evidenceGaps,
+        `对账：组 ${input.taskGroupIdentifier} 由操作者确认可继续（${input.note}）`,
+      ],
+      updatedAtIso: new Date().toISOString(),
+    });
+    await refreshGoalGateCache();
+    return { reconciled: true };
+  };
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -3490,6 +3543,7 @@ export async function createApplicationRuntime(
     recordIndependentVerdict,
     registerAgentIdentity,
     recomputeGoalPotential,
+    reconcileGoalTaskGroup,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,

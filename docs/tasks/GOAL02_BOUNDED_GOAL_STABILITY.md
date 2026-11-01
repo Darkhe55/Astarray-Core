@@ -375,3 +375,12 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **真实夹具验证**：`goal-viol` 1 条持久 + 1 条归档，输出 `persistedCount=1, archivedCount=1`。
 - **测试**：全量 471 files / 3601 tests。
 - **未做**：归档轮转/按目标过滤、自动化测试、文本排版。ADR-0169。
+
+### R108 强杀重启演练 + 在途组对账入口（2026-11-01）
+
+- 强杀（T-01 done / T-02 running）后：租约未过期 ⇒ `mission-locked` 拒绝抢跑；过期后 ⇒
+  `reconcile-first`（目标组未收口）拒绝重跑；新增 `goal-mode reconcile --goal --group --note`
+  由操作者收口在途组（不重放、不推进 V），收口后仍被**任务级**对账拦住（`运行中任务副作用未知: T-02`）。
+- 预算：崩溃前后 `consumedToolCalls=2`，**未归零**。
+- **测试**：全量 471 files / 3601 tests。
+- **未做**：任务级对账入口、对账后自动继续、`goal-mode reconcile` 自动化测试。ADR-0170。

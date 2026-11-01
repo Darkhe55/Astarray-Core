@@ -4755,3 +4755,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 读持久违规 + 归档 JSONL（坏行跳过）；真实夹具输出 `persistedCount=1, archivedCount=1`。
 > **验证**：全量 471 files / 3601 tests；typecheck/lint/build 绿。
 > **未做**：归档轮转/按目标过滤、自动化测试、文本排版。ADR-0169。
+
+> **181（R108）：强杀重启演练 + 在途组对账（部分完成）**：强杀后 resume 被正确拒绝——
+> 租约未过期 `mission-locked`；过期后 `reconcile-first`（目标组未收口）；新增
+> `goal-mode reconcile --goal --group --note` 收口在途组（不重放/不推进 V）；收口后仍被
+> **任务级**对账拦下（`运行中任务副作用未知: T-02`）。预算 `consumedToolCalls=2` 崩溃前后不变。
+> **验证**：全量 471 files / 3601 tests；typecheck/lint/build 绿。
+> **未做**：任务级对账入口、一键对账后继续、reconcile 自动化测试。ADR-0170。

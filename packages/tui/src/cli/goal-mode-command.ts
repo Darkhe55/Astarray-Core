@@ -600,3 +600,39 @@ export async function executeGoalModeViolationsCommand(
   }
   return EXIT_CODES.SUCCESS;
 }
+
+/** R108：`goal-mode reconcile` —— 操作者核对副作用后收口在途组（不重放工具）。 */
+export interface GoalModeReconcileCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly goalIdentifier: string;
+  readonly taskGroupIdentifier: string;
+  readonly note: string;
+}
+
+export async function executeGoalModeReconcileCommand(
+  input: GoalModeReconcileCommandInput,
+): Promise<number> {
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.reconcileGoalTaskGroup({
+      goalIdentifier: input.goalIdentifier,
+      taskGroupIdentifier: input.taskGroupIdentifier,
+      note: input.note,
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "goal-group-reconciled", ...result });
+    } else {
+      process.stdout.write(
+        `已在途组对账：${input.taskGroupIdentifier}（可继续恢复，不会重放工具）\n`,
+      );
+    }
+    return EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
+}
