@@ -408,3 +408,10 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - 运行时在"发生归档追加"后调用（正常零开销，失败忽略）。
 - **测试**：`goal-invariant-archive.test.ts` 2/2；全量 **471 files / 3606 tests**（一次 unhandled 瞬时，重跑 exit 0）。
 - **未做**：只在追加时触发、上限不可配置、读取入口不读 `.1/.2`、真实 5000 行未演练。ADR-0173。
+
+### R113 调度器指令门面入口（2026-11-01）
+
+- 门面新增 `sendMissionInstruction`（委托 `sendSchedulerInstruction`；unblock/retry/cancel/reassign）。
+- **不加 CLI**：指令只对**同进程**调度器有效，headless 跨进程无效，加 CLI 会误导。
+- **测试**：`goal-mission-instruction.test.ts` 1/1（无活动调度器时安全 no-op）；全量 471 files / **3607 tests**。
+- **未做**：真实 rework 组闭环、指令回执、TUI/GUI 接入。ADR-0174。

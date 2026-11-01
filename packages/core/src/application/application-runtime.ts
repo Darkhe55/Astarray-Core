@@ -307,6 +307,8 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。 */
+  sendMissionInstruction: (missionIdentifier: string, instructionText: string) => void;
   /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
   reconcileMissionTask: (input: {
     readonly missionIdentifier: string;
@@ -2094,6 +2096,18 @@ export async function createApplicationRuntime(
     });
     return { reconciled: true, previousStatus: task.status };
   };
+  /**
+   * R113（2026-11-01）：**向运行中的调度器发送指令**（`unblock`/`retry`/`cancel`/`reassign`）。
+   *
+   * 与 TUI 内指令同一入口；**仅同进程有效**（跨进程的 mission 由租约隔离）。
+   * 模型不可调用：这是用户/宿主的运维动作。
+   */
+  const sendMissionInstruction = (
+    missionIdentifier: string,
+    instructionText: string,
+  ): void => {
+    controller.sendSchedulerInstruction(missionIdentifier, instructionText);
+  };
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -3615,6 +3629,7 @@ export async function createApplicationRuntime(
     recomputeGoalPotential,
     reconcileGoalTaskGroup,
     reconcileMissionTask,
+    sendMissionInstruction,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,
