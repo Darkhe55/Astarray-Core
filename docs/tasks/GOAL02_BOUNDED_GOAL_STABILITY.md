@@ -394,3 +394,10 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   `{"status":"done","resumed":true}`，T-01/T-02 均 done，`consumedToolCalls=2` 未归零。
 - **测试**：全量 471 files / 3601 tests。
 - **未做**：对账命令无自动化测试、无一键继续、恢复组消耗未增加（只读任务无收据）。ADR-0171。
+
+### R111 对账入口自动化测试（2026-11-01）
+
+- `goal-reconcile.test.ts` 3/3：任务 `running→pending`（revision+1、其余不变）；已完成/空说明被拒；
+  组对账清空在途组并写证据缺口。
+- 全量 **471 files / 3604 tests**。
+- **未做**：CLI 端到端、对账后 resume 的自动化集成、租约等待。ADR-0172。
