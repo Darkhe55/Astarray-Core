@@ -283,7 +283,13 @@ export class WorkerAgent {
     }
   }
 
-  constructor(private readonly options: WorkerAgentOptions) {}
+  constructor(private readonly options: WorkerAgentOptions) {
+    if (process.env.ASTARRAY_TRACE_COMPLETION === "1") {
+      process.stderr.write(
+        `[WCOMP] task=${this.options.task.id} requireCompletionEvent=${String(this.options.requireCompletionEvent)} conversation=${String(this.options.isConversationMode === true)}\n`,
+      );
+    }
+  }
 
   cancel(): void {
     this.cancellationController.abort();

@@ -294,3 +294,12 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   `taskPlanningOutcome: "model"`（非降级）；该 mission 因模型未发完成控制事件而失败（非分解问题）。
 - **测试**：全量 471 files / 3600 tests。
 - **未做**：多组完成 + 每三组检查的真实演练；规划质量只校验工具名；`projectSummary` 仍为空。ADR-0163。
+
+### R101 完成控制事件核查（2026-11-01）
+
+- 提示**存在且启用**（`worker-agent.ts` 在 `requireCompletionEvent` 时注入末行 marker + 冻结 JSON）；
+- provider 路径由门面**强制开启**（`public-sdk.ts:2772`），属既有安全设计；
+- 补跑（加 `ASTARRAY_TRACE_COMPLETION=1`）：`mission-0524ccd3` **status=done**、
+  `taskPlanningOutcome=model`、T-01/T-02 均 done ⇒ **两节点模型分解 + 完成事件可完整通过**。
+  此前失败为**单次模型未遵守提示**，不是提示未注入/门禁错误。
+- **测试**：全量 471 files / 3600 tests。ADR-0164。
