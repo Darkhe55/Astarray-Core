@@ -18,7 +18,10 @@ import { TaskLedgerDivergenceJournal } from "../../../core/src/orchestration/tas
 import { MissionSequenceBindingStore } from "../../../core/src/orchestration/mission-sequence-binding-store.js";
 import { DeferredInsertionQueueStore } from "../../../core/src/orchestration/deferred-insertion-queue.js";
 import type { DeferredInsertionEntry } from "../../../core/src/orchestration/deferred-insertion-queue.js";
-import { TaskSequenceStatusController } from "../../../core/src/orchestration/task-sequence-controllers.js";
+import {
+  TaskSequenceManageController,
+  TaskSequenceStatusController,
+} from "../../../core/src/orchestration/task-sequence-controllers.js";
 import { TaskStore } from "../../../core/src/infra/task-store.js";
 import { EXIT_CODES, printJson } from "./json-output.js";
 
@@ -465,6 +468,112 @@ export async function executeTaskLedgerStatusCommand(
         `onlyMission=${String(entry.tasksOnlyInMission.length)} ` +
         `mismatch=${String(entry.statusMismatchCount)} (${entry.trigger})\n`,
     );
+  }
+  return EXIT_CODES.SUCCESS;
+}
+/** R121（2026-11-01）：`task-ledger apply-writeback` —— 人工批准后应用写回提案。 */
+export interface TaskLedgerApplyWriteBackCommandInput {
+  readonly stateDirectory: string;
+  readonly missionIdentifier: string;
+  readonly sequenceIdentifier?: string;
+  readonly ownerAgentInstanceIdentifier?: string;
+  readonly approvedBy: string;
+  readonly expectedSequenceRevision: number;
+  readonly isJsonOutput: boolean;
+}
+
+export async function executeTaskLedgerApplyWriteBackCommand(
+  input: TaskLedgerApplyWriteBackCommandInput,
+): Promise<number> {
+  const bindingStore = new MissionSequenceBindingStore({
+    baseDirectory: input.stateDirectory,
+  });
+  const binding = await bindingStore
+    .readForMission(input.missionIdentifier)
+    .catch(() => null);
+  const sequenceIdentifier =
+    input.sequenceIdentifier ?? binding?.sequenceIdentifier;
+  const ownerAgentInstanceIdentifier =
+    input.ownerAgentInstanceIdentifier ?? binding?.ownerAgentInstanceIdentifier;
+  if (sequenceIdentifier === undefined || ownerAgentInstanceIdentifier === undefined) {
+    const message = `index-missing: mission ${input.missionIdentifier} 没有可用的序列绑定（请显式给 --sequence/--owner）`;
+    if (input.isJsonOutput) {
+      printJson({ status: "index-missing", message });
+    } else {
+      process.stderr.write(`${message}\n`);
+    }
+    return EXIT_CODES.USAGE_ERROR;
+  }
+  const taskStore = new TaskStore({ baseDirectory: input.stateDirectory });
+  const missionManager = new MissionManager(taskStore, input.stateDirectory);
+  const sequenceStore = new AgentTaskSequenceStore({
+    baseDirectory: input.stateDirectory,
+  });
+  const statusController = new TaskSequenceStatusController(sequenceStore);
+  const manageController = new TaskSequenceManageController(sequenceStore);
+  const actor = { sourceKind: "user" as const, actorId: input.approvedBy };
+  const bridge = new TaskLedgerBridge({
+    sequenceLedger: {
+      getSnapshot: (snapshotInput) => statusController.getSnapshot(snapshotInput),
+    },
+    missionTaskChain: {
+      getMissionStatus: (missionIdentifier) =>
+        missionManager.getMissionStatus(missionIdentifier),
+    },
+    sequenceTransition: {
+      transitionTaskStatus: (transitionInput) =>
+        manageController.transitionTaskStatus({
+          ownerAgentInstanceId: transitionInput.ownerAgentInstanceId,
+          sequenceId: transitionInput.sequenceId,
+          taskId: transitionInput.taskId,
+          nextStatus: "done",
+          blockReason: null,
+          expectedRevision: transitionInput.expectedRevision,
+          actor: transitionInput.actor,
+        }),
+    },
+  });
+  const proposal = await bridge.buildWriteBackProposal({
+    missionIdentifier: input.missionIdentifier,
+    ownerAgentInstanceId: ownerAgentInstanceIdentifier,
+    sequenceId: sequenceIdentifier,
+    viewer: actor,
+  });
+  if (proposal.sequenceRevision !== input.expectedSequenceRevision) {
+    const message = `stale-revision: 当前提案基于 revision ${String(proposal.sequenceRevision)}，与 --expected-revision ${String(input.expectedSequenceRevision)} 不一致；请重新生成提案。`;
+    if (input.isJsonOutput) {
+      printJson({ status: "stale-revision", message });
+    } else {
+      process.stderr.write(`${message}\n`);
+    }
+    return EXIT_CODES.FAILURE;
+  }
+  const result = await bridge.applyWriteBackProposal({
+    proposal,
+    ownerAgentInstanceId: ownerAgentInstanceIdentifier,
+    approval: {
+      approvedBy: input.approvedBy,
+      approvedAtIso: new Date().toISOString(),
+    },
+    expectedSequenceRevision: input.expectedSequenceRevision,
+    actor,
+  });
+  if (input.isJsonOutput) {
+    printJson({
+      status: "writeback-applied",
+      missionIdentifier: input.missionIdentifier,
+      sequenceIdentifier,
+      ...result,
+    });
+  } else {
+    process.stdout.write(
+      `已应用写回：${result.appliedTaskIdentifiers.join(", ") || "(无)"}；跳过 ${String(result.skipped.length)} 条；序列 revision → ${String(result.sequenceRevisionAfter)}\n`,
+    );
+    for (const skipped of result.skipped) {
+      process.stdout.write(
+        `- 跳过 ${skipped.taskIdentifier}（${skipped.proposedAction}）：${skipped.reason}\n`,
+      );
+    }
   }
   return EXIT_CODES.SUCCESS;
 }

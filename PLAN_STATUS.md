@@ -4835,3 +4835,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：单测 4/4；全量 **471 files / 3618 tests**；typecheck/lint/build 绿。
 > **未做**：无 CLI 入口、无真实序列端到端、批准无身份校验、批量非原子。ADR-0179。
 > §B2 由"不可应用"更新为"引擎可应用，缺 CLI 入口与端到端"。
+
+> **193（R121）：写回 CLI + 真实存储端到端（完成，带缺口）**：新增
+> `task-ledger apply-writeback`（索引补全→现生成提案→revision 校验→应用）；夹具 `mission-wb`
+> 端到端：T-01 done、序列 revision 2→4、审计追加，旧 revision 再应用 ⇒ `stale-revision`。
+> **发现**：真实 mission 的 `T-01` 与序列 `task-mission-<id>` **无共同 id** ⇒ `mark-sequence-done`
+> 在真实数据不可达（结构性缺口），端到端靠夹具对齐。
+> **验证**：CLI 测试 2/2；全量 **471 files / 3620 tests**（首轮两条瞬时失败，重跑 exit 0）；typecheck/lint/build 绿。
+> **未做**：真实数据不可达、批准无身份校验、批量非原子、无 --dry-run。ADR-0180。
