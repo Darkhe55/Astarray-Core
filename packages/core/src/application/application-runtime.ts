@@ -141,7 +141,8 @@ import {
   GOAL_PROPOSAL_TOOL_DESCRIPTOR,
   GOAL_PROPOSAL_TOOL_NAME,
 } from "../tools/goal-proposal-tool.js";
-import { appendBoundedInvariantViolation } from "../orchestration/goal-invariant-catalog.js";
+import { partitionInvariantViolations } from "../orchestration/goal-invariant-catalog.js";
+import { appendFile, mkdir } from "node:fs/promises";
 import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
 import { evaluateGoalPauseConditions } from "../orchestration/goal-pause-conditions.js";
 import { buildInvalidatedGoalState } from "../orchestration/goal-evidence-invalidation.js";
@@ -2872,19 +2873,31 @@ export async function createApplicationRuntime(
         if (state === null) {
           return;
         }
+        const violationPartition = partitionInvariantViolations(
+          state.invariantViolations ?? [],
+          {
+            invariantCode: violation.invariantCode,
+            detail: violation.detail,
+            recordedAtIso,
+          },
+        );
+        if (violationPartition.dropped.length > 0) {
+          const archiveDirectory = path.join(stateDirectory, "goal-mode");
+          await mkdir(archiveDirectory, { recursive: true }).catch(() => undefined);
+          await appendFile(
+            path.join(archiveDirectory, "invariant-violations-archive.jsonl"),
+            violationPartition.dropped
+              .map((entry) => JSON.stringify(entry))
+              .join("\n") + "\n",
+            "utf8",
+          ).catch(() => undefined);
+        }
         await goalModeStateStore
           .write({
             ...state,
             documentRevision: state.documentRevision + 1,
-            /** R98：有界（只保留最近 200 条）。 */
-            invariantViolations: appendBoundedInvariantViolation(
-              state.invariantViolations ?? [],
-              {
-                invariantCode: violation.invariantCode,
-                detail: violation.detail,
-                recordedAtIso,
-              },
-            ),
+            /** R106：有界 + 被挤出的记录归档（不静默丢弃）。 */
+            invariantViolations: violationPartition.kept,
             updatedAtIso: recordedAtIso,
           })
           .catch(() => undefined);

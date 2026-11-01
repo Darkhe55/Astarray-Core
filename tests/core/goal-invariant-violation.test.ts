@@ -9,7 +9,10 @@ import { describe, expect, it } from "vitest";
 import { GoalDispatchGate } from "../../packages/core/src/orchestration/goal-dispatch-gate.js";
 import { validateGoalContract } from "../../packages/core/src/orchestration/goal-contract.js";
 import type { GoalContract } from "../../packages/core/src/orchestration/goal-contract.js";
-import { appendBoundedInvariantViolation } from "../../packages/core/src/orchestration/goal-invariant-catalog.js";
+import {
+  appendBoundedInvariantViolation,
+  partitionInvariantViolations,
+} from "../../packages/core/src/orchestration/goal-invariant-catalog.js";
 
 function buildContract(overrides: Partial<GoalContract> = {}): GoalContract {
   return {
@@ -135,6 +138,19 @@ describe("K4 安全不变量", () => {
     );
     expect(violations).toHaveLength(2);
     expect(violations.map((entry) => entry.detail)).toEqual(["b", "c"]);
+  });
+
+  it("有界 + 归档：被挤出的记录进入 dropped", () => {
+    const partition = partitionInvariantViolations(
+      [
+        { invariantCode: "tool.permission-denied", detail: "a", recordedAtIso: "1" },
+        { invariantCode: "tool.permission-denied", detail: "b", recordedAtIso: "2" },
+      ],
+      { invariantCode: "tool.permission-denied", detail: "c", recordedAtIso: "3" },
+      2,
+    );
+    expect(partition.kept.map((entry) => entry.detail)).toEqual(["b", "c"]);
+    expect(partition.dropped.map((entry) => entry.detail)).toEqual(["a"]);
   });
 
   it("契约校验：未知不变量标识被拒，已知标识合法", () => {

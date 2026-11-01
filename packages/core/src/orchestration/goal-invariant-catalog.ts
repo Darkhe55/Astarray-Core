@@ -57,3 +57,42 @@ export function appendBoundedInvariantViolation(
   const combined = [...existing, violation];
   return combined.length <= limit ? combined : combined.slice(combined.length - limit);
 }
+/**
+ * R106（2026-11-01）：**有界 + 丢弃归档**的分区函数。
+ *
+ * 与"只保留最近 N 条"不同：被挤出的记录由调用方**归档**（不静默丢弃）。
+ */
+export function partitionInvariantViolations(
+  existing: readonly {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[],
+  violation: {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  },
+  limit: number = GOAL_INVARIANT_VIOLATION_LIMIT,
+): {
+  readonly kept: {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[];
+  readonly dropped: {
+    readonly invariantCode: string;
+    readonly detail: string;
+    readonly recordedAtIso: string;
+  }[];
+} {
+  const combined = [...existing, violation];
+  if (combined.length <= limit) {
+    return { kept: combined, dropped: [] };
+  }
+  const cutIndex = combined.length - limit;
+  return {
+    kept: combined.slice(cutIndex),
+    dropped: combined.slice(0, cutIndex),
+  };
+}
