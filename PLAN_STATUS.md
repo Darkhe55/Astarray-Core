@@ -4733,3 +4733,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **推送记录（R103）**：`4fe63ac0` 之后的多组正向提交已本地提交，`git push` 连续 5 次失败
 > （`Please make sure you have the correct access rights and the repository exists.`，网络/SSH），
 > 按纪律记录待重试；当前 `ahead=1`。
+
+> **177（R104）：停滞暂停真实验证（完成）**：目标 `goal-stag`（`req-1→T-999`，V 恒为 1），
+> **预置** 8 组/2 次检查 + 真实 run 第 9/10 组 ⇒ `isPaused=true`、
+> `pauseReason:"连续 3 次进展检查 V 未下降。"`、`checksSinceLastReduction=3`；
+> `--goal-enforce` 下下一次提交被**启动前阻断**（退出码 2，`stag2.md` 未创建）。
+> **验证**：全量 471 files / 3600 tests；typecheck/lint 绿。ADR-0167。
+> **未做**：真实跑满 12 组（历史预置）、真实 rework 组、暂停不自动恢复。

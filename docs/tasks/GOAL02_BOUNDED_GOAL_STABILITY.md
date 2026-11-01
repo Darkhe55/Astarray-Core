@@ -325,3 +325,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   `completedGroupCount=3`、`lastTaskGroupKind="normal"`。
 - **测试**：全量 471 files / 3600 tests。
 - **未做**：停滞暂停（需 9 组）、真实 rework 组、证据强度下降的说明见 ADR。ADR-0166。
+
+### R104 停滞暂停真实验证（2026-11-01）
+
+- 方式：预置状态（`completedGroupCount=8`、`checksSinceLastReduction=2`）+ 真实 run 第 9/10 组，
+  要求 `req-1 → T-999`（不存在节点，V 恒为 1）。
+- 真实结果：`mission-894385cf` done（观察模式）；`goal-stag` **isPaused=true**、
+  `pauseReason: "连续 3 次进展检查 V 未下降。"`、`checksSinceLastReduction=3`、`completedGroupCount=10`。
+- 强制模式：`--goal-enforce` 下一次提交被**启动前阻断**（退出码 2，无副作用）。
+- **测试**：全量 471 files / 3600 tests。ADR-0167。
+- **未做**：真实跑满 12 组（历史为预置）、真实 rework 组、暂停不自动恢复。
