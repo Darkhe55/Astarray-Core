@@ -2101,6 +2101,8 @@ export async function createApplicationRuntime(
    *
    * 与 TUI 内指令同一入口；**仅同进程有效**（跨进程的 mission 由租约隔离）。
    * 模型不可调用：这是用户/宿主的运维动作。
+   * `instructionText` 必须是 **JSON**：`{"action":"unblock|retry|cancel|reassign","taskId":"T-001"}`
+   * （纯文本会被解析器拒绝，只升级"指令无法解析"）。
    */
   const sendMissionInstruction = (
     missionIdentifier: string,
