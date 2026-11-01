@@ -4770,3 +4770,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `consumedToolCalls=2` 崩溃前后一致。
 > **验证**：全量 471 files / 3601 tests；typecheck/lint/build 绿。
 > **未做**：对账命令无自动化测试、无一键继续、恢复组消耗未增加（只读任务无收据）。ADR-0171。
+
+> **183（R111）：对账入口自动化测试（完成）**：`goal-reconcile.test.ts` 3/3——任务对账
+> （running→pending、revision+1、其余不变）、拒绝路径（已完成/空说明）、组对账（清在途组+缺口）。
+> **验证**：全量 **471 files / 3604 tests**；typecheck/lint/build 绿。
+> **未做**：CLI 端到端、对账后 resume 自动化集成、租约等待。ADR-0172。
