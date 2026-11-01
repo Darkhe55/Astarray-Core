@@ -4793,3 +4793,6 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **约束记录**：指令必须是 JSON；时机须在编排器注册后、第二组启动前。
 > **验证**：全量 471 files / 3607 tests；typecheck/lint/build 绿。ADR-0175。
 > **未做**：演练脚本未入库、investigation 无信号、指令时机无产品级保障。
+
+> **推送记录（R114）**：rework 演练提交已本地提交，`git push` 连续 5 次失败（网络/SSH 不可达），
+> 按纪律记录待重试；当前 `ahead=1`。
