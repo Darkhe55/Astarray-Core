@@ -4796,3 +4796,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 > **推送记录（R114）**：rework 演练提交已本地提交，`git push` 连续 5 次失败（网络/SSH 不可达），
 > 按纪律记录待重试；当前 `ahead=1`。
+
+> **187（R115）：完成控制协议缺失的有界重试（完成并真实跑通）**：新增
+> `shouldRetryCompletionProtocolFailure`（要求完成事件 + 原因匹配 + 未重试 + **不叠加早停续跑**）⇒
+> 重试一次（reassign 语义，返工组）。**真实证据**：两节点任务首轮缺事件 → 自动重试 →
+> `mission-9d01d418` **done**（T-01/T-02 均 done）。
+> **验证**：单测 4/4；全量 **471 files / 3612 tests**（首轮两条瞬时失败，重跑 exit 0）；typecheck/lint/build 绿。
+> **未做**：重试不改提示词、计数仅内存、未造"重试后仍失败"实跑。ADR-0176。
