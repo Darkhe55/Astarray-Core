@@ -5493,6 +5493,16 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *
    * 映射层会把短暂 blocked 报成 running（续跑语义），CLI 关闭前需要原始值判断"终态是否已落库"。
    */
+  /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
+  reconcileMissionTask(input: {
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly note: string;
+  }): Promise<{ readonly reconciled: boolean; readonly previousStatus: string }> {
+    this.assertOpen();
+    return this.runtime.reconcileMissionTask(input);
+  }
+
   /** R108：在途组对账（操作者核对副作用后收口，不重放工具）。 */
   reconcileGoalTaskGroup(input: {
     readonly goalIdentifier: string;

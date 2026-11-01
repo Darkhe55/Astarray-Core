@@ -4762,3 +4762,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **任务级**对账拦下（`运行中任务副作用未知: T-02`）。预算 `consumedToolCalls=2` 崩溃前后不变。
 > **验证**：全量 471 files / 3601 tests；typecheck/lint/build 绿。
 > **未做**：任务级对账入口、一键对账后继续、reconcile 自动化测试。ADR-0170。
+
+> **182（R109/R110）：强杀恢复闭环（完成）**：新增 `goal-mode reconcile-task`（任务级对账，
+> running/blocked→pending）；修复 `resumeMission` 只传未完成任务导致
+> `T-02 依赖不存在的任务 T-01` 的真实 bug（改为完整任务链）。
+> **真实闭环**：强杀 → 组对账 → 任务对账 → 租约过期 → resume **done**，T-01/T-02 均 done，
+> `consumedToolCalls=2` 崩溃前后一致。
+> **验证**：全量 471 files / 3601 tests；typecheck/lint/build 绿。
+> **未做**：对账命令无自动化测试、无一键继续、恢复组消耗未增加（只读任务无收据）。ADR-0171。

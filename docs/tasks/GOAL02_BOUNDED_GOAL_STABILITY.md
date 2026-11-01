@@ -384,3 +384,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - 预算：崩溃前后 `consumedToolCalls=2`，**未归零**。
 - **测试**：全量 471 files / 3601 tests。
 - **未做**：任务级对账入口、对账后自动继续、`goal-mode reconcile` 自动化测试。ADR-0170。
+
+### R109/R110 强杀恢复闭环（2026-11-01）
+
+- 新增 `goal-mode reconcile-task`（任务级对账：running/blocked → pending，revision+1，不重放）。
+- **真实 bug 修复**：`resumeMission` 只传未完成任务 ⇒ `TaskGraph` 报
+  `T-02 依赖不存在的任务 T-01`；改为传**完整任务链**（done 节点不重跑）。
+- **闭环证据**：强杀 → 组对账 → resume 仍拒（任务级）→ 任务对账 → 租约过期 → resume
+  `{"status":"done","resumed":true}`，T-01/T-02 均 done，`consumedToolCalls=2` 未归零。
+- **测试**：全量 471 files / 3601 tests。
+- **未做**：对账命令无自动化测试、无一键继续、恢复组消耗未增加（只读任务无收据）。ADR-0171。

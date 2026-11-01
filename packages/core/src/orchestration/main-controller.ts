@@ -1129,10 +1129,18 @@ export class MainController {
     if (preparedLease !== null && preparedLease !== undefined) {
       this.options.missionRuntimeRegistry?.register(preparedLease);
     }
+    /**
+     * R110（2026-11-01）：**续接必须传完整任务链**，不能只传未完成任务。
+     *
+     * 只传未完成任务会丢掉"已完成的前置节点"⇒ `TaskGraph` 校验报
+     * `任务 T-02 依赖不存在的任务 T-01`（强杀恢复演练实测）。
+     * 已完成节点带着 `done` 状态进入图，调度器不会重跑它们。
+     */
+    const resumeTaskNodes = missionStatus.taskChain.tasks;
     if (mode === "devolve") {
-      this.launchDevolveMission(missionId, incompleteTasks);
+      this.launchDevolveMission(missionId, resumeTaskNodes);
     } else {
-      this.launchAssistMission(missionId, incompleteTasks);
+      this.launchAssistMission(missionId, resumeTaskNodes);
     }
   }
 

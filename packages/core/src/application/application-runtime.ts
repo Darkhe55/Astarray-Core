@@ -306,6 +306,12 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
+  reconcileMissionTask: (input: {
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly note: string;
+  }) => Promise<{ readonly reconciled: boolean; readonly previousStatus: string }>;
   /** R108：在途组对账（操作者核对副作用后收口，不重放工具）。 */
   reconcileGoalTaskGroup: (input: {
     readonly goalIdentifier: string;
@@ -2030,6 +2036,63 @@ export async function createApplicationRuntime(
     await refreshGoalGateCache();
     return { reconciled: true };
   };
+  /**
+   * R109（2026-11-01）：**任务级对账（操作者动作）**。
+   *
+   * 强杀时在途任务会停留在 `running`，恢复门禁据此拒绝自动续接。
+   * 本入口在操作者核对副作用后把该任务**重新排队**（`pending`），并记录说明；
+   * 不重放已完成动作、不改 mission 终态、不推进 V。
+   */
+  const reconcileMissionTask = async (input: {
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly note: string;
+  }): Promise<{ readonly reconciled: boolean; readonly previousStatus: string }> => {
+    if (input.note.trim() === "") {
+      throw new DomainError(
+        "invalid-task-chain",
+        "任务对账必须给出说明（核对过哪些副作用）。",
+      );
+    }
+    const chain = await taskStore.readTaskChain(input.missionIdentifier);
+    if (chain === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `mission ${input.missionIdentifier} 没有任务链。`,
+      );
+    }
+    const task = chain.tasks.find((entry) => entry.id === input.taskIdentifier);
+    if (task === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `任务 ${input.taskIdentifier} 不在任务链中。`,
+      );
+    }
+    if (task.status !== "running" && task.status !== "blocked") {
+      throw new DomainError(
+        "invalid-task-chain",
+        `任务 ${input.taskIdentifier} 当前状态为 ${task.status}，无需任务级对账。`,
+      );
+    }
+    await taskStore.updateTaskChain(input.missionIdentifier, (current) => {
+      if (current === null) {
+        throw new DomainError(
+          "mission-not-found",
+          `mission ${input.missionIdentifier} 没有任务链。`,
+        );
+      }
+      return {
+        ...current,
+        revision: current.revision + 1,
+        tasks: current.tasks.map((entry) =>
+          entry.id === input.taskIdentifier
+            ? { ...entry, status: "pending" as const }
+            : entry,
+        ),
+      };
+    });
+    return { reconciled: true, previousStatus: task.status };
+  };
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -3544,6 +3607,7 @@ export async function createApplicationRuntime(
     registerAgentIdentity,
     recomputeGoalPotential,
     reconcileGoalTaskGroup,
+    reconcileMissionTask,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,

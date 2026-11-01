@@ -636,3 +636,39 @@ export async function executeGoalModeReconcileCommand(
     await application.shutdown();
   }
 }
+
+/** R109：`goal-mode reconcile-task` —— 操作者核对副作用后把在途任务重新排队。 */
+export interface GoalModeReconcileTaskCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly missionIdentifier: string;
+  readonly taskIdentifier: string;
+  readonly note: string;
+}
+
+export async function executeGoalModeReconcileTaskCommand(
+  input: GoalModeReconcileTaskCommandInput,
+): Promise<number> {
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.reconcileMissionTask({
+      missionIdentifier: input.missionIdentifier,
+      taskIdentifier: input.taskIdentifier,
+      note: input.note,
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: "mission-task-reconciled", ...result });
+    } else {
+      process.stdout.write(
+        `任务 ${input.taskIdentifier} 已重新排队（原状态 ${result.previousStatus}）；可继续 resume。\n`,
+      );
+    }
+    return EXIT_CODES.SUCCESS;
+  } finally {
+    await application.shutdown();
+  }
+}
