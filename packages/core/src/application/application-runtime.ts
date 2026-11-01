@@ -142,6 +142,7 @@ import {
   GOAL_PROPOSAL_TOOL_NAME,
 } from "../tools/goal-proposal-tool.js";
 import { partitionInvariantViolations } from "../orchestration/goal-invariant-catalog.js";
+import { rotateInvariantViolationArchiveIfNeeded } from "../orchestration/goal-invariant-archive.js";
 import { appendFile, mkdir } from "node:fs/promises";
 import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
 import { evaluateGoalPauseConditions } from "../orchestration/goal-pause-conditions.js";
@@ -3007,6 +3008,12 @@ export async function createApplicationRuntime(
               .join("\n") + "\n",
             "utf8",
           ).catch(() => undefined);
+          await rotateInvariantViolationArchiveIfNeeded({
+            archivePath: path.join(
+              archiveDirectory,
+              "invariant-violations-archive.jsonl",
+            ),
+          }).catch(() => undefined);
         }
         await goalModeStateStore
           .write({

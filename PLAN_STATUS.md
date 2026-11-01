@@ -4775,3 +4775,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （running→pending、revision+1、其余不变）、拒绝路径（已完成/空说明）、组对账（清在途组+缺口）。
 > **验证**：全量 **471 files / 3604 tests**；typecheck/lint/build 绿。
 > **未做**：CLI 端到端、对账后 resume 自动化集成、租约等待。ADR-0172。
+
+> **184（R112）：违规归档轮转（完成）**：`GOAL_INVARIANT_ARCHIVE_MAXIMUM_LINES=5000`、保留 2 份；
+> 超限轮转（`.1→.2`、原文件→`.1`、清空、删超保留）；运行时仅在归档追加后调用，失败忽略。
+> **验证**：单测 2/2；全量 **471 files / 3606 tests**（一次 unhandled 瞬时，重跑 exit 0）；typecheck/lint/build 绿。
+> **未做**：仅追加时触发、上限不可配置、读取入口不读 `.1/.2`、真实 5000 行未演练。ADR-0173。
