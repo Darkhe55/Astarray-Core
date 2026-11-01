@@ -313,3 +313,15 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   `lastTaskGroupKind="normal"`、`gateSnapshot.completedGroupCount=3`。
 - 证明：多组真实发生、组边界停止生效、终态 blocked 一致、组性质持久化生效。
 - **未覆盖**：停滞暂停（需 9+ 组）、多组正常 V=0 收口、真实 rework 组。ADR-0165。
+
+### R103 多组正向完成（2026-11-01）
+
+- **发现**：`deterministic-check` 收据要求 `artifactPaths.length > 0`，导致只读任务（无产物）永远
+  `unverified`，多组都 done 仍 V=1（`mission-791caa30` 实测被完成耦合拦下）。
+- **改动**：验证收据只看 `hasVerifiedCompletionControlEvent`（产物对账仍在结案门禁）；
+  组结束 V 计算与 `recomputeGoalPotential` 两处同步。
+- **真实证据**：`mission-90bc56fb`（两节点、`--model-planning`、`--goal-require-completion`）
+  **status=done**，T-01/T-02 均 done；`goal-mg3` **V=0**、未暂停、consumed=2、
+  `completedGroupCount=3`、`lastTaskGroupKind="normal"`。
+- **测试**：全量 471 files / 3600 tests。
+- **未做**：停滞暂停（需 9 组）、真实 rework 组、证据强度下降的说明见 ADR。ADR-0166。

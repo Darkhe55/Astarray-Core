@@ -4722,3 +4722,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `lastTaskGroupKind=normal`、`completedGroupCount=3`。
 > **验证**：全量 471 files / 3600 tests；lint 绿。ADR-0165。
 > **未覆盖**：停滞暂停（需 9+ 组）、多组正常 V=0 收口、真实 rework 组。
+
+> **176（R103）：多组正向完成（完成）**：修复"只读任务无产物 ⇒ 永远 unverified"——
+> `deterministic-check` 收据不再要求 `artifactPaths` 非空（只认验证完成事件；产物对账仍在结案门禁）。
+> **真实证据**：`mission-90bc56fb` 两节点全部 done、**V=0**、`--goal-require-completion` 下 **status=done**；
+> `goal-mg3` 未暂停、consumed=2、groupCount=3、`lastTaskGroupKind=normal`。
+> **验证**：全量 471 files / 3600 tests；lint 绿。ADR-0166。
+> **未做**：停滞暂停（需 9 组）、真实 rework 组；证据强度下降已记录。
