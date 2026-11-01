@@ -4872,3 +4872,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > "按显式任务映射对齐"，`needs-human-review`（mission blocked）。
 > **验证**：映射单测 3/3、CLI 单测 3/3；全量 **471 files / 3627 tests**；typecheck/lint/build 绿。ADR-0183。
 > **未做**：仅首次发布登记、失败静默、过期不清理、无反向查询、三连自动化未做。
+
+> **198（R125）：扫描记录持久化 + 只读查看（完成，§B6 收口）**：新增
+> `PromptScanJournalStore`（`prompt-scan-journal.json`，只记结论/有界 100/丢弃计数/原子写），
+> 运行时通过 `setPromptScanJournalSink` 异步落盘（吞错），CLI `scan-records [--recent] [--json]` 只读。
+> **真实证据**：mission-1afe51bc 落盘 1 条（clean），`scan-records` 读回。
+> **验证**：单测 2/2；全量 **471 files / 3629 tests**；typecheck/lint/build 绿。ADR-0184。
+> **未做**：fire-and-forget 可能丢尾、无轮转、无过滤查询、无 UI、接收器为全局单例。

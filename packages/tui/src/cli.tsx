@@ -38,6 +38,8 @@ import {
   executeGoalModeReconcileCommand,
   executeGoalModeReconcileTaskCommand,
 } from "./cli/goal-mode-command.js";
+// R125（2026-11-01）：提示词扫描记录的只读视图（持久化）。
+import { executeScanRecordsCommand } from "./cli/scan-records-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
 import {
   DEFAULT_HISTORY_PAGE_SIZE,
@@ -1342,6 +1344,19 @@ goalModeCommand
       goalIdentifier: options.goal,
       taskGroupIdentifier: options.group,
       note: options.note,
+    });
+  });
+
+program
+  .command("scan-records")
+  .description("只读查看持久化的提示词扫描记录（结论字段，不含正文）")
+  .option("--recent <count>", "显示最近多少条", "20")
+  .option("--json", "JSON 输出")
+  .action(async (options: { recent?: string; json?: boolean }) => {
+    process.exitCode = await executeScanRecordsCommand({
+      stateDirectory: defaultStateDirectory(),
+      recentCount: options.recent === undefined ? 20 : Number(options.recent),
+      isJsonOutput: options.json === true,
     });
   });
 
