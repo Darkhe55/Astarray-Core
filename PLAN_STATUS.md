@@ -4745,3 +4745,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 多数有真实/单测证据；剩余为强度/边界类未演练项"；新增 R105 映射表（验收条件 → 证据 → 强度）。
 > 明确保留 6 项后续（真实 12 组停滞、运行中重启恢复、真实 rework 组、归档/上限可配置、规划质量、
 > 模型不守约重试），且**不**宣称"永不偏航"。无代码改动。
+
+> **179（R106）：违规丢弃归档（完成）**：`partitionInvariantViolations` 返回 `{kept,dropped}`，
+> 运行时把 `dropped` 追加到 `goal-mode/invariant-violations-archive.jsonl`（失败不阻塞）。
+> **验证**：单测 7/7；全量 **471 files / 3601 tests**；typecheck/lint/build 绿。
+> **未做**：归档无读取入口/轮转/重试；真实超 200 条未演练。ADR-0168。

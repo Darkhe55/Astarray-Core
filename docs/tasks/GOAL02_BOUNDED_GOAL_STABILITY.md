@@ -360,3 +360,10 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 
 **定位不变**：候选势函数是工程类比，稳定/收敛/安全是不同性质；本卡交付的是**受约束推进**，
 不是"永不偏航"的证明。
+
+### R106 违规丢弃归档（2026-11-01）
+
+- `partitionInvariantViolations` 返回 `{kept, dropped}`；运行时把 `dropped` 追加到
+  `<state>/goal-mode/invariant-violations-archive.jsonl`（失败不阻塞）。
+- **测试**：`goal-invariant-violation.test.ts` 7/7（新增分区用例）；全量 471 files / **3601 tests**。
+- **未做**：归档无读取入口/轮转/重试；真实超 200 条未演练。ADR-0168。
