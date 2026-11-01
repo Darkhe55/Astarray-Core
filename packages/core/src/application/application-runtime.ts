@@ -131,6 +131,8 @@ import { ProjectWorkWindowStore } from "../orchestration/project-work-window-sto
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
 import { MissionTaskSequenceMapStore } from "../orchestration/mission-task-sequence-map-store.js";
+import { PromptScanJournalStore } from "../orchestration/prompt-scan-journal-store.js";
+import { setPromptScanJournalSink } from "../orchestration/prompt-scan-journal.js";
 import { DeferredInsertionQueueStore } from "../orchestration/deferred-insertion-queue.js";
 import { GoalModeStateStore, GOAL_MODE_STATE_SCHEMA_VERSION } from "../orchestration/goal-mode-store.js";
 import type { GoalModeStatusView } from "../orchestration/goal-mode-store.js";
@@ -2523,6 +2525,13 @@ export async function createApplicationRuntime(
   /** R124：任务映射存储（发布端自动登记；写回提案读取）。 */
   const missionTaskSequenceMapStore = new MissionTaskSequenceMapStore({
     baseDirectory: stateDirectory,
+  });
+  /** R125：扫描记录持久化（有界；只记结论，不含正文）。 */
+  const promptScanJournalStore = new PromptScanJournalStore({
+    baseDirectory: stateDirectory,
+  });
+  setPromptScanJournalSink((record) => {
+    void promptScanJournalStore.append(record).catch(() => undefined);
   });
 
 

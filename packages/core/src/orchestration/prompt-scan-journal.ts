@@ -29,6 +29,20 @@ export const MAXIMUM_PROMPT_CONTENT_SCAN_RECORDS = 100;
 
 const promptContentScanRecords: PromptContentScanRecord[] = [];
 
+/**
+ * R125：可选的持久化接收器（由运行时装配；失败由接收方吞掉，不影响装配）。
+ */
+export type PromptScanJournalSink = (record: PromptContentScanRecord) => void;
+
+let promptScanJournalSink: PromptScanJournalSink | null = null;
+
+/** 装配/清除持久化接收器（传 null 清除）。 */
+export function setPromptScanJournalSink(
+  sink: PromptScanJournalSink | null,
+): void {
+  promptScanJournalSink = sink;
+}
+
 /** 记录一次装配标注（由 provider 调用；不含正文）。 */
 export function recordPromptContentScan(
   input: Omit<PromptContentScanRecord, "recordedAtIso"> & {
@@ -49,6 +63,12 @@ export function recordPromptContentScan(
   promptContentScanRecords.push(record);
   if (promptContentScanRecords.length > MAXIMUM_PROMPT_CONTENT_SCAN_RECORDS) {
     promptContentScanRecords.shift();
+  }
+  /** R125：落盘（接收方自己吞错，记录失败不改变装配/派发）。 */
+  try {
+    promptScanJournalSink?.(record);
+  } catch {
+    // 诊断不阻断业务
   }
   return record;
 }
