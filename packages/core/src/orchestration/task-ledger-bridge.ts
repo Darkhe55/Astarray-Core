@@ -722,8 +722,15 @@ export class TaskLedgerBridge {
     for (const mapping of input.mappings) {
       const sequenceStatus =
         input.sequenceStatusByTaskIdentifier.get(mapping.sequenceTaskIdentifier) ?? null;
-      const missionStatus =
-        input.missionStatusByTaskIdentifier.get(mapping.missionTaskIdentifier) ?? null;
+      /** R124：`"*"` 表示整 mission 映射到该节点。 */
+      const isWholeMissionMapping = mapping.missionTaskIdentifier === "*";
+      const missionStatus = isWholeMissionMapping
+        ? [...input.missionStatusByTaskIdentifier.values()].every(
+            (status) => status === "done",
+          )
+          ? "done"
+          : "not-done"
+        : input.missionStatusByTaskIdentifier.get(mapping.missionTaskIdentifier) ?? null;
       if (sequenceStatus === null) {
         notes.push(
           `映射 ${mapping.missionTaskIdentifier}→${mapping.sequenceTaskIdentifier} 的序列节点不存在（映射可能过期）。`,

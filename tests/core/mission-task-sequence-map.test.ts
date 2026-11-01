@@ -109,3 +109,48 @@ describe("按显式映射生成写回提案", () => {
     expect(proposal.notes.join("；")).toContain("显式任务映射");
   });
 });
+
+describe("整 mission 哨兵映射（*）", () => {
+  it("mission 全部 done + 节点 pending ⇒ mark-sequence-done；未全部 done ⇒ 需人工", async () => {
+    const buildBridge = (isAllDone: boolean) =>
+      new TaskLedgerBridge({
+        sequenceLedger: {
+          getSnapshot: async () => ({
+            sequenceId: "seq-1",
+            revision: 2,
+            nodes: [{ taskId: "task-mission-1", status: "pending" }],
+            readyTaskIds: [],
+          }),
+        },
+        missionTaskChain: {
+          getMissionStatus: async () => ({
+            taskChain: {
+              tasks: [
+                { id: "T-01", status: isAllDone ? "done" : "running" },
+                { id: "T-02", status: "done" },
+              ],
+            },
+          }),
+        },
+        taskMappings: {
+          listForMission: async () => [
+            { missionTaskIdentifier: "*", sequenceTaskIdentifier: "task-mission-1" },
+          ],
+        },
+      });
+    const doneProposal = await buildBridge(true).buildWriteBackProposal({
+      missionIdentifier: "mission-1",
+      ownerAgentInstanceId: "scheduler:mission-1",
+      sequenceId: "seq-1",
+      viewer: { sourceKind: "user", actorId: "user-local" },
+    });
+    expect(doneProposal.entries[0]?.proposedAction).toBe("mark-sequence-done");
+    const pendingProposal = await buildBridge(false).buildWriteBackProposal({
+      missionIdentifier: "mission-1",
+      ownerAgentInstanceId: "scheduler:mission-1",
+      sequenceId: "seq-1",
+      viewer: { sourceKind: "user", actorId: "user-local" },
+    });
+    expect(pendingProposal.entries[0]?.proposedAction).toBe("needs-human-review");
+  });
+});

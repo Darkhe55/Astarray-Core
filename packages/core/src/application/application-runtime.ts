@@ -130,6 +130,7 @@ import { ArtifactRecordStore } from "../orchestration/artifact-record-store.js";
 import { ProjectWorkWindowStore } from "../orchestration/project-work-window-store.js";
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
+import { MissionTaskSequenceMapStore } from "../orchestration/mission-task-sequence-map-store.js";
 import { DeferredInsertionQueueStore } from "../orchestration/deferred-insertion-queue.js";
 import { GoalModeStateStore, GOAL_MODE_STATE_SCHEMA_VERSION } from "../orchestration/goal-mode-store.js";
 import type { GoalModeStatusView } from "../orchestration/goal-mode-store.js";
@@ -2420,7 +2421,6 @@ export async function createApplicationRuntime(
   const accuracyVerificationAuditLog = new FileAccuracyVerificationAuditLog({
     baseDirectory: stateDirectory,
   });
-
   // E2E-01-03 S2b：恢复检查点写入者（按 mission+agent 复用同一记录器以维持哈希链）。
   const recoveryCheckpointStore = new RecoveryCheckpointStore({
     baseDirectory: stateDirectory,
@@ -2520,12 +2520,16 @@ export async function createApplicationRuntime(
   const localPreservationService = new LocalPreservationService({
     baseDirectory: stateDirectory,
   });
+  /** R124：任务映射存储（发布端自动登记；写回提案读取）。 */
+  const missionTaskSequenceMapStore = new MissionTaskSequenceMapStore({
+    baseDirectory: stateDirectory,
+  });
+
 
   // E2E-01-03 S1 / T05D-03：Agent 编辑意图与陈旧写入强制（按状态目录持久化基线）。
   const agentEditIntentGuard = new AgentEditIntentGuard({
     baseDirectory: stateDirectory,
   });
-
   // T06B/ADR-0014：策略包装器（worker 任务端口与思索模式只读端口共用同一套安全端口）。
   const createPolicyWrapperForAgent = (input: {
     agentInstanceId: string;
@@ -2905,7 +2909,6 @@ export async function createApplicationRuntime(
   const missionRelationIndexStore = new MissionRelationIndexStore({
     baseDirectory: stateDirectory,
   });
-
   /**
    * ALIGN-04-02：恢复前只读对账门禁（可选，缺省关）。
    *
@@ -2985,6 +2988,8 @@ export async function createApplicationRuntime(
     taskSequenceManageController: sequenceManageController,
     /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
     taskSequenceStatusController: sequenceStatusController,
+    /** R124：发布时自动登记整 mission 映射。 */
+    missionTaskSequenceMapStore,
     taskLedgerDivergenceJournal,
     /** R21：mission↔序列 持久索引（控制器写入；CLI 读取）。 */
     missionSequenceBindingStore,
