@@ -2337,6 +2337,83 @@ export class MainController {
   }
 
   /**
+   * R120（2026-11-01）：**应用写回提案**（人工批准 + revision 防护）。
+   *
+   * 复用 `TaskLedgerBridge.applyWriteBackProposal` 的规则；序列迁移走既有
+   * `TaskSequenceStatusController.transitionTaskStatus`（自带审计条目）。
+   */
+  async applyTaskLedgerWriteBack(input: {
+    readonly proposal: {
+      readonly missionIdentifier: string;
+      readonly sequenceId: string;
+      readonly sequenceRevision: number;
+      readonly entries: readonly {
+        readonly taskIdentifier: string;
+        readonly proposedAction:
+          | "mark-sequence-done"
+          | "needs-human-review"
+          | "missing-in-sequence"
+          | "missing-in-mission";
+      }[];
+    };
+    readonly ownerAgentInstanceId: string;
+    readonly sequenceId: string;
+    readonly approval: {
+      readonly approvedBy: string;
+      readonly approvedAtIso: string;
+    };
+    readonly expectedSequenceRevision: number;
+    readonly actor: ActorIdentity;
+  }): Promise<{
+    readonly appliedTaskIdentifiers: readonly string[];
+    readonly skipped: readonly {
+      readonly taskIdentifier: string;
+      readonly proposedAction: string;
+      readonly reason: string;
+    }[];
+    readonly sequenceRevisionAfter: number;
+  }> {
+    const statusController = this.options.taskSequenceStatusController;
+    const manageController = this.options.taskSequenceManageController;
+    if (
+      statusController === null ||
+      statusController === undefined ||
+      manageController === null ||
+      manageController === undefined
+    ) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "任务序列控制面未装配：无法执行写回（不伪造成功）。",
+      );
+    }
+    const bridge = new TaskLedgerBridge({
+      sequenceLedger: {
+        getSnapshot: (snapshotInput) => statusController.getSnapshot(snapshotInput),
+      },
+      missionTaskChain: {
+        getMissionStatus: (missionIdentifier) =>
+          this.options.missionManager.getMissionStatus(missionIdentifier),
+      },
+      sequenceTransition: {
+        transitionTaskStatus: (transitionInput) =>
+          manageController.transitionTaskStatus({
+            ownerAgentInstanceId: transitionInput.ownerAgentInstanceId,
+            sequenceId: transitionInput.sequenceId,
+            taskId: transitionInput.taskId,
+            nextStatus: "done",
+            blockReason: null,
+            expectedRevision: transitionInput.expectedRevision,
+            actor: transitionInput.actor,
+          }),
+      },
+    });
+    return bridge.applyWriteBackProposal({
+      ...input,
+      proposal: { ...input.proposal, sequenceId: input.sequenceId },
+    });
+  }
+
+  /**
    * R75（2026-10-31）：**组边界门禁复查（K10）**——只在**强制模式开启**时装配。
    *
    * 复用启动前那道 `observeGoalDispatchGate`（含判定落盘与流式输出）；

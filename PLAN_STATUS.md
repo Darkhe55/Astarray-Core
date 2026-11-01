@@ -4828,3 +4828,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `--include-archive` 已读轮转文件（ADR-0178）；§B5（组标识唯一）标记为 **R64 已缓解**——
 > 8 位随机令牌，撞名概率 1/2^32（未改 UUID，如实标注）。
 > 剩余 §B：B1 taskId 派发、B2 写回执行端、B3 investigation 信号、B6 扫描记录持久化。
+
+> **192（R120）：写回提案应用引擎（引擎完成）**：`TaskLedgerBridge.applyWriteBackProposal`
+> 只应用 `mark-sequence-done`、人工批准必填、revision 双重校验、其它动作跳过并说明；
+> 控制器 `applyTaskLedgerWriteBack` 接 `TaskSequenceManageController.transitionTaskStatus`。
+> **验证**：单测 4/4；全量 **471 files / 3618 tests**；typecheck/lint/build 绿。
+> **未做**：无 CLI 入口、无真实序列端到端、批准无身份校验、批量非原子。ADR-0179。
+> §B2 由"不可应用"更新为"引擎可应用，缺 CLI 入口与端到端"。
