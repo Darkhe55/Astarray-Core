@@ -56,6 +56,7 @@ import { LocalRigorPolicyEngine } from "../tools/local-rigor-policy-engine.js";
 import type { ContextNodeLifecyclePort } from "./worker-agent.js";
 import type { AgentWorkArchiveStore } from "./work-archive-store.js";
 import { DomainError } from "../core/errors.js";
+import { shouldRetryCompletionProtocolFailure } from "./completion-protocol-retry.js";
 import type { MissionLeaseStore } from "../infra/mission-lease-store.js";
 import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 import { DagScheduler } from "./dag-scheduler.js";
@@ -1275,6 +1276,8 @@ export class MissionOrchestrator {
 
   /** G5（第 233 轮）：每任务的**已续跑次数**（下一增量写入；上限 2，防止无限重试）。 */
   private readonly resumeAttemptsByTask = new Map<string, number>();
+  /** R115：完成控制协议缺失的重试次数（每任务，上限 1）。 */
+  private readonly completionProtocolRetriesByTask = new Map<string, number>();
 
   protected buildWorkerAgent(options: WorkerAgentOptions): WorkerAgent {
     return new WorkerAgent({
@@ -1527,7 +1530,30 @@ export class MissionOrchestrator {
         }
         break;
       }
-      case "failure":
+      case "failure": {
+        /**
+         * R115（2026-11-01）：**完成控制协议缺失 ⇒ 有界重试一次**。
+         *
+         * 模型偶尔不输出完成事件；直接判失败会让"确实做完了"的任务被误杀。
+         * 只对该原因、只在要求完成事件时、每任务最多一次；重试走 reassign 语义（返工组）。
+         */
+        const protocolRetryDecision = shouldRetryCompletionProtocolFailure({
+          failureReason: outcome.failureReason,
+          attemptCount: this.completionProtocolRetriesByTask.get(taskId) ?? 0,
+          isCompletionProtocolRequired: this.options.requireCompletionControlEvent === true,
+          hasOtherRetry: (this.resumeAttemptsByTask.get(taskId) ?? 0) > 0,
+        });
+        if (protocolRetryDecision.shouldRetry) {
+          this.completionProtocolRetriesByTask.set(
+            taskId,
+            (this.completionProtocolRetriesByTask.get(taskId) ?? 0) + 1,
+          );
+          this.reworkedTaskIdentifiers.add(taskId);
+          await this.dagScheduler.releaseTaskBackToPending(taskId).catch(() => null);
+          this.options.onUserEscalation(protocolRetryDecision.reason ?? "完成控制事件缺失，已重试");
+          this.wake();
+          break;
+        }
         /**
          * R85（2026-10-31）：**治理停止**（预算耗尽）与普通任务失败分开。
          *
@@ -1577,6 +1603,7 @@ export class MissionOrchestrator {
           // 状态迁移失败不得影响任务收口
         }
         break;
+      }
       case "ambiguous":
         await this.dagScheduler.blockTaskForHumanDecision(taskId);
         this.options.onUserEscalation(
