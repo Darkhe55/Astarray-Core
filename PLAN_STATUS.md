@@ -4821,3 +4821,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：单测 2/2；真实 CLI 夹具 `archivedCount=2`（主文件 + `.1`）；全量 **471 files / 3614 tests**；
 > typecheck/lint/build 绿。ADR-0178。
 > **未做**：只读 2 份轮转、导出不标注来源文件、归档不按目标过滤。
+
+> **191（R119）：台账 §B 两项按现状更新（文档）**：§B4（归档读取）标记为 **R118 闭合**——
+> `--include-archive` 已读轮转文件（ADR-0178）；§B5（组标识唯一）标记为 **R64 已缓解**——
+> 8 位随机令牌，撞名概率 1/2^32（未改 UUID，如实标注）。
+> 剩余 §B：B1 taskId 派发、B2 写回执行端、B3 investigation 信号、B6 扫描记录持久化。
