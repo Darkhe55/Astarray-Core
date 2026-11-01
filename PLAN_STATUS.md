@@ -4887,3 +4887,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 控制器限同进程运行中 mission（否则 `mission-not-active`）、门面暴露；**无 CLI**（同进程限制）。
 > **验证**：调度器单测 3/3；门面单测 2/2；全量 **471 files / 3633 tests**；typecheck/lint/build 绿。ADR-0185。
 > **仍不支持**：乱序派发（依赖未完成）、抢占、跨进程、派发事件回执；`requestDispatchByTaskIdentifier` 仍拒绝。
+
+> **200（R127）：状态总览更新（只读）**：`docs/reports/STATE_OVERVIEW_2026-11-01.md` 更新到
+> HEAD `b79906ac`、471 files / **3633 tests**、ADR 0145–0185、§B 六项现状、
+> 用户未提交文件清单（10 项，未暂存）。无代码改动。
