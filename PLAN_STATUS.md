@@ -4750,3 +4750,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 运行时把 `dropped` 追加到 `goal-mode/invariant-violations-archive.jsonl`（失败不阻塞）。
 > **验证**：单测 7/7；全量 **471 files / 3601 tests**；typecheck/lint/build 绿。
 > **未做**：归档无读取入口/轮转/重试；真实超 200 条未演练。ADR-0168。
+
+> **180（R107）：违规只读查看（完成）**：新增 `goal-mode violations --goal <id> [--include-archive]`，
+> 读持久违规 + 归档 JSONL（坏行跳过）；真实夹具输出 `persistedCount=1, archivedCount=1`。
+> **验证**：全量 471 files / 3601 tests；typecheck/lint/build 绿。
+> **未做**：归档轮转/按目标过滤、自动化测试、文本排版。ADR-0169。
