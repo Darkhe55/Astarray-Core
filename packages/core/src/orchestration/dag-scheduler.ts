@@ -25,6 +25,13 @@ export interface DagSchedulerOptions {
 
 export class DagScheduler {
   private readonly claimedTaskIds = new Set<string>();
+  /**
+   * R126（2026-11-01）：**按 taskId 优先派发**。
+   *
+   * 只影响**可运行任务之间的顺序**：不绕过依赖、不改图、不允许运行中改图。
+   * 下一个调度轮次优先启动这些任务；启动后从集合移除。
+   */
+  private readonly preferredDispatchTaskIds = new Set<string>();
   private readonly graph: TaskGraph;
   private readonly concurrency: number;
   private readonly missionId: string;
@@ -69,12 +76,18 @@ export class DagScheduler {
     const runnableTaskIds = this.graph
       .findRunnableTaskIds()
       .filter((taskId) => !this.claimedTaskIds.has(taskId))
+      .sort((left, right) => {
+        const leftPreferred = this.preferredDispatchTaskIds.has(left) ? 0 : 1;
+        const rightPreferred = this.preferredDispatchTaskIds.has(right) ? 0 : 1;
+        return leftPreferred - rightPreferred;
+      })
       .slice(0, availableSlots);
     for (const taskId of runnableTaskIds) {
       const assignedAgentId = this.options.allocateAgentId(taskId);
       this.claimedTaskIds.add(taskId);
       this.graph.markRunning(taskId);
       this.graph.assignAgent(taskId, assignedAgentId);
+      this.preferredDispatchTaskIds.delete(taskId);
       actions.push({ action: "start-task", taskId, assignedAgentId });
     }
     if (actions.length > 0) {
@@ -219,5 +232,56 @@ export class DagScheduler {
         tasks: this.graph.getNodes(),
       };
     });
+  }
+
+  /**
+   * R126：请求"下一个轮次优先启动该任务"。
+   *
+   * 真实约束（不静默放宽）：任务必须存在、处于 pending、且依赖全部 done；
+   * 运行中/已领取的任务不能再"派发"一次。
+   */
+  preferTaskDispatch(taskId: string): {
+    readonly outcome: "accepted" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  } {
+    const node = this.graph.getNode(taskId);
+    if (node === undefined) {
+      return {
+        outcome: "refused",
+        reasonCode: "task-not-found",
+        reason: `任务 ${taskId} 不在任务链中。`,
+      };
+    }
+    if (this.claimedTaskIds.has(taskId) || node.status === "running") {
+      return {
+        outcome: "refused",
+        reasonCode: "task-already-running",
+        reason: `任务 ${taskId} 已在运行，拒绝重复派发。`,
+      };
+    }
+    if (node.status !== "pending") {
+      return {
+        outcome: "refused",
+        reasonCode: "task-not-dispatchable",
+        reason: `任务 ${taskId} 当前状态为 ${node.status}：只有 pending 任务可按需派发（blocked/failed 需先 retry/reassign）。`,
+      };
+    }
+    const unmetDependencies = node.dependsOn.filter(
+      (dependencyId) => this.graph.getNode(dependencyId)?.status !== "done",
+    );
+    if (unmetDependencies.length > 0) {
+      return {
+        outcome: "refused",
+        reasonCode: "dependencies-unmet",
+        reason: `任务 ${taskId} 的依赖未完成：${unmetDependencies.join(", ")}（不绕过依赖）。`,
+      };
+    }
+    this.preferredDispatchTaskIds.add(taskId);
+    return {
+      outcome: "accepted",
+      reasonCode: "preferred",
+      reason: `任务 ${taskId} 将在下一次调度轮次优先启动。`,
+    };
   }
 }

@@ -724,6 +724,24 @@ export class MissionOrchestrator {
     this.wake();
   }
 
+  /**
+   * R126（2026-11-01）：**按 taskId 优先派发**（只调整可运行任务之间的顺序）。
+   *
+   * - 任务必须存在、pending、依赖全部 done；否则拒绝并说明原因；
+   * - 不绕过依赖、不改图、不重复派发运行中任务；
+   * - 接受后下一次调度轮次优先启动。
+   */
+  dispatchTaskByTaskIdentifier(taskId: string): {
+    readonly outcome: "accepted" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  } {
+    const decision = this.dagScheduler.preferTaskDispatch(taskId);
+    if (decision.outcome === "accepted") {
+      this.wake();
+    }
+    return decision;
+  }
   async cancelTask(taskId: string): Promise<void> {
     await this.dagScheduler.cancelTask(taskId);
     this.wake();

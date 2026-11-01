@@ -342,6 +342,12 @@ export interface ApplicationRuntime {
     }[];
     readonly sequenceRevisionAfter: number;
   }>;
+  /** R126：按 taskId 优先派发（同进程；运行中的 mission）。 */
+  dispatchMissionTask: (missionIdentifier: string, taskIdentifier: string) => {
+    readonly outcome: "accepted" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  };
   /** R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。 */
   sendMissionInstruction: (missionIdentifier: string, instructionText: string) => void;
   /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
@@ -2139,6 +2145,10 @@ export async function createApplicationRuntime(
    * `instructionText` 必须是 **JSON**：`{"action":"unblock|retry|cancel|reassign","taskId":"T-001"}`
    * （纯文本会被解析器拒绝，只升级"指令无法解析"）。
    */
+  /** R126：按 taskId 优先派发（仅同进程）。 */
+  const dispatchMissionTask = (missionIdentifier: string, taskIdentifier: string) =>
+    controller.dispatchMissionTask(missionIdentifier, taskIdentifier);
+
   const sendMissionInstruction = (
     missionIdentifier: string,
     instructionText: string,
@@ -3716,6 +3726,7 @@ export async function createApplicationRuntime(
     reconcileGoalTaskGroup,
     reconcileMissionTask,
     sendMissionInstruction,
+    dispatchMissionTask,
     applyTaskLedgerWriteBack,
     bindRequirementTaskMapping,
     deactivateGoal,

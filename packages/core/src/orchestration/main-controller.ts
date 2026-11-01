@@ -3131,6 +3131,44 @@ export class MainController {
    * 永远到不了调度器、任务停在 blocked。改为**同进程直接投递**；镜像一条反馈消息
    * 以保留审计/信箱语义（派发失败不影响裁决生效）。
    */
+  /**
+   * R126（2026-11-01）：**按 taskId 优先派发**（仅同进程、运行中的 mission）。
+   *
+   * 拒绝时不伪造成功：mission 不在本进程运行 ⇒ `mission-not-active`；
+   * 任务不可派发/依赖未完成 ⇒ 由调度器给出具体原因。
+   */
+  dispatchMissionTask(
+    missionId: string,
+    taskId: string,
+  ): {
+    readonly outcome: "accepted" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  } {
+    const activeEntry = this.activeOrchestrators.get(missionId);
+    if (activeEntry === undefined) {
+      return {
+        outcome: "refused",
+        reasonCode: "mission-not-active",
+        reason: `mission ${missionId} 不在本进程运行：无法按 taskId 派发（跨进程由租约隔离）。`,
+      };
+    }
+    const scheduler = activeEntry.scheduler as {
+      dispatchTaskByTaskIdentifier?: (taskId: string) => {
+        readonly outcome: "accepted" | "refused";
+        readonly reasonCode: string;
+        readonly reason: string;
+      };
+    };
+    if (typeof scheduler.dispatchTaskByTaskIdentifier !== "function") {
+      return {
+        outcome: "refused",
+        reasonCode: "unsupported",
+        reason: "当前调度器不支持按 taskId 派发。",
+      };
+    }
+    return scheduler.dispatchTaskByTaskIdentifier(taskId);
+  }
   sendSchedulerInstruction(missionId: string, instructionText: string): void {
     const activeEntry = this.activeOrchestrators.get(missionId);
     const schedulerWithInstruction = activeEntry?.scheduler as
