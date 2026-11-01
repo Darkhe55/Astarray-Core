@@ -26,7 +26,9 @@
 >
 > ### B. 仍缺（可在本仓库闭合，尚未做）
 >
-> 1. **按 taskId 真正派发**：`requestDispatchByTaskIdentifier` 仍显式拒绝；预检只表达缺什么（ADR-0110）。
+> 1. ~~**按 taskId 真正派发**~~（**R126 有界实现**）：可运行任务之间按 taskId **优先启动**
+>    （`DagScheduler.preferTaskDispatch` / 编排器 / 控制器 / 门面），拒绝依赖未完成/非 pending/已运行；
+>    **乱序派发、抢占、跨进程仍不支持**（ADR-0052/0185）。`requestDispatchByTaskIdentifier` 仍显式拒绝（序列→mission 方向）。
 > 2. **写回执行端**：提案不可应用（无审批/审计入口，ADR-0114）。
 > 3. **GOAL-02 `groupKind` 的 `investigation` 信号**：`rework` 已有默认策略（R61，ADR-0130：
 >    retry/reassign/早停续跑 ⇒ `rework`），但**仓内仍无"调查组"的客观信号** ⇒ 默认策略永不产生
