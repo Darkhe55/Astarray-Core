@@ -4715,3 +4715,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `taskPlanningOutcome=model`、**T-01/T-02 均 done** ⇒ 两节点模型分解 + 完成事件可完整通过。
 > 此前失败是单次模型未遵守提示（加了 env 开关 `ASTARRAY_TRACE_COMPLETION=1` 便于再查）。
 > **验证**：全量 471 files / 3600 tests；typecheck/lint 绿。ADR-0164。
+
+> **175（R102）：多组 mission 真实演练（完成）**：`goal-mg`（预算 2）+ `--model-planning` →
+> `mission-c6b13c65` **blocked**（CLI/磁盘一致）、tasks=**2**（`outcome=model`，T-01 done/T-02 failed）、
+> 日志含"预算已用尽，mission 停止"+"组边界拒绝继续调度"；目标 `isPaused`、`consumed=2`、
+> `lastTaskGroupKind=normal`、`completedGroupCount=3`。
+> **验证**：全量 471 files / 3600 tests；lint 绿。ADR-0165。
+> **未覆盖**：停滞暂停（需 9+ 组）、多组正常 V=0 收口、真实 rework 组。

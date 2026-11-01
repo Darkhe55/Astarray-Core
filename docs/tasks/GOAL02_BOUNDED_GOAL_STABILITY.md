@@ -303,3 +303,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   `taskPlanningOutcome=model`、T-01/T-02 均 done ⇒ **两节点模型分解 + 完成事件可完整通过**。
   此前失败为**单次模型未遵守提示**，不是提示未注入/门禁错误。
 - **测试**：全量 471 files / 3600 tests。ADR-0164。
+
+### R102 多组 mission 真实演练（2026-11-01）
+
+- 目标 `goal-mg`（预算 2、`budget-exhausted`、`req-1→[T-01,T-02]`）+ `--model-planning`：
+  `mission-c6b13c65` **status=blocked**（CLI 与 summary 一致），tasks=2（`outcome=model`），
+  T-01 done、T-02 failed；日志出现"预算已用尽，mission 停止"与"组边界拒绝继续调度"。
+- 目标状态：`isPaused=true`、预算原因、`consumedToolCalls=2`、`lastPotentialValue=1`、
+  `lastTaskGroupKind="normal"`、`gateSnapshot.completedGroupCount=3`。
+- 证明：多组真实发生、组边界停止生效、终态 blocked 一致、组性质持久化生效。
+- **未覆盖**：停滞暂停（需 9+ 组）、多组正常 V=0 收口、真实 rework 组。ADR-0165。
