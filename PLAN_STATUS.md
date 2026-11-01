@@ -4786,3 +4786,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 跨进程由租约隔离，加 CLI 会误导）。
 > **验证**：单测 1/1（无活动调度器安全 no-op）；全量 **471 files / 3607 tests**；typecheck/lint/build 绿。
 > **未做**：真实 rework 组闭环（需同进程 retry）、指令回执、TUI/GUI 接入。ADR-0174。
+
+> **186（R114）：rework 组性质真实演练（完成）**：同进程脚本 + 真实 provider + 模型分解两节点，
+> 在 T-01 running 时发 JSON 指令 `{"action":"reassign","taskId":"T-02"}` ⇒ 第二组 `rework` 启动，
+> 目标状态 `lastTaskGroupKind="rework"`（trace 三段证据）。
+> **约束记录**：指令必须是 JSON；时机须在编排器注册后、第二组启动前。
+> **验证**：全量 471 files / 3607 tests；typecheck/lint/build 绿。ADR-0175。
+> **未做**：演练脚本未入库、investigation 无信号、指令时机无产品级保障。

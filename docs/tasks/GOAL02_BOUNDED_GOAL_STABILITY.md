@@ -415,3 +415,13 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
 - **不加 CLI**：指令只对**同进程**调度器有效，headless 跨进程无效，加 CLI 会误导。
 - **测试**：`goal-mission-instruction.test.ts` 1/1（无活动调度器时安全 no-op）；全量 471 files / **3607 tests**。
 - **未做**：真实 rework 组闭环、指令回执、TUI/GUI 接入。ADR-0174。
+
+### R114 rework 组性质真实演练（2026-11-01）
+
+- 同进程宿主脚本：真实 provider + 模型分解两节点 → 等 T-01 running → 发 JSON 指令
+  `{"action":"reassign","taskId":"T-02"}` → 第二组以 `rework` 启动。
+- **真实 trace**：`groupStart starting=T-01 reworked=` → `reassign=T-02 reworked=T-02` →
+  `groupStart starting=T-02 reworked=T-02`；目标状态 `lastTaskGroupKind="rework"`、组数 2。
+- **约束**：指令必须是 JSON；发送时机须在编排器注册后、第二组启动前。
+- **测试**：全量 471 files / 3607 tests。ADR-0175。
+- **未做**：脚本未入库/无自动化、investigation 无信号、指令时机无产品级保障。ADR-0175。

@@ -5493,7 +5493,11 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *
    * 映射层会把短暂 blocked 报成 running（续跑语义），CLI 关闭前需要原始值判断"终态是否已落库"。
    */
-  /** R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。 */
+  /**
+   * R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。
+   *
+   * `instructionText` 必须是 JSON：`{"action":"retry","taskId":"T-001"}`。
+   */
   sendMissionInstruction(missionIdentifier: string, instructionText: string): void {
     this.assertOpen();
     this.runtime.sendMissionInstruction(missionIdentifier, instructionText);

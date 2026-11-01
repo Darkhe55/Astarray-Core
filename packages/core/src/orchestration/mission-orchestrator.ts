@@ -716,6 +716,9 @@ export class MissionOrchestrator {
   async reassignTask(taskId: string): Promise<void> {
     /** R61：retry/reassign ⇒ 该任务属于"返工"，由默认 groupKind 策略使用。 */
     this.reworkedTaskIdentifiers.add(taskId);
+    if (process.env.ASTARRAY_TRACE_GROUPKIND === "1") {
+      process.stderr.write(`[GK] reassign=${taskId} reworked=${[...this.reworkedTaskIdentifiers].join(",")}\n`);
+    }
     await this.dagScheduler.reassignTask(taskId);
     this.wake();
   }
@@ -812,6 +815,11 @@ export class MissionOrchestrator {
           .filter((action) => action.action === "start-task")
           .map((action) => action.taskId);
         /** R61/R62：解析集中到纯函数，便于单测（ADR-0130/0131）。 */
+        if (process.env.ASTARRAY_TRACE_GROUPKIND === "1") {
+          process.stderr.write(
+            `[GK] groupStart starting=${startingTaskIdentifiers.join(",")} reworked=${[...this.reworkedTaskIdentifiers].join(",")}\n`,
+          );
+        }
         this.currentGoalTaskGroupKind = resolveGoalTaskGroupKind({
           taskIdentifiers: startingTaskIdentifiers,
           reworkedTaskIdentifiers: this.reworkedTaskIdentifiers,
