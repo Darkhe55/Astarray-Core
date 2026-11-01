@@ -134,3 +134,83 @@ describe("applyWriteBackProposal", () => {
     ).rejects.toThrow();
   });
 });
+
+/** R122：真实数据的"整 mission 节点"对齐（序列 1 节点，externalReference=mission:<id>）。 */
+function buildMissionLevelBridge(input: {
+  readonly nodeStatus: "pending" | "done";
+  readonly missionTaskStatuses: readonly string[];
+}) {
+  return new TaskLedgerBridge({
+    sequenceLedger: {
+      getSnapshot: async () => ({
+        sequenceId: "sequence-scheduler:mission-1",
+        revision: 2,
+        nodes: [
+          {
+            taskId: "task-mission-1",
+            status: input.nodeStatus,
+            externalReference: "mission:mission-1",
+          },
+        ],
+        readyTaskIds: [],
+      }),
+    },
+    missionTaskChain: {
+      getMissionStatus: async () => ({
+        taskChain: {
+          tasks: input.missionTaskStatuses.map((status, index) => ({
+            id: `T-0${String(index + 1)}`,
+            status,
+          })),
+        },
+      }),
+    },
+  });
+}
+
+describe("整 mission 节点的写回提案", () => {
+  it("mission 全部 done + 节点 pending ⇒ mark-sequence-done（目标是序列节点 id）", async () => {
+    const bridge = buildMissionLevelBridge({
+      nodeStatus: "pending",
+      missionTaskStatuses: ["done", "done"],
+    });
+    const proposal = await bridge.buildWriteBackProposal({
+      missionIdentifier: "mission-1",
+      ownerAgentInstanceId: "scheduler:mission-1",
+      sequenceId: "sequence-scheduler:mission-1",
+      viewer,
+    });
+    expect(proposal.entries).toHaveLength(1);
+    expect(proposal.entries[0]?.taskIdentifier).toBe("task-mission-1");
+    expect(proposal.entries[0]?.proposedAction).toBe("mark-sequence-done");
+  });
+
+  it("mission 未全部 done ⇒ needs-human-review（不单向推导）", async () => {
+    const bridge = buildMissionLevelBridge({
+      nodeStatus: "pending",
+      missionTaskStatuses: ["done", "running"],
+    });
+    const proposal = await bridge.buildWriteBackProposal({
+      missionIdentifier: "mission-1",
+      ownerAgentInstanceId: "scheduler:mission-1",
+      sequenceId: "sequence-scheduler:mission-1",
+      viewer,
+    });
+    expect(proposal.entries).toHaveLength(1);
+    expect(proposal.entries[0]?.proposedAction).toBe("needs-human-review");
+  });
+
+  it("序列节点已 done ⇒ 无条目（不产出噪声）", async () => {
+    const bridge = buildMissionLevelBridge({
+      nodeStatus: "done",
+      missionTaskStatuses: ["done"],
+    });
+    const proposal = await bridge.buildWriteBackProposal({
+      missionIdentifier: "mission-1",
+      ownerAgentInstanceId: "scheduler:mission-1",
+      sequenceId: "sequence-scheduler:mission-1",
+      viewer,
+    });
+    expect(proposal.entries).toEqual([]);
+  });
+});
