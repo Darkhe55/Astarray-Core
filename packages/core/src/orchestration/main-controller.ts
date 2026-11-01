@@ -636,6 +636,16 @@ export interface MainControllerOptions {
    * 用于两套记账对照（`inspectTaskLedgerAlignment`），不改变任何状态。
    */
   taskSequenceStatusController?: TaskSequenceStatusController | null;
+  /** R124：任务映射存储（发布时自动登记整 mission 映射；可选）。 */
+  missionTaskSequenceMapStore?: {
+    bind(input: {
+      readonly missionIdentifier: string;
+      readonly sequenceIdentifier: string;
+      readonly ownerAgentInstanceIdentifier: string;
+      readonly missionTaskIdentifier: string;
+      readonly sequenceTaskIdentifier: string;
+    }): Promise<{ readonly didWrite: boolean }>;
+  } | null;
   /**
    * ALIGN-02-06（2026-10-28）：运行中插入的**安全点注入端口**（可选）。
    *
@@ -1519,6 +1529,16 @@ export class MainController {
       sequenceRevision: registration.document.revision,
       isSequenceCreated: registration.isSequenceCreated,
     });
+    /** R124：自动登记"整 mission ↔ 序列节点"映射（失败不阻断发布）。 */
+    void this.options.missionTaskSequenceMapStore
+      ?.bind({
+        missionIdentifier: input.missionId,
+        sequenceIdentifier: registration.document.sequenceId,
+        ownerAgentInstanceIdentifier: input.secondaryAgentInstanceId,
+        missionTaskIdentifier: "*",
+        sequenceTaskIdentifier: registration.taskIdentifier,
+      })
+      .catch(() => undefined);
     /** R21：登记 mission↔序列 持久索引（失败不阻断发布，只流式告知）。 */
     void this.persistMissionSequenceBinding({
       missionIdentifier: input.missionId,

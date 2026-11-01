@@ -9,7 +9,10 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { executeTaskLedgerApplyWriteBackCommand } from "../../packages/tui/src/cli/task-ledger-command.js";
+import {
+  executeTaskLedgerApplyWriteBackCommand,
+  executeTaskLedgerBindTaskMapCommand,
+} from "../../packages/tui/src/cli/task-ledger-command.js";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -173,5 +176,20 @@ describe("task-ledger apply-writeback", () => {
       isJsonOutput: true,
     });
     expect(exitCode).not.toBe(0);
+  });
+});
+
+/** R124：整 mission 哨兵 `*` 可经 CLI 登记。 */
+describe("bind-task-map 哨兵", () => {
+  it("`*` 可登记为整 mission 映射", async () => {
+    const stateDirectory = await createFixture();
+    const exitCode = await executeTaskLedgerBindTaskMapCommand({
+      stateDirectory,
+      missionIdentifier: "mission-wb",
+      missionTaskIdentifier: "*",
+      sequenceTaskIdentifier: "T-01",
+      isJsonOutput: true,
+    });
+    expect(exitCode).toBe(0);
   });
 });

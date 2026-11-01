@@ -4864,3 +4864,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `mark-sequence-done` ⇒ 应用后 node-a/node-b 均 done（revision 2→6）。
 > **验证**：单测 2/2；全量 **471 files / 3625 tests**；typecheck/lint/build 绿。ADR-0182。
 > **未做**：映射需人工登记（发布端未自动写）、无反向查询、过期不自动清理、批量非原子。
+
+> **197（R124）：发布端自动登记整 mission 映射（完成，真实跑通）**：映射哨兵 `"*"`
+> （整 mission ↔ 序列节点）；控制器在 `registerUserTaskInSequence` 发布成功后自动登记；提案映射路径
+> 支持 `"*"`；`bind-task-map --mission-task "*"` 允许。
+> **真实证据**：`mission-f2b5ef24` 发布后 `mission-task-maps.json` 出现 `*` 映射，提案 notes 为
+> "按显式任务映射对齐"，`needs-human-review`（mission blocked）。
+> **验证**：映射单测 3/3、CLI 单测 3/3；全量 **471 files / 3627 tests**；typecheck/lint/build 绿。ADR-0183。
+> **未做**：仅首次发布登记、失败静默、过期不清理、无反向查询、三连自动化未做。

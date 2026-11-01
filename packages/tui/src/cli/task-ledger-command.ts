@@ -626,9 +626,12 @@ export async function executeTaskLedgerBindTaskMapCommand(
   const taskStore = new TaskStore({ baseDirectory: input.stateDirectory });
   const missionManager = new MissionManager(taskStore, input.stateDirectory);
   const missionStatus = await missionManager.getMissionStatus(input.missionIdentifier);
-  const hasMissionTask = (missionStatus.taskChain?.tasks ?? []).some(
-    (task) => task.id === input.missionTaskIdentifier,
-  );
+  /** R124：允许哨兵 `*`（整 mission 映射）。 */
+  const hasMissionTask =
+    input.missionTaskIdentifier === "*" ||
+    (missionStatus.taskChain?.tasks ?? []).some(
+      (task) => task.id === input.missionTaskIdentifier,
+    );
   if (!hasMissionTask) {
     const message = `invalid-task-chain: mission ${input.missionIdentifier} 没有任务 ${input.missionTaskIdentifier}`;
     if (input.isJsonOutput) {
