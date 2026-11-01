@@ -4809,3 +4809,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `--goal-enforce` 下下一单被启动前阻断（退出码 2、无文件）。
 > **验证**：全量 471 files / 3612 tests；typecheck/lint/build 绿。
 > **注意**：14 组（非恰好 12）、构造性目标、investigation 无信号。ADR-0177。
+
+> **189（R117）：GOAL-02 最终交付报告（文档收口）**：新增
+> `docs/reports/GOAL02_FINAL_DELIVERY_2026-11-01.md`——交付概览、**真实 mission 证据表**（14 项）、
+> 自动化验证（471 files / 3612 tests）、验收条件对照、剩余 6 项、明确不宣称项。
+> 本卡收口完成；无代码改动。
