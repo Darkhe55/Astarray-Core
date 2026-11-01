@@ -4709,3 +4709,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 该 mission 因模型未发完成控制事件失败（模型行为，非分解缺陷）。
 > **验证**：全量 **471 files / 3600 tests**；lint 绿。
 > **未做**：多组完成 + 每三组检查真实演练；规划质量仅校验工具名；projectSummary 为空。ADR-0163。
+
+> **174（R101）：完成控制事件核查（结论：无缺陷）**：提示确实注入（`requireCompletionEvent` 时），
+> provider 路径由门面强制开启（`public-sdk.ts:2772`）；补跑 `mission-0524ccd3` **done**、
+> `taskPlanningOutcome=model`、**T-01/T-02 均 done** ⇒ 两节点模型分解 + 完成事件可完整通过。
+> 此前失败是单次模型未遵守提示（加了 env 开关 `ASTARRAY_TRACE_COMPLETION=1` 便于再查）。
+> **验证**：全量 471 files / 3600 tests；typecheck/lint 绿。ADR-0164。
