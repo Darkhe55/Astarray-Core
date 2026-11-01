@@ -88,6 +88,18 @@ export class TaskLedgerBridge {
        *
        * 未装配 ⇒ `applyWriteBackProposal` 明确拒绝（不静默 no-op）。
        */
+      /** R123：显式任务映射（mission task ↔ 序列节点）；缺省不读。 */
+      readonly taskMappings?: {
+        listForMission(input: {
+          readonly missionIdentifier: string;
+          readonly sequenceIdentifier: string;
+        }): Promise<
+          readonly {
+            readonly missionTaskIdentifier: string;
+            readonly sequenceTaskIdentifier: string;
+          }[]
+        >;
+      };
       readonly sequenceTransition?: {
         transitionTaskStatus(input: {
           readonly ownerAgentInstanceId: string;
@@ -482,6 +494,39 @@ export class TaskLedgerBridge {
      * 而 mission 链有多个 `T-xx`。两者**没有共同 id**，按 taskId 逐条比对会全部误报。
      * 当序列恰好一个节点且它是本 mission 的节点时，按"mission 整体"对齐。
      */
+    /**
+     * R123（2026-11-01）：**显式映射优先**。
+     *
+     * 有映射时按映射逐对比较（适用多节点序列）；没有映射才退回整 mission / 逐 id 推断。
+     */
+    const mappings =
+      this.options.taskMappings === undefined
+        ? []
+        : await this.options.taskMappings.listForMission({
+            missionIdentifier: input.missionIdentifier,
+            sequenceIdentifier: input.sequenceId,
+          });
+    if (mappings.length > 0) {
+      const { entries: mappedEntries, notes: mappedNotes } =
+        this.buildMappedWriteBackEntries({
+          mappings,
+          sequenceStatusByTaskIdentifier,
+          missionStatusByTaskIdentifier,
+        });
+      return {
+        missionIdentifier: input.missionIdentifier,
+        sequenceId: input.sequenceId,
+        sequenceRevision: snapshot.revision,
+        generatedAtIso: new Date().toISOString(),
+        isExecutable: false,
+        entries: mappedEntries,
+        notes: [
+          "按显式任务映射对齐（mission task ↔ 序列节点）。",
+          "本提案只读生成，不写任何文件、不改任何状态。",
+          ...mappedNotes,
+        ],
+      };
+    }
     const missionNode =
       snapshot.nodes.length === 1
         ? snapshot.nodes.find(
@@ -634,5 +679,88 @@ export class TaskLedgerBridge {
         "插入后的 revision 一致性与在途任务隔离",
       ],
     };
+  }
+
+  /** R123：显式映射的逐对比较（返回条目与附加说明）——供提案使用。 */
+  private buildMappedWriteBackEntries(input: {
+    readonly mappings: readonly {
+      readonly missionTaskIdentifier: string;
+      readonly sequenceTaskIdentifier: string;
+    }[];
+    readonly sequenceStatusByTaskIdentifier: ReadonlyMap<string, string>;
+    readonly missionStatusByTaskIdentifier: ReadonlyMap<string, string>;
+  }): {
+    readonly entries: {
+      taskIdentifier: string;
+      sequenceStatus: string | null;
+      missionStatus: string | null;
+      proposedAction:
+        | "mark-sequence-done"
+        | "needs-human-review"
+        | "missing-in-sequence"
+        | "missing-in-mission";
+      rationale: string;
+      risk: string;
+      requiresHumanApproval: true;
+    }[];
+    readonly notes: string[];
+  } {
+    const entries: {
+      taskIdentifier: string;
+      sequenceStatus: string | null;
+      missionStatus: string | null;
+      proposedAction:
+        | "mark-sequence-done"
+        | "needs-human-review"
+        | "missing-in-sequence"
+        | "missing-in-mission";
+      rationale: string;
+      risk: string;
+      requiresHumanApproval: true;
+    }[] = [];
+    const notes: string[] = [];
+    for (const mapping of input.mappings) {
+      const sequenceStatus =
+        input.sequenceStatusByTaskIdentifier.get(mapping.sequenceTaskIdentifier) ?? null;
+      const missionStatus =
+        input.missionStatusByTaskIdentifier.get(mapping.missionTaskIdentifier) ?? null;
+      if (sequenceStatus === null) {
+        notes.push(
+          `映射 ${mapping.missionTaskIdentifier}→${mapping.sequenceTaskIdentifier} 的序列节点不存在（映射可能过期）。`,
+        );
+        continue;
+      }
+      if (missionStatus === null) {
+        notes.push(
+          `映射 ${mapping.missionTaskIdentifier}→${mapping.sequenceTaskIdentifier} 的 mission 任务不存在。`,
+        );
+        continue;
+      }
+      if (sequenceStatus === missionStatus) {
+        continue;
+      }
+      if (missionStatus === "done") {
+        entries.push({
+          taskIdentifier: mapping.sequenceTaskIdentifier,
+          sequenceStatus,
+          missionStatus,
+          proposedAction: "mark-sequence-done",
+          rationale: `映射对：mission 任务 ${mapping.missionTaskIdentifier} 已 done，序列节点未 done。`,
+          risk: "若序列侧仍有未完成的依赖者，提前置 done 会让下游 ready 判定失真。",
+          requiresHumanApproval: true,
+        });
+        continue;
+      }
+      entries.push({
+        taskIdentifier: mapping.sequenceTaskIdentifier,
+        sequenceStatus,
+        missionStatus,
+        proposedAction: "needs-human-review",
+        rationale: `映射对：mission 侧 ${missionStatus}、序列侧 ${sequenceStatus}，无法安全单向推导。`,
+        risk: "自动写回可能把未完成任务标成完成，或把已完成任务重新打开。",
+        requiresHumanApproval: true,
+      });
+    }
+    return { entries, notes };
   }
 }
