@@ -307,6 +307,38 @@ export interface ApplicationRuntime {
     readonly goalIdentifier: string;
     readonly reason: string;
   }) => Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }>;
+  /** R120：应用写回提案（人工批准 + revision 防护）。 */
+  applyTaskLedgerWriteBack: (input: {
+    readonly proposal: {
+      readonly missionIdentifier: string;
+      readonly sequenceId: string;
+      readonly sequenceRevision: number;
+      readonly entries: readonly {
+        readonly taskIdentifier: string;
+        readonly proposedAction:
+          | "mark-sequence-done"
+          | "needs-human-review"
+          | "missing-in-sequence"
+          | "missing-in-mission";
+      }[];
+    };
+    readonly ownerAgentInstanceId: string;
+    readonly sequenceId: string;
+    readonly approval: {
+      readonly approvedBy: string;
+      readonly approvedAtIso: string;
+    };
+    readonly expectedSequenceRevision: number;
+    readonly actor: { readonly sourceKind: string; readonly actorId: string };
+  }) => Promise<{
+    readonly appliedTaskIdentifiers: readonly string[];
+    readonly skipped: readonly {
+      readonly taskIdentifier: string;
+      readonly proposedAction: string;
+      readonly reason: string;
+    }[];
+    readonly sequenceRevisionAfter: number;
+  }>;
   /** R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。 */
   sendMissionInstruction: (missionIdentifier: string, instructionText: string) => void;
   /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
@@ -2110,6 +2142,44 @@ export async function createApplicationRuntime(
   ): void => {
     controller.sendSchedulerInstruction(missionIdentifier, instructionText);
   };
+  /**
+   * R120（2026-11-01）：**应用写回提案**（人工批准 + revision 防护；委托控制器）。
+   */
+  const applyTaskLedgerWriteBack = async (input: {
+    readonly proposal: {
+      readonly missionIdentifier: string;
+      readonly sequenceId: string;
+      readonly sequenceRevision: number;
+      readonly entries: readonly {
+        readonly taskIdentifier: string;
+        readonly proposedAction:
+          | "mark-sequence-done"
+          | "needs-human-review"
+          | "missing-in-sequence"
+          | "missing-in-mission";
+      }[];
+    };
+    readonly ownerAgentInstanceId: string;
+    readonly sequenceId: string;
+    readonly approval: {
+      readonly approvedBy: string;
+      readonly approvedAtIso: string;
+    };
+    readonly expectedSequenceRevision: number;
+    readonly actor: { readonly sourceKind: string; readonly actorId: string };
+  }): Promise<{
+    readonly appliedTaskIdentifiers: readonly string[];
+    readonly skipped: readonly {
+      readonly taskIdentifier: string;
+      readonly proposedAction: string;
+      readonly reason: string;
+    }[];
+    readonly sequenceRevisionAfter: number;
+  }> =>
+    controller.applyTaskLedgerWriteBack({
+      ...input,
+      actor: input.actor as never,
+    });
   const describeGoalStatus = async (
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> =>
@@ -3632,6 +3702,7 @@ export async function createApplicationRuntime(
     reconcileGoalTaskGroup,
     reconcileMissionTask,
     sendMissionInstruction,
+    applyTaskLedgerWriteBack,
     bindRequirementTaskMapping,
     deactivateGoal,
     updateGoalContract,

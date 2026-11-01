@@ -81,9 +81,130 @@ export class TaskLedgerBridge {
     private readonly options: {
       readonly sequenceLedger: TaskSequenceLedgerPort;
       readonly missionTaskChain: MissionTaskChainPort;
+      /**
+       * R120（2026-11-01）：**写回执行端口**（可选）。
+       *
+       * 未装配 ⇒ `applyWriteBackProposal` 明确拒绝（不静默 no-op）。
+       */
+      readonly sequenceTransition?: {
+        transitionTaskStatus(input: {
+          readonly ownerAgentInstanceId: string;
+          readonly sequenceId: string;
+          readonly taskId: string;
+          readonly nextStatus: "done";
+          readonly expectedRevision: number;
+          readonly actor: ActorIdentity;
+        }): Promise<{ readonly revision: number }>;
+      };
     },
   ) {}
 
+
+  /**
+   * R120（2026-11-01）：**应用写回提案（需人工批准 + revision 防护）**。
+   *
+   * 固定规则：
+   * - 只应用 `mark-sequence-done`；其它动作**原样跳过**并给出原因（不猜、不推导）；
+   * - 必须提供 `approvedBy`（人工）与 `approvedAtIso`；
+   * - `expectedSequenceRevision` 必须等于提案里的 revision，且必须等于**当前**快照 revision，
+   *   否则 `stale-revision`（防止应用旧提案覆盖新状态）；
+   * - 每次迁移都带当前 revision，失败即整体报错（不部分静默）。
+   */
+  async applyWriteBackProposal(input: {
+    readonly proposal: {
+      readonly missionIdentifier: string;
+      readonly sequenceId: string;
+      readonly sequenceRevision: number;
+      readonly entries: readonly {
+        readonly taskIdentifier: string;
+        readonly proposedAction:
+          | "mark-sequence-done"
+          | "needs-human-review"
+          | "missing-in-sequence"
+          | "missing-in-mission";
+      }[];
+    };
+    readonly ownerAgentInstanceId: string;
+    readonly approval: {
+      readonly approvedBy: string;
+      readonly approvedAtIso: string;
+    };
+    readonly expectedSequenceRevision: number;
+    readonly actor: ActorIdentity;
+  }): Promise<{
+    readonly appliedTaskIdentifiers: readonly string[];
+    readonly skipped: readonly {
+      readonly taskIdentifier: string;
+      readonly proposedAction: string;
+      readonly reason: string;
+    }[];
+    readonly sequenceRevisionAfter: number;
+  }> {
+    const transitionPort = this.options.sequenceTransition;
+    if (transitionPort === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "写回执行端口未装配：拒绝应用提案（不静默 no-op）。",
+      );
+    }
+    if (input.approval.approvedBy.trim() === "") {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "写回必须先经过人工批准（approvedBy 不能为空）。",
+      );
+    }
+    if (Number.isNaN(Date.parse(input.approval.approvedAtIso))) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `批准时间非法: ${input.approval.approvedAtIso}`,
+      );
+    }
+    if (input.expectedSequenceRevision !== input.proposal.sequenceRevision) {
+      throw new DomainError(
+        "stale-revision",
+        `提案基于 revision ${String(input.proposal.sequenceRevision)}，调用方期望 ${String(input.expectedSequenceRevision)}：拒绝应用。`,
+      );
+    }
+    const snapshot = await this.options.sequenceLedger.getSnapshot({
+      ownerAgentInstanceId: input.ownerAgentInstanceId,
+      sequenceId: input.proposal.sequenceId,
+      viewer: input.actor,
+    });
+    if (snapshot.revision !== input.expectedSequenceRevision) {
+      throw new DomainError(
+        "stale-revision",
+        `当前序列 revision 为 ${String(snapshot.revision)}，提案基于 ${String(input.expectedSequenceRevision)}：请重新生成提案。`,
+      );
+    }
+    const appliedTaskIdentifiers: string[] = [];
+    const skipped: {
+      taskIdentifier: string;
+      proposedAction: string;
+      reason: string;
+    }[] = [];
+    let currentRevision = snapshot.revision;
+    for (const entry of input.proposal.entries) {
+      if (entry.proposedAction !== "mark-sequence-done") {
+        skipped.push({
+          taskIdentifier: entry.taskIdentifier,
+          proposedAction: entry.proposedAction,
+          reason: "该动作需要人工判断（本次只执行 mark-sequence-done）",
+        });
+        continue;
+      }
+      const transitioned = await transitionPort.transitionTaskStatus({
+        ownerAgentInstanceId: input.ownerAgentInstanceId,
+        sequenceId: input.proposal.sequenceId,
+        taskId: entry.taskIdentifier,
+        nextStatus: "done",
+        expectedRevision: currentRevision,
+        actor: input.actor,
+      });
+      currentRevision = transitioned.revision;
+      appliedTaskIdentifiers.push(entry.taskIdentifier);
+    }
+    return { appliedTaskIdentifiers, skipped, sequenceRevisionAfter: currentRevision };
+  }
   /** 只读对照：两套记账差在哪。 */
   async inspectAlignment(input: {
     readonly missionIdentifier: string;

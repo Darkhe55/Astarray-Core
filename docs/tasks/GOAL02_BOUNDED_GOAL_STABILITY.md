@@ -449,3 +449,11 @@ K4/K5/K6/K9/K11/K12 为"已实现未接线"或低量级补齐。
   交付概览、**真实 mission 证据表**、自动化验证（471 files / 3612 tests）、
   验收条件对照、剩余 6 项、明确不宣称项。
 - 本卡收口（不宣称"永不偏航"；剩余项见报告 §5）。
+
+### R120 写回提案应用引擎（2026-11-01）
+
+- `TaskLedgerBridge.applyWriteBackProposal`：只应用 `mark-sequence-done`；人工批准必填；
+  revision 与提案及当前快照**双重校验**；其它动作跳过并说明原因；未装配端口明确拒绝。
+- 控制器 `applyTaskLedgerWriteBack` 接 `TaskSequenceManageController.transitionTaskStatus`（自带审计）。
+- **测试**：单测 4/4；全量 471 files / 3618 tests。
+- **未做**：无 CLI 入口、无真实序列端到端、批准无身份校验、批量非原子。ADR-0179。
