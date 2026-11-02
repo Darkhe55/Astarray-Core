@@ -12,6 +12,8 @@ import type { GoalGroupKind } from "./goal-dispatch-gate.js";
 export interface GoalTaskGroupKindResolutionInput {
   readonly taskIdentifiers: readonly string[];
   readonly reworkedTaskIdentifiers: ReadonlySet<string>;
+  /** R141：本组启动任务中"只读（调查）"的任务集合。 */
+  readonly investigationTaskIdentifiers?: ReadonlySet<string>;
   readonly provider?: (input: {
     readonly taskIdentifiers: readonly string[];
   }) => GoalGroupKind;
@@ -28,9 +30,22 @@ export function resolveGoalTaskGroupKind(
       return "normal";
     }
   }
-  return input.taskIdentifiers.some((taskIdentifier) =>
-    input.reworkedTaskIdentifiers.has(taskIdentifier),
-  )
-    ? "rework"
-    : "normal";
+  if (
+    input.taskIdentifiers.some((taskIdentifier) =>
+      input.reworkedTaskIdentifiers.has(taskIdentifier),
+    )
+  ) {
+    return "rework";
+  }
+  const investigationIdentifiers = input.investigationTaskIdentifiers;
+  if (
+    investigationIdentifiers !== undefined &&
+    input.taskIdentifiers.length > 0 &&
+    input.taskIdentifiers.every((taskIdentifier) =>
+      investigationIdentifiers.has(taskIdentifier),
+    )
+  ) {
+    return "investigation";
+  }
+  return "normal";
 }

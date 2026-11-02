@@ -463,6 +463,17 @@ export class DagScheduler {
       };
     }
   }
+  /** R141：读取任务声明的工具名（只读；用于调查组信号）。 */
+  getTaskToolNames(
+    taskIds: readonly string[],
+  ): ReadonlyMap<string, readonly string[]> {
+    const result = new Map<string, readonly string[]>();
+    for (const taskId of taskIds) {
+      const node = this.graph.getNode(taskId);
+      result.set(taskId, node === undefined ? [] : [...node.toolNames]);
+    }
+    return result;
+  }
   isAtSafePointForInjection(): boolean {
     return this.claimedTaskIds.size === 0;
   }

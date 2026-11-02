@@ -32,6 +32,7 @@ import { evaluateCompletionReceipt } from "./completion-receipt.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { GoalGroupKind } from "./goal-dispatch-gate.js";
 import { resolveGoalTaskGroupKind } from "./goal-task-group-kind.js";
+import { isReadOnlyToolName } from "./goal-investigation-signal.js";
 import { buildGoalTaskGroupIdentifier } from "./goal-task-group-identifier.js";
 import type { GuidanceControlQueue } from "../runtime-guidance/guidance-control-queue.js";
 
@@ -934,9 +935,23 @@ export class MissionOrchestrator {
             `[GK] groupStart starting=${startingTaskIdentifiers.join(",")} reworked=${[...this.reworkedTaskIdentifiers].join(",")}\n`,
           );
         }
+        /** R141：调查组本地信号——本组启动任务是否全部只读。 */
+        const toolNamesByTask = this.dagScheduler.getTaskToolNames(
+          startingTaskIdentifiers,
+        );
+        const investigationTaskIdentifiers = new Set(
+          startingTaskIdentifiers.filter((taskIdentifier) => {
+            const toolNames = toolNamesByTask.get(taskIdentifier) ?? [];
+            return (
+              toolNames.length > 0 &&
+              toolNames.every((toolName) => isReadOnlyToolName(toolName))
+            );
+          }),
+        );
         this.currentGoalTaskGroupKind = resolveGoalTaskGroupKind({
           taskIdentifiers: startingTaskIdentifiers,
           reworkedTaskIdentifiers: this.reworkedTaskIdentifiers,
+          investigationTaskIdentifiers,
           ...(this.options.goalTaskGroupKindProvider === undefined
             ? {}
             : { provider: this.options.goalTaskGroupKindProvider }),
