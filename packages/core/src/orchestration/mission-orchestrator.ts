@@ -204,6 +204,29 @@ export interface MissionOrchestratorOptions {
   initialChain: TaskChainDocument;
   taskStore: TaskStorePort;
   concurrency: number;
+  /** R132/R133：图变更审计与通知（透传给 DagScheduler）。 */
+  graphChangeJournal?: {
+    append(entry: {
+      readonly missionIdentifier: string;
+      readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+      readonly taskIdentifier: string;
+      readonly recordedAtIso: string;
+      readonly before: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+      readonly after: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+    }): Promise<void>;
+  };
+  onGraphChanged?: (event: {
+    readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+    readonly taskIdentifier: string;
+  }) => void;
   failureThreshold: number;
   maxLoopIterations: number;
   /**
@@ -492,6 +515,12 @@ export class MissionOrchestrator {
       concurrency: options.concurrency,
       taskStore: options.taskStore,
       allocateAgentId: (taskId: string) => `worker:${this.options.missionId}:${taskId}`,
+      ...(options.graphChangeJournal === undefined
+        ? {}
+        : { graphChangeJournal: options.graphChangeJournal }),
+      ...(options.onGraphChanged === undefined
+        ? {}
+        : { onGraphChanged: options.onGraphChanged }),
     });
   }
 

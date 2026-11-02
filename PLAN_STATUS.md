@@ -4936,3 +4936,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **V 上升 ⇒ 暂停+需重规划**；不变/下降/null ⇒ 不暂停。取代 R133 的"任何图变更都暂停"。
 > **验证**：判定单测 3/3；全量 **471 files / 3646 tests**；typecheck/lint/build 绿。ADR-0192。
 > **未做**：运行时联动无集成测试、无真实演练、映射不随图变更清理、重算失败静默、无恢复流程。
+
+> **208（R135）：图变更接线修复 + 审计落盘时序（完成）**：发现并修复 `MissionOrchestrator`
+> 构造 `DagScheduler` 时**未透传** `graphChangeJournal`/`onGraphChanged`（真实注入 trace 显示
+> `journal=none`）；`recordGraphChange` 改为 async 并被四个变更路径 await（失败仍吞错）。
+> **验证**：真实 store 测试 2/2（注入落盘、坏行跳过）；全量 **471 files / 3648 tests**；
+> typecheck/lint/build 绿。ADR-0193。
+> **未做**：真实 mission 的"图变更→V→目标暂停"端到端（模型波动拿不到注入窗口）、联动独立测试。
