@@ -76,6 +76,36 @@ export class MissionTaskSequenceMapStore {
     };
   }
 
+  /**
+   * R139（2026-11-03）：**删除任务时清理其映射**（避免映射指向已消失的节点）。
+   *
+   * 只删匹配 mission + missionTaskIdentifier 的条目；`"*"`（整 mission）不动。
+   */
+  async removeForMissionTask(input: {
+    readonly missionIdentifier: string;
+    readonly missionTaskIdentifier: string;
+  }): Promise<{ readonly removedCount: number }> {
+    return this.writeLock.runExclusive(async () => {
+      const document = await this.read();
+      const kept = document.maps.filter(
+        (entry) =>
+          !(
+            entry.missionIdentifier === input.missionIdentifier &&
+            entry.missionTaskIdentifier === input.missionTaskIdentifier
+          ),
+      );
+      const removedCount = document.maps.length - kept.length;
+      if (removedCount === 0) {
+        return { removedCount };
+      }
+      await writeAtomicJson(this.filePath, {
+        schemaVersion: 1,
+        documentRevision: document.documentRevision + 1,
+        maps: kept,
+      } satisfies MissionTaskSequenceMapDocument);
+      return { removedCount };
+    });
+  }
   /** 按 mission+sequence 列出映射（写回提案使用）。 */
   async listForMission(input: {
     readonly missionIdentifier: string;

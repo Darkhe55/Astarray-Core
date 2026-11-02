@@ -154,3 +154,33 @@ describe("整 mission 哨兵映射（*）", () => {
     expect(pendingProposal.entries[0]?.proposedAction).toBe("needs-human-review");
   });
 });
+
+describe("删除任务时清理映射（R139）", () => {
+  it("只删匹配 mission+task 的映射；`*` 保留", async () => {
+    const store = await createStore();
+    await store.bind({
+      missionIdentifier: "mission-1",
+      sequenceIdentifier: "seq-1",
+      ownerAgentInstanceIdentifier: "scheduler:mission-1",
+      missionTaskIdentifier: "*",
+      sequenceTaskIdentifier: "task-mission-1",
+    });
+    await store.bind({
+      missionIdentifier: "mission-1",
+      sequenceIdentifier: "seq-1",
+      ownerAgentInstanceIdentifier: "scheduler:mission-1",
+      missionTaskIdentifier: "T-99",
+      sequenceTaskIdentifier: "node-99",
+    });
+    const removed = await store.removeForMissionTask({
+      missionIdentifier: "mission-1",
+      missionTaskIdentifier: "T-99",
+    });
+    expect(removed.removedCount).toBe(1);
+    const listed = await store.listForMission({
+      missionIdentifier: "mission-1",
+      sequenceIdentifier: "seq-1",
+    });
+    expect(listed.map((entry) => entry.missionTaskIdentifier)).toEqual(["*"]);
+  });
+});

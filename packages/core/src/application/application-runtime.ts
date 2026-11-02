@@ -3160,6 +3160,15 @@ export async function createApplicationRuntime(
     /** R133：图变更 ⇒ 目标联动（标记需重新规划 + 暂停 + 落盘）。 */
     onMissionGraphChanged: (missionIdentifier, event) => {
       void (async () => {
+        /** R139：删除任务 ⇒ 清理其映射（不指向已消失的节点）；"*" 不动。 */
+        if (event.changeKind === "remove") {
+          await missionTaskSequenceMapStore
+            .removeForMissionTask({
+              missionIdentifier,
+              missionTaskIdentifier: event.taskIdentifier,
+            })
+            .catch(() => undefined);
+        }
         const goalIdentifier = await goalMissionBindingStore
           .readGoalIdentifier(missionIdentifier)
           .catch(() => null);
