@@ -49,6 +49,24 @@ function makeNode(
 async function createScheduler(
   nodes: TaskDependencyNode[],
   concurrency: number,
+  graphChangeJournal?: {
+    append(entry: {
+      readonly missionIdentifier: string;
+      readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+      readonly taskIdentifier: string;
+      readonly recordedAtIso: string;
+      readonly before: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+      readonly after: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+    }): Promise<void>;
+  },
 ): Promise<DagScheduler> {
   const chain: TaskChainDocument = {
     schemaVersion: 1,
@@ -65,6 +83,7 @@ async function createScheduler(
       agentIdSequence += 1;
       return `L3-${agentIdSequence}`;
     },
+    ...(graphChangeJournal === undefined ? {} : { graphChangeJournal }),
   });
 }
 
@@ -220,5 +239,31 @@ describe("安全点重连依赖（R131）", () => {
     await scheduler.scheduleRound();
     const refused = await scheduler.rewireTaskDependencies("t2", ["t1"]);
     expect(refused.reasonCode).toBe("not-safe-point");
+  });
+});
+
+describe("图变更审计（R132）", () => {
+  it("注入/重连各写一条变更，含 before/after", async () => {
+    const entries: {
+      changeKind: string;
+      taskIdentifier: string;
+      before: { dependsOn: readonly string[] } | null;
+      after: { dependsOn: readonly string[] } | null;
+      missionIdentifier: string;
+    }[] = [];
+    const scheduler = await createScheduler([makeNode("t1")], 1, {
+      append: async (entry) => {
+        entries.push(entry as never);
+      },
+    });
+    await scheduler.injectTaskChecked(makeNode("t9"));
+    await scheduler.rewireTaskDependencies("t9", ["t1"]);
+    const kinds = entries.map((entry) => entry.changeKind);
+    expect(kinds).toEqual(["inject", "rewire"]);
+    expect(entries[0]?.before).toBeNull();
+    expect(entries[0]?.after?.dependsOn).toEqual([]);
+    expect(entries[1]?.before?.dependsOn).toEqual([]);
+    expect(entries[1]?.after?.dependsOn).toEqual(["t1"]);
+    expect(entries[1]?.missionIdentifier).toBe("mission-prefer");
   });
 });

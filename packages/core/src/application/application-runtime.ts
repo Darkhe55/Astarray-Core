@@ -131,6 +131,7 @@ import { ProjectWorkWindowStore } from "../orchestration/project-work-window-sto
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
 import { MissionTaskSequenceMapStore } from "../orchestration/mission-task-sequence-map-store.js";
+import { TaskGraphChangeJournalStore } from "../orchestration/task-graph-change-journal.js";
 import { PromptScanJournalStore } from "../orchestration/prompt-scan-journal-store.js";
 import { setPromptScanJournalSink } from "../orchestration/prompt-scan-journal.js";
 import { DeferredInsertionQueueStore } from "../orchestration/deferred-insertion-queue.js";
@@ -2617,6 +2618,10 @@ export async function createApplicationRuntime(
   const localPreservationService = new LocalPreservationService({
     baseDirectory: stateDirectory,
   });
+  /** R132：图变更审计（追加式 JSONL；失败不阻断）。 */
+  const taskGraphChangeJournal = new TaskGraphChangeJournalStore({
+    baseDirectory: stateDirectory,
+  });
   /** R124：任务映射存储（发布端自动登记；写回提案读取）。 */
   const missionTaskSequenceMapStore = new MissionTaskSequenceMapStore({
     baseDirectory: stateDirectory,
@@ -3094,6 +3099,7 @@ export async function createApplicationRuntime(
     taskSequenceStatusController: sequenceStatusController,
     /** R124：发布时自动登记整 mission 映射。 */
     missionTaskSequenceMapStore,
+    graphChangeJournal: taskGraphChangeJournal,
     taskLedgerDivergenceJournal,
     /** R21：mission↔序列 持久索引（控制器写入；CLI 读取）。 */
     missionSequenceBindingStore,

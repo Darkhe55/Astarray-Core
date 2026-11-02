@@ -4917,3 +4917,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：调度器单测 11/11（环回滚、重连落盘、未知依赖、blocked 自动 pending、在途拒绝）；
 > 全量 **471 files / 3641 tests**；typecheck/lint/build 绿。ADR-0189。
 > **仍未支持**：运行中重连、批量/换图/回滚、目标模式联动、图变更历史、真实演练。
+
+> **205（R132）：任务图变更审计（完成）**：新增 `TaskGraphChangeJournalStore`
+> （`task-graph-changes.jsonl`，before/after 结构字段、无正文、失败不阻断），
+> 调度器在注入/删除/修订/重连时各记一条；运行时装配；CLI `graph-changes --mission` 只读。
+> **验证**：调度器单测 12/12（注入/重连 before/after 正确）；真实 CLI 夹具 `count=1`；
+> 全量 **471 files / 3642 tests**；typecheck/lint/build 绿。ADR-0190。
+> **未做**：仅调度器内变更入账、无轮转/上限、无 actor、无过滤、真实演练未做。
