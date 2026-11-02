@@ -49,6 +49,35 @@ export class TaskGraph {
     return new TaskGraph(document.tasks);
   }
 
+  /**
+   * R130（2026-11-02）：**安全点删除 pending 叶子任务**。
+   *
+   * 边界（刻意保守）：
+   * - 只能删 `pending` 且**没有任何节点依赖它**的任务（否则下游会被悬空）；
+   * - 不让删有依赖者的中间节点：那需要重连依赖，属 ADR-0052 未支持范围。
+   */
+  removePendingLeafNode(taskId: string): void {
+    const node = this.nodesById.get(taskId);
+    if (node === undefined) {
+      throw new DomainError("invalid-task-chain", `任务不存在: ${taskId}`);
+    }
+    if (node.status !== "pending") {
+      throw new DomainError(
+        "invalid-task-chain",
+        `只能删除 pending 任务: ${taskId}（当前 ${node.status}）`,
+      );
+    }
+    const dependents = [...this.nodesById.values()].filter((candidate) =>
+      candidate.dependsOn.includes(taskId),
+    );
+    if (dependents.length > 0) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `任务 ${taskId} 仍被依赖（${dependents.map((candidate) => candidate.id).join(", ")}）：拒绝删除，避免悬空依赖。`,
+      );
+    }
+    this.nodesById.delete(taskId);
+  }
   getNode(taskId: string): TaskDependencyNode | undefined {
     return this.nodesById.get(taskId);
   }

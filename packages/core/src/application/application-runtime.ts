@@ -362,6 +362,30 @@ export interface ApplicationRuntime {
     readonly reasonCode: string;
     readonly reason: string;
   }>;
+  /** R130：安全点注入任务（只追加，不改已有依赖；仅同进程）。 */
+  injectMissionTask: (
+    missionIdentifier: string,
+    node: {
+      readonly id: string;
+      readonly description: string;
+      readonly dependsOn: readonly string[];
+      readonly taskType: string;
+      readonly toolNames: readonly string[];
+    },
+  ) => Promise<{
+    readonly outcome: "injected" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }>;
+  /** R130：安全点删除 pending 叶子任务（仅同进程）。 */
+  removeMissionTask: (
+    missionIdentifier: string,
+    taskIdentifier: string,
+  ) => Promise<{
+    readonly outcome: "removed" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }>;
   /** R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。 */
   sendMissionInstruction: (missionIdentifier: string, instructionText: string) => void;
   /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
@@ -2161,6 +2185,21 @@ export async function createApplicationRuntime(
    */
   /** R126：按 taskId 优先派发（仅同进程）。 */
   /** R129：运行中修订 pending 任务（仅同进程）。 */
+  /** R130：安全点注入任务（仅同进程）。 */
+  const injectMissionTask = (
+    missionIdentifier: string,
+    node: {
+      readonly id: string;
+      readonly description: string;
+      readonly dependsOn: readonly string[];
+      readonly taskType: string;
+      readonly toolNames: readonly string[];
+    },
+  ) => controller.injectMissionTask(missionIdentifier, node);
+  /** R130：安全点删除 pending 叶子任务（仅同进程）。 */
+  const removeMissionTask = (missionIdentifier: string, taskIdentifier: string) =>
+    controller.removeMissionTask(missionIdentifier, taskIdentifier);
+
   const reviseMissionTask = (
     missionIdentifier: string,
     taskIdentifier: string,
@@ -3752,6 +3791,8 @@ export async function createApplicationRuntime(
     sendMissionInstruction,
     dispatchMissionTask,
     reviseMissionTask,
+    injectMissionTask,
+    removeMissionTask,
     applyTaskLedgerWriteBack,
     bindRequirementTaskMapping,
     deactivateGoal,

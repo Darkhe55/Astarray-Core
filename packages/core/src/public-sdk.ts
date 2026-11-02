@@ -5506,6 +5506,41 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   /**
    * R129：运行中修订 pending 任务（只改 description/toolNames；仅同进程）。
    */
+  /**
+   * R130：安全点注入任务（只追加，不改已有依赖；仅同进程）。
+   */
+  injectMissionTask(
+    missionIdentifier: string,
+    node: {
+      readonly id: string;
+      readonly description: string;
+      readonly dependsOn: readonly string[];
+      readonly taskType: string;
+      readonly toolNames: readonly string[];
+    },
+  ): Promise<{
+    readonly outcome: "injected" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    this.assertOpen();
+    return this.runtime.injectMissionTask(missionIdentifier, node);
+  }
+
+  /**
+   * R130：安全点删除 pending 叶子任务（仅同进程）。
+   */
+  removeMissionTask(
+    missionIdentifier: string,
+    taskIdentifier: string,
+  ): Promise<{
+    readonly outcome: "removed" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    this.assertOpen();
+    return this.runtime.removeMissionTask(missionIdentifier, taskIdentifier);
+  }
   reviseMissionTask(
     missionIdentifier: string,
     taskIdentifier: string,
