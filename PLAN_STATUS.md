@@ -4962,3 +4962,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 顺带修复图变更联动的 unhandled rejection（IIFE 加 catch），全量恢复"0 Errors"。
 > **验证**：单测 2/2；全量 **3652 tests 全通过、无 Errors**；typecheck/lint/build 绿。ADR-0196。
 > **未做**：恢复后不自动继续、无结构化重规划产物、不与映射/证据失效联动、预算暂停不走此入口。
+
+> **212（R139）：删除任务时清理映射（完成）**：`MissionTaskSequenceMapStore.removeForMissionTask`
+> 只删匹配 mission+task 的映射、保留 `"*"`；运行时在 `changeKind=remove` 时先清理再重算 V。
+> **验证**：单测 4/4；全量 **3653 tests 全通过、无 Errors**；typecheck/lint/build 绿。ADR-0197。
+> **未做**：清理 fire-and-forget、序列节点反向删除、完整链路联动测试、`"*"` 的整 mission 清理。
