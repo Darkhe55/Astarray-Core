@@ -322,7 +322,7 @@ export class DagScheduler {
       node.toolNames = [...patch.toolNames];
     }
     await this.persistChain();
-    this.recordGraphChange({
+    await this.recordGraphChange({
       changeKind: "revise",
       taskIdentifier: taskId,
       before,
@@ -343,7 +343,7 @@ export class DagScheduler {
     }
     this.graph.addNode(node);
     await this.persistChain();
-    this.recordGraphChange({
+    await this.recordGraphChange({
       changeKind: "inject",
       taskIdentifier: node.id,
       before: null,
@@ -401,7 +401,7 @@ export class DagScheduler {
       const before = this.snapshotNode(taskId);
       this.graph.removePendingLeafNode(taskId);
       await this.persistChain();
-      this.recordGraphChange({
+      await this.recordGraphChange({
         changeKind: "remove",
         taskIdentifier: taskId,
         before,
@@ -444,7 +444,7 @@ export class DagScheduler {
       const before = this.snapshotNode(taskId);
       this.graph.rewireNodeDependencies(taskId, dependsOn);
       await this.persistChain();
-      this.recordGraphChange({
+      await this.recordGraphChange({
         changeKind: "rewire",
         taskIdentifier: taskId,
         before,
@@ -468,7 +468,7 @@ export class DagScheduler {
   }
 
   /** R132：记录图变更（失败忽略，不阻断业务）。 */
-  private recordGraphChange(entry: {
+  private async recordGraphChange(entry: {
     readonly changeKind: "inject" | "remove" | "revise" | "rewire";
     readonly taskIdentifier: string;
     readonly before: {
@@ -481,7 +481,7 @@ export class DagScheduler {
       readonly description: string;
       readonly toolNames: readonly string[];
     } | null;
-  }): void {
+  }): Promise<void> {
     try {
       this.options.onGraphChanged?.({
         changeKind: entry.changeKind,
@@ -491,16 +491,25 @@ export class DagScheduler {
       // 通知失败不阻断图变更
     }
     const journal = this.options.graphChangeJournal;
+    if (process.env.ASTARRAY_TRACE_GRAPH === "1") {
+      process.stderr.write(
+        `[GRAPH] ${entry.changeKind} ${entry.taskIdentifier} journal=${journal === undefined ? "none" : "yes"}\n`,
+      );
+    }
     if (journal === undefined) {
       return;
     }
-    void journal
+    await journal
       .append({
         missionIdentifier: this.missionId,
         recordedAtIso: new Date().toISOString(),
         ...entry,
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        if (process.env.ASTARRAY_TRACE_GRAPH === "1") {
+          process.stderr.write(`[GRAPH] append failed: ${(error as Error).message}\n`);
+        }
+      });
   }
 
   /** 取节点快照（审计用）。 */
