@@ -195,6 +195,9 @@ async function startBlockedMission(): Promise<{
     goalIdentifier,
   });
   const missionIdentifier = accepted.missionIdentifier;
+  if (missionIdentifier === undefined || missionIdentifier === null) {
+    throw new Error("submitTask 未返回 missionIdentifier");
+  }
   const blockedTaskId = await waitForTaskBlocked(missionIdentifier, 20_000);
   expect(blockedTaskId).toBe("T-001");
   return { application, missionIdentifier, goalIdentifier };
