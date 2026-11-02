@@ -302,3 +302,67 @@ describe("确定性图变更演练", () => {
     }
   });
 });
+
+describe("确定性图变更演练：修订/重连/删除", () => {
+  it("同一安全点内注入 → 修订 → 重连 → 删除；审计按序落盘且目标不暂停", async () => {
+    const { application, missionIdentifier, goalIdentifier } =
+      await startBlockedMission();
+    try {
+      const injection = await application.injectMissionTask(missionIdentifier, {
+        id: "T-99",
+        description: "注入：读取 graph-drill.md",
+        dependsOn: ["T-001"],
+        taskType: "data",
+        toolNames: ["readFile"],
+      });
+      expect(injection.outcome).toBe("injected");
+
+      const revised = await application.reviseMissionTask(missionIdentifier, "T-99", {
+        description: "注入后修订：读取并汇报",
+        toolNames: ["readFile", "searchProjectText"],
+      });
+      expect(revised.outcome).toBe("revised");
+
+      /** 依赖仍指向被权限阻塞的 T-001：重连后仍 pending，避免被调度器立刻启动。 */
+      const rewired = await application.rewireMissionTaskDependencies(
+        missionIdentifier,
+        "T-99",
+        ["T-001"],
+      );
+      expect(rewired.outcome, JSON.stringify(rewired)).toBe("rewired");
+
+      const removed = await application.removeMissionTask(missionIdentifier, "T-99");
+      expect(removed.outcome).toBe("removed");
+
+      const chain = JSON.parse(
+        await fs.readFile(
+          path.join(stateDirectory, "missions", missionIdentifier, "task-chain.json"),
+          "utf8",
+        ),
+      ) as { tasks: { id: string }[] };
+      expect(chain.tasks.map((task) => task.id)).not.toContain("T-99");
+
+      const journal = new TaskGraphChangeJournalStore({
+        baseDirectory: stateDirectory,
+      });
+      const entries = await journal.listForMission(missionIdentifier);
+      expect(entries.map((entry) => entry.changeKind)).toEqual([
+        "inject",
+        "revise",
+        "rewire",
+        "remove",
+      ]);
+
+      const goalState = JSON.parse(
+        await fs.readFile(
+          path.join(stateDirectory, "goal-mode", `${goalIdentifier}.json`),
+          "utf8",
+        ),
+      ) as { requiresReplanning: boolean; pauseReason: string | null };
+      expect(goalState.requiresReplanning).toBe(false);
+      expect(goalState.pauseReason).toBeNull();
+    } finally {
+      await application.shutdown();
+    }
+  });
+});
