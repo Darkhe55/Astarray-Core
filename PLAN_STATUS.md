@@ -4930,3 +4930,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 即图变更后**目标暂停并要求重新规划**（不自动重算 V）。
 > **验证**：调度器单测 13/13；全量 **471 files / 3643 tests**；typecheck/lint/build 绿。ADR-0191。
 > **未做**：自动重算 V、重规划后一键恢复、联动集成测试、fire-and-forget、无实质修订也暂停（保守）。
+
+> **207（R134）：图变更后自动重算 V（实现，联动未集成测试）**：绑定目标时先
+> `recomputeGoalPotential` 重算并落盘，再按 `shouldPauseForGraphChange` 判定——
+> **V 上升 ⇒ 暂停+需重规划**；不变/下降/null ⇒ 不暂停。取代 R133 的"任何图变更都暂停"。
+> **验证**：判定单测 3/3；全量 **471 files / 3646 tests**；typecheck/lint/build 绿。ADR-0192。
+> **未做**：运行时联动无集成测试、无真实演练、映射不随图变更清理、重算失败静默、无恢复流程。
