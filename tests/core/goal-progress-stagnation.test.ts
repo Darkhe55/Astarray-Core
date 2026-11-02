@@ -113,3 +113,21 @@ describe("每三组进展检查与停滞暂停", () => {
     ).toThrow();
   });
 });
+
+describe("调查组不计停滞（多组）", () => {
+  it("连续 12 个 investigation 组、V 不降 ⇒ 不暂停、计数保持 0", () => {
+    const gate = new GoalDispatchGate(buildContract());
+    let lastChecks = 0;
+    for (let index = 1; index <= 12; index += 1) {
+      const result = completeGroup(gate, index, 2, "investigation");
+      /** 到检查点时"检查执行但跳过计数"；非检查点不执行。 */
+      expect(result.didRunProgressCheck).toBe(index % 3 === 0);
+      expect(result.didPause).toBe(false);
+      lastChecks = result.checksSinceLastReduction;
+    }
+    expect(lastChecks).toBe(0);
+    /** 之后一个普通组检查仍从 0 开始（调查组不积累"未降"次数）。 */
+    const normalAfter = completeGroup(gate, 13, 2, "normal");
+    expect(normalAfter.didRunProgressCheck).toBe(false);
+  });
+});

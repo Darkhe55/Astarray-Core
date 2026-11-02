@@ -4997,3 +4997,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 目标 `goal-inv` 的 **lastTaskGroupKind="investigation"**（V=1、未暂停）。
 > 此前两次尝试因完成事件缺失触发重试 ⇒ **rework**（真实验证"返工优先于调查"）。
 > **未验证**：只读组免停滞的多组效果、混合读写组判定。ADR-0200。
+
+> **219（R146）：GOAL-02 剩余六项按序收口（完成）**：
+> ① 调查组免停滞补 12 组门禁级测试；② 混合读写判定由现有单测覆盖；③ 删除映射清理补**链路**测试；
+> ④ 在途重连拒绝已有专测；⑤ **真实 mission 四操作演练**（mission-97a98727：inject/revise/rewire/remove 全成功）；
+> ⑥ 恢复后自动继续：replan 后同一 mission 再注入被接受（语义确认 + 测试）。
+> **验证**：全量 **3659 tests 全通过**；typecheck/lint/build 绿。ADR-0201。
+> **未做**：真实 12 组全只读 mission（模型稳定性限制）、真实混合组、自动重放失败任务（明确不做）。
