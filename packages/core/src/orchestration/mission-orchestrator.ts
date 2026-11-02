@@ -793,6 +793,21 @@ export class MissionOrchestrator {
     }
     return result;
   }
+  /** R131：安全点重连依赖。 */
+  async rewireTaskDependencies(
+    taskId: string,
+    dependsOn: readonly string[],
+  ): Promise<{
+    readonly outcome: "rewired" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const result = await this.dagScheduler.rewireTaskDependencies(taskId, dependsOn);
+    if (result.outcome === "rewired") {
+      this.wake();
+    }
+    return result;
+  }
   async cancelTask(taskId: string): Promise<void> {
     await this.dagScheduler.cancelTask(taskId);
     this.wake();

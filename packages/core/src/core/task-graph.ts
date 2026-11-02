@@ -78,6 +78,56 @@ export class TaskGraph {
     }
     this.nodesById.delete(taskId);
   }
+  /**
+   * R131（2026-11-02）：**重连依赖**（只改某一个 pending/blocked 节点的 dependsOn）。
+   *
+   * 边界：
+   * - 只允许 `pending` 或 `blocked` 节点（运行中/终态拒绝）；
+   * - 新依赖必须已存在、不含自身、且重连后**仍无环**（失败回滚）；
+   * - 若节点原为 `blocked` 且新依赖全部 `done` ⇒ 自动放回 `pending`（可运行）。
+   */
+  rewireNodeDependencies(taskId: string, dependsOn: readonly string[]): void {
+    const node = this.nodesById.get(taskId);
+    if (node === undefined) {
+      throw new DomainError("invalid-task-chain", `任务不存在: ${taskId}`);
+    }
+    if (node.status !== "pending" && node.status !== "blocked") {
+      throw new DomainError(
+        "invalid-task-chain",
+        `只能重连 pending/blocked 任务: ${taskId}（当前 ${node.status}）`,
+      );
+    }
+    if (dependsOn.includes(taskId)) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `任务 ${taskId} 不能依赖自身。`,
+      );
+    }
+    for (const dependencyId of dependsOn) {
+      if (!this.nodesById.has(dependencyId)) {
+        throw new DomainError(
+          "invalid-task-chain",
+          `新依赖不存在: ${taskId} -> ${dependencyId}`,
+        );
+      }
+    }
+    const previousDependencies = [...node.dependsOn];
+    node.dependsOn = [...dependsOn];
+    try {
+      this.validateAcyclic();
+    } catch (error) {
+      node.dependsOn = previousDependencies;
+      throw error;
+    }
+    if (node.status === "blocked") {
+      const isReady = node.dependsOn.every(
+        (dependencyId) => this.nodesById.get(dependencyId)?.status === "done",
+      );
+      if (isReady) {
+        this.markPendingForRetry(taskId);
+      }
+    }
+  }
   getNode(taskId: string): TaskDependencyNode | undefined {
     return this.nodesById.get(taskId);
   }

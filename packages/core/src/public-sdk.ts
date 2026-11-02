@@ -5507,6 +5507,25 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    * R129：运行中修订 pending 任务（只改 description/toolNames；仅同进程）。
    */
   /**
+   * R131：安全点重连依赖（只改一个 pending/blocked 节点；仅同进程）。
+   */
+  rewireMissionTaskDependencies(
+    missionIdentifier: string,
+    taskIdentifier: string,
+    dependsOn: readonly string[],
+  ): Promise<{
+    readonly outcome: "rewired" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    this.assertOpen();
+    return this.runtime.rewireMissionTaskDependencies(
+      missionIdentifier,
+      taskIdentifier,
+      dependsOn,
+    );
+  }
+  /**
    * R130：安全点注入任务（只追加，不改已有依赖；仅同进程）。
    */
   injectMissionTask(

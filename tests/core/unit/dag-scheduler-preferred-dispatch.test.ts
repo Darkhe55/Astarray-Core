@@ -182,3 +182,43 @@ describe("安全点注入/删除（R130）", () => {
     expect(running.reasonCode).toBe("task-running");
   });
 });
+
+describe("安全点重连依赖（R131）", () => {
+  it("重连后下游可运行；环被拒且回滚；未知依赖被拒", async () => {
+    const scheduler = await createScheduler(
+      [makeNode("t1"), makeNode("t2", [], "done"), makeNode("t3", ["t1"])],
+      1,
+    );
+    /** 先制造环：t3 依赖 t1，若把 t1 改依赖 t3 会成环 ⇒ 拒绝且回滚。 */
+    const cycle = await scheduler.rewireTaskDependencies("t1", ["t3"]);
+    expect(cycle.outcome).toBe("refused");
+    const afterCycle = await taskStore.readTaskChain("mission-prefer");
+    expect(afterCycle?.tasks.find((task) => task.id === "t1")?.dependsOn).toEqual([]);
+
+    const rewired = await scheduler.rewireTaskDependencies("t3", ["t2"]);
+    expect(rewired.outcome).toBe("rewired");
+    const chain = await taskStore.readTaskChain("mission-prefer");
+    expect(chain?.tasks.find((task) => task.id === "t3")?.dependsOn).toEqual(["t2"]);
+
+    const unknown = await scheduler.rewireTaskDependencies("t3", ["t404"]);
+    expect(unknown.outcome).toBe("refused");
+  });
+
+  it("blocked 任务重连到已满足依赖 ⇒ 自动回到 pending", async () => {
+    const scheduler = await createScheduler(
+      [makeNode("t1", [], "done"), makeNode("t2", ["t1"], "blocked")],
+      1,
+    );
+    const rewired = await scheduler.rewireTaskDependencies("t2", ["t1"]);
+    expect(rewired.outcome).toBe("rewired");
+    const chain = await taskStore.readTaskChain("mission-prefer");
+    expect(chain?.tasks.find((task) => task.id === "t2")?.status).toBe("pending");
+  });
+
+  it("有在途任务时拒绝重连（not-safe-point）", async () => {
+    const scheduler = await createScheduler([makeNode("t1"), makeNode("t2")], 1);
+    await scheduler.scheduleRound();
+    const refused = await scheduler.rewireTaskDependencies("t2", ["t1"]);
+    expect(refused.reasonCode).toBe("not-safe-point");
+  });
+});
