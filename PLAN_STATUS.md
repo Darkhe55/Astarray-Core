@@ -4949,3 +4949,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 目标 `requiresReplanning=false / pauseReason=null / lastPotentialValue=1`（V 未上升 ⇒ 不暂停）。
 > **验证**：集成测试 1/1；全量 **471 files / 3649 tests**；typecheck/lint/build 绿。ADR-0194。
 > **未覆盖**：V 上升 ⇒ 暂停分支（安全图操作构造不出）、删除/修订/重连演练、暂停后恢复。
+
+> **210（R137）：V 上升 ⇒ 暂停分支的确定性验证（完成）**：在权限阻塞夹具里**预置陈旧 V=0**，
+> 注入触发重算 V=1 ⇒ 暂停 + `requiresReplanning` + `pauseReason` 含"V 上升"；另一用例证明
+> V 未上升时不暂停。**真实图操作构造不出该分支**（删除只能 pending、重连不改状态），属防御性路径。
+> **验证**：集成测试 2/2；全量 **471 files / 3650 tests**；typecheck/lint/build 绿。ADR-0195。
+> **未做**：业务路径 V 上升语义、删除/修订/重连各自的演练、暂停后恢复。
