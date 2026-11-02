@@ -131,6 +131,7 @@ import { ProjectWorkWindowStore } from "../orchestration/project-work-window-sto
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
 import { MissionTaskSequenceMapStore } from "../orchestration/mission-task-sequence-map-store.js";
+import { shouldPauseForGraphChange } from "../orchestration/goal-graph-change-decision.js";
 import { TaskGraphChangeJournalStore } from "../orchestration/task-graph-change-journal.js";
 import { PromptScanJournalStore } from "../orchestration/prompt-scan-journal-store.js";
 import { setPromptScanJournalSink } from "../orchestration/prompt-scan-journal.js";
@@ -3111,22 +3112,53 @@ export async function createApplicationRuntime(
         if (state === null) {
           return;
         }
-        const reason = `图变更（${event.changeKind} ${event.taskIdentifier}）需重新规划`;
-        goalGateCache
-          .resolve(missionIdentifier)
-          ?.pause(reason, [reason]);
+        /**
+         * R134（2026-11-02）：**图变更后自动重算 V**。
+         *
+         * 规则（保守）：
+         * - 先按当前映射/收据/裁决重算 V 并落盘（`recomputeGoalPotential`）；
+         * - V **上升**（有要求失去证据，例如被删/被重连掉）⇒ 暂停并要求重新规划；
+         * - V 不变或下降 ⇒ 不加新的暂停（不在无证据损失时打断用户）。
+         */
+        const previousPotentialValue = state.lastPotentialValue;
+        const recomputed = await recomputeGoalPotential({
+          goalIdentifier,
+          missionIdentifier,
+        }).catch(() => null);
+        const nextPotentialValue = recomputed?.potentialValue ?? null;
+        if (nextPotentialValue === null) {
+          return;
+        }
+        const pauseDecision = shouldPauseForGraphChange({
+          previousPotentialValue: state.lastPotentialValue,
+          nextPotentialValue,
+        });
+        if (!pauseDecision.shouldPause) {
+          return;
+        }
+        const reason =
+          `图变更（${event.changeKind} ${event.taskIdentifier}）导致 V 上升：` +
+          `${String(previousPotentialValue)} → ${String(nextPotentialValue)}，需重新规划`;
+        const latestState = await goalModeStateStore
+          .read(goalIdentifier)
+          .catch(() => null);
+        if (latestState === null) {
+          return;
+        }
+        goalGateCache.resolve(missionIdentifier)?.pause(reason, [reason]);
         await goalModeStateStore.write({
-          ...state,
-          documentRevision: state.documentRevision + 1,
+          ...latestState,
+          documentRevision: latestState.documentRevision + 1,
           requiresReplanning: true,
           pauseReason: reason,
-          evidenceGaps: [...state.evidenceGaps, reason],
+          evidenceGaps: [...latestState.evidenceGaps, reason],
           gateSnapshot: {
-            ...state.gateSnapshot,
+            ...latestState.gateSnapshot,
             requiresReplanning: true,
             isPaused: true,
             pauseReason: reason,
-            evidenceGaps: [...state.gateSnapshot.evidenceGaps, reason],
+            evidenceGaps: [...latestState.gateSnapshot.evidenceGaps, reason],
+            lastPotentialValue: nextPotentialValue,
           },
           updatedAtIso: new Date().toISOString(),
         });
