@@ -406,6 +406,11 @@ export interface ApplicationRuntime {
     readonly taskIdentifier: string;
     readonly note: string;
   }) => Promise<{ readonly reconciled: boolean; readonly previousStatus: string }>;
+  /** R138：暂停后恢复（重新规划确认；只清 requiresReplanning，不自动继续）。 */
+  replanGoal: (input: {
+    readonly goalIdentifier: string;
+    readonly note: string;
+  }) => Promise<{ readonly resumed: boolean; readonly reason: string | null }>;
   /** R108：在途组对账（操作者核对副作用后收口，不重放工具）。 */
   reconcileGoalTaskGroup: (input: {
     readonly goalIdentifier: string;
@@ -1611,6 +1616,59 @@ export async function createApplicationRuntime(
    * - **累计预算不重置**（保留 `consumedToolCalls`/`consumedCostUnits`）；
    * - V 依据作废（`requiresReplanning: true` + 证据缺口），因为旧证据绑定旧 revision。
    */
+  /**
+   * R138（2026-11-03）：**暂停后恢复（重新规划确认）**。
+   *
+   * 规则：
+   * - 只在 `requiresReplanning === true` 时接受（否则拒绝，不假装恢复）；
+   * - 必须给说明（记录到证据缺口，便于审计）；
+   * - 清 `requiresReplanning` / `pauseReason` / `isPaused`，并刷新门禁缓存；
+   * - **不**自动重算 V、**不**自动继续派发（由用户重新提交/宿主决定）。
+   */
+  const replanGoal = async (input: {
+    readonly goalIdentifier: string;
+    readonly note: string;
+  }): Promise<{ readonly resumed: boolean; readonly reason: string | null }> => {
+    if (input.note.trim() === "") {
+      throw new DomainError(
+        "invalid-task-chain",
+        "重新规划必须给出说明（note 不能为空）。",
+      );
+    }
+    const state = await goalModeStateStore
+      .read(input.goalIdentifier)
+      .catch(() => null);
+    if (state === null) {
+      throw new DomainError(
+        "mission-not-found",
+        `目标 ${input.goalIdentifier} 没有状态，无法恢复。`,
+      );
+    }
+    if (!state.requiresReplanning) {
+      return {
+        resumed: false,
+        reason: "目标不处于 requiresReplanning 状态：无需（也不能）以此入口恢复。",
+      };
+    }
+    const note = `重新规划：${input.note.trim()}`;
+    await goalModeStateStore.write({
+      ...state,
+      documentRevision: state.documentRevision + 1,
+      requiresReplanning: false,
+      pauseReason: null,
+      evidenceGaps: [...state.evidenceGaps, note],
+      gateSnapshot: {
+        ...state.gateSnapshot,
+        requiresReplanning: false,
+        isPaused: false,
+        pauseReason: null,
+        evidenceGaps: [...state.gateSnapshot.evidenceGaps, note],
+      },
+      updatedAtIso: new Date().toISOString(),
+    });
+    await refreshGoalGateCache();
+    return { resumed: true, reason: null };
+  };
   const updateGoalContract = async (input: {
     readonly contract: GoalContract;
     readonly proposer: GoalChangeProposer;
@@ -3162,7 +3220,7 @@ export async function createApplicationRuntime(
           },
           updatedAtIso: new Date().toISOString(),
         });
-      })();
+      })().catch(() => undefined);
     },    missionTaskSequenceMapStore,
     graphChangeJournal: taskGraphChangeJournal,
     taskLedgerDivergenceJournal,
@@ -3880,6 +3938,7 @@ export async function createApplicationRuntime(
     registerAgentIdentity,
     recomputeGoalPotential,
     reconcileGoalTaskGroup,
+    replanGoal,
     reconcileMissionTask,
     sendMissionInstruction,
     dispatchMissionTask,

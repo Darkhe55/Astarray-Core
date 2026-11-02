@@ -37,6 +37,7 @@ import {
   executeGoalModeViolationsCommand,
   executeGoalModeReconcileCommand,
   executeGoalModeReconcileTaskCommand,
+  executeGoalModeReplanCommand,
 } from "./cli/goal-mode-command.js";
 // R132（2026-11-02）：任务图变更审计的只读视图。
 import { executeGraphChangesCommand } from "./cli/graph-changes-command.js";
@@ -1302,6 +1303,21 @@ goalModeCommand
       goalIdentifier: options.goal,
       requirementIdentifier: options.requirement,
       taskNodeIdentifiers: options.tasks,
+    });
+  });
+
+goalModeCommand
+  .command("replan")
+  .description("暂停后恢复：清除 requiresReplanning（记录说明；不自动继续派发）")
+  .requiredOption("--goal <goal-id>", "目标标识")
+  .requiredOption("--note <text>", "重新规划说明")
+  .option("--json", "JSON 输出")
+  .action(async (options: { goal: string; note: string; json?: boolean }) => {
+    process.exitCode = await executeGoalModeReplanCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+      goalIdentifier: options.goal,
+      note: options.note,
     });
   });
 

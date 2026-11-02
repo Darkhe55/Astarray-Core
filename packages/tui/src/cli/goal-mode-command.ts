@@ -672,3 +672,39 @@ export async function executeGoalModeReconcileTaskCommand(
     await application.shutdown();
   }
 }
+
+/** R138（2026-11-03）：`goal-mode replan` —— 暂停后恢复（重新规划确认）。 */
+export interface GoalModeReplanCommandInput {
+  readonly stateDirectory: string;
+  readonly isJsonOutput: boolean;
+  readonly goalIdentifier: string;
+  readonly note: string;
+}
+
+export async function executeGoalModeReplanCommand(
+  input: GoalModeReplanCommandInput,
+): Promise<number> {
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory: input.stateDirectory,
+    mode: "assist",
+    runtime: "mock",
+  });
+  try {
+    const result = await application.replanGoal({
+      goalIdentifier: input.goalIdentifier,
+      note: input.note,
+    });
+    if (input.isJsonOutput) {
+      printJson({ status: result.resumed ? "goal-resumed" : "goal-not-replanning", ...result });
+    } else {
+      process.stdout.write(
+        result.resumed
+          ? `目标 ${input.goalIdentifier} 已恢复（需重新规划状态已清除；不会自动继续派发）\n`
+          : `目标 ${input.goalIdentifier} 未处于需重新规划状态：${result.reason ?? ""}\n`,
+      );
+    }
+    return result.resumed ? EXIT_CODES.SUCCESS : EXIT_CODES.FAILURE;
+  } finally {
+    await application.shutdown();
+  }
+}
