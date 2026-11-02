@@ -3140,6 +3140,7 @@ export class MainController {
   dispatchMissionTask(
     missionId: string,
     taskId: string,
+    options?: { readonly allowUnmetDependencies?: boolean },
   ): {
     readonly outcome: "accepted" | "refused";
     readonly reasonCode: string;
@@ -3154,7 +3155,10 @@ export class MainController {
       };
     }
     const scheduler = activeEntry.scheduler as {
-      dispatchTaskByTaskIdentifier?: (taskId: string) => {
+      dispatchTaskByTaskIdentifier?: (
+        taskId: string,
+        options?: { readonly allowUnmetDependencies?: boolean },
+      ) => {
         readonly outcome: "accepted" | "refused";
         readonly reasonCode: string;
         readonly reason: string;
@@ -3167,7 +3171,7 @@ export class MainController {
         reason: "当前调度器不支持按 taskId 派发。",
       };
     }
-    return scheduler.dispatchTaskByTaskIdentifier(taskId);
+    return scheduler.dispatchTaskByTaskIdentifier(taskId, options);
   }
   sendSchedulerInstruction(missionId: string, instructionText: string): void {
     const activeEntry = this.activeOrchestrators.get(missionId);

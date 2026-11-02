@@ -96,3 +96,31 @@ describe("按 taskId 优先派发", () => {
     expect(scheduler.preferTaskDispatch("t1").reasonCode).toBe("task-already-running");
   });
 });
+
+describe("显式乱序派发（allowUnmetDependencies）", () => {
+  it("请求乱序 ⇒ 依赖未完成也先启动该任务；依赖任务保持 pending", async () => {
+    const scheduler = await createScheduler(
+      [makeNode("t1"), makeNode("t2", ["t1"])],
+      1,
+    );
+    const decision = scheduler.preferTaskDispatch("t2", {
+      allowUnmetDependencies: true,
+    });
+    expect(decision.outcome).toBe("accepted");
+    expect(decision.reasonCode).toBe("forced-dispatch");
+    const round = await scheduler.scheduleRound();
+    const started = round.filter((action) => action.action === "start-task");
+    expect(started.map((action) => action.taskId)).toEqual(["t2"]);
+    const chain = await taskStore.readTaskChain("mission-prefer");
+    const t1 = chain?.tasks.find((task) => task.id === "t1");
+    expect(t1?.status).toBe("pending");
+  });
+
+  it("未请求乱序时仍拒绝依赖未完成", async () => {
+    const scheduler = await createScheduler(
+      [makeNode("t1"), makeNode("t2", ["t1"])],
+      1,
+    );
+    expect(scheduler.preferTaskDispatch("t2").reasonCode).toBe("dependencies-unmet");
+  });
+});
