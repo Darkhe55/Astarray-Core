@@ -4955,3 +4955,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > V 未上升时不暂停。**真实图操作构造不出该分支**（删除只能 pending、重连不改状态），属防御性路径。
 > **验证**：集成测试 2/2；全量 **471 files / 3650 tests**；typecheck/lint/build 绿。ADR-0195。
 > **未做**：业务路径 V 上升语义、删除/修订/重连各自的演练、暂停后恢复。
+
+> **211（R138）：暂停后恢复（replanGoal）（完成）**：只在 `requiresReplanning=true` 时接受，
+> 必须给说明；清 `requiresReplanning`/`pauseReason`/`isPaused` 并刷新门禁；**不自动重算 V、
+> 不自动继续**。CLI `goal-mode replan --goal --note`；真实夹具 `resumed=true`，重复调用 false（退出码 1）。
+> 顺带修复图变更联动的 unhandled rejection（IIFE 加 catch），全量恢复"0 Errors"。
+> **验证**：单测 2/2；全量 **3652 tests 全通过、无 Errors**；typecheck/lint/build 绿。ADR-0196。
+> **未做**：恢复后不自动继续、无结构化重规划产物、不与映射/证据失效联动、预算暂停不走此入口。

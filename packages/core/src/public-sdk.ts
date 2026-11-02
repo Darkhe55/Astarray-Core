@@ -5603,6 +5603,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.runtime.reconcileMissionTask(input);
   }
 
+  /**
+   * R138：暂停后恢复（重新规划确认）。
+   *
+   * 只清 `requiresReplanning`/暂停并记录说明；不自动重算 V、不自动继续。
+   */
+  replanGoal(input: {
+    readonly goalIdentifier: string;
+    readonly note: string;
+  }): Promise<{ readonly resumed: boolean; readonly reason: string | null }> {
+    this.assertOpen();
+    return this.runtime.replanGoal(input);
+  }
   /** R108：在途组对账（操作者核对副作用后收口，不重放工具）。 */
   reconcileGoalTaskGroup(input: {
     readonly goalIdentifier: string;
