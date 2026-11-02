@@ -4967,3 +4967,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 只删匹配 mission+task 的映射、保留 `"*"`；运行时在 `changeKind=remove` 时先清理再重算 V。
 > **验证**：单测 4/4；全量 **3653 tests 全通过、无 Errors**；typecheck/lint/build 绿。ADR-0197。
 > **未做**：清理 fire-and-forget、序列节点反向删除、完整链路联动测试、`"*"` 的整 mission 清理。
+
+> **213（R140）：状态总览更新（只读收口）**：新增 `docs/reports/STATE_OVERVIEW_2026-11-03.md`——
+> HEAD `022dd73a`、**3653 tests 无 Errors**、ADR 0145–0197、R101–R139 能力表、
+> 改图/联动/写回闭环、剩余项按性质分类、用户未提交文件清单（10 项，未暂存）。
+> 另提交一处测试守卫（missing mission id）。无产品代码改动。
