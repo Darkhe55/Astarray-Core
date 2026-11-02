@@ -343,7 +343,11 @@ export interface ApplicationRuntime {
     readonly sequenceRevisionAfter: number;
   }>;
   /** R126：按 taskId 优先派发（同进程；运行中的 mission）。 */
-  dispatchMissionTask: (missionIdentifier: string, taskIdentifier: string) => {
+  dispatchMissionTask: (
+    missionIdentifier: string,
+    taskIdentifier: string,
+    options?: { readonly allowUnmetDependencies?: boolean },
+  ) => {
     readonly outcome: "accepted" | "refused";
     readonly reasonCode: string;
     readonly reason: string;
@@ -2146,8 +2150,11 @@ export async function createApplicationRuntime(
    * （纯文本会被解析器拒绝，只升级"指令无法解析"）。
    */
   /** R126：按 taskId 优先派发（仅同进程）。 */
-  const dispatchMissionTask = (missionIdentifier: string, taskIdentifier: string) =>
-    controller.dispatchMissionTask(missionIdentifier, taskIdentifier);
+  const dispatchMissionTask = (
+    missionIdentifier: string,
+    taskIdentifier: string,
+    options?: { readonly allowUnmetDependencies?: boolean },
+  ) => controller.dispatchMissionTask(missionIdentifier, taskIdentifier, options);
 
   const sendMissionInstruction = (
     missionIdentifier: string,

@@ -5506,13 +5506,14 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   dispatchMissionTask(
     missionIdentifier: string,
     taskIdentifier: string,
+    options?: { readonly allowUnmetDependencies?: boolean },
   ): {
     readonly outcome: "accepted" | "refused";
     readonly reasonCode: string;
     readonly reason: string;
   } {
     this.assertOpen();
-    return this.runtime.dispatchMissionTask(missionIdentifier, taskIdentifier);
+    return this.runtime.dispatchMissionTask(missionIdentifier, taskIdentifier, options);
   }
   sendMissionInstruction(missionIdentifier: string, instructionText: string): void {
     this.assertOpen();

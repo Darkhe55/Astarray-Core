@@ -4891,3 +4891,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **200（R127）：状态总览更新（只读）**：`docs/reports/STATE_OVERVIEW_2026-11-01.md` 更新到
 > HEAD `b79906ac`、471 files / **3633 tests**、ADR 0145–0185、§B 六项现状、
 > 用户未提交文件清单（10 项，未暂存）。无代码改动。
+
+> **201（R128）：显式乱序派发（完成，默认仍拒绝）**：`preferTaskDispatch(taskId, {allowUnmetDependencies})`
+> ——只有显式请求才在依赖未完成时先启动；`forcedDispatchTaskIds` 在 `scheduleRound` 先跑（尊重并发）；
+> 编排器升级说明、控制器/门面透传；**运行中改图仍不支持**（ADR-0052）。
+> **验证**：调度器单测 5/5；全量 **471 files / 3635 tests**；typecheck/lint/build 绿。ADR-0186。
+> **未做**：运行中改图、二次确认/审批、真实乱序演练、下游语义建模。

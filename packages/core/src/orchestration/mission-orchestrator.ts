@@ -731,13 +731,19 @@ export class MissionOrchestrator {
    * - 不绕过依赖、不改图、不重复派发运行中任务；
    * - 接受后下一次调度轮次优先启动。
    */
-  dispatchTaskByTaskIdentifier(taskId: string): {
+  dispatchTaskByTaskIdentifier(
+    taskId: string,
+    options?: { readonly allowUnmetDependencies?: boolean },
+  ): {
     readonly outcome: "accepted" | "refused";
     readonly reasonCode: string;
     readonly reason: string;
   } {
-    const decision = this.dagScheduler.preferTaskDispatch(taskId);
+    const decision = this.dagScheduler.preferTaskDispatch(taskId, options);
     if (decision.outcome === "accepted") {
+      if (decision.reasonCode === "forced-dispatch") {
+        this.options.onUserEscalation(decision.reason);
+      }
       this.wake();
     }
     return decision;

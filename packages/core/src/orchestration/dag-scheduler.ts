@@ -32,6 +32,13 @@ export class DagScheduler {
    * 下一个调度轮次优先启动这些任务；启动后从集合移除。
    */
   private readonly preferredDispatchTaskIds = new Set<string>();
+  /**
+   * R128（2026-11-01）：**显式乱序派发**（用户确认"不等依赖"）。
+   *
+   * 只允许用户/宿主显式请求；启动不改变依赖边，只是让该任务先跑。
+   * 风险由调用方承担（任务可能在依赖产出尚未就绪时运行）。
+   */
+  private readonly forcedDispatchTaskIds = new Set<string>();
   private readonly graph: TaskGraph;
   private readonly concurrency: number;
   private readonly missionId: string;
@@ -73,15 +80,37 @@ export class DagScheduler {
     if (availableSlots <= 0) {
       return actions;
     }
-    const runnableTaskIds = this.graph
-      .findRunnableTaskIds()
-      .filter((taskId) => !this.claimedTaskIds.has(taskId))
-      .sort((left, right) => {
-        const leftPreferred = this.preferredDispatchTaskIds.has(left) ? 0 : 1;
-        const rightPreferred = this.preferredDispatchTaskIds.has(right) ? 0 : 1;
-        return leftPreferred - rightPreferred;
+    /** R128：显式乱序派发优先（即使依赖未完成）。 */
+    const forcedTaskIds = [...this.forcedDispatchTaskIds]
+      .filter((taskId) => {
+        const node = this.graph.getNode(taskId);
+        return (
+          node !== undefined &&
+          node.status === "pending" &&
+          !this.claimedTaskIds.has(taskId)
+        );
       })
       .slice(0, availableSlots);
+    for (const taskId of forcedTaskIds) {
+      this.forcedDispatchTaskIds.delete(taskId);
+      this.preferredDispatchTaskIds.delete(taskId);
+    }
+    const remainingSlots = availableSlots - forcedTaskIds.length;
+    const runnableTaskIds = [
+      ...forcedTaskIds,
+      ...this.graph
+        .findRunnableTaskIds()
+        .filter(
+          (taskId) =>
+            !this.claimedTaskIds.has(taskId) && !forcedTaskIds.includes(taskId),
+        )
+        .sort((left, right) => {
+          const leftPreferred = this.preferredDispatchTaskIds.has(left) ? 0 : 1;
+          const rightPreferred = this.preferredDispatchTaskIds.has(right) ? 0 : 1;
+          return leftPreferred - rightPreferred;
+        })
+        .slice(0, remainingSlots),
+    ];
     for (const taskId of runnableTaskIds) {
       const assignedAgentId = this.options.allocateAgentId(taskId);
       this.claimedTaskIds.add(taskId);
@@ -240,7 +269,10 @@ export class DagScheduler {
    * 真实约束（不静默放宽）：任务必须存在、处于 pending、且依赖全部 done；
    * 运行中/已领取的任务不能再"派发"一次。
    */
-  preferTaskDispatch(taskId: string): {
+  preferTaskDispatch(
+    taskId: string,
+    options?: { readonly allowUnmetDependencies?: boolean },
+  ): {
     readonly outcome: "accepted" | "refused";
     readonly reasonCode: string;
     readonly reason: string;
@@ -271,10 +303,18 @@ export class DagScheduler {
       (dependencyId) => this.graph.getNode(dependencyId)?.status !== "done",
     );
     if (unmetDependencies.length > 0) {
+      if (options?.allowUnmetDependencies === true) {
+        this.forcedDispatchTaskIds.add(taskId);
+        return {
+          outcome: "accepted",
+          reasonCode: "forced-dispatch",
+          reason: `任务 ${taskId} 的依赖未完成（${unmetDependencies.join(", ")}），已按显式请求乱序派发；风险由调用方承担。`,
+        };
+      }
       return {
         outcome: "refused",
         reasonCode: "dependencies-unmet",
-        reason: `任务 ${taskId} 的依赖未完成：${unmetDependencies.join(", ")}（不绕过依赖）。`,
+        reason: `任务 ${taskId} 的依赖未完成：${unmetDependencies.join(", ")}（未请求乱序派发）。`,
       };
     }
     this.preferredDispatchTaskIds.add(taskId);
