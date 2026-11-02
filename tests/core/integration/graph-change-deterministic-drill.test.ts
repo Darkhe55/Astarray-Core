@@ -1,15 +1,13 @@
 /**
- * R136（2026-11-03）：**确定性图变更演练**（不依赖真实模型）。
+ * R136/R137（2026-11-03）：**确定性图变更演练**（不依赖真实模型）。
  *
- * 场景：假 Provider 先请求写文件 ⇒ assist 默认权限触发"需要用户" ⇒ 任务被 blocked、
- * 在途领取被释放，mission 仍处于活动状态（等待裁决）。此时是**安全点**：
- * 注入新任务应被接受，且因为 V 未上升（mapped T-001 仍未完成）目标**不应被暂停**。
+ * 用"权限询问"制造稳定安全点：假 Provider 请求写工具 ⇒ assist 默认权限触发
+ * "需要用户" ⇒ 任务 blocked、在途领取释放，mission 仍活动（等待裁决）。
  *
- * 断言：
- * 1. 权限询问确实发生（任务进入 blocked）；
- * 2. 注入被接受，任务链含 T-99；
- * 3. 图变更审计落盘一条 inject；
- * 4. 目标状态：requiresReplanning=false、pauseReason=null、lastPotentialValue=1。
+ * 用例：
+ * 1. 正常状态（V=1）注入 ⇒ 接受、审计落盘、V 未上升 ⇒ **不暂停**；
+ * 2. 预置"陈旧 V=0"（模拟曾有证据）后注入 ⇒ 重算 V=1 ⇒ **暂停 + 需重新规划**
+ *    （覆盖 R134 的 V 上升分支；预置状态在测试目录内，不改产品代码）。
  */
 import http from "node:http";
 import { promises as fs } from "node:fs";
@@ -112,92 +110,101 @@ async function waitForTaskBlocked(
   return null;
 }
 
-describe("确定性图变更演练（R136）", () => {
-  it("权限阻塞期注入：接受、审计落盘、V 未上升 ⇒ 不暂停", async () => {
-    const endpoint = await startWriteAskServer();
-    const registry = new ProviderRuntimeRegistry({
-      protectedCredentialStore: {
-        doesReferenceExist: async () => true,
-        readCredential: async () => ({ baseUrl: endpoint, apiKey: "fake-key" }),
-      },
-    });
-    registry.register(createOpenAiCompatibleProviderRegistration());
-    const application = await AstarrayApplicationFacade.create({
-      stateDirectory,
-      mode: "assist",
-      runtime: "provider",
-      useFeedbackProcess: false,
-      providerRuntimeRegistry: registry,
-      provider: {
-        providerId: OPENAI_COMPATIBLE_PROVIDER_ID,
-        modelIdentifier: "fake-model",
-        allowedModelIdentifiers: ["fake-model"],
-        requiredCapabilities: ["streaming", "tool-calling"],
-        baseUrl: endpoint,
-        protectedCredentialReferenceId: "cred-1",
-        requestTimeoutMilliseconds: 5_000,
-      },
-      statusPollIntervalMilliseconds: 10,
-    });
-    try {
-      application.activateGoalMode({
-        isExplicitUserRequest: true,
-        isAuthenticatedUser: true,
-        isExplicitlyEnabled: true,
-        requestedBy: "user",
-      });
-      const goalIdentifier = "goal-graph-drill";
-      const proposal = await application.proposeGoalContract({
-        sourceRequestReference: "user-message:graph-drill",
-        draft: {
-          objectiveText: "图变更确定性演练",
-          requirements: [
-            {
-              requirementIdentifier: "req-1",
-              description: "创建文件完成",
-              weight: 1,
-              completionPredicateKind: "deterministic-check",
-            },
-          ],
-          scope: { projectIdentifiers: [], allowedToolNames: null },
-          nonViolableInvariants: [],
-          resourceLimits: {
-            maximumToolCalls: 10,
-            maximumWallClockSeconds: null,
-            maximumCostUnits: null,
-          },
-          deadlineIso: null,
-          pauseConditions: [],
+async function startBlockedMission(): Promise<{
+  readonly application: AstarrayApplicationFacade;
+  readonly missionIdentifier: string;
+  readonly goalIdentifier: string;
+}> {
+  const endpoint = await startWriteAskServer();
+  const registry = new ProviderRuntimeRegistry({
+    protectedCredentialStore: {
+      doesReferenceExist: async () => true,
+      readCredential: async () => ({ baseUrl: endpoint, apiKey: "fake-key" }),
+    },
+  });
+  registry.register(createOpenAiCompatibleProviderRegistration());
+  const application = await AstarrayApplicationFacade.create({
+    stateDirectory,
+    mode: "assist",
+    runtime: "provider",
+    useFeedbackProcess: false,
+    providerRuntimeRegistry: registry,
+    provider: {
+      providerId: OPENAI_COMPATIBLE_PROVIDER_ID,
+      modelIdentifier: "fake-model",
+      allowedModelIdentifiers: ["fake-model"],
+      requiredCapabilities: ["streaming", "tool-calling"],
+      baseUrl: endpoint,
+      protectedCredentialReferenceId: "cred-1",
+      requestTimeoutMilliseconds: 5_000,
+    },
+    statusPollIntervalMilliseconds: 10,
+  });
+  application.activateGoalMode({
+    isExplicitUserRequest: true,
+    isAuthenticatedUser: true,
+    isExplicitlyEnabled: true,
+    requestedBy: "user",
+  });
+  const goalIdentifier = "goal-graph-drill";
+  const proposal = await application.proposeGoalContract({
+    sourceRequestReference: "user-message:graph-drill",
+    draft: {
+      objectiveText: "图变更确定性演练",
+      requirements: [
+        {
+          requirementIdentifier: "req-1",
+          description: "创建文件完成",
+          weight: 1,
+          completionPredicateKind: "deterministic-check",
         },
-      });
-      await application.confirmGoalContract({
-        proposalIdentifier: proposal.proposalIdentifier,
-        goalIdentifier,
-        ownerIdentifier: "user-local",
-        activation: {
-          isExplicitUserRequest: true,
-          isAuthenticatedUser: true,
-          isExplicitlyEnabled: true,
-          requestedBy: "user",
-        },
-        isUserConfirmation: true,
-      });
-      await application.bindRequirementTaskMapping({
-        goalIdentifier,
-        requirementIdentifier: "req-1",
-        taskNodeIdentifiers: ["T-001"],
-      });
-      application.createSession({ sessionId: "graph-session", mode: "assist" });
-      const accepted = await application.submitTask({
-        sessionId: "graph-session",
-        taskIdentifier: "graph-task",
-        prompt: "创建文件 graph-drill.md。",
-        goalIdentifier,
-      });
-      const missionIdentifier = accepted.missionIdentifier;
-      const blockedTaskId = await waitForTaskBlocked(missionIdentifier, 20_000);
-      expect(blockedTaskId).toBe("T-001");
+      ],
+      scope: { projectIdentifiers: [], allowedToolNames: null },
+      nonViolableInvariants: [],
+      resourceLimits: {
+        maximumToolCalls: 50,
+        maximumWallClockSeconds: null,
+        maximumCostUnits: null,
+      },
+      deadlineIso: null,
+      pauseConditions: [],
+    },
+  });
+  await application.confirmGoalContract({
+    proposalIdentifier: proposal.proposalIdentifier,
+    goalIdentifier,
+    ownerIdentifier: "user-local",
+    activation: {
+      isExplicitUserRequest: true,
+      isAuthenticatedUser: true,
+      isExplicitlyEnabled: true,
+      requestedBy: "user",
+    },
+    isUserConfirmation: true,
+  });
+  await application.bindRequirementTaskMapping({
+    goalIdentifier,
+    requirementIdentifier: "req-1",
+    taskNodeIdentifiers: ["T-001"],
+  });
+  application.createSession({ sessionId: "graph-session", mode: "assist" });
+  const accepted = await application.submitTask({
+    sessionId: "graph-session",
+    taskIdentifier: "graph-task",
+    prompt: "创建文件 graph-drill.md。",
+    goalIdentifier,
+  });
+  const missionIdentifier = accepted.missionIdentifier;
+  const blockedTaskId = await waitForTaskBlocked(missionIdentifier, 20_000);
+  expect(blockedTaskId).toBe("T-001");
+  return { application, missionIdentifier, goalIdentifier };
+}
 
+describe("确定性图变更演练", () => {
+  it("V 未上升 ⇒ 注入接受、审计落盘、目标不暂停", async () => {
+    const { application, missionIdentifier, goalIdentifier } =
+      await startBlockedMission();
+    try {
       const injection = await application.injectMissionTask(missionIdentifier, {
         id: "T-99",
         description: "注入：读取 graph-drill.md",
@@ -219,7 +226,12 @@ describe("确定性图变更演练（R136）", () => {
         baseDirectory: stateDirectory,
       });
       const entries = await journal.listForMission(missionIdentifier);
-      expect(entries.some((entry) => entry.changeKind === "inject" && entry.taskIdentifier === "T-99")).toBe(true);
+      expect(
+        entries.some(
+          (entry) =>
+            entry.changeKind === "inject" && entry.taskIdentifier === "T-99",
+        ),
+      ).toBe(true);
 
       const goalState = JSON.parse(
         await fs.readFile(
@@ -234,6 +246,54 @@ describe("确定性图变更演练（R136）", () => {
       expect(goalState.requiresReplanning).toBe(false);
       expect(goalState.pauseReason).toBeNull();
       expect(goalState.lastPotentialValue).toBe(1);
+    } finally {
+      await application.shutdown();
+    }
+  });
+
+  it("预置陈旧 V=0 后注入 ⇒ 重算 V=1 上升 ⇒ 目标暂停并需重新规划", async () => {
+    const { application, missionIdentifier, goalIdentifier } =
+      await startBlockedMission();
+    try {
+      /** 预置"上次算过 V=0"（模拟曾有证据）；不改产品代码，只改测试状态目录。 */
+      const statePath = path.join(
+        stateDirectory,
+        "goal-mode",
+        `${goalIdentifier}.json`,
+      );
+      const seeded = JSON.parse(await fs.readFile(statePath, "utf8")) as Record<string, unknown> & {
+        gateSnapshot: Record<string, unknown>;
+      };
+      seeded.lastPotentialValue = 0;
+      seeded.gateSnapshot = {
+        ...seeded.gateSnapshot,
+        lastPotentialValue: 0,
+      };
+      await fs.writeFile(statePath, JSON.stringify(seeded, null, 2), "utf8");
+
+      const injection = await application.injectMissionTask(missionIdentifier, {
+        id: "T-99",
+        description: "注入：读取 graph-drill.md",
+        dependsOn: [],
+        taskType: "data",
+        toolNames: ["readFile"],
+      });
+      expect(injection.outcome).toBe("injected");
+
+      /** 联动是异步写入：轮询到暂停落盘（最多 3s）。 */
+      let goalState = JSON.parse(await fs.readFile(statePath, "utf8")) as {
+        requiresReplanning: boolean;
+        pauseReason: string | null;
+        lastPotentialValue: number;
+      };
+      const deadline = Date.now() + 3_000;
+      while (Date.now() < deadline && !goalState.requiresReplanning) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        goalState = JSON.parse(await fs.readFile(statePath, "utf8")) as typeof goalState;
+      }
+      expect(goalState.lastPotentialValue).toBe(1);
+      expect(goalState.requiresReplanning).toBe(true);
+      expect(goalState.pauseReason).toContain("V 上升");
     } finally {
       await application.shutdown();
     }
