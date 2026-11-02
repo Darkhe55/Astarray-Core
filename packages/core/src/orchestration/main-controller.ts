@@ -636,6 +636,25 @@ export interface MainControllerOptions {
    * 用于两套记账对照（`inspectTaskLedgerAlignment`），不改变任何状态。
    */
   taskSequenceStatusController?: TaskSequenceStatusController | null;
+  /** R132：图变更审计端口（可选；失败不阻断）。 */
+  graphChangeJournal?: {
+    append(entry: {
+      readonly missionIdentifier: string;
+      readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+      readonly taskIdentifier: string;
+      readonly recordedAtIso: string;
+      readonly before: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+      readonly after: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+    }): Promise<void>;
+  } | null;
   /** R124：任务映射存储（发布时自动登记整 mission 映射；可选）。 */
   missionTaskSequenceMapStore?: {
     bind(input: {
@@ -3587,6 +3606,9 @@ export class MainController {
       missionId,
       initialChain,
       taskStore: this.options.taskStore,
+      ...(this.options.graphChangeJournal == null
+        ? {}
+        : { graphChangeJournal: this.options.graphChangeJournal }),
       concurrency: this.options.concurrency,
       failureThreshold: this.options.failureThreshold,
       maxLoopIterations: this.options.maxLoopIterations,
@@ -3833,6 +3855,9 @@ export class MainController {
       missionId,
       initialChain,
       taskStore: this.options.taskStore,
+      ...(this.options.graphChangeJournal == null
+        ? {}
+        : { graphChangeJournal: this.options.graphChangeJournal }),
       concurrency: this.options.concurrency,
       failureThreshold: this.options.failureThreshold,
       maxLoopIterations: this.options.maxLoopIterations,

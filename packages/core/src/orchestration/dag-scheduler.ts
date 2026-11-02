@@ -21,6 +21,25 @@ export interface DagSchedulerOptions {
   taskStore: TaskStorePort;
   /** 为新领取的任务分配 Worker（Agent）实例 ID。 */
   allocateAgentId: (taskId: string) => string;
+  /** R132：图变更审计（可选；失败不阻断变更）。 */
+  graphChangeJournal?: {
+    append(entry: {
+      readonly missionIdentifier: string;
+      readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+      readonly taskIdentifier: string;
+      readonly recordedAtIso: string;
+      readonly before: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+      readonly after: {
+        readonly dependsOn: readonly string[];
+        readonly description: string;
+        readonly toolNames: readonly string[];
+      } | null;
+    }): Promise<void>;
+  };
 }
 
 export class DagScheduler {
@@ -290,6 +309,7 @@ export class DagScheduler {
         reason: "description 不能改成空字符串。",
       };
     }
+    const before = this.snapshotNode(taskId);
     if (patch.description !== undefined) {
       node.description = patch.description;
     }
@@ -297,6 +317,12 @@ export class DagScheduler {
       node.toolNames = [...patch.toolNames];
     }
     await this.persistChain();
+    this.recordGraphChange({
+      changeKind: "revise",
+      taskIdentifier: taskId,
+      before,
+      after: this.snapshotNode(taskId),
+    });
     return {
       outcome: "revised",
       reasonCode: "revised",
@@ -312,6 +338,12 @@ export class DagScheduler {
     }
     this.graph.addNode(node);
     await this.persistChain();
+    this.recordGraphChange({
+      changeKind: "inject",
+      taskIdentifier: node.id,
+      before: null,
+      after: this.snapshotNode(node.id),
+    });
   }
 
   /**
@@ -361,8 +393,15 @@ export class DagScheduler {
       };
     }
     try {
+      const before = this.snapshotNode(taskId);
       this.graph.removePendingLeafNode(taskId);
       await this.persistChain();
+      this.recordGraphChange({
+        changeKind: "remove",
+        taskIdentifier: taskId,
+        before,
+        after: null,
+      });
       return {
         outcome: "removed",
         reasonCode: "removed",
@@ -397,8 +436,15 @@ export class DagScheduler {
       };
     }
     try {
+      const before = this.snapshotNode(taskId);
       this.graph.rewireNodeDependencies(taskId, dependsOn);
       await this.persistChain();
+      this.recordGraphChange({
+        changeKind: "rewire",
+        taskIdentifier: taskId,
+        before,
+        after: this.snapshotNode(taskId),
+      });
       return {
         outcome: "rewired",
         reasonCode: "rewired",
@@ -414,6 +460,51 @@ export class DagScheduler {
   }
   isAtSafePointForInjection(): boolean {
     return this.claimedTaskIds.size === 0;
+  }
+
+  /** R132：记录图变更（失败忽略，不阻断业务）。 */
+  private recordGraphChange(entry: {
+    readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+    readonly taskIdentifier: string;
+    readonly before: {
+      readonly dependsOn: readonly string[];
+      readonly description: string;
+      readonly toolNames: readonly string[];
+    } | null;
+    readonly after: {
+      readonly dependsOn: readonly string[];
+      readonly description: string;
+      readonly toolNames: readonly string[];
+    } | null;
+  }): void {
+    const journal = this.options.graphChangeJournal;
+    if (journal === undefined) {
+      return;
+    }
+    void journal
+      .append({
+        missionIdentifier: this.missionId,
+        recordedAtIso: new Date().toISOString(),
+        ...entry,
+      })
+      .catch(() => undefined);
+  }
+
+  /** 取节点快照（审计用）。 */
+  private snapshotNode(taskId: string): {
+    readonly dependsOn: readonly string[];
+    readonly description: string;
+    readonly toolNames: readonly string[];
+  } | null {
+    const node = this.graph.getNode(taskId);
+    if (node === undefined) {
+      return null;
+    }
+    return {
+      dependsOn: [...node.dependsOn],
+      description: node.description,
+      toolNames: [...node.toolNames],
+    };
   }
 
   private async persistChain(): Promise<void> {

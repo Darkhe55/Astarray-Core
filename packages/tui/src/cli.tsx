@@ -38,6 +38,8 @@ import {
   executeGoalModeReconcileCommand,
   executeGoalModeReconcileTaskCommand,
 } from "./cli/goal-mode-command.js";
+// R132（2026-11-02）：任务图变更审计的只读视图。
+import { executeGraphChangesCommand } from "./cli/graph-changes-command.js";
 // R125（2026-11-01）：提示词扫描记录的只读视图（持久化）。
 import { executeScanRecordsCommand } from "./cli/scan-records-command.js";
 // HISTORY-01-03（2026-10-18）：本地运行历史的只读视图（list / show）。
@@ -1344,6 +1346,19 @@ goalModeCommand
       goalIdentifier: options.goal,
       taskGroupIdentifier: options.group,
       note: options.note,
+    });
+  });
+
+program
+  .command("graph-changes")
+  .description("只读查看 mission 的任务图变更审计（注入/删除/修订/重连）")
+  .requiredOption("--mission <mission-id>", "mission 标识")
+  .option("--json", "JSON 输出")
+  .action(async (options: { mission: string; json?: boolean }) => {
+    process.exitCode = await executeGraphChangesCommand({
+      stateDirectory: defaultStateDirectory(),
+      missionIdentifier: options.mission,
+      isJsonOutput: options.json === true,
     });
   });
 
