@@ -46,12 +46,38 @@ describe("resolveGoalTaskGroupKind", () => {
     expect(resolved).toBe("normal");
   });
 
-  it("默认策略永不产生 investigation（无返工信号时）", () => {
+  it("空任务组 ⇒ normal（不产生 investigation）", () => {
     const resolved = resolveGoalTaskGroupKind({
       taskIdentifiers: [],
       reworkedTaskIdentifiers: new Set<string>(),
     });
-    expect(resolved).not.toBe("investigation");
+    expect(resolved).toBe("normal");
+  });
+
+  it("R141：全部启动任务都是只读调查组 ⇒ investigation", () => {
+    const resolved = resolveGoalTaskGroupKind({
+      taskIdentifiers: ["task-1", "task-2"],
+      reworkedTaskIdentifiers: new Set<string>(),
+      investigationTaskIdentifiers: new Set<string>(["task-1", "task-2"]),
+    });
+    expect(resolved).toBe("investigation");
+  });
+
+  it("R141：调查组与返工同时命中 ⇒ rework 优先（返工语义更强）", () => {
+    const resolved = resolveGoalTaskGroupKind({
+      taskIdentifiers: ["task-1"],
+      reworkedTaskIdentifiers: new Set<string>(["task-1"]),
+      investigationTaskIdentifiers: new Set<string>(["task-1"]),
+    });
+    expect(resolved).toBe("rework");
+  });
+
+  it("R141：只有部分任务只读 ⇒ normal（不把写组伪装成调查）", () => {
+    const resolved = resolveGoalTaskGroupKind({
+      taskIdentifiers: ["task-1", "task-2"],
+      reworkedTaskIdentifiers: new Set<string>(),
+      investigationTaskIdentifiers: new Set<string>(["task-1"]),
+    });
     expect(resolved).toBe("normal");
   });
 
@@ -68,5 +94,24 @@ describe("resolveGoalTaskGroupKind", () => {
     });
     expect(received).toEqual(["task-1"]);
     expect(received).not.toBe(taskIdentifiers);
+  });
+});
+
+describe("调查组局部信号（R141）", () => {
+  it("只读工具判定与整组判定", async () => {
+    const { isReadOnlyToolName, isInvestigationTaskGroup } = await import(
+      "../../packages/core/src/orchestration/goal-investigation-signal.js"
+    );
+    expect(isReadOnlyToolName("readFile")).toBe(true);
+    expect(isReadOnlyToolName("searchProjectText")).toBe(true);
+    expect(isReadOnlyToolName("createProjectFile")).toBe(false);
+    expect(isReadOnlyToolName("unknown-tool")).toBe(false);
+    expect(
+      isInvestigationTaskGroup({ taskToolNames: [["readFile"], ["searchProjectText"]] }),
+    ).toBe(true);
+    expect(
+      isInvestigationTaskGroup({ taskToolNames: [["readFile", "createProjectFile"]] }),
+    ).toBe(false);
+    expect(isInvestigationTaskGroup({ taskToolNames: [[]] })).toBe(false);
   });
 });

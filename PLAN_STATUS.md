@@ -30,9 +30,9 @@
 >    （`DagScheduler.preferTaskDispatch` / 编排器 / 控制器 / 门面），拒绝依赖未完成/非 pending/已运行；
 >    **乱序派发、抢占、跨进程仍不支持**（ADR-0052/0185）。`requestDispatchByTaskIdentifier` 仍显式拒绝（序列→mission 方向）。
 > 2. **写回执行端**：提案不可应用（无审批/审计入口，ADR-0114）。
-> 3. **GOAL-02 `groupKind` 的 `investigation` 信号**：`rework` 已有默认策略（R61，ADR-0130：
->    retry/reassign/早停续跑 ⇒ `rework`），但**仓内仍无"调查组"的客观信号** ⇒ 默认策略永不产生
->    `investigation`；`unblock` 后重跑也不算返工。
+> 3. ~~**GOAL-02 `groupKind` 的 `investigation` 信号**~~（**R141 已实现，启发式**）：全组启动任务
+>    都声明只读工具（目录 `*.read`/`git.read`/`backup.list`/`task.read`）⇒ `investigation`；
+>    返工优先于调查；写组/混合组仍 `normal`（ADR-0198）。该定义属**本仓库选定**，未经产品正式确认。
 > 4. ~~**归档历史保留**~~（**R118 已闭合**）：溢出已归档（R63）、归档有上限+轮转+保留份数（R65，ADR-0134），
 >    且 `--include-archive` **已读轮转文件**（R118，ADR-0178：`.N→.1→主文件`）；剩余仅"保留窗口外仍会删除"（按设计）。
 > 5. ~~**组标识全局唯一**~~（**R64 已缓解**）：标识为 `goal-group-<UTC14>-<n>-<8 位随机令牌>`（ADR-0127），
@@ -4972,3 +4972,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > HEAD `022dd73a`、**3653 tests 无 Errors**、ADR 0145–0197、R101–R139 能力表、
 > 改图/联动/写回闭环、剩余项按性质分类、用户未提交文件清单（10 项，未暂存）。
 > 另提交一处测试守卫（missing mission id）。无产品代码改动。
+
+> **214（R141）：调查组本地信号（B3，启发式实现）**：定义"全组启动任务都声明只读工具
+> （目录 `*.read`/`git.read`/`backup.list`/`task.read`）⇒ investigation"，返工优先；新增
+> `goal-investigation-signal.ts`、`DagScheduler.getTaskToolNames`、编排器组开始计算并传参。
+> **语义影响**：调查组不计入停滞检查（长时间只读 mission 会更晚触发停滞暂停）。
+> **验证**：单测 10/10；全量 **3657 tests**（首轮负载超时，重跑 exit 0）；typecheck/lint/build 绿。ADR-0198。
+> **未做**：定义为仓库启发式（未产品确认）、只看声明不查实际调用、无真实全只读 mission 演练、自定义工具视为非只读。
