@@ -352,6 +352,16 @@ export interface ApplicationRuntime {
     readonly reasonCode: string;
     readonly reason: string;
   };
+  /** R129：运行中修订 pending 任务（只改 description/toolNames；仅同进程）。 */
+  reviseMissionTask: (
+    missionIdentifier: string,
+    taskIdentifier: string,
+    patch: { readonly description?: string; readonly toolNames?: readonly string[] },
+  ) => Promise<{
+    readonly outcome: "revised" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }>;
   /** R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。 */
   sendMissionInstruction: (missionIdentifier: string, instructionText: string) => void;
   /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
@@ -2150,6 +2160,13 @@ export async function createApplicationRuntime(
    * （纯文本会被解析器拒绝，只升级"指令无法解析"）。
    */
   /** R126：按 taskId 优先派发（仅同进程）。 */
+  /** R129：运行中修订 pending 任务（仅同进程）。 */
+  const reviseMissionTask = (
+    missionIdentifier: string,
+    taskIdentifier: string,
+    patch: { readonly description?: string; readonly toolNames?: readonly string[] },
+  ) => controller.reviseMissionTask(missionIdentifier, taskIdentifier, patch);
+
   const dispatchMissionTask = (
     missionIdentifier: string,
     taskIdentifier: string,
@@ -3734,6 +3751,7 @@ export async function createApplicationRuntime(
     reconcileMissionTask,
     sendMissionInstruction,
     dispatchMissionTask,
+    reviseMissionTask,
     applyTaskLedgerWriteBack,
     bindRequirementTaskMapping,
     deactivateGoal,

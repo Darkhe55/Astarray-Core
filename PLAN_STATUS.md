@@ -4897,3 +4897,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 编排器升级说明、控制器/门面透传；**运行中改图仍不支持**（ADR-0052）。
 > **验证**：调度器单测 5/5；全量 **471 files / 3635 tests**；typecheck/lint/build 绿。ADR-0186。
 > **未做**：运行中改图、二次确认/审批、真实乱序演练、下游语义建模。
+
+> **202（R129）：运行中修订 pending 任务（完成，只改内容）**：`DagScheduler.revisePendingTask`
+> （只允许 pending；只改 description/toolNames；revision+1 落盘），编排器/控制器/门面透传；
+> 跨进程 `mission-not-active`。**改依赖/删节点/替换图仍不支持**（ADR-0052）。
+> **验证**：单测 6/6；全量 **471 files / 3636 tests**；typecheck/lint/build 绿。ADR-0187。
+> **未做**：改依赖/删节点、修订历史、真实演练、修订后重算 V。

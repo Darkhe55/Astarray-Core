@@ -124,3 +124,25 @@ describe("显式乱序派发（allowUnmetDependencies）", () => {
     expect(scheduler.preferTaskDispatch("t2").reasonCode).toBe("dependencies-unmet");
   });
 });
+
+describe("运行中修订 pending 任务（R129）", () => {
+  it("修订 description/toolNames 并持久化；运行中任务被拒", async () => {
+    const scheduler = await createScheduler([makeNode("t1"), makeNode("t2")], 1);
+    const revised = await scheduler.revisePendingTask("t2", {
+      description: "新的任务描述",
+      toolNames: ["write"],
+    });
+    expect(revised.outcome).toBe("revised");
+    const chain = await taskStore.readTaskChain("mission-prefer");
+    const t2 = chain?.tasks.find((task) => task.id === "t2");
+    expect(t2?.description).toBe("新的任务描述");
+    expect(t2?.toolNames).toEqual(["write"]);
+
+    await scheduler.scheduleRound();
+    const refused = await scheduler.revisePendingTask("t1", {
+      description: "运行中改需求",
+    });
+    expect(refused.outcome).toBe("refused");
+    expect(refused.reasonCode).toBe("task-not-pending");
+  });
+});
