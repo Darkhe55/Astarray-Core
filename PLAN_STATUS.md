@@ -4924,3 +4924,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：调度器单测 12/12（注入/重连 before/after 正确）；真实 CLI 夹具 `count=1`；
 > 全量 **471 files / 3642 tests**；typecheck/lint/build 绿。ADR-0190。
 > **未做**：仅调度器内变更入账、无轮转/上限、无 actor、无过滤、真实演练未做。
+
+> **206（R133）：图变更 ⇒ 目标联动（完成）**：`DagScheduler.onGraphChanged` 在注入/删除/修订/重连后
+> 通知控制器；运行时查目标绑定并 `pause` + 落盘 `requiresReplanning/pauseReason/evidenceGaps/gateSnapshot`。
+> 即图变更后**目标暂停并要求重新规划**（不自动重算 V）。
+> **验证**：调度器单测 13/13；全量 **471 files / 3643 tests**；typecheck/lint/build 绿。ADR-0191。
+> **未做**：自动重算 V、重规划后一键恢复、联动集成测试、fire-and-forget、无实质修订也暂停（保守）。
