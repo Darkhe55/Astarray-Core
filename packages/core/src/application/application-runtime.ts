@@ -3098,7 +3098,40 @@ export async function createApplicationRuntime(
     /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
     taskSequenceStatusController: sequenceStatusController,
     /** R124：发布时自动登记整 mission 映射。 */
-    missionTaskSequenceMapStore,
+    /** R133：图变更 ⇒ 目标联动（标记需重新规划 + 暂停 + 落盘）。 */
+    onMissionGraphChanged: (missionIdentifier, event) => {
+      void (async () => {
+        const goalIdentifier = await goalMissionBindingStore
+          .readGoalIdentifier(missionIdentifier)
+          .catch(() => null);
+        if (goalIdentifier === null) {
+          return;
+        }
+        const state = await goalModeStateStore.read(goalIdentifier).catch(() => null);
+        if (state === null) {
+          return;
+        }
+        const reason = `图变更（${event.changeKind} ${event.taskIdentifier}）需重新规划`;
+        goalGateCache
+          .resolve(missionIdentifier)
+          ?.pause(reason, [reason]);
+        await goalModeStateStore.write({
+          ...state,
+          documentRevision: state.documentRevision + 1,
+          requiresReplanning: true,
+          pauseReason: reason,
+          evidenceGaps: [...state.evidenceGaps, reason],
+          gateSnapshot: {
+            ...state.gateSnapshot,
+            requiresReplanning: true,
+            isPaused: true,
+            pauseReason: reason,
+            evidenceGaps: [...state.gateSnapshot.evidenceGaps, reason],
+          },
+          updatedAtIso: new Date().toISOString(),
+        });
+      })();
+    },    missionTaskSequenceMapStore,
     graphChangeJournal: taskGraphChangeJournal,
     taskLedgerDivergenceJournal,
     /** R21：mission↔序列 持久索引（控制器写入；CLI 读取）。 */

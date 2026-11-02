@@ -636,6 +636,14 @@ export interface MainControllerOptions {
    * 用于两套记账对照（`inspectTaskLedgerAlignment`），不改变任何状态。
    */
   taskSequenceStatusController?: TaskSequenceStatusController | null;
+  /** R133：图变更通知（可选；用于目标联动：标记需重新规划并暂停）。 */
+  onMissionGraphChanged?: (
+    missionId: string,
+    event: {
+      readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+      readonly taskIdentifier: string;
+    },
+  ) => void;
   /** R132：图变更审计端口（可选；失败不阻断）。 */
   graphChangeJournal?: {
     append(entry: {
@@ -3609,6 +3617,16 @@ export class MainController {
       ...(this.options.graphChangeJournal == null
         ? {}
         : { graphChangeJournal: this.options.graphChangeJournal }),
+      ...(this.options.onMissionGraphChanged === undefined
+        ? {}
+        : {
+            onGraphChanged: (event: {
+              readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+              readonly taskIdentifier: string;
+            }) => {
+              this.options.onMissionGraphChanged?.(missionId, event);
+            },
+          }),
       concurrency: this.options.concurrency,
       failureThreshold: this.options.failureThreshold,
       maxLoopIterations: this.options.maxLoopIterations,
@@ -3858,6 +3876,16 @@ export class MainController {
       ...(this.options.graphChangeJournal == null
         ? {}
         : { graphChangeJournal: this.options.graphChangeJournal }),
+      ...(this.options.onMissionGraphChanged === undefined
+        ? {}
+        : {
+            onGraphChanged: (event: {
+              readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+              readonly taskIdentifier: string;
+            }) => {
+              this.options.onMissionGraphChanged?.(missionId, event);
+            },
+          }),
       concurrency: this.options.concurrency,
       failureThreshold: this.options.failureThreshold,
       maxLoopIterations: this.options.maxLoopIterations,

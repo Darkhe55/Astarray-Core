@@ -21,6 +21,11 @@ export interface DagSchedulerOptions {
   taskStore: TaskStorePort;
   /** 为新领取的任务分配 Worker（Agent）实例 ID。 */
   allocateAgentId: (taskId: string) => string;
+  /** R133：图变更通知（可选；失败不阻断）。 */
+  onGraphChanged?: (event: {
+    readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+    readonly taskIdentifier: string;
+  }) => void;
   /** R132：图变更审计（可选；失败不阻断变更）。 */
   graphChangeJournal?: {
     append(entry: {
@@ -477,6 +482,14 @@ export class DagScheduler {
       readonly toolNames: readonly string[];
     } | null;
   }): void {
+    try {
+      this.options.onGraphChanged?.({
+        changeKind: entry.changeKind,
+        taskIdentifier: entry.taskIdentifier,
+      });
+    } catch {
+      // 通知失败不阻断图变更
+    }
     const journal = this.options.graphChangeJournal;
     if (journal === undefined) {
       return;

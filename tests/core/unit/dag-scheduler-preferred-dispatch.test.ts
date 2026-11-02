@@ -67,6 +67,10 @@ async function createScheduler(
       } | null;
     }): Promise<void>;
   },
+  onGraphChanged?: (event: {
+    readonly changeKind: "inject" | "remove" | "revise" | "rewire";
+    readonly taskIdentifier: string;
+  }) => void,
 ): Promise<DagScheduler> {
   const chain: TaskChainDocument = {
     schemaVersion: 1,
@@ -84,6 +88,7 @@ async function createScheduler(
       return `L3-${agentIdSequence}`;
     },
     ...(graphChangeJournal === undefined ? {} : { graphChangeJournal }),
+    ...(onGraphChanged === undefined ? {} : { onGraphChanged }),
   });
 }
 
@@ -265,5 +270,22 @@ describe("图变更审计（R132）", () => {
     expect(entries[1]?.before?.dependsOn).toEqual([]);
     expect(entries[1]?.after?.dependsOn).toEqual(["t1"]);
     expect(entries[1]?.missionIdentifier).toBe("mission-prefer");
+  });
+});
+
+describe("图变更通知（R133）", () => {
+  it("注入/重连各触发一次通知", async () => {
+    const events: string[] = [];
+    const scheduler = await createScheduler(
+      [makeNode("t1")],
+      1,
+      undefined,
+      (event) => {
+        events.push(`${event.changeKind}:${event.taskIdentifier}`);
+      },
+    );
+    await scheduler.injectTaskChecked(makeNode("t9"));
+    await scheduler.rewireTaskDependencies("t9", ["t1"]);
+    expect(events).toEqual(["inject:t9", "rewire:t9"]);
   });
 });
