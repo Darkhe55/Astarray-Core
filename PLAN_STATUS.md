@@ -4903,3 +4903,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 跨进程 `mission-not-active`。**改依赖/删节点/替换图仍不支持**（ADR-0052）。
 > **验证**：单测 6/6；全量 **471 files / 3636 tests**；typecheck/lint/build 绿。ADR-0187。
 > **未做**：改依赖/删节点、修订历史、真实演练、修订后重算 V。
+
+> **203（R130）：运行中改图（安全点注入 + 删除叶子）**：新增
+> `injectMissionTask`（安全点、id 唯一、依赖须存在、落盘 revision+1）与
+> `removeMissionTask`（仅 pending 且无依赖者的叶子；被依赖/运行中拒绝）；控制器/门面透传，
+> 仅同进程运行中的 mission。**改依赖/删中间节点/换图仍不支持**（ADR-0052）。
+> **验证**：调度器单测 8/8；全量 **471 files / 3638 tests**；typecheck/lint/build 绿。ADR-0188。
+> **未做**：依赖重连、注入后重规划/重算 V、删除历史、真实演练。

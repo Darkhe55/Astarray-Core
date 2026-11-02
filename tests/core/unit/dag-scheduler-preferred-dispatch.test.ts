@@ -146,3 +146,39 @@ describe("运行中修订 pending 任务（R129）", () => {
     expect(refused.reasonCode).toBe("task-not-pending");
   });
 });
+
+describe("安全点注入/删除（R130）", () => {
+  it("安全点注入新任务并落盘；重复 ID 被拒；有在途任务时拒绝", async () => {
+    const scheduler = await createScheduler([makeNode("t1")], 1);
+    const injected = await scheduler.injectTaskChecked(makeNode("t9"));
+    expect(injected.outcome).toBe("injected");
+    const chain = await taskStore.readTaskChain("mission-prefer");
+    expect(chain?.tasks.map((task) => task.id)).toContain("t9");
+
+    const duplicate = await scheduler.injectTaskChecked(makeNode("t9"));
+    expect(duplicate.outcome).toBe("refused");
+
+    await scheduler.scheduleRound();
+    const notSafe = await scheduler.injectTaskChecked(makeNode("t10"));
+    expect(notSafe.reasonCode).toBe("not-safe-point");
+  });
+
+  it("删除 pending 叶子成功；被依赖或运行中的任务被拒", async () => {
+    const scheduler = await createScheduler(
+      [makeNode("t1"), makeNode("t2", ["t1"]), makeNode("t3")],
+      1,
+    );
+    const removed = await scheduler.removePendingTask("t3");
+    expect(removed.outcome).toBe("removed");
+    const chain = await taskStore.readTaskChain("mission-prefer");
+    expect(chain?.tasks.map((task) => task.id)).not.toContain("t3");
+
+    const dependent = await scheduler.removePendingTask("t1");
+    expect(dependent.outcome).toBe("refused");
+
+    await scheduler.scheduleRound();
+    const running = await scheduler.removePendingTask("t1");
+    expect(running.outcome).toBe("refused");
+    expect(running.reasonCode).toBe("task-running");
+  });
+});

@@ -768,6 +768,31 @@ export class MissionOrchestrator {
     }
     return result;
   }
+  /** R130：安全点注入任务（只追加，不改已有依赖）。 */
+  async injectTaskBySpec(node: Parameters<DagScheduler["injectTaskChecked"]>[0]): Promise<{
+    readonly outcome: "injected" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const result = await this.dagScheduler.injectTaskChecked(node);
+    if (result.outcome === "injected") {
+      this.wake();
+    }
+    return result;
+  }
+
+  /** R130：安全点删除 pending 叶子任务。 */
+  async removeTaskByTaskIdentifier(taskId: string): Promise<{
+    readonly outcome: "removed" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const result = await this.dagScheduler.removePendingTask(taskId);
+    if (result.outcome === "removed") {
+      this.wake();
+    }
+    return result;
+  }
   async cancelTask(taskId: string): Promise<void> {
     await this.dagScheduler.cancelTask(taskId);
     this.wake();

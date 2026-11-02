@@ -3218,6 +3218,99 @@ export class MainController {
     }
     return scheduler.reviseTaskByTaskIdentifier(taskId, patch);
   }
+  /**
+   * R130（2026-11-02）：**安全点注入任务**（仅同进程、运行中的 mission）。
+   */
+  async injectMissionTask(
+    missionId: string,
+    node: {
+      readonly id: string;
+      readonly description: string;
+      readonly dependsOn: readonly string[];
+      readonly taskType: string;
+      readonly toolNames: readonly string[];
+    },
+  ): Promise<{
+    readonly outcome: "injected" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const activeEntry = this.activeOrchestrators.get(missionId);
+    if (activeEntry === undefined) {
+      return {
+        outcome: "refused",
+        reasonCode: "mission-not-active",
+        reason: `mission ${missionId} 不在本进程运行：无法注入任务。`,
+      };
+    }
+    const scheduler = activeEntry.scheduler as unknown as {
+      injectTaskBySpec?: (node: {
+        readonly id: string;
+        readonly description: string;
+        readonly dependsOn: readonly string[];
+        readonly taskType: string;
+        readonly toolNames: readonly string[];
+        readonly assignedAgentId: string | null;
+        readonly status: "pending";
+        readonly resultLocation: string | null;
+      }) => Promise<{
+        readonly outcome: "injected" | "refused";
+        readonly reasonCode: string;
+        readonly reason: string;
+      }>;
+    };
+    if (typeof scheduler.injectTaskBySpec !== "function") {
+      return {
+        outcome: "refused",
+        reasonCode: "unsupported",
+        reason: "当前调度器不支持安全点注入。",
+      };
+    }
+    return scheduler.injectTaskBySpec({
+      ...node,
+      dependsOn: [...node.dependsOn],
+      toolNames: [...node.toolNames],
+      assignedAgentId: null,
+      status: "pending",
+      resultLocation: null,
+    });
+  }
+
+  /**
+   * R130（2026-11-02）：**安全点删除 pending 叶子任务**（仅同进程、运行中的 mission）。
+   */
+  async removeMissionTask(
+    missionId: string,
+    taskId: string,
+  ): Promise<{
+    readonly outcome: "removed" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const activeEntry = this.activeOrchestrators.get(missionId);
+    if (activeEntry === undefined) {
+      return {
+        outcome: "refused",
+        reasonCode: "mission-not-active",
+        reason: `mission ${missionId} 不在本进程运行：无法删除任务。`,
+      };
+    }
+    const scheduler = activeEntry.scheduler as {
+      removeTaskByTaskIdentifier?: (taskId: string) => Promise<{
+        readonly outcome: "removed" | "refused";
+        readonly reasonCode: string;
+        readonly reason: string;
+      }>;
+    };
+    if (typeof scheduler.removeTaskByTaskIdentifier !== "function") {
+      return {
+        outcome: "refused",
+        reasonCode: "unsupported",
+        reason: "当前调度器不支持安全点删除。",
+      };
+    }
+    return scheduler.removeTaskByTaskIdentifier(taskId);
+  }
   sendSchedulerInstruction(missionId: string, instructionText: string): void {
     const activeEntry = this.activeOrchestrators.get(missionId);
     const schedulerWithInstruction = activeEntry?.scheduler as

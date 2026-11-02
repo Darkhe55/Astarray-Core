@@ -314,6 +314,68 @@ export class DagScheduler {
     await this.persistChain();
   }
 
+  /**
+   * R130（2026-11-02）：**安全点注入（判定式）**——把异常转成明确拒绝。
+   */
+  async injectTaskChecked(node: TaskDependencyNode): Promise<{
+    readonly outcome: "injected" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    if (this.claimedTaskIds.size > 0) {
+      return {
+        outcome: "refused",
+        reasonCode: "not-safe-point",
+        reason: "有在途任务：当前不是安全点，不能注入（应推迟到下一组）。",
+      };
+    }
+    try {
+      await this.injectTask(node);
+      return {
+        outcome: "injected",
+        reasonCode: "injected",
+        reason: `任务 ${node.id} 已注入（下一次调度可运行）。`,
+      };
+    } catch (error) {
+      return {
+        outcome: "refused",
+        reasonCode: "invalid-task-chain",
+        reason: (error as Error).message,
+      };
+    }
+  }
+
+  /**
+   * R130（2026-11-02）：**安全点删除 pending 叶子任务**（判定式）。
+   */
+  async removePendingTask(taskId: string): Promise<{
+    readonly outcome: "removed" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    if (this.claimedTaskIds.has(taskId)) {
+      return {
+        outcome: "refused",
+        reasonCode: "task-running",
+        reason: `任务 ${taskId} 已被领取/运行：拒绝删除。`,
+      };
+    }
+    try {
+      this.graph.removePendingLeafNode(taskId);
+      await this.persistChain();
+      return {
+        outcome: "removed",
+        reasonCode: "removed",
+        reason: `任务 ${taskId} 已从任务链删除（仅 pending 叶子节点）。`,
+      };
+    } catch (error) {
+      return {
+        outcome: "refused",
+        reasonCode: "invalid-task-chain",
+        reason: (error as Error).message,
+      };
+    }
+  }
   isAtSafePointForInjection(): boolean {
     return this.claimedTaskIds.size === 0;
   }
