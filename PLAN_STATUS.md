@@ -4943,3 +4943,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：真实 store 测试 2/2（注入落盘、坏行跳过）；全量 **471 files / 3648 tests**；
 > typecheck/lint/build 绿。ADR-0193。
 > **未做**：真实 mission 的"图变更→V→目标暂停"端到端（模型波动拿不到注入窗口）、联动独立测试。
+
+> **209（R136）：确定性图变更演练（完成）**：假 Provider 写工具 ⇒ 权限询问 ⇒ 任务 blocked
+> 且领取释放（安全点）⇒ 注入 T-99 被接受；断言任务链、`inject:T-99` 审计、
+> 目标 `requiresReplanning=false / pauseReason=null / lastPotentialValue=1`（V 未上升 ⇒ 不暂停）。
+> **验证**：集成测试 1/1；全量 **471 files / 3649 tests**；typecheck/lint/build 绿。ADR-0194。
+> **未覆盖**：V 上升 ⇒ 暂停分支（安全图操作构造不出）、删除/修订/重连演练、暂停后恢复。
