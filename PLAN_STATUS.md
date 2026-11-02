@@ -4991,3 +4991,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 演练改为依赖被阻塞任务以保持 pending。
 > **验证**：集成测试 3/3；全量 **3658 tests**；typecheck/lint/build 绿。ADR-0199。
 > **未做**：删除被映射任务的清理联动、有在途任务重连的专测、真实 mission 演练、investigation 真实组演练。
+
+> **218（R145）：investigation 全只读 mission 真实演练（完成）**：真实 provider + `--model-planning`，
+> 只读 prompt ⇒ `mission-ed128999` 单任务 `toolNames=["readFile"]`，
+> 目标 `goal-inv` 的 **lastTaskGroupKind="investigation"**（V=1、未暂停）。
+> 此前两次尝试因完成事件缺失触发重试 ⇒ **rework**（真实验证"返工优先于调查"）。
+> **未验证**：只读组免停滞的多组效果、混合读写组判定。ADR-0200。
