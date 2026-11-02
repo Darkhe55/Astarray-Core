@@ -3311,6 +3311,43 @@ export class MainController {
     }
     return scheduler.removeTaskByTaskIdentifier(taskId);
   }
+  /** R131（2026-11-02）：安全点重连依赖（仅同进程、运行中的 mission）。 */
+  async rewireMissionTaskDependencies(
+    missionId: string,
+    taskId: string,
+    dependsOn: readonly string[],
+  ): Promise<{
+    readonly outcome: "rewired" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const activeEntry = this.activeOrchestrators.get(missionId);
+    if (activeEntry === undefined) {
+      return {
+        outcome: "refused",
+        reasonCode: "mission-not-active",
+        reason: `mission ${missionId} 不在本进程运行：无法重连依赖。`,
+      };
+    }
+    const scheduler = activeEntry.scheduler as unknown as {
+      rewireTaskDependencies?: (
+        taskId: string,
+        dependsOn: readonly string[],
+      ) => Promise<{
+        readonly outcome: "rewired" | "refused";
+        readonly reasonCode: string;
+        readonly reason: string;
+      }>;
+    };
+    if (typeof scheduler.rewireTaskDependencies !== "function") {
+      return {
+        outcome: "refused",
+        reasonCode: "unsupported",
+        reason: "当前调度器不支持重连依赖。",
+      };
+    }
+    return scheduler.rewireTaskDependencies(taskId, dependsOn);
+  }
   sendSchedulerInstruction(missionId: string, instructionText: string): void {
     const activeEntry = this.activeOrchestrators.get(missionId);
     const schedulerWithInstruction = activeEntry?.scheduler as

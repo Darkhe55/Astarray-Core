@@ -376,6 +376,42 @@ export class DagScheduler {
       };
     }
   }
+  /**
+   * R131（2026-11-02）：**安全点重连依赖**（判定式）。
+   *
+   * 只允许在无在途任务时执行；失败回滚并给出原因。
+   */
+  async rewireTaskDependencies(
+    taskId: string,
+    dependsOn: readonly string[],
+  ): Promise<{
+    readonly outcome: "rewired" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    if (this.claimedTaskIds.size > 0) {
+      return {
+        outcome: "refused",
+        reasonCode: "not-safe-point",
+        reason: "有在途任务：当前不是安全点，不能重连依赖。",
+      };
+    }
+    try {
+      this.graph.rewireNodeDependencies(taskId, dependsOn);
+      await this.persistChain();
+      return {
+        outcome: "rewired",
+        reasonCode: "rewired",
+        reason: `任务 ${taskId} 的依赖已重连为 [${dependsOn.join(", ")}]。`,
+      };
+    } catch (error) {
+      return {
+        outcome: "refused",
+        reasonCode: "invalid-task-chain",
+        reason: (error as Error).message,
+      };
+    }
+  }
   isAtSafePointForInjection(): boolean {
     return this.claimedTaskIds.size === 0;
   }

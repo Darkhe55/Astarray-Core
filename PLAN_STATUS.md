@@ -4910,3 +4910,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 仅同进程运行中的 mission。**改依赖/删中间节点/换图仍不支持**（ADR-0052）。
 > **验证**：调度器单测 8/8；全量 **471 files / 3638 tests**；typecheck/lint/build 绿。ADR-0188。
 > **未做**：依赖重连、注入后重规划/重算 V、删除历史、真实演练。
+
+> **204（R131）：安全点重连依赖（完成，ADR-0052 核心的一半）**：`rewireTaskDependencies(taskId, dependsOn)`
+> ——安全点内、只允许 pending/blocked、新依赖须存在、**重连后校验无环且失败回滚**、
+> blocked 且依赖已满足 ⇒ 自动 pending、revision+1 落盘；控制器/门面 `rewireMissionTaskDependencies`。
+> **验证**：调度器单测 11/11（环回滚、重连落盘、未知依赖、blocked 自动 pending、在途拒绝）；
+> 全量 **471 files / 3641 tests**；typecheck/lint/build 绿。ADR-0189。
+> **仍未支持**：运行中重连、批量/换图/回滚、目标模式联动、图变更历史、真实演练。

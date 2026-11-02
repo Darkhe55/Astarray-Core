@@ -362,6 +362,16 @@ export interface ApplicationRuntime {
     readonly reasonCode: string;
     readonly reason: string;
   }>;
+  /** R131：安全点重连依赖（仅同进程）。 */
+  rewireMissionTaskDependencies: (
+    missionIdentifier: string,
+    taskIdentifier: string,
+    dependsOn: readonly string[],
+  ) => Promise<{
+    readonly outcome: "rewired" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }>;
   /** R130：安全点注入任务（只追加，不改已有依赖；仅同进程）。 */
   injectMissionTask: (
     missionIdentifier: string,
@@ -2200,6 +2210,18 @@ export async function createApplicationRuntime(
   const removeMissionTask = (missionIdentifier: string, taskIdentifier: string) =>
     controller.removeMissionTask(missionIdentifier, taskIdentifier);
 
+  /** R131：安全点重连依赖（仅同进程）。 */
+  const rewireMissionTaskDependencies = (
+    missionIdentifier: string,
+    taskIdentifier: string,
+    dependsOn: readonly string[],
+  ) =>
+    controller.rewireMissionTaskDependencies(
+      missionIdentifier,
+      taskIdentifier,
+      dependsOn,
+    );
+
   const reviseMissionTask = (
     missionIdentifier: string,
     taskIdentifier: string,
@@ -3791,6 +3813,7 @@ export async function createApplicationRuntime(
     sendMissionInstruction,
     dispatchMissionTask,
     reviseMissionTask,
+    rewireMissionTaskDependencies,
     injectMissionTask,
     removeMissionTask,
     applyTaskLedgerWriteBack,
