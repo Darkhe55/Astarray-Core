@@ -3173,6 +3173,51 @@ export class MainController {
     }
     return scheduler.dispatchTaskByTaskIdentifier(taskId, options);
   }
+  /**
+   * R129（2026-11-02）：**运行中修订 pending 任务**（仅同进程、运行中的 mission）。
+   */
+  async reviseMissionTask(
+    missionId: string,
+    taskId: string,
+    patch: {
+      readonly description?: string;
+      readonly toolNames?: readonly string[];
+    },
+  ): Promise<{
+    readonly outcome: "revised" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const activeEntry = this.activeOrchestrators.get(missionId);
+    if (activeEntry === undefined) {
+      return {
+        outcome: "refused",
+        reasonCode: "mission-not-active",
+        reason: `mission ${missionId} 不在本进程运行：无法修订任务（跨进程由租约隔离）。`,
+      };
+    }
+    const scheduler = activeEntry.scheduler as {
+      reviseTaskByTaskIdentifier?: (
+        taskId: string,
+        patch: {
+          readonly description?: string;
+          readonly toolNames?: readonly string[];
+        },
+      ) => Promise<{
+        readonly outcome: "revised" | "refused";
+        readonly reasonCode: string;
+        readonly reason: string;
+      }>;
+    };
+    if (typeof scheduler.reviseTaskByTaskIdentifier !== "function") {
+      return {
+        outcome: "refused",
+        reasonCode: "unsupported",
+        reason: "当前调度器不支持修订任务。",
+      };
+    }
+    return scheduler.reviseTaskByTaskIdentifier(taskId, patch);
+  }
   sendSchedulerInstruction(missionId: string, instructionText: string): void {
     const activeEntry = this.activeOrchestrators.get(missionId);
     const schedulerWithInstruction = activeEntry?.scheduler as

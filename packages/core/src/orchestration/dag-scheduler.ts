@@ -235,6 +235,74 @@ export class DagScheduler {
    * 追加到内存图 → 原子写回任务链（revision +1）。
    * 依赖必须已存在；重复 ID 直接拒绝。
    */
+  /**
+   * R129（2026-11-02）：**运行中修订 pending 任务的描述/工具**（安全点、只改内容）。
+   *
+   * 边界（刻意保守）：
+   * - 只允许 `pending` 任务：运行中/终态任务不能"改需求"；
+   * - 只改 `description` / `toolNames`（不改 id、依赖、状态、图结构）；
+   * - 必须有在途任务=0 之外的任何时刻都可以（内容修改不影响正在跑的任务，
+   *   但为了让模型下一轮读到一致内容，仍要求任务尚未启动）。
+   */
+  async revisePendingTask(
+    taskId: string,
+    patch: {
+      readonly description?: string;
+      readonly toolNames?: readonly string[];
+    },
+  ): Promise<{
+    readonly outcome: "revised" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const node = this.graph.getNode(taskId);
+    if (node === undefined) {
+      return {
+        outcome: "refused",
+        reasonCode: "task-not-found",
+        reason: `任务 ${taskId} 不在任务链中。`,
+      };
+    }
+    if (node.status !== "pending") {
+      return {
+        outcome: "refused",
+        reasonCode: "task-not-pending",
+        reason: `任务 ${taskId} 当前状态为 ${node.status}：只能修订 pending 任务。`,
+      };
+    }
+    if (
+      patch.description === undefined &&
+      patch.toolNames === undefined
+    ) {
+      return {
+        outcome: "refused",
+        reasonCode: "empty-patch",
+        reason: "没有需要修订的字段（description/toolNames 至少给一个）。",
+      };
+    }
+    if (
+      patch.description !== undefined &&
+      patch.description.trim() === ""
+    ) {
+      return {
+        outcome: "refused",
+        reasonCode: "invalid-patch",
+        reason: "description 不能改成空字符串。",
+      };
+    }
+    if (patch.description !== undefined) {
+      node.description = patch.description;
+    }
+    if (patch.toolNames !== undefined) {
+      node.toolNames = [...patch.toolNames];
+    }
+    await this.persistChain();
+    return {
+      outcome: "revised",
+      reasonCode: "revised",
+      reason: `任务 ${taskId} 已修订（下一次派发使用新内容）。`,
+    };
+  }
   async injectTask(node: TaskDependencyNode): Promise<void> {
     if (this.claimedTaskIds.size > 0) {
       throw new DomainError(

@@ -748,6 +748,26 @@ export class MissionOrchestrator {
     }
     return decision;
   }
+  /**
+   * R129（2026-11-02）：**运行中修订 pending 任务**（只改 description/toolNames）。
+   */
+  async reviseTaskByTaskIdentifier(
+    taskId: string,
+    patch: {
+      readonly description?: string;
+      readonly toolNames?: readonly string[];
+    },
+  ): Promise<{
+    readonly outcome: "revised" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    const result = await this.dagScheduler.revisePendingTask(taskId, patch);
+    if (result.outcome === "revised") {
+      this.wake();
+    }
+    return result;
+  }
   async cancelTask(taskId: string): Promise<void> {
     await this.dagScheduler.cancelTask(taskId);
     this.wake();

@@ -5503,6 +5503,25 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *
    * 只调整可运行任务之间的顺序，不绕过依赖；拒绝时返回具体原因。
    */
+  /**
+   * R129：运行中修订 pending 任务（只改 description/toolNames；仅同进程）。
+   */
+  reviseMissionTask(
+    missionIdentifier: string,
+    taskIdentifier: string,
+    patch: { readonly description?: string; readonly toolNames?: readonly string[] },
+  ): Promise<{
+    readonly outcome: "revised" | "refused";
+    readonly reasonCode: string;
+    readonly reason: string;
+  }> {
+    this.assertOpen();
+    return this.runtime.reviseMissionTask(
+      missionIdentifier,
+      taskIdentifier,
+      patch,
+    );
+  }
   dispatchMissionTask(
     missionIdentifier: string,
     taskIdentifier: string,
