@@ -25,6 +25,7 @@ import {
 } from "../../../packages/core/src/runtime/openai-compatible-provider-registration.js";
 import { ProviderRuntimeRegistry } from "../../../packages/core/src/runtime/provider-runtime-registry.js";
 import { TaskGraphChangeJournalStore } from "../../../packages/core/src/orchestration/task-graph-change-journal.js";
+import { MissionTaskSequenceMapStore } from "../../../packages/core/src/orchestration/mission-task-sequence-map-store.js";
 
 let stateDirectory: string;
 let server: http.Server | null = null;
@@ -277,7 +278,7 @@ describe("确定性图变更演练", () => {
       const injection = await application.injectMissionTask(missionIdentifier, {
         id: "T-99",
         description: "注入：读取 graph-drill.md",
-        dependsOn: [],
+        dependsOn: ["T-001"],
         taskType: "data",
         toolNames: ["readFile"],
       });
@@ -297,6 +298,21 @@ describe("确定性图变更演练", () => {
       expect(goalState.lastPotentialValue).toBe(1);
       expect(goalState.requiresReplanning).toBe(true);
       expect(goalState.pauseReason).toContain("V 上升");
+
+      /** 恢复后自动继续：replan 清停顿后，同一 mission 的派发控制面应立即可用（无需重建 mission）。 */
+      const resumed = await application.replanGoal({
+        goalIdentifier,
+        note: "演练：确认 V 上升原因后继续",
+      });
+      expect(resumed.resumed).toBe(true);
+      const afterReplan = await application.injectMissionTask(missionIdentifier, {
+        id: "T-98",
+        description: "恢复后继续：只读检查",
+        dependsOn: ["T-001"],
+        taskType: "data",
+        toolNames: ["readFile"],
+      });
+      expect(afterReplan.outcome, JSON.stringify(afterReplan)).toBe("injected");
     } finally {
       await application.shutdown();
     }
@@ -331,8 +347,34 @@ describe("确定性图变更演练：修订/重连/删除", () => {
       );
       expect(rewired.outcome, JSON.stringify(rewired)).toBe("rewired");
 
+      /** 先登记一条映射，删除任务后应被清理（链路，而非仅存储单测）。 */
+      const mapStore = new MissionTaskSequenceMapStore({
+        baseDirectory: stateDirectory,
+      });
+      await mapStore.bind({
+        missionIdentifier,
+        sequenceIdentifier: "sequence-drill",
+        ownerAgentInstanceIdentifier: "scheduler:drill",
+        missionTaskIdentifier: "T-99",
+        sequenceTaskIdentifier: "node-99",
+      });
+
       const removed = await application.removeMissionTask(missionIdentifier, "T-99");
       expect(removed.outcome).toBe("removed");
+
+      const mapDeadline = Date.now() + 3_000;
+      let remainingMappings = await mapStore.listForMission({
+        missionIdentifier,
+        sequenceIdentifier: "sequence-drill",
+      });
+      while (Date.now() < mapDeadline && remainingMappings.length > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        remainingMappings = await mapStore.listForMission({
+          missionIdentifier,
+          sequenceIdentifier: "sequence-drill",
+        });
+      }
+      expect(remainingMappings).toEqual([]);
 
       const chain = JSON.parse(
         await fs.readFile(
