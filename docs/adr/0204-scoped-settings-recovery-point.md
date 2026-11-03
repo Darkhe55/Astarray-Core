@@ -34,3 +34,13 @@ typecheck / lint / build → 全绿
 - "恢复继承"（删除覆盖字段而非写 0）未做；
 - 权限覆盖的**放宽预览/确认闭环**（GUI-04-01）未做；
 - 真实"备份后可恢复到旧值"的读取/回滚入口未做（只有历史文件）。
+
+## 5. 追加：恢复继承（2026-11-03）
+
+- `updateContext` 的预算值 `-1` 表示**恢复继承**：删除 `context` 字段（不再写 0）；
+  其它负值仍拒绝。
+- `updatePermission` 的 `permissionProfileId === null` 表示**恢复继承**：删除 `permission` 字段
+  （不再写 null）；条目为空时连标识一起移除。
+- 两种清除都走 `expectedRevision` CAS 与覆盖前 recovery point。
+
+验证：存储测试 8/8（新增清除与 -2 拒绝）；全量 3676 tests。

@@ -5026,3 +5026,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 备份失败抛 `scoped-settings-backup-failed` 并拒绝覆盖）。`.bak` 仍为"最新健康副本"，语义分开。
 > **验证**：存储测试 6/6（含备份失败拒绝）；全量 **3674 tests**；typecheck/lint/build 绿。ADR-0204。
 > **未做**：跨进程写锁、恢复继承、放宽预览/确认（GUI-04-01）、历史回滚入口。
+
+> **224（GUI-04-02 第二步）：恢复继承改为删除覆盖字段（完成）**：上下文预算 `-1` ⇒ 删除 `context`；
+> 权限 `null` ⇒ 删除 `permission`；空条目移除；仍走 CAS 与覆盖前 recovery point。
+> **验证**：存储测试 8/8；全量 **3676 tests**；typecheck/lint/build 绿。ADR-0204 §5。
+> **未做**：跨进程写锁、放宽预览/确认（GUI-04-01）、历史回滚入口。

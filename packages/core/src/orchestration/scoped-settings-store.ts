@@ -146,9 +146,12 @@ export class ScopedSettingsStore {
     }
     if (
       !Number.isInteger(input.configuredMaximumGlobalContextTokenCount) ||
-      input.configuredMaximumGlobalContextTokenCount < 0
+      input.configuredMaximumGlobalContextTokenCount < -1
     ) {
-      throw new DomainError("invalid-task-chain", "上下文预算必须为非负整数。");
+      throw new DomainError(
+        "invalid-task-chain",
+        "上下文预算必须为非负整数，或 -1 表示恢复继承。",
+      );
     }
     return this.storeLock.runExclusive(async () => {
       const current = await this.read();
@@ -163,21 +166,29 @@ export class ScopedSettingsStore {
       }
       const bucket = input.scope === "project" ? current.projects : current.sessions;
       const previous = bucket[input.identifier] ?? {};
+      /** GUI-04-02：`-1` 表示恢复继承 ⇒ 删除 context 字段（不是写 0）。 */
+      const isClear = input.configuredMaximumGlobalContextTokenCount === -1;
+      const nextEntry = { ...previous };
+      if (isClear) {
+        delete (nextEntry as { context?: unknown }).context;
+      } else {
+        (nextEntry as { context?: unknown }).context = {
+          configuredMaximumGlobalContextTokenCount:
+            input.configuredMaximumGlobalContextTokenCount,
+          updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
+          updatedByUserId: input.updatedByUserId,
+        };
+      }
+      const nextBucket = { ...bucket };
+      if (Object.keys(nextEntry).length === 0) {
+        delete nextBucket[input.identifier];
+      } else {
+        nextBucket[input.identifier] = nextEntry;
+      }
       const next: ScopedSettingsDocument = {
         ...current,
         revision: current.revision + 1,
-        [input.scope === "project" ? "projects" : "sessions"]: {
-          ...bucket,
-          [input.identifier]: {
-            ...previous,
-            context: {
-              configuredMaximumGlobalContextTokenCount:
-                input.configuredMaximumGlobalContextTokenCount,
-              updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
-              updatedByUserId: input.updatedByUserId,
-            },
-          },
-        },
+        [input.scope === "project" ? "projects" : "sessions"]: nextBucket,
       };
       await this.captureRecoveryPoint(current, "update");
       await writeAtomicJson(this.filePath, next);
@@ -210,20 +221,27 @@ export class ScopedSettingsStore {
       }
       const bucket = input.scope === "project" ? current.projects : current.sessions;
       const previous = bucket[input.identifier] ?? {};
+      /** GUI-04-02：`null` 表示恢复继承 ⇒ 删除 permission 字段（不是写 null）。 */
+      const nextEntry = { ...previous };
+      if (input.permissionProfileId === null) {
+        delete (nextEntry as { permission?: unknown }).permission;
+      } else {
+        (nextEntry as { permission?: unknown }).permission = {
+          permissionProfileId: input.permissionProfileId,
+          updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
+          updatedByUserId: input.updatedByUserId,
+        };
+      }
+      const nextBucket = { ...bucket };
+      if (Object.keys(nextEntry).length === 0) {
+        delete nextBucket[input.identifier];
+      } else {
+        nextBucket[input.identifier] = nextEntry;
+      }
       const next: ScopedSettingsDocument = {
         ...current,
         revision: current.revision + 1,
-        [input.scope === "project" ? "projects" : "sessions"]: {
-          ...bucket,
-          [input.identifier]: {
-            ...previous,
-            permission: {
-              permissionProfileId: input.permissionProfileId,
-              updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
-              updatedByUserId: input.updatedByUserId,
-            },
-          },
-        },
+        [input.scope === "project" ? "projects" : "sessions"]: nextBucket,
       };
       await this.captureRecoveryPoint(current, "update");
       await writeAtomicJson(this.filePath, next);
