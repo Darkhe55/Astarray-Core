@@ -66,6 +66,10 @@ export type DomainErrorCode =
   | "stale-revision"
   /** GUI-04-02：覆盖前旧版本备份失败（拒绝覆盖，不写半截）。 */
   | "scoped-settings-backup-failed"
+  /** GUI-04-01：权限放宽预览（缺失/过期/参数不符）。 */
+  | "permission-preview-not-found"
+  | "permission-preview-expired"
+  | "permission-preview-stale"
   | "journal-corrupted"
   | "operation-not-idempotent"
   | "tool-execution-failed"
