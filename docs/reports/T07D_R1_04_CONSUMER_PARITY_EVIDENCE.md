@@ -15,7 +15,7 @@
 |---|---|
 | `packages/core/src/public-sdk.ts` | 新增 `PublicApplicationService`（`Pick<MainController, ...>`：任务状态/模式/权限组控制面）与 `PublicMissionState`；facade 实现该端口并全部委托同一控制器；新增 `queryMission(missionIdentifier)`；`PublicApplicationOptions.streamOutput` 供 headless 流式输出 |
 | `私有 TUI 包（已迁出）/app.tsx` | 控制器参数类型由内部 `MainController` 改为公共 `PublicApplicationService`（TUI 不再依赖内部类型） |
-| `packages/tui/src/cli/tui.tsx` | TUI 以 `AstarrayApplicationFacade` 承载运行时（装配仍由 `createApplicationRuntime` 完成），退出/信号统一走 `application.shutdown()` |
+| `私有 TUI 入口（已迁出）` | TUI 以 `AstarrayApplicationFacade` 承载运行时（装配仍由 `createApplicationRuntime` 完成），退出/信号统一走 `application.shutdown()` |
 | `packages/tui/src/cli/run-command.ts` | headless `run` 改用公共应用服务：`create → createSession → submitTask → queryTask`，输出与退出码契约不变 |
 | `scripts/sdk-consumer-scenario.mjs`、`scripts/verify-sdk-consumer.mjs` | 新增仓库内 tarball 消费者行为验证（安装后提交/查询/取消/关闭 + 产物断言）；`package.json` 新增 `verify:sdk-consumer` |
 | `tests/tui/unit/cli-sdk-parity.test.ts` | 新增：CLI `run` 与 SDK `queryMission` 对同一 mission 的状态一致，并断言 `task-chain.json` 含 `T-001` 与 `done` |
