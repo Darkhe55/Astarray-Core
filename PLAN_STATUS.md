@@ -5108,3 +5108,6 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **235（第 50 轮复验，2026-11-03）**：两仓库同时全绿——
 > 私有库 `npm run check` → 101 files / 681 tests；公开库全量串行 → **502 files / 3699 tests**，
 > typecheck/lint 通过（本轮未出现既有 drill 抖动）。无新增未推送提交。
+
+> **236（第 54 轮复验，2026-11-04）**：私有库 `npm run check` → 101 files / 681 tests；
+> 公开库全量串行 → **502 files / 3699 tests**；typecheck/lint 通过。两仓库无未推送提交。
