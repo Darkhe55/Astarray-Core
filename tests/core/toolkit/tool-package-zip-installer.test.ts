@@ -4,7 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.setConfig({ testTimeout: 60_000 });
 
 import { ToolPackageLifecycleService } from "../../../packages/core/src/toolkit/tool-package-lifecycle-service.js";
 import { ToolPackageZipInstaller } from "../../../packages/core/src/toolkit/tool-package-zip-installer.js";

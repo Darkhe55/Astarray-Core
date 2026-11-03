@@ -5111,3 +5111,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 
 > **236（第 54 轮复验，2026-11-04）**：外部仓库 `npm run check` → 101 files / 681 tests；
 > 公开库全量串行 → **502 files / 3699 tests**；typecheck/lint 通过。两仓库无未推送提交。
+
+> **237（全量门禁修复，2026-11-04）**：`npm run check`（全量 598 files）此前**并非全绿**：
+> ① 破坏性文件 API 静态守卫把 8 个模块判为违规（本轮新增的 scoped-settings/work-window 锁，
+> 以及 6 个历史模块）；② 子进程超时守卫指出 `tool-package-zip-installer.test.ts` 未设 testTimeout。
+> 修复：为 8 个模块补最小令牌 + 理由白名单；zip 安装测试补 `testTimeout: 60_000`。
+> **验证**：`npm run check:low-parallel` → **598 files / 4192 tests 通过**，typecheck/lint/build 绿。
