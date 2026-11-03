@@ -10,8 +10,8 @@
 | --- | --- |
 | `packages/core/src/application/application-runtime.ts` | 暴露 `globalContextBudgetStore`、`contextRuntimeEventStore`、`mainAgentInstanceId`（原本仅内部局部变量），使 CLI/GUI/SDK 共用同一权威预算存储与真实装配事件流 |
 | `packages/core/src/public-sdk.ts` | 新增公开 DTO `PublicContextSettings`/`PublicRecoveryMissionView`/`PublicRecoveryOverview`；公开事件新增 `budget-policy-updated`（带 revision/幂等 ID）；新增 `queryContextSettings`、`updateContextBudget`（CAS + 域错误码映射）、`queryRecoveryOverview`、`inspectRecoveryMission`（懒建真实 `RecoveryCenterController`，DTO 丢弃 `leaseProcessInstanceId`） |
-| `UI 包（已迁出）/src/server/gui-server.ts` | 端口扩展 `GuiApplicationPort`（`queryContextSettings`/`updateContextBudget`/`getCurrentPermissionProfileReference`/`listPermissionProfiles`/`switchPermissionProfile`/`queryRecoveryOverview`/`inspectRecoveryMission`，可选能力缺失时 501）；新增 `GET /settings`、`GET /recovery`、`POST /commands/set-context-budget`、`POST /commands/switch-permission-profile`；页面新增设置与恢复中心面板（预算表单、权限组切换、恢复列表） |
-| `UI 测试（已迁出）/integration/gui-settings-recovery.test.ts`（新，5 用例） | 真实门面联测：预算→下一请求生效、409/400/403 反例、权限组跨界面一致、恢复只读与字段过滤、能力缺失 501 |
+| `UI 包/src/server/gui-server.ts` | 端口扩展 `GuiApplicationPort`（`queryContextSettings`/`updateContextBudget`/`getCurrentPermissionProfileReference`/`listPermissionProfiles`/`switchPermissionProfile`/`queryRecoveryOverview`/`inspectRecoveryMission`，可选能力缺失时 501）；新增 `GET /settings`、`GET /recovery`、`POST /commands/set-context-budget`、`POST /commands/switch-permission-profile`；页面新增设置与恢复中心面板（预算表单、权限组切换、恢复列表） |
+| `UI 测试/integration/gui-settings-recovery.test.ts`（新，5 用例） | 真实门面联测：预算→下一请求生效、409/400/403 反例、权限组跨界面一致、恢复只读与字段过滤、能力缺失 501 |
 
 无新依赖；GUI 仍只消费公共应用服务与其 DTO，未复制预算、权限或恢复状态机；未把状态目录、租约进程标识或凭据引用暴露给前端。
 
@@ -41,7 +41,7 @@
 | --- | --- |
 | `npx tsc --noEmit` | 0 |
 | `npx eslint .` | 0 |
-| `npx vitest run UI 测试（已迁出）` | 0；**28 passed**（5 文件，新增 5 用例） |
+| `npx vitest run UI 测试` | 0；**28 passed**（5 文件，新增 5 用例） |
 | 关联回归 `public-sdk`/`application-sdk-*`/`cli-sdk-parity`/`context-*` | 0；20 passed（6 文件） |
 | `npm run check` / `npm run test:coverage` | **未完成（不得视为通过）**：受限沙箱下 `tsup`（esbuild 服务）与 forks 池需管道子进程，报 `spawn EPERM`；升级 `danger-full-access` 重试 4 次均在审批通道等待 600s 超时、命令未实际执行。下一阶段带审批重跑，并连带补跑累积的 tarball 回归 |
 

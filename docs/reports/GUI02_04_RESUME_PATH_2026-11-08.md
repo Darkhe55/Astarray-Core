@@ -56,7 +56,7 @@ isReauthorizationSatisfied: (missionView.requiredReauthorizationTypes ?? []).len
 
 ## 5. 反例 5 条（先红后绿）
 
-`UI 测试（已迁出）/integration/gui02-04-recovery-resume-gate.test.ts`
+`UI 测试/integration/gui02-04-recovery-resume-gate.test.ts`
 
 | # | 反例 | 结果 |
 | --- | --- | --- |

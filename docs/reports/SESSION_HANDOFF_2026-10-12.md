@@ -104,8 +104,8 @@
 - `tests/core/integration/gui02-01-permission-ask-event-publish.test.ts`（4 条，实现前 **4 红**）
 - `tests/tui/integration/gui02-01-cli-permission-ask-registration.test.ts`（2 条，**假 Provider + spawn CLI**）
 - `tests/core/integration/gui02-02-permission-ask-adjudication-safety.test.ts`（8 条，实现前全红）
-- `UI 测试（已迁出）/integration/gui02-02-permission-ask-routes.test.ts`（7 条，**验证性**，如实标注）
-- `UI 测试（已迁出）/integration/gui02-02-permission-ask-ui-constraints.test.ts`（6 条）
+- `UI 测试/integration/gui02-02-permission-ask-routes.test.ts`（7 条，**验证性**，如实标注）
+- `UI 测试/integration/gui02-02-permission-ask-ui-constraints.test.ts`（6 条）
 - `tests/core/integration/gui02-permission-ask-boundary-coverage.test.ts`（6 条）
 
 ## 2. 未完成项（**请勿当作已完成**）

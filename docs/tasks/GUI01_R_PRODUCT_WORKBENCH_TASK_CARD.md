@@ -76,20 +76,20 @@
 - 人工/外部依赖及剩余风险：浏览器自动化/驱动属待确认依赖（按协同安装门禁先询问用户，不隐式下载）；无 DOM 库前提下 GUI 测试只能做服务端 HTML/协议断言，真实浏览器验收属 GUI-01-R-04 人工项；Linux/macOS 未验证。
 - 本地提交、推送尝试与结果：GUI-01-R-01 `1184c74`；`git push` 第 1 次成功（`5519193..1184c74`，`origin/main`）。
 - GUI-01-R-02 实现与入口证据：docs/reports/GUI01_R_02_LOCAL_SERVER_EVIDENCE.md（loopback/Host/Origin/CSRF/清洗/SSE 首帧与重连/监听失败/退出收口的红→绿反例；公共门面真实提交到 `done`；`astarray gui [--port <n>] [--no-open]`；打包 CLI 冒烟 URL/状态/端口释放）。
-- GUI-01-R-02 测试命令、退出码和产物哈希：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试（已迁出）` 0（23 passed）；`npm run check` 构建通过、1553/1554 用例通过（唯一失败为既有计时波动 `provider-runtime-registry`，隔离复跑 6/6 通过）；`npm run test:coverage` 0（184 文件/1554 用例全通过，statements 93.52% / branch 86.44% / functions 91.68% / lines 93.55%）。受限沙箱下 tsup/forks 池会 `spawn EPERM`，门禁在获准完整访问下执行。
+- GUI-01-R-02 测试命令、退出码和产物哈希：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试` 0（23 passed）；`npm run check` 构建通过、1553/1554 用例通过（唯一失败为既有计时波动 `provider-runtime-registry`，隔离复跑 6/6 通过）；`npm run test:coverage` 0（184 文件/1554 用例全通过，statements 93.52% / branch 86.44% / functions 91.68% / lines 93.55%）。受限沙箱下 tsup/forks 池会 `spawn EPERM`，门禁在获准完整访问下执行。
 - GUI-01-R-02 人工/外部依赖及剩余风险：真实浏览器人工体验（键盘/中文/缩放/可访问性）留给 GUI-01-R-04，本检查点不做结论；SSE 客户端退避使用浏览器原生重连（约 3s，落在 1–30s 区间）+ 服务端首帧快照，端到端体验校验留给 -04；Linux/macOS 未验证。
 - GUI-01-R-02 本地提交、推送尝试与结果：实现提交 `b5e3be1`（11 文件；用户并行改动未暂存）。`git push` 4 次：第 1 次受限沙箱失败（`couldn't create signal pipe, Win32 error 5`，exit 128）；第 2–4 次升级重试均因审批通道 600s 超时未执行 → 本轮跳过上传，累积到下一阶段一并再试。
 - GUI-01-R-03a 实现与入口证据：docs/reports/GUI01_R_03_SETTINGS_RECOVERY_EVIDENCE.md（预算写入→下一真实装配按新 revision、过期 revision 409、权限组跨界面一致、恢复只读视图与字段过滤、能力缺失 501 的红→绿反例）。
-- GUI-01-R-03a 测试命令、退出码：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试（已迁出）` 0（28 passed）；关联回归 20 passed（public-sdk/application-sdk-*/cli-sdk-parity/context-*）。
+- GUI-01-R-03a 测试命令、退出码：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试` 0（28 passed）；关联回归 20 passed（public-sdk/application-sdk-*/cli-sdk-parity/context-*）。
 - GUI-01-R-03a 门禁缺口（已补齐，2026-09-13）：`npm run check` exit 0（187 文件/1566 用例）；`npm run test:coverage` exit 0（statements 93.61% / branch 86.40% / functions 91.98% / lines 93.64%）；`verify:security-coverage` 22/22；`npm pack`+`verify-package`（207 文件）+`smoke-install` exit 0（tarball sha256 `e709427a…7e7f7e`）。首跑覆盖率仅两个已知超时波动用例失败，复跑即绿。
 - GUI-01-R-03a 本地提交、推送尝试与结果：实现提交 `12e80eb`（6 文件）；`git push` 于 2026-09-13 成功（`0946530..28705b2`，含 `b5e3be1`、`2dd9fdd`、`12e80eb`）。
 - GUI-01-R-03a 人工/外部依赖及剩余风险：已验收/待追认与人工裁决属 03b（已完成）；真实浏览器人工体验属 04；Linux/macOS 未验证。
 - GUI-01-R-03b 实现与入口证据：docs/reports/GUI01_R_03B_VERIFICATION_DECISION_EVIDENCE.md（真实 Devolve 链路生成延迟核验任务 → GUI 列表/追认落盘/否决重开节点；跨 Agent 404 与陈旧签字 409 反例）。
-- GUI-01-R-03b 测试命令与退出码：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试（已迁出）` 0（32 passed）；关联回归 27 passed。
+- GUI-01-R-03b 测试命令与退出码：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试` 0（32 passed）；关联回归 27 passed。
 - GUI-01-R-03b 门禁缺口（已补齐，2026-09-13）：同 03a，`npm run check`/`npm run test:coverage`/`verify:security-coverage` 与打包三项均 exit 0。
 - GUI-01-R-03b 本地提交、推送尝试与结果：实现提交 `4ed4c14`（6 文件）；已随 `0946530..28705b2` 推送。
 - GUI-01-R-04a 实现与入口证据：docs/reports/GUI01_R_04A_UX_STATIC_EVIDENCE.md（3 个新用例：可访问性静态契约、离线自足、关闭时资源回收）；人工验收步骤与打包命令清单见 docs/reports/GUI01_R_04_MANUAL_ACCEPTANCE_CHECKLIST.md（未执行）。
-- GUI-01-R-04a 测试命令与退出码：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试（已迁出）` 0（35 passed，7 文件）。
+- GUI-01-R-04a 测试命令与退出码：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试` 0（35 passed，7 文件）。
 - GUI-01-R-04a 门禁缺口（已补齐，2026-09-13）：`npm run check`/`npm run test:coverage`/`verify:security-coverage` 与打包验收（`npm pack`、`verify-package` 207 文件、`smoke-install`）全部 exit 0；另从隔离安装包启动 GUI 冒烟通过（`GET /` 200、`/state` 脱敏、终止后端口释放）。04b 的人类体验与平台证据仍未做。
 - GUI-01-R-04a 人工/外部依赖及剩余风险：真实用户人工体验结论、从安装包打开 GUI、Linux/macOS 平台证据属 04b，当前为 pending/blocked，不以自动断言替代。
 - GUI-01-R-04a 本地提交、推送尝试与结果：实现提交 `b35cc9f`（4 文件）；已随 `0946530..28705b2` 推送。

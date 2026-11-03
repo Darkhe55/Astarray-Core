@@ -9,11 +9,11 @@
 | 文件 | 变更 |
 | --- | --- |
 | `packages/core/src/public-sdk.ts` | 关闭 R-01 记录的 revision 缺口：`PublicAstarrayEvent` 全事件追加 `revision` 与 `idempotencyId`；`TaskRecord` 增加 `revision` 并从 `taskChain.revision` 读取；新增 `nextEventIdempotencyId`/`nextSessionEventRevision`，6 处 emit 点全部带版本与幂等 ID |
-| `UI 包（已迁出）/src/application/gui-read-model.ts`（新） | 只读视图模型：事件→任务跟踪→脱敏快照（`GuiTaskView`/`GuiSnapshot`）；revision 取最大值，乱序/重复事件不回退 |
-| `UI 包（已迁出）/src/server/gui-server.ts`（新） | 本地宿主：loopback HTTP、`GET /`、`GET /state`、`GET /events`（SSE）、`POST /commands/submit`、`POST /commands/cancel`；Host/Origin/CSRF 校验；输入清洗；HTML 转义；监听失败有界拒绝；`close()` 收口 |
+| `UI 包/src/application/gui-read-model.ts`（新） | 只读视图模型：事件→任务跟踪→脱敏快照（`GuiTaskView`/`GuiSnapshot`）；revision 取最大值，乱序/重复事件不回退 |
+| `UI 包/src/server/gui-server.ts`（新） | 本地宿主：loopback HTTP、`GET /`、`GET /state`、`GET /events`（SSE）、`POST /commands/submit`、`POST /commands/cancel`；Host/Origin/CSRF 校验；输入清洗；HTML 转义；监听失败有界拒绝；`close()` 收口 |
 | `packages/tui/src/cli/commands.ts` | `executeGuiServeCommand`：复用 `AstarrayApplicationFacade`（createSession→startGuiServer→等待本地关闭信号→close/shutdown），默认打开浏览器、端口校验 |
 | `packages/tui/src/cli.tsx` | `astarray gui [--port <n>] [--no-open]` |
-| `UI 测试（已迁出）/`（新，4 文件 23 用例） | 集成：`gui-server.test.ts`(11)、`gui-command.test.ts`(2)；单元：`gui-server-security.test.ts`(7)、`gui-read-model.test.ts`(3) |
+| `UI 测试/`（新，4 文件 23 用例） | 集成：`gui-server.test.ts`(11)、`gui-command.test.ts`(2)；单元：`gui-server-security.test.ts`(7)、`gui-read-model.test.ts`(3) |
 
 无新依赖（仅 Node 内置 `node:http`/`node:crypto` + 既有 zod/commander）；GUI 源码只依赖 `packages/core`，未依赖 tui/Ink，未复制核心状态机。
 
@@ -36,8 +36,8 @@
 
 ## 3. 公共入口真实调用控制器（非桩）
 
-- 测试 `UI 测试（已迁出）/integration/gui-server.test.ts > 经 GUI 命令提交真实任务并由公共应用服务完成`：`POST /commands/submit` → 真实 `AstarrayApplicationFacade.submitTask` → 轮询 `queryTask` 至 `done`（mock Provider 运行时），证明 GUI 只是公共门面的消费者。
-- 测试 `UI 测试（已迁出）/integration/gui-command.test.ts`：调用 CLI 公共入口 `executeGuiServeCommand`（port 0），打印真实 loopback URL，`GET /state` 返回 `{sessionId:"gui-session-local",mode:"assist",connectionStatus:"connected"}`；关闭信号后该 URL 连接失败。
+- 测试 `UI 测试/integration/gui-server.test.ts > 经 GUI 命令提交真实任务并由公共应用服务完成`：`POST /commands/submit` → 真实 `AstarrayApplicationFacade.submitTask` → 轮询 `queryTask` 至 `done`（mock Provider 运行时），证明 GUI 只是公共门面的消费者。
+- 测试 `UI 测试/integration/gui-command.test.ts`：调用 CLI 公共入口 `executeGuiServeCommand`（port 0），打印真实 loopback URL，`GET /state` 返回 `{sessionId:"gui-session-local",mode:"assist",connectionStatus:"connected"}`；关闭信号后该 URL 连接失败。
 - 打包产物冒烟：`node dist/cli.js gui --port 0 --no-open` → `Astarray GUI 已启动：http://127.0.0.1:4189/`；`GET /` 200（3554 字节，`Set-Cookie: gui_csrf=…; SameSite=Strict; HttpOnly`），`GET /state` 返回脱敏 JSON；终止后端口释放。
 
 ## 4. 测试与门禁（命令 / 退出码 / 结果）
@@ -45,8 +45,8 @@
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | 0（无类型错误） |
-| `npx eslint .` | 0（含 `UI 包（已迁出）/**`、`UI 测试（已迁出）/**`） |
-| `npx vitest run UI 测试（已迁出）`（4 文件） | 0；**23 passed** |
+| `npx eslint .` | 0（含 `UI 包/**`、`UI 测试/**`） |
+| `npx vitest run UI 测试`（4 文件） | 0；**23 passed** |
 | `npm run check`（typecheck+lint+build+test） | build 通过；用例 183/184 文件、1553/1554；唯一失败为既有计时波动 `provider-runtime-registry.test.ts`（5s 超时），隔离复跑 6/6 通过 |
 | `npm run test:coverage` | **0；184 文件 / 1554 用例全通过**；全局 statements 93.52% / branch 86.44% / functions 91.68% / lines 93.55%（阈值 85） |
 | 打包 CLI 冒烟（见 §3） | 页面/状态/退出收口均符合 |

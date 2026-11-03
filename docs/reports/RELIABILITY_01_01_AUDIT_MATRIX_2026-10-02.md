@@ -78,7 +78,7 @@
 | CLI `run` | `packages/tui/src/cli/run-command.ts` | → SDK `submitTask` → MainController → MissionOrchestrator → WorkerAgent → `ScopeGatedToolPort` → `PolicyWrapper` → builtins；权限询问经 `permission-ask-adjudication.ts` | 已证实（含 `artifact-presence-cli` / `permission-ask-timing` 端到端） |
 | CLI 其他命令 | `packages/tui/src/cli.tsx` | provider/config/profile/recover/doctor 等，多数为状态目录读写 | 部分验证 |
 | TUI | `TUI 包（已迁出）/**` | 经同一 SDK/控制器 | **未验证**（本轮未覆盖） |
-| GUI | `UI 包（已迁出）/**` + `gui-server` | 经 SDK | **未验证** |
+| GUI | `UI 包/**` + `gui-server` | 经 SDK | **未验证** |
 | MCP | `mcp-stdio-server` / `mcp-tool-bridge` | 工具桥接 | **未验证** |
 | SDK | `packages/core/src/public-sdk.ts` | `submitTask`（含 idempotencyKey，见疑点 2）、`queryTask`、`resume` 等 | 部分证实 |
 | 调度派发 | `mission-orchestrator.ts` | 任务链、worker 工厂、失败阈值 | 已证实（多测试） |

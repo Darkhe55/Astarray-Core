@@ -62,7 +62,7 @@
 
 | 次 | 失败用例 | 隔离复跑 |
 | --- | --- | --- |
-| 1 | `UI 测试（已迁出）/integration/gui-settings-recovery.test.ts`（`expected 'running' to be 'done'`） | ✓ 5/5 通过（602ms） |
+| 1 | `UI 测试/integration/gui-settings-recovery.test.ts`（`expected 'running' to be 'done'`） | ✓ 5/5 通过（602ms） |
 | 2 | `git-defensive-branches.test.ts`、`instruction-continuous-reception.test.ts`（`expected 'admitted' to be 'queued'`） | ✓ 3/3、6/6 通过（4.2s） |
 
 另有默认并发下的首轮覆盖率尝试失败于 `reliability-git-process-tree` 与 `cli-commands`，

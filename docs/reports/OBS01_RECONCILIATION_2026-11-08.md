@@ -14,7 +14,7 @@
 | --- | --- |
 | 相关测试 | **16 文件 / 104 用例全部通过**，`npx vitest run <16 个文件>`、**exit 0**、耗时 2.47s |
 | 实现模块 | `packages/core/src/orchestration/perf-event-store.ts`（515 行）、`…/usage-ledger-store.ts`、`…/diagnostic-event-store.ts` |
-| 入口测试 | `tests/tui/integration/cli-observability-entry.test.ts`、`UI 测试（已迁出）/integration/gui-observability-overview.test.ts` |
+| 入口测试 | `tests/tui/integration/cli-observability-entry.test.ts`、`UI 测试/integration/gui-observability-overview.test.ts` |
 | 包级验证 | `scripts/verify-observability-entry-package.mjs`（存在；`PLAN_STATUS` 记 2026-10-10 实跑 **exit 0、8/8**） |
 | 既有审计 | `docs/reports/OBS_01_01_AUDIT_AND_EVENT_CONTRACT_2026-10-02.md` |
 

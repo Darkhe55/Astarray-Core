@@ -40,8 +40,8 @@
 - TUI 焦点：`TUI 包（已迁出）/panel-navigation.ts`
 - TUI 命令：`TUI 包（已迁出）/slash-commands.ts`
 - TUI 面板：`TUI 包（已迁出）/components/panels.tsx`
-- GUI 页面/路由：`UI 包（已迁出）/src/server/gui-server.ts`、`project-chat-routes.ts`
-- GUI 读取模型：`UI 包（已迁出）/src/application/project-chat-view.ts` 等
+- GUI 页面/路由：`UI 包/src/server/gui-server.ts`、`project-chat-routes.ts`
+- GUI 读取模型：`UI 包/src/application/project-chat-view.ts` 等
 - Electron 壳：`desktop/electron/main.mjs`
 
 ## 3. 从普通界面移出（发布包）

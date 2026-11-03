@@ -16,9 +16,9 @@ GUI-01-R-04 要求"键盘、中文、缩放、可访问性、断线恢复与资�
 
 | 文件 | 内容 |
 | --- | --- |
-| `UI 测试（已迁出）/integration/gui-ux-accessibility.test.ts`（新，3 用例） | 语言/视口/配色方案 + 无外部资源 + 无 `innerHTML`；表单控件 `label for` 关联与 `aria-live` 动态区、按钮显式 `type=button`；关闭时取消订阅、结束 SSE、端口可重用 |
+| `UI 测试/integration/gui-ux-accessibility.test.ts`（新，3 用例） | 语言/视口/配色方案 + 无外部资源 + 无 `innerHTML`；表单控件 `label for` 关联与 `aria-live` 动态区、按钮显式 `type=button`；关闭时取消订阅、结束 SSE、端口可重用 |
 
-命令与结果：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试（已迁出）` **35 passed**（7 文件）。
+命令与结果：`npx tsc --noEmit` 0；`npx eslint .` 0；`npx vitest run UI 测试` **35 passed**（7 文件）。
 
 ## 3. 打包验收命令（未执行，待完整访问）
 

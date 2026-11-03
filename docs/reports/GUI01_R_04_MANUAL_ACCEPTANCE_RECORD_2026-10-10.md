@@ -57,7 +57,7 @@
 
 | 层 | 事实 | 证据 |
 | --- | --- | --- |
-| GUI 端口 | `GuiApplicationPort` **没有**权限询问/升级相关的任何方法 | `UI 包（已迁出）/src/server/gui-server.ts:45` 起 |
+| GUI 端口 | `GuiApplicationPort` **没有**权限询问/升级相关的任何方法 | `UI 包/src/server/gui-server.ts:45` 起 |
 | GUI 路由 | **没有**授权/批准路由（仅有 submit / cancel / set-context-budget / switch-permission-profile / verification-decision） | 同文件路由表 |
 | 公共事件 | `PublicAstarrayEvent` **不发布**权限询问事件（只有 session-status / task-status / task-finished / budget-policy-updated） | `packages/core/src/public-sdk.ts` |
 | 公共结果 | `PublicTaskResult` **不含** `permissionAsk` 字段 | 同上 |

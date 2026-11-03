@@ -318,8 +318,8 @@ CLI 每次调用都是**独立进程**，因此"停用阻止新运行"与"回滚
 - 接入 `GuiSnapshot.toolPackages`（**始终存在**，缺省为空视图）与 GUI 服务端
   `/state` 与 SSE 快照：端口为**可选能力**，缺失时回落空视图且**不 500**。
 
-- 反例（先红后绿）：`UI 测试（已迁出）/unit/toolkit01-tool-package-gui-view.test.ts` **7 条**
-  （实现前全红）+ `UI 测试（已迁出）/integration/gui-server.test.ts` 新增 1 条（`/state` 携带视图与
+- 反例（先红后绿）：`UI 测试/unit/toolkit01-tool-package-gui-view.test.ts` **7 条**
+  （实现前全红）+ `UI 测试/integration/gui-server.test.ts` 新增 1 条（`/state` 携带视图与
   缺失时空视图不 500）；GUI 相关合计 **22/22**。
 - **仍未完成**：TUI 面板、独立反馈入口、取消/崩溃恢复的管理入口；01/02/03 的 fixture 与基线成本；05/06。
 ### TOOLKIT-01-04 进展（2026-10-10 四）：TUI 面板

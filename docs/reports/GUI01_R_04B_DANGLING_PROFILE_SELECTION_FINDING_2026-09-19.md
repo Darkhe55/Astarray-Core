@@ -19,7 +19,7 @@ POST /commands/switch-permission-profile
 
 | 层 | 位置 | 行为 |
 | --- | --- | --- |
-| GUI 路由 | `UI 包（已迁出）/src/server/gui-server.ts:835-868` | 只校验 `kind` 与内置白名单（ponder/assist/devolve）；`custom` 只校验非空字符串，随后直接调用并回 200 |
+| GUI 路由 | `UI 包/src/server/gui-server.ts:835-868` | 只校验 `kind` 与内置白名单（ponder/assist/devolve）；`custom` 只校验非空字符串，随后直接调用并回 200 |
 | 公共 SDK | `packages/core/src/public-sdk.ts:846-847` | 直接转调控制器，无校验 |
 | 控制器 | `packages/core/src/orchestration/main-controller.ts:333-343` | 读取当前选择后**直接持久化**传入引用，不查询权限组是否存在 |
 | 选择存储 | `packages/core/src/tools/current-permission-selection.ts:16-25, 73-94` | schema 允许任意非空 `custom.profileId`；仅做 revision 校验 |
@@ -50,10 +50,10 @@ POST /commands/switch-permission-profile
 | `packages/core/src/core/errors.ts` | 新增稳定错误码 `permission-profile-not-found` |
 | `packages/core/src/tools/permission-profile-store.ts` | `readProfile` 自定义组缺失时改抛 `permission-profile-not-found`（不再误用 `task-sequence-not-found`） |
 | `packages/core/src/orchestration/main-controller.ts` | `switchPermissionProfile` 在持久化前校验自定义组存在（内置组不依赖该存储；未装配存储时抛"权限组存储未装配"） |
-| `UI 包（已迁出）/src/server/gui-server.ts` | 切换路由把该错误映射为 `404 {"error":"permission-profile-not-found"}`，不再落入 500 |
+| `UI 包/src/server/gui-server.ts` | 切换路由把该错误映射为 `404 {"error":"permission-profile-not-found"}`，不再落入 500 |
 | `tests/core/unit/main-controller-facades.test.ts` | 新增 3 条：自定义组不存在→拒绝且不写入选择；存在→按当前 revision 持久化；内置组不依赖自定义存储 |
 | `tests/core/unit/ar07-module-gaps-5.test.ts` | `readProfile` 缺失组断言改为新错误码 |
-| `UI 测试（已迁出）/integration/gui-settings-recovery.test.ts` | 未知自定义组 → `404 permission-profile-not-found`，且权威选择保持不变 |
+| `UI 测试/integration/gui-settings-recovery.test.ts` | 未知自定义组 → `404 permission-profile-not-found`，且权威选择保持不变 |
 | `scripts/verify-gui-sse-reconnect.mjs` | 原"缺陷观察"断言改为"应被拒绝（404）" |
 
 验证（先红后绿）：

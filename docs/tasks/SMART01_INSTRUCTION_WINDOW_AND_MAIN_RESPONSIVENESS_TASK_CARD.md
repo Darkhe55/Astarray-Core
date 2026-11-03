@@ -208,15 +208,15 @@
 
 **SMART-01-04 GUI 入口接线（2026-10-10，本轮续）**：
 
-- `UI 包（已迁出）/src/application/gui-read-model.ts`：新增 `GuiInstructionView` /
+- `UI 包/src/application/gui-read-model.ts`：新增 `GuiInstructionView` /
   `GuiInstructionWindowView` 与纯函数 `buildGuiInstructionWindowView()`；
   `GuiSnapshot.instructions` **始终存在**（未提供窗口时为空窗口，形状唯一、不伪造指令）。
-- `UI 包（已迁出）/src/server/gui-server.ts`：`GuiApplicationPort` 新增可选
+- `UI 包/src/server/gui-server.ts`：`GuiApplicationPort` 新增可选
   `queryInstructionWindow({ sessionId })`（签名与公共 facade 对齐），
   `/state` 与 SSE 首帧快照**均携带指令窗口**；能力缺失或读取失败 ⇒ 空窗口，
   **不让 /state 因此 500、也不伪造指令**。
-- 反例（先红后绿）：`UI 测试（已迁出）/unit/smart01-instruction-gui-read-model.test.ts` 4 条
-  （实现前 `2 failed`）+ `UI 测试（已迁出）/integration/gui-server.test.ts` 新增 2 条
+- 反例（先红后绿）：`UI 测试/unit/smart01-instruction-gui-read-model.test.ts` 4 条
+  （实现前 `2 failed`）+ `UI 测试/integration/gui-server.test.ts` 新增 2 条
   （`/state` 携带窗口且 `dispatched`/排队 `isWorkCompleted=false`；能力缺失时空窗口不 500）；
   GUI 套件 **46/46** 通过。
 
