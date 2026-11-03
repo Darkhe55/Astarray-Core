@@ -5173,3 +5173,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ② `history01-run-history-e2e` 的 run-history 文件出现（改为**最多 5s 轮询**到文件存在）。
 > **断言内容未改**，只等待既有异步语义。**证据**：两文件合并隔离复跑 3/3；全量
 > `check:low-parallel` → **599 files / 4196 tests** 通过。不宣称"抖动绝迹"，只记录本轮证据。
+
+> **250（收尾基线，2026-11-04）**：公开库 HEAD `069dbf33`，全量门禁 **599 files / 4196 tests** 全绿；
+> 外部仓库 HEAD `e4a83b1`，`npm run check` **103 files / 686 tests** 通过。
+> 公开工作树仅剩用户本地 3 个未提交文档（`B6R-11`、`NEXT60`、`RESUME02`），未替用户提交。
+> 剩余未完成均为外部条件：真实浏览器/Electron 窗口/Linux、macOS/屏幕阅读器验收；ALIGN-01-03 成功提交需真实次级派生。
