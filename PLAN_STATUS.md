@@ -5016,3 +5016,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `getNotificationPreferences` / `updateNotificationPreferences`（未认证拒绝）。GUI-03 F01 路线 B。
 > **验证**：存储单测 6/6、门面单测 2/2；全量 **3672 tests**；typecheck/lint/build 绿。ADR-0203。
 > **未做**：B3 外部仓库 GUI 路由与面板接线、通知事件映射、旧 localStorage 迁移。
+
+> **222（B3）：通知偏好 GUI 接线（完成）**：GUI 侧新增只读/写路由（能力缺失 501、未认证 403、
+> 陈旧 revision 409）与面板服务端读写；localStorage 降级为离线缓存；外部仓库测试 4/4、全量 85 文件/658 用例。
+> 公开侧 ADR-0203 已同步状态（不含外部细节）。**未做**：真实浏览器人工体验、旧偏好迁移、通知产生侧端到端。

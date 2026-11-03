@@ -1,6 +1,6 @@
 # ADR-0203 通知偏好的服务端持久化（B1/B2，2026-11-03）
 
-- 状态：**已实现（公开侧 B1+B2）**；GUI 接线（B3）待做
+- 状态：**已实现（公开侧 B1+B2；GUI 侧 B3 已接线）**
 - 来源：GUI-03 **F01**（通知偏好），用户选择路线 **B（服务端持久化）**
 - 相关：`accuracy-policy-store.ts`（存储范式）、GUI 既有 localStorage 偏好
 
@@ -30,7 +30,8 @@ typecheck / lint / build → 全绿
 
 ## 3. 未完成
 
-- **B3（外部仓库 GUI）**：路由 `GET/POST /commands/notification-preferences`、CSRF/主体校验、
-  面板改走服务端（localStorage 降级为缓存）——尚未做；
+- GUI 侧 B3 **已接线**（独立提交）：`GET /settings/notification-preferences` 与
+  `POST /commands/notification-preferences`（能力缺失 501、未认证 403、陈旧 revision 409），
+  面板改为服务端读写，localStorage 降级为离线缓存；
 - 没有"偏好影响哪些通知事件"的完整映射（当前只存开关，通知产生侧是否消费待 B3 对齐）；
 - 无导出/迁移工具；旧 localStorage 偏好**不自动迁移**（避免猜测归属）。
