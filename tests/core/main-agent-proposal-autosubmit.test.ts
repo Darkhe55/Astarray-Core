@@ -42,3 +42,17 @@ describe("extractMainAgentProposalPayload", () => {
     expect(extractMainAgentProposalPayload("null")).toBeNull();
   });
 });
+
+describe("injectHarnessUserTaskReference", () => {
+  it("有已登记引用 ⇒ 覆盖模型字段；缺失 ⇒ 保持原样；不修改入参", async () => {
+    const { injectHarnessUserTaskReference } = await import(
+      "../../packages/core/src/orchestration/main-agent-proposal-autosubmit.js"
+    );
+    const record = { userTaskReference: "model-guess", title: "x" };
+    const injected = injectHarnessUserTaskReference(record, "user-message-real");
+    expect(injected.userTaskReference).toBe("user-message-real");
+    expect(record.userTaskReference).toBe("model-guess");
+    expect(injectHarnessUserTaskReference(record, undefined)).toBe(record);
+    expect(injectHarnessUserTaskReference(record, "")).toBe(record);
+  });
+});

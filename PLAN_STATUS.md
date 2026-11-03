@@ -5069,3 +5069,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `withResumeLock`（resume.lock + token/pid；存活持锁跳过、死锁接管、token 校验释放），
 > 运行时 rest→working 恢复已加锁。**验证**：恢复测试 5/5；全量串行 **501 files / 3697 tests**；
 > typecheck/lint/build 绿。ADR-0207 §5。**未做**：跨时段真实触发端到端。
+
+> **231（ALIGN-01-03 缺陷修复）：主 Agent 提案自动提交此前必然失败**：契约要求
+> `userTaskReference` 与 harness 随机生成的 `user-message-<uuid>` **逐字相等**，而模型看不到该引用
+> ⇒ 自动提交每次都会以"引用不一致"被拒（功能不可用）。修复：新增
+> `injectHarnessUserTaskReference`，自动提交路径在提交前用会话已登记引用覆盖模型字段；
+> 缺少登记时保持原样由契约拒绝。
+> **验证**：注入函数单测 1/1 + 既有 5/5；全量串行 **501 files / 3698 tests**；typecheck/lint/build 绿。
+> **仍未做**：完整"主 Agent 回合 → 自动提交"端到端（本次尝试在本地假 Provider 下回合无文本增量，
+> 未能建立可重复的回合级夹具；已放弃提交失败用例，不伪造通过）。
