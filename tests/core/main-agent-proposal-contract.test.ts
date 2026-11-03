@@ -72,7 +72,7 @@ describe("主 Agent 提案提交", () => {
       sourceKind: "agent",
       sourceActorId: "main-agent-1",
     });
-    expect(captured[0].task.externalReference).toBe("user-task:user-message-1");
+    expect(captured[0]!.task.externalReference).toBe("user-task:user-message-1");
   });
 
   it("模型自报来源字段 ⇒ 直接拒绝", async () => {

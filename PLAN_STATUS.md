@@ -5064,3 +5064,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 空来源/空用户任务 ⇒ 拒绝；成功路径捕获 `TaskInsertionProposal` 并核对字段。
 > **验证**：全量串行 **501 files / 3695 tests 通过**；typecheck/lint/build 绿。
 > **仍未做**：完整"主 Agent 回合 → 自动提交"端到端（需 provider SSE 假服务 + 已存在目标次级个体 + 真实 insertion 控制面装配）。
+
+> **230（GUI-04-06 补强）：工作时段恢复的跨进程互斥**：新增
+> `withResumeLock`（resume.lock + token/pid；存活持锁跳过、死锁接管、token 校验释放），
+> 运行时 rest→working 恢复已加锁。**验证**：恢复测试 5/5；全量串行 **501 files / 3697 tests**；
+> typecheck/lint/build 绿。ADR-0207 §5。**未做**：跨时段真实触发端到端。

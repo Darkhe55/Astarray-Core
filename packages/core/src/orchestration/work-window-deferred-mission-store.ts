@@ -10,6 +10,8 @@
  * - 恢复被核心拒绝（坏检查点/未决冲突等）⇒ 保留记录，不假装成功；
  * - 人工暂停不登记（人工暂停优先，不因时段变化复活）。
  */
+import { randomUUID } from "node:crypto";
+import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
@@ -30,9 +32,19 @@ interface DeferredDocument {
   readonly records: readonly WorkWindowDeferredMissionRecord[];
 }
 
+function defaultIsProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 export class WorkWindowDeferredMissionStore {
   private readonly filePath: string;
   private readonly backupFilePath: string;
+  private readonly lockFilePath: string;
   private readonly writeLock = new AsyncMutex();
 
   constructor(
@@ -44,6 +56,61 @@ export class WorkWindowDeferredMissionStore {
     const directory = path.join(options.baseDirectory, "work-window");
     this.filePath = path.join(directory, "deferred-missions.json");
     this.backupFilePath = `${this.filePath}.bak`;
+    this.lockFilePath = path.join(directory, "resume.lock");
+  }
+
+  /**
+   * GUI-04-06 补强：**跨进程恢复互斥**。
+   *
+   * 两个进程同时收到 rest→working 时，只允许一个执行恢复；持锁进程仍存活 ⇒ 返回 null（本轮跳过）。
+   * 持锁进程已退出 ⇒ 接管；完成后校验 token 释放，避免误删他人锁。
+   */
+  async withResumeLock<T>(run: () => Promise<T>): Promise<T | null> {
+    await fs.mkdir(path.dirname(this.lockFilePath), { recursive: true });
+    const token = `${process.pid}:${randomUUID()}`;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const handle = await fs.open(this.lockFilePath, "wx");
+        try {
+          await handle.writeFile(
+            JSON.stringify({ pid: process.pid, token, acquiredAtIso: this.nowIso() }),
+            "utf8",
+          );
+        } finally {
+          await handle.close();
+        }
+        try {
+          return await run();
+        } finally {
+          try {
+            const raw = await fs.readFile(this.lockFilePath, "utf8");
+            const holder = JSON.parse(raw) as { token?: unknown };
+            if (holder.token === token) {
+              await fs.unlink(this.lockFilePath);
+            }
+          } catch {
+            // 已被接管/删除 ⇒ 无需释放
+          }
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+          throw error;
+        }
+      }
+      let holderPid: number | null;
+      try {
+        const raw = await fs.readFile(this.lockFilePath, "utf8");
+        const holder = JSON.parse(raw) as { pid?: unknown };
+        holderPid = typeof holder.pid === "number" ? holder.pid : null;
+      } catch {
+        holderPid = null;
+      }
+      if (holderPid !== null && defaultIsProcessAlive(holderPid)) {
+        return null;
+      }
+      await fs.unlink(this.lockFilePath).catch(() => undefined);
+    }
+    return null;
   }
 
   private nowIso(): string {

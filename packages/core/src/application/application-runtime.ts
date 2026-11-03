@@ -2575,19 +2575,23 @@ export async function createApplicationRuntime(
       void (async () => {
         /** GUI-04-06：先做一次受控恢复（默认开启；可用开关关闭）。 */
         if (options.isWorkWindowAutoResumeEnabled !== false) {
-          await resumeDeferredWorkWindowMissions({
-            store: workWindowDeferredMissionStore,
-            resume: (missionIdentifier) =>
-              controller.handleWorkWindowResume({
-                missionIdentifier,
-                previousState: "resting",
-                currentState: "working",
-                hasPendingResume: true,
-                isManuallyCancelled: false,
-                hasResumedSinceWake: false,
-                pauseKind: "rest",
+          await workWindowDeferredMissionStore
+            .withResumeLock(() =>
+              resumeDeferredWorkWindowMissions({
+                store: workWindowDeferredMissionStore,
+                resume: (missionIdentifier) =>
+                  controller.handleWorkWindowResume({
+                    missionIdentifier,
+                    previousState: "resting",
+                    currentState: "working",
+                    hasPendingResume: true,
+                    isManuallyCancelled: false,
+                    hasResumedSinceWake: false,
+                    pauseKind: "rest",
+                  }),
               }),
-          }).catch(() => undefined);
+            )
+            .catch(() => undefined);
         }
         await options.onWorkWindowRestToWorking?.(observation.observedAtIso);
       })();
