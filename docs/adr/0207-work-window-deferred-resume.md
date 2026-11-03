@@ -35,3 +35,13 @@ tests/core/integration/work-window-deferred-recording.test.ts → 1/1（全天�
 - 恢复被拒的 mission 只保留登记，没有退避/上限与告警面板；
 - 人工暂停不登记（符合卡内"手动取消不复活"），但未加专门反例；
 - 多进程同时触发恢复未加锁（依赖 `already-running` 与登记移除，仍可能双触发后一者被拒）。
+
+## 5. 追加：跨进程恢复互斥（2026-11-03）
+
+- `WorkWindowDeferredMissionStore.withResumeLock(run)`：`work-window/resume.lock` 独占创建，
+  记录 `pid/token/acquiredAtIso`；
+- 持锁进程仍存活 ⇒ 返回 `null`（另一进程正在恢复，本轮跳过）；持锁进程已退出 ⇒ 接管；
+- 完成后校验 token 释放；运行器内部仍按"成功/已运行移除、被拒保留"处理登记。
+- 运行时 rest→working 的恢复调用已用该锁包裹。
+
+验证：恢复测试 5/5（存活持锁跳过、死锁接管并释放）；全量串行 501 files / 3697 tests。

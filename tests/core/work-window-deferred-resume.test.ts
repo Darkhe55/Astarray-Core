@@ -4,6 +4,7 @@
  * 覆盖：去重登记、损坏文件回退、成功/已在运行移除、被拒/异常保留、按登记顺序恢复。
  */
 import { mkdtemp, rm } from "node:fs/promises";
+import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -93,5 +94,38 @@ describe("一次性恢复", () => {
     expect(outcomes[3]).toMatchObject({ didResume: false, decision: "resume-error" });
     const remaining = await store.list();
     expect(remaining.map((record) => record.missionIdentifier).sort()).toEqual(["c", "d"]);
+  });
+});
+
+describe("恢复互斥锁", () => {
+  it("持锁进程存活 ⇒ 本轮跳过且不执行", async () => {
+    const lockPath = path.join(directory, "work-window", "resume.lock");
+    await fs.mkdir(path.dirname(lockPath), { recursive: true });
+    await fs.writeFile(
+      lockPath,
+      JSON.stringify({ pid: process.pid, token: "other", acquiredAtIso: "x" }),
+      "utf8",
+    );
+    let executed = false;
+    const result = await store.withResumeLock(async () => {
+      executed = true;
+      return "ran";
+    });
+    expect(result).toBeNull();
+    expect(executed).toBe(false);
+    await expect(fs.stat(lockPath)).resolves.toBeDefined();
+  });
+
+  it("持锁进程不存在 ⇒ 接管执行并释放锁", async () => {
+    const lockPath = path.join(directory, "work-window", "resume.lock");
+    await fs.mkdir(path.dirname(lockPath), { recursive: true });
+    await fs.writeFile(
+      lockPath,
+      JSON.stringify({ pid: 999_999, token: "dead", acquiredAtIso: "x" }),
+      "utf8",
+    );
+    const result = await store.withResumeLock(async () => "ran");
+    expect(result).toBe("ran");
+    await expect(fs.stat(lockPath)).rejects.toThrow();
   });
 });
