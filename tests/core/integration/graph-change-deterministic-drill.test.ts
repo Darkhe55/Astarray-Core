@@ -237,16 +237,25 @@ describe("确定性图变更演练", () => {
         ),
       ).toBe(true);
 
-      const goalState = JSON.parse(
-        await fs.readFile(
-          path.join(stateDirectory, "goal-mode", `${goalIdentifier}.json`),
-          "utf8",
-        ),
-      ) as {
+      /**
+       * 目标重算在编排循环里异步落盘：轮询到 V 重算完成（最多 3s），
+       * 避免负载下"注入返回但重算未落盘"的假失败。
+       */
+      const goalStatePath = path.join(
+        stateDirectory,
+        "goal-mode",
+        `${goalIdentifier}.json`,
+      );
+      let goalState = JSON.parse(await fs.readFile(goalStatePath, "utf8")) as {
         requiresReplanning: boolean;
         pauseReason: string | null;
         lastPotentialValue: number;
       };
+      const goalDeadline = Date.now() + 3_000;
+      while (Date.now() < goalDeadline && goalState.lastPotentialValue !== 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        goalState = JSON.parse(await fs.readFile(goalStatePath, "utf8")) as typeof goalState;
+      }
       expect(goalState.requiresReplanning).toBe(false);
       expect(goalState.pauseReason).toBeNull();
       expect(goalState.lastPotentialValue).toBe(1);

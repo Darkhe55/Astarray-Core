@@ -5167,3 +5167,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （`graph-change-deterministic-drill` 的「V 未上升」用例，负载下偶发）；
 > **隔离复跑 3/3 通过**（每次约 1.2s），随后**全量重跑通过：599 files / 4196 tests**，typecheck/lint/build 绿。
 > 不宣称该抖动已修复，仅记录本轮证据。
+
+> **249（抖动根因修复，2026-11-04）**：两处集成测试在**异步落盘完成前**就读文件 ⇒ 负载下假失败：
+> ① `graph-change-deterministic-drill` 的「V 未上升」等目标重算落盘（改为**最多 3s 轮询**到 V 重算）；
+> ② `history01-run-history-e2e` 的 run-history 文件出现（改为**最多 5s 轮询**到文件存在）。
+> **断言内容未改**，只等待既有异步语义。**证据**：两文件合并隔离复跑 3/3；全量
+> `check:low-parallel` → **599 files / 4196 tests** 通过。不宣称"抖动绝迹"，只记录本轮证据。
