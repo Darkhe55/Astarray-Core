@@ -131,6 +131,8 @@ import { ProjectWorkWindowStore } from "../orchestration/project-work-window-sto
 import { TaskLedgerDivergenceJournal } from "../orchestration/task-ledger-divergence-journal.js";
 import { MissionSequenceBindingStore } from "../orchestration/mission-sequence-binding-store.js";
 import { MissionTaskSequenceMapStore } from "../orchestration/mission-task-sequence-map-store.js";
+import { NotificationPreferenceStore } from "../orchestration/notification-preference-store.js";
+import type { NotificationPreferences } from "../orchestration/notification-preference-store.js";
 import { shouldPauseForGraphChange } from "../orchestration/goal-graph-change-decision.js";
 import { TaskGraphChangeJournalStore } from "../orchestration/task-graph-change-journal.js";
 import { PromptScanJournalStore } from "../orchestration/prompt-scan-journal-store.js";
@@ -406,6 +408,22 @@ export interface ApplicationRuntime {
     readonly taskIdentifier: string;
     readonly note: string;
   }) => Promise<{ readonly reconciled: boolean; readonly previousStatus: string }>;
+  /** GUI-03 F01：读取通知偏好（认证用户 + 项目）。 */
+  getNotificationPreferences: (input: {
+    readonly projectIdentifier?: string;
+  }) => Promise<{
+    readonly preferences: NotificationPreferences;
+    readonly revision: number;
+  }>;
+  /** GUI-03 F01：更新通知偏好（未知字段/陈旧 revision 拒绝）。 */
+  updateNotificationPreferences: (input: {
+    readonly projectIdentifier?: string;
+    readonly preferences: unknown;
+    readonly expectedRevision?: number;
+  }) => Promise<{
+    readonly preferences: NotificationPreferences;
+    readonly revision: number;
+  }>;
   /** R138：暂停后恢复（重新规划确认；只清 requiresReplanning，不自动继续）。 */
   replanGoal: (input: {
     readonly goalIdentifier: string;
@@ -2687,6 +2705,49 @@ export async function createApplicationRuntime(
   const missionTaskSequenceMapStore = new MissionTaskSequenceMapStore({
     baseDirectory: stateDirectory,
   });
+  /** GUI-03 F01：通知偏好服务端存储（按认证用户 + 项目）。 */
+  const notificationPreferenceStore = new NotificationPreferenceStore({
+    baseDirectory: stateDirectory,
+  });
+  const resolveNotificationProject = (requested?: string): string => {
+    const trimmed = requested?.trim();
+    if (trimmed !== undefined && trimmed !== "") {
+      return trimmed;
+    }
+    const fallback = options.projectIdentifier?.trim();
+    return fallback !== undefined && fallback !== "" ? fallback : "workspace";
+  };
+  const requireAuthenticatedUserId = (): string => {
+    const userId = options.authenticatedUserId?.trim();
+    if (userId === undefined || userId === "") {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "通知偏好属于认证用户：未认证会话不能读写。",
+      );
+    }
+    return userId;
+  };
+  const getNotificationPreferences = async (input: {
+    readonly projectIdentifier?: string;
+  }) =>
+    notificationPreferenceStore.read({
+      userId: requireAuthenticatedUserId(),
+      projectIdentifier: resolveNotificationProject(input.projectIdentifier),
+    });
+  const updateNotificationPreferences = async (input: {
+    readonly projectIdentifier?: string;
+    readonly preferences: unknown;
+    readonly expectedRevision?: number;
+  }) =>
+    notificationPreferenceStore.update({
+      userId: requireAuthenticatedUserId(),
+      projectIdentifier: resolveNotificationProject(input.projectIdentifier),
+      preferences: input.preferences,
+      ...(input.expectedRevision === undefined
+        ? {}
+        : { expectedRevision: input.expectedRevision }),
+      updatedByUserId: requireAuthenticatedUserId(),
+    });
   /** R125：扫描记录持久化（有界；只记结论，不含正文）。 */
   const promptScanJournalStore = new PromptScanJournalStore({
     baseDirectory: stateDirectory,
@@ -3951,6 +4012,8 @@ export async function createApplicationRuntime(
     recomputeGoalPotential,
     reconcileGoalTaskGroup,
     replanGoal,
+    getNotificationPreferences,
+    updateNotificationPreferences,
     reconcileMissionTask,
     sendMissionInstruction,
     dispatchMissionTask,

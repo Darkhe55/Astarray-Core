@@ -5609,6 +5609,33 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   /**
+   * GUI-03 F01：读取通知偏好（认证用户 + 项目；未配置 ⇒ 默认值）。
+   */
+  getNotificationPreferences(input: {
+    readonly projectIdentifier?: string;
+  }): Promise<{
+    readonly preferences: { complete: boolean; failure: boolean; pending: boolean; system: boolean };
+    readonly revision: number;
+  }> {
+    this.assertOpen();
+    return this.runtime.getNotificationPreferences(input);
+  }
+
+  /**
+   * GUI-03 F01：更新通知偏好（未知字段/陈旧 revision 拒绝）。
+   */
+  updateNotificationPreferences(input: {
+    readonly projectIdentifier?: string;
+    readonly preferences: unknown;
+    readonly expectedRevision?: number;
+  }): Promise<{
+    readonly preferences: { complete: boolean; failure: boolean; pending: boolean; system: boolean };
+    readonly revision: number;
+  }> {
+    this.assertOpen();
+    return this.runtime.updateNotificationPreferences(input);
+  }
+  /**
    * R138：暂停后恢复（重新规划确认）。
    *
    * 只清 `requiresReplanning`/暂停并记录说明；不自动重算 V、不自动继续。

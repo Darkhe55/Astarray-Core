@@ -5010,3 +5010,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ponder 回答若为提案 JSON 则调用既有 `submitMainAgentTaskProposal`，失败只升级说明；
 > 门面/运行时透传开关。**默认未开启**，assist 主 Agent 回合仍缺（架构项）。
 > **验证**：单测 5/5；全量 **3664 tests**；typecheck/lint/build 绿。ADR-0202。
+
+> **221（B1/B2）：通知偏好服务端持久化（公开侧完成）**：新增
+> `NotificationPreferenceStore`（按认证用户+项目；默认值/未知字段拒绝/revision 冲突/损坏回退/原子写）与门面
+> `getNotificationPreferences` / `updateNotificationPreferences`（未认证拒绝）。GUI-03 F01 路线 B。
+> **验证**：存储单测 6/6、门面单测 2/2；全量 **3672 tests**；typecheck/lint/build 绿。ADR-0203。
+> **未做**：B3 私有库 GUI 路由与面板接线、通知事件映射、旧 localStorage 迁移。
