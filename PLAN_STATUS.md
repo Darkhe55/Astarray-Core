@@ -5121,3 +5121,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **238（第 57 轮补验，2026-11-04）**：私有库 `npm run build` 通过；公开库隐私扫描
 > （排除 `tests/` 守卫）无 `private-ui`/`user`/`packages/gui`/`tests/gui` 命中；
 > 全量门禁维持 598 files / 4192 tests 通过。
+
+> **239（第 59 轮全量复验，2026-11-04）**：私有库 `npm run check` → 102 files / 682 tests；
+> 公开库 `npm run check:low-parallel` → **598 files / 4192 tests**，typecheck/lint/build 全绿。
+> 两仓库均无未推送提交；公开库隐私扫描仍为 0 命中（tests 守卫除外）。
