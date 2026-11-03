@@ -630,6 +630,7 @@ export {
 import type { AgentMode, AgentRuntime, TaskDependencyNode } from "./core/types.js";
 import type { MainController } from "./orchestration/main-controller.js";
 import type { PermissionProfileReference } from "./tools/permission-profile-store.js";
+import type { ScopedPermissionChangePreview } from "./orchestration/scoped-permission-change-service.js";
 import {
   applySettingChangeProposal,
   type SettingChangeApplicationOutcome,
@@ -3451,7 +3452,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     identifier: string;
     permissionProfileId: string;
     expectedRevision: number;
-  }): Promise<import("./orchestration/scoped-permission-change-service.js").ScopedPermissionChangePreview> {
+  }): Promise<ScopedPermissionChangePreview> {
     this.assertOpen();
     try {
       return await this.runtime.previewScopedPermissionChange(input);

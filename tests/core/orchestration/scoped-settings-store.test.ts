@@ -254,3 +254,90 @@ describe("GUI-04-04 会话覆盖按稳定会话解析", () => {
     ).toBeUndefined();
   });
 });
+
+describe("GUI-04-02 跨进程写锁", () => {
+  it("两个实例并发写同一 revision：只有一个成功", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "astarray-scoped-lock-"));
+    directories.push(directory);
+    const first = new ScopedSettingsStore({ baseDirectory: directory });
+    const second = new ScopedSettingsStore({ baseDirectory: directory });
+    const results = await Promise.allSettled([
+      first.updateContext({
+        scope: "project",
+        identifier: "project-a",
+        expectedRevision: 1,
+        configuredMaximumGlobalContextTokenCount: 4096,
+        updatedByUserId: "user-a",
+      }),
+      second.updateContext({
+        scope: "project",
+        identifier: "project-a",
+        expectedRevision: 1,
+        configuredMaximumGlobalContextTokenCount: 8192,
+        updatedByUserId: "user-b",
+      }),
+    ]);
+    const fulfilled = results.filter((result) => result.status === "fulfilled");
+    const rejected = results.filter((result) => result.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({
+      errorCode: "stale-revision",
+    });
+    const reread = await first.read();
+    expect(reread.revision).toBe(2);
+  });
+
+  it("持锁进程存活且等待超时 ⇒ 拒绝，删除锁文件的行为不发生", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "astarray-scoped-lock-busy-"));
+    directories.push(directory);
+    const store = new ScopedSettingsStore({
+      baseDirectory: directory,
+      lockTimeoutMilliseconds: 100,
+      ownerIdentifier: "test-busy",
+    });
+    const lockPath = path.join(directory, "scoped-settings", "settings.lock");
+    await fs.mkdir(path.dirname(lockPath), { recursive: true });
+    await fs.writeFile(
+      lockPath,
+      JSON.stringify({ token: "other", pid: process.pid, reason: "test" }),
+      "utf8",
+    );
+    await expect(
+      store.updateContext({
+        scope: "project",
+        identifier: "project-a",
+        expectedRevision: 1,
+        configuredMaximumGlobalContextTokenCount: 4096,
+        updatedByUserId: "user-a",
+      }),
+    ).rejects.toMatchObject({ errorCode: "scoped-settings-lock-timeout" });
+    await expect(fs.stat(lockPath)).resolves.toBeDefined();
+  });
+
+  it("持锁进程已不存在 ⇒ 接管并成功写入；写后释放锁", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "astarray-scoped-lock-stale-"));
+    directories.push(directory);
+    const store = new ScopedSettingsStore({
+      baseDirectory: directory,
+      ownerIdentifier: "test-stale",
+      isProcessAlive: () => false,
+    });
+    const lockPath = path.join(directory, "scoped-settings", "settings.lock");
+    await fs.mkdir(path.dirname(lockPath), { recursive: true });
+    await fs.writeFile(
+      lockPath,
+      JSON.stringify({ token: "dead", pid: 999_999, reason: "test" }),
+      "utf8",
+    );
+    const updated = await store.updateContext({
+      scope: "project",
+      identifier: "project-a",
+      expectedRevision: 1,
+      configuredMaximumGlobalContextTokenCount: 4096,
+      updatedByUserId: "user-a",
+    });
+    expect(updated.revision).toBe(2);
+    await expect(fs.stat(lockPath)).rejects.toThrow();
+  });
+});
