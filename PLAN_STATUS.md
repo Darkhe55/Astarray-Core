@@ -5104,3 +5104,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   其余面板未迁）；UX-02-01–05 代码项基本完成但**真实浏览器/Electron/跨平台验收未做**；
 >   ALIGN-01-03 注入缺陷已修、回合路径已测，但**成功提交**仍需真实派生的次级个体/序列。
 > - **平台采集反复抖动**（anthropic/provider/merge/obs 等）均单跑通过；未改断言掩盖。
+
+> **235（第 50 轮复验，2026-11-03）**：两仓库同时全绿——
+> 私有库 `npm run check` → 101 files / 681 tests；公开库全量串行 → **502 files / 3699 tests**，
+> typecheck/lint 通过（本轮未出现既有 drill 抖动）。无新增未推送提交。
