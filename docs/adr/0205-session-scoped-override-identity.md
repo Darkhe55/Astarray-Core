@@ -36,3 +36,13 @@ tests/core --no-file-parallelism → 496 files / 3677 tests 通过
 - 会话级**权限**覆盖是否也按会话键读取，未逐条核对（本次只修上下文预算）；
 - GUI 无"会话选择器"时相关面板只能提示，不自动选最近会话；
 - 真实浏览器人工体验未做。
+
+## 5. 追加审计（2026-11-04）：会话级**权限**覆盖仍未消费
+
+- 运行时仅把 `scoped.projects[projectIdentifier].permission` 接进权限组解析
+  （`createPolicyWrapperForAgent`）；`scoped.sessions[...]` 的权限覆盖**没有读取方**。
+- 原因：该工厂是**同步**函数，只拿到 `projectIdentifier`/`missionIdentifier`，没有稳定会话标识；
+  若按 missionId 读取又会重犯本 ADR 修复的"mission 当会话"缺陷。
+- 结论：GUI 可以写会话权限覆盖，但当前不会生效。**不得**把它当作已生效功能；
+  后续需在任务启动时把 conversationIdentifier 解析好并传入策略层（异步预解析），或提供异步权限组 provider。
+- 本 ADR 的上下文预算修复不受影响（已有 `resolveScopedContextOverride`）。

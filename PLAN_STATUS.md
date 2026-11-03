@@ -5125,3 +5125,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **239（第 59 轮全量复验，2026-11-04）**：私有库 `npm run check` → 102 files / 682 tests；
 > 公开库 `npm run check:low-parallel` → **598 files / 4192 tests**，typecheck/lint/build 全绿。
 > 两仓库均无未推送提交；公开库隐私扫描仍为 0 命中（tests 守卫除外）。
+
+> **240（审计补记）：会话级权限覆盖未消费**：运行时只读取项目级权限覆盖；
+> `scoped.sessions[...]` 权限覆盖无读取方，且同步策略工厂拿不到稳定会话标识。
+> 已在 ADR-0205 §5 记为已知缺口；GUI 写入该值当前不生效（不算已交付）。
+> 未改代码。
