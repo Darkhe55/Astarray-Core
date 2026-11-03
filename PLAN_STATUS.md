@@ -5144,3 +5144,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `GET /settings/scoped-recovery` 与 `POST /commands/restore-scoped-settings`，数据面板提供
 > "作用域配置历史"列表与"恢复到该版本"按钮。
 > **验证**：公开库该存储测试通过；私有库 `npm run check` 103 files / 684 tests。
+
+> **244（门面回滚测试）：** 新增 `tests/core/scoped-settings-recovery-sdk.test.ts`（2 条）：
+> 列出恢复摘要（不含完整旧文档）、按恢复点写回为 revision+1、未认证拒绝。
+> **验证**：公开库全量 **599 files / 4196 tests** 通过，typecheck/lint/build 绿。GUI 侧接线见 `6c5b6ce`。
