@@ -320,6 +320,14 @@ export interface MainControllerOptions {
     projectIdentifier: string | null;
     nowIso: string;
   }) => Promise<{ isAllowed: boolean; reasonCode: string; reason: string }>;
+  /** GUI-04-06：记录"因休息被挡"的 mission，供 rest→working 一次性恢复。 */
+  workWindowDeferredMissionStore?: {
+    record(input: {
+      missionIdentifier: string;
+      projectIdentifier: string | null;
+      reason: string;
+    }): Promise<void>;
+  };
   /** A2：mission 调度前解析模型 binding 并获取 lease；缺省不切换模型。 */
   missionRuntimePreparer?: (input: {
     missionId: string;
@@ -907,6 +915,11 @@ export class MainController {
       nowIso: new Date().toISOString(),
     });
     if (workWindowDecision !== undefined && !workWindowDecision.isAllowed) {
+      await this.options.workWindowDeferredMissionStore?.record({
+        missionIdentifier: missionId,
+        projectIdentifier: projectIdentifier ?? null,
+        reason: workWindowDecision.reason,
+      });
       throw new DomainError("work-window-resting", workWindowDecision.reason);
     }
     /**
@@ -1148,6 +1161,11 @@ export class MainController {
       nowIso: new Date().toISOString(),
     });
     if (resumeWorkWindowDecision !== undefined && !resumeWorkWindowDecision.isAllowed) {
+      await this.options.workWindowDeferredMissionStore?.record({
+        missionIdentifier: missionId,
+        projectIdentifier: this.missionProjectIdentifiers.get(missionId) ?? null,
+        reason: resumeWorkWindowDecision.reason,
+      });
       throw new DomainError("work-window-resting", resumeWorkWindowDecision.reason);
     }
     const incompleteTasks = missionStatus.taskChain.tasks.filter(
@@ -4122,6 +4140,7 @@ export class MainController {
     const provider = this.options.workWindowGateDecisionProvider;
     if (provider === undefined) return runtime;
     const projectIdentifier = this.missionProjectIdentifiers.get(missionId) ?? null;
+    const deferredMissionStore = this.options.workWindowDeferredMissionStore;
     return {
       async *run(input: AgentRunInput, signal: AbortSignal) {
         const decision = await provider({
@@ -4130,6 +4149,11 @@ export class MainController {
           nowIso: new Date().toISOString(),
         });
         if (!decision.isAllowed) {
+          await deferredMissionStore?.record({
+            missionIdentifier: missionId,
+            projectIdentifier,
+            reason: decision.reason,
+          });
           yield {
             kind: "runFinished",
             agentId: input.agentId,

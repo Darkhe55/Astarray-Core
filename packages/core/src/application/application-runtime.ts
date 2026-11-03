@@ -124,6 +124,10 @@ import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
 import { ScopedSettingsStore, resolveScopedContextOverride } from "../orchestration/scoped-settings-store.js";
 import { ScopedPermissionChangeService } from "../orchestration/scoped-permission-change-service.js";
+import {
+  WorkWindowDeferredMissionStore,
+  resumeDeferredWorkWindowMissions,
+} from "../orchestration/work-window-deferred-mission-store.js";
 import type { ScopedPermissionChangePreview } from "../orchestration/scoped-permission-change-service.js";
 import type { ScopedSettingsDocument } from "../orchestration/scoped-settings-store.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
@@ -682,6 +686,8 @@ export interface ApplicationRuntimeOptions {
   isWorkWindowResumeMonitorEnabled?: boolean;
   /** 时段 rest → working 时的宿主回调（收到观测时间；是否恢复由宿主决定）。 */
   onWorkWindowRestToWorking?: (observedAtIso: string) => void | Promise<void>;
+  /** GUI-04-06：rest→working 自动恢复（默认开启；false 仅供测试/嵌入方关闭）。 */
+  isWorkWindowAutoResumeEnabled?: boolean;
   /**
    * 清单第 ⑥ 项（2026-10-28）：目标门禁解析器透传（缺省不参与派发）。
    *
@@ -2546,6 +2552,10 @@ export async function createApplicationRuntime(
    * 首次观测只建基线；只在 rest → working 时回调一次。
    * 未提供 `onWorkWindowRestToWorking` 时只记录观察结果，**不偷偷恢复任务**。
    */
+  /** GUI-04-06：因休息被挡的 mission 记账（rest→working 一次性恢复）。 */
+  const workWindowDeferredMissionStore = new WorkWindowDeferredMissionStore({
+    baseDirectory: stateDirectory,
+  });
   const workWindowTransitionMonitor = createWorkWindowTransitionMonitor({
     timerPort: {
       setInterval: (callback: () => void, intervalMilliseconds: number) =>
@@ -2559,15 +2569,29 @@ export async function createApplicationRuntime(
         instantIso,
         rules: await projectWorkWindowStore.readRules(),
       }).state,
-    ...(options.onWorkWindowRestToWorking === undefined
-      ? {}
-      : {
-          onRestToWorking: (observation: {
-            readonly observedAtIso: string;
-          }): void => {
-            void options.onWorkWindowRestToWorking?.(observation.observedAtIso);
-          },
-        }),
+    onRestToWorking: (observation: {
+      readonly observedAtIso: string;
+    }): void => {
+      void (async () => {
+        /** GUI-04-06：先做一次受控恢复（默认开启；可用开关关闭）。 */
+        if (options.isWorkWindowAutoResumeEnabled !== false) {
+          await resumeDeferredWorkWindowMissions({
+            store: workWindowDeferredMissionStore,
+            resume: (missionIdentifier) =>
+              controller.handleWorkWindowResume({
+                missionIdentifier,
+                previousState: "resting",
+                currentState: "working",
+                hasPendingResume: true,
+                isManuallyCancelled: false,
+                hasResumedSinceWake: false,
+                pauseKind: "rest",
+              }),
+          }).catch(() => undefined);
+        }
+        await options.onWorkWindowRestToWorking?.(observation.observedAtIso);
+      })();
+    },
   });
   workWindowTransitionMonitor.start();
   const experimentSettingsStore = new ExperimentSettingsStore({ baseDirectory: stateDirectory });
@@ -3673,6 +3697,7 @@ export async function createApplicationRuntime(
     modeMachine,
     missionRuntimeRegistry,
     artifactRecordStore,
+    workWindowDeferredMissionStore,
     workWindowGateDecisionProvider: async (input) => {
       const workWindowRules = await projectWorkWindowStore.readRules(
         input.projectIdentifier ?? undefined,
