@@ -271,6 +271,99 @@ export class ScopedSettingsStore {
     }
   }
 
+  /** GUI-04-02 回滚入口：列出可恢复的历史版本（最新的在前）。 */
+  async listRecoveryEntries(): Promise<
+    Array<{
+      readonly recordedAtIso: string;
+      readonly reason: string;
+      readonly previous: ScopedSettingsDocument;
+    }>
+  > {
+    const historyPath = path.join(this.recoveryDirectoryPath, "history.jsonl");
+    let raw: string;
+    try {
+      raw = await fs.readFile(historyPath, "utf8");
+    } catch {
+      return [];
+    }
+    const entries: Array<{
+      recordedAtIso: string;
+      reason: string;
+      previous: ScopedSettingsDocument;
+    }> = [];
+    for (const line of raw.split(/\r?\n/)) {
+      if (line.trim() === "") continue;
+      try {
+        const parsed = JSON.parse(line) as {
+          recordedAtIso?: unknown;
+          reason?: unknown;
+          previous?: unknown;
+        };
+        const previous = parsed.previous as ScopedSettingsDocument | undefined;
+        if (
+          typeof parsed.recordedAtIso !== "string" ||
+          typeof parsed.reason !== "string" ||
+          previous === undefined ||
+          previous.schemaVersion !== 1 ||
+          typeof previous.revision !== "number"
+        ) {
+          continue;
+        }
+        entries.push({
+          recordedAtIso: parsed.recordedAtIso,
+          reason: parsed.reason,
+          previous,
+        });
+      } catch {
+        // 跳过损坏行，不伪造历史
+      }
+    }
+    return entries.reverse();
+  }
+
+  /**
+   * GUI-04-02 回滚：把指定历史版本写回为**新 revision**（不改写历史、不降低 revision）。
+   * `expectedRevision` 用于 CAS，避免覆盖并发写入；恢复动作本身也写 recovery point。
+   */
+  async restoreRecoveryEntry(input: {
+    readonly recordedAtIso: string;
+    readonly expectedRevision: number;
+  }): Promise<ScopedSettingsDocument> {
+    return this.storeLock.runExclusive(async () => {
+      const fileLock = await this.acquireCrossProcessLock("restore");
+      try {
+        const current = await this.read();
+        if (current.revision !== input.expectedRevision) {
+          throw new DomainError(
+            "stale-revision",
+            "作用域配置 revision 不匹配: 现有 " +
+              current.revision +
+              "，期望 " +
+              input.expectedRevision,
+          );
+        }
+        const entries = await this.listRecoveryEntries();
+        const entry = entries.find(
+          (candidate) => candidate.recordedAtIso === input.recordedAtIso,
+        );
+        if (entry === undefined) {
+          throw new DomainError("invalid-task-chain", "未找到该恢复点。");
+        }
+        const restored: ScopedSettingsDocument = {
+          ...entry.previous,
+          revision: current.revision + 1,
+        };
+        await this.captureRecoveryPoint(current, "restore");
+        await writeAtomicJson(this.filePath, restored);
+        await backupExistingFile(this.filePath, this.backupFilePath);
+        this.cachedDocument = restored;
+        return restored;
+      } finally {
+        await fileLock.release();
+      }
+    });
+  }
+
   /** 同步只读缓存；启动时 preload，写入后更新。 */
   getCached(): ScopedSettingsDocument {
     return this.cachedDocument ?? emptyDocument();

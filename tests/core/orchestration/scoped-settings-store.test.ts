@@ -392,3 +392,49 @@ describe("ADR-0205 会话权限覆盖解析", () => {
     ).toBeUndefined();
   });
 });
+
+describe("GUI-04-02 历史回滚", () => {
+  it("列出恢复点；按恢复点回滚为新的 revision；陈旧 revision 拒绝", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "astarray-scoped-restore-"));
+    directories.push(directory);
+    const store = new ScopedSettingsStore({ baseDirectory: directory });
+    await store.updateContext({
+      scope: "project",
+      identifier: "project-a",
+      expectedRevision: 1,
+      configuredMaximumGlobalContextTokenCount: 4096,
+      updatedByUserId: "user-a",
+    });
+    await store.updateContext({
+      scope: "project",
+      identifier: "project-a",
+      expectedRevision: 2,
+      configuredMaximumGlobalContextTokenCount: 8192,
+      updatedByUserId: "user-a",
+    });
+    const entries = await store.listRecoveryEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.previous.revision).toBe(2);
+    expect(entries[0]!.previous.projects["project-a"]?.context?.configuredMaximumGlobalContextTokenCount).toBe(4096);
+
+    await expect(
+      store.restoreRecoveryEntry({
+        recordedAtIso: entries[0]!.recordedAtIso,
+        expectedRevision: 2,
+      }),
+    ).rejects.toMatchObject({ errorCode: "stale-revision" });
+
+    const restored = await store.restoreRecoveryEntry({
+      recordedAtIso: entries[0]!.recordedAtIso,
+      expectedRevision: 3,
+    });
+    expect(restored.revision).toBe(4);
+    expect(restored.projects["project-a"]?.context?.configuredMaximumGlobalContextTokenCount).toBe(4096);
+    await expect(
+      store.restoreRecoveryEntry({
+        recordedAtIso: "missing",
+        expectedRevision: 4,
+      }),
+    ).rejects.toThrow(/未找到该恢复点/);
+  });
+});
