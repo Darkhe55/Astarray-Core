@@ -5148,3 +5148,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **244（门面回滚测试）：** 新增 `tests/core/scoped-settings-recovery-sdk.test.ts`（2 条）：
 > 列出恢复摘要（不含完整旧文档）、按恢复点写回为 revision+1、未认证拒绝。
 > **验证**：公开库全量 **599 files / 4196 tests** 通过，typecheck/lint/build 绿。GUI 侧接线见 `6c5b6ce`。
+
+> **245（连续施工收尾状态页，2026-11-04）**：公开库本轮新增/收口——通知偏好、作用域配置 recovery 与**历史回滚**、
+> 会话**上下文**与**权限**覆盖、工作时段延后 mission 恢复、主 Agent 提案引用注入、架构门禁修复；
+> 公开全量门禁 **599 files / 4196 tests** 全绿（含破坏性 API 与子进程超时守卫）。
+> 私有 UI 侧状态页见私有仓库 `docs/reports/UX02_FINAL_STATUS_2026-11-04.md`（该文件不入公开库）。
+> 明确未完成：真实浏览器/Electron/跨平台人工验收；ALIGN-01-03 成功提交路径需真实次级派生。
