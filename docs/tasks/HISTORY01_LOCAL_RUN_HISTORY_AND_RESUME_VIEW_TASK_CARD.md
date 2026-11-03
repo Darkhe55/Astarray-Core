@@ -163,7 +163,7 @@
 | 红灯 | 根因 | 处置 |
 | --- | --- | --- |
 | `tests/core/unit/agent-lifecycle-and-memory.test.ts`「两个同级 Agent…记忆完全隔离」失败 | 工作树里有一处**未提交**的改动把 `sourceAgentInstanceId` 记成 `runtimeAgentInstanceId`（等于「去除来源冒充自身记忆」，与该文件注释和 §4 记忆隔离契约直接冲突；也正是变异体 `memory-observation-source-replaced-by-owner` 的注入形态） | 恢复为 `input.sourceAgentInstanceId`（与 HEAD 一致）；该用例 14/14 转绿 |
-| `私有 GUI 测试（已迁出）/integration/gui02-04-package-entry.test.ts` 4 条失败 | 分层提交 `d3f01be6` 只把 `私有 GUI 测试（已迁出）/**` 写进 `coverage.exclude`、没写进 `test.exclude`，而该文件的验收前提「GUI 必须有公开包入口」已被 `0cf91b24` **刻意移除** | 只排除**这一个已作废的文件**（不整目录排除）；**不改私有用例**。初次整目录排除时 `verify:mutation-kills` 立刻掉了 6 条（GUI-02-03 历史视图守卫全部"存活"）⇒ 已收窄 |
+| `私有 GUI 测试/integration/gui02-04-package-entry.test.ts` 4 条失败 | 分层提交 `d3f01be6` 只把 `私有 GUI 测试/**` 写进 `coverage.exclude`、没写进 `test.exclude`，而该文件的验收前提「GUI 必须有公开包入口」已被 `0cf91b24` **刻意移除** | 只排除**这一个已作废的文件**（不整目录排除）；**不改私有用例**。初次整目录排除时 `verify:mutation-kills` 立刻掉了 6 条（GUI-02-03 历史视图守卫全部"存活"）⇒ 已收窄 |
 
 ## 10. `HISTORY-01-04` 的 tarball 回溯证据（2026-10-18）
 

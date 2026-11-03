@@ -631,7 +631,7 @@ async function runUntilTerminal(...) {
 ## 15. 抖动现场观测（2026-11-08，第 92 轮）：`gui-verification-decision` 负载下 30s 超时 + `EPERM rename`
 
 **现场**：在一次「**先连跑 30 个变异体**（每个都起一次 vitest）再跑全量门禁」的序列里，
-`私有 GUI 测试（已迁出）/integration/gui-verification-decision.test.ts` 的
+`私有 GUI 测试/integration/gui-verification-decision.test.ts` 的
 「跨 Agent 裁决被拒绝，且不写入对方存档（隔离）」失败：
 `expected 'running' to be 'done'`，该用例耗时 **30086 ms**；同一次运行还伴有一个
 `EPERM: operation not permitted, rename '…\missions\mission-161fa2c0\.summar…'`（Windows 文件锁）。

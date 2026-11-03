@@ -15,7 +15,7 @@
 | 特征字段 `allowedPathsByTaskType` / `buildGitWorktreeToolPort` | 只出现在**两处**：`packages/core/src/orchestration/mission-orchestrator.ts`（**类型定义**）与**测试 harness** ⇒ **没有任何生产代码构造该选项对象** |
 | `packages/core/src/application/application-runtime.ts`（装配层） | **完全不含** `gitIntegration` ⇒ **从不传给** `MainController` |
 | 公开门面 `AstarrayApplicationFacade.create` 选项 | **不接受** `gitIntegration` ⇒ **宿主也无法注入** |
-| `packages/tui`／`私有 GUI 包（已迁出）`／`scripts` | **零命中** |
+| `packages/tui`／`私有 GUI 包`／`scripts` | **零命中** |
 
 `MainController` 只在两处把 `this.options.gitIntegration ?? null` 转发给编排器
 （`main-controller.ts` L840／L917），而**没有任何地方给它赋值** ⇒ 生产里恒为 `null`

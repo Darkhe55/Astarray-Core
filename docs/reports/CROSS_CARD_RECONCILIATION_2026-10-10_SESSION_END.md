@@ -42,7 +42,7 @@
 | `summary-index-store.ts` | **迁移崩溃恢复不可能**：备份名带时间戳 ⇒ 认不出"迁移中断" | 迁移执行 ⑤ | **已修**（确定性备份名 + 中断识别 + 不二次备份） |
 | `summary-index-store.ts` | **`detectLegacyManifests` 排序不确定**：`readdir` 顺序泄漏到报告 | 迁移判定 ⑫ | **已修**（补 `sourceKind` 比较键） |
 | `summary-index-store.ts` | **永远走不到的假分支**（zod 只抛 `Error` 子类） | —— | **已删** |
-| `私有 GUI 包（已迁出）/.../gui-server.ts` | **未绑定 receiver** ⇒ GUI 静默显示"unknown" | — | **已修**（`readSettings.call(...)`） |
+| `私有 GUI 包/.../gui-server.ts` | **未绑定 receiver** ⇒ GUI 静默显示"unknown" | — | **已修**（`readSettings.call(...)`） |
 | `public-sdk.ts` | 统一入口解析**过度接管**（误拒 `backupVault`） | 既有保护网 | **已修**（限定已注册族名/别名） |
 | `parameter-authorization-settings-store.ts` | 关闭细分**静默扩大权限** | MERGE-01-02 反例 | **已修**（放宽需认证确认、被拒不推进 revision） |
 

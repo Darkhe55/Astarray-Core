@@ -545,8 +545,8 @@ summary/outline。因此上一轮枚举里的 `code`/`markup`/`data` 与 `view`�
 GUI **静默显示"未知"**，看起来就像"根本没有这个能力"。已改为
 `readSettings.call(options.applicationService)` 并在代码内注明缘由。
 
-- 反例（先红后绿）：`私有 GUI 测试（已迁出）/unit/merge01-parameter-authorization-settings-view.test.ts` **7 条**；
-  `私有 GUI 测试（已迁出）/integration/gui-server.test.ts` 新增 **3 条**（含**真实 SDK 门面接入 GUI**：
+- 反例（先红后绿）：`私有 GUI 测试/unit/merge01-parameter-authorization-settings-view.test.ts` **7 条**；
+  `私有 GUI 测试/integration/gui-server.test.ts` 新增 **3 条**（含**真实 SDK 门面接入 GUI**：
   SDK 写入的设置被 `/state` **如实反映**；能力缺失时如实报未知且 **不 500**）。
 - **仍未完成**：连续输入/部分失败/取消/重启的端到端验证；**TUI 内的设置界面**
   （当前 TUI 经 CLI 子命令）⇒ **MERGE-01-03 不判 done**。

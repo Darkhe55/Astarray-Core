@@ -35,7 +35,7 @@
 > 根因：`#recovery` 等 **5 个会被整块替换的列表容器**自己挂着 `aria-live="polite"`
 > ⇒ 翻页时整批 20 条被替换 ⇒ 屏幕阅读器念整批列表，**把状态播报淹没**。
 > 修法：把这 5 个列表容器的 `aria-live` 摘掉，**状态文本区全部保留**（18 → 13 个 live 区）；
-> 提交 `0a81e8c`，反例 `私有 GUI 测试（已迁出）/integration/gui-accessibility-live-regions.test.ts`（4 条，首跑①红）。
+> 提交 `0a81e8c`，反例 `私有 GUI 测试/integration/gui-accessibility-live-regions.test.ts`（4 条，首跑①红）。
 >
 > **⚠️ 精确边界（不夸大）**：人工确认的是**翻页状态区**（`#recovery-paging`）的播报；
 > 其余状态区（`#submit-result`／`#history-paging`／`#recovery-resume-result` 等）

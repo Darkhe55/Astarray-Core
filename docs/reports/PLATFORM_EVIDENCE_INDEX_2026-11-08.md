@@ -128,9 +128,9 @@
 ## 3. 顺带取得的两个**缺陷级**发现
 
 1. **GUI 根本不在发布包里**（第 47 轮，`44ad8b8`）：`tsup.config.ts` 的 entry 只有
-   `cli`／`feedback-process-entry`／`public-sdk` ⇒ `私有 GUI 包（已迁出）` **既无公开入口、也不在 `exports` 里**
+   `cli`／`feedback-process-entry`／`public-sdk` ⇒ `私有 GUI 包` **既无公开入口、也不在 `exports` 里**
    ⇒ 消费者装上隔离 tarball **拿不到 GUI**，卡内那句"隔离 tarball 打开 GUI 复验"**此前根本无法执行**。
-   已补 `私有 GUI 包（已迁出）/src/public-gui.ts` ＋ `tsup` entry ＋ `exports["./gui"]`，
+   已补 `私有 GUI 包/src/public-gui.ts` ＋ `tsup` entry ＋ `exports["./gui"]`，
    并新增包级验收脚本 `npm run verify:gui-package`（**exit 0、6/6**）。
 2. **一处"定位但未修"的 Linux-only 缺陷已不再复现**（第 54 轮，`9c56427`）：
    2026-10-10 报告记的 `authorization-retry-closure` ①（`非法状态迁移: T-001 pending → done`

@@ -9,8 +9,8 @@
 | --- | --- |
 | `packages/core/src/application/application-runtime.ts` | 暴露 `humanVerificationController`、`contextClosureCapsuleStore`、`contextGraphStore`（原本仅内部局部变量），使 GUI/SDK 与产品任务路径共用同一核验与上下文存储 |
 | `packages/core/src/public-sdk.ts` | 新增 `PublicPendingVerification`/`PublicVerificationDecisionResult`；新增 `listPendingVerifications()`（按 owner `agentInstanceId` 分组，不合并上下文）与 `recordVerificationDecision()`（读延迟核验任务 → 按胶囊内容哈希定位所属 mission/图 → 签收或否决；域错误码映射；跨 Agent 一律 404） |
-| `私有 GUI 包（已迁出）/src/server/gui-server.ts` | 端口新增 `listPendingVerifications`/`recordVerificationDecision`；新增 `GET /verifications`、`POST /commands/verification-decision`（404 未找到/无上下文、409 签字过期、能力缺失 501）；页面新增"待追认（按 Agent 隔离）"面板，逐条绑定 owner 与追认/否决按钮 |
-| `私有 GUI 测试（已迁出）/integration/gui-verification-decision.test.ts`（新，4 用例） | 真实 Devolve 任务链路：列表、追认落盘、跨 Agent 拒绝、陈旧签字 409、否决重开节点 |
+| `私有 GUI 包/src/server/gui-server.ts` | 端口新增 `listPendingVerifications`/`recordVerificationDecision`；新增 `GET /verifications`、`POST /commands/verification-decision`（404 未找到/无上下文、409 签字过期、能力缺失 501）；页面新增"待追认（按 Agent 隔离）"面板，逐条绑定 owner 与追认/否决按钮 |
+| `私有 GUI 测试/integration/gui-verification-decision.test.ts`（新，4 用例） | 真实 Devolve 任务链路：列表、追认落盘、跨 Agent 拒绝、陈旧签字 409、否决重开节点 |
 
 无新依赖；核验任务/胶囊/图的读写全部经真实控制器，GUI 不复制核验或恢复状态机；不同 Agent 的待追认项按 owner 分列，签收只写入该 owner 的存档。
 
@@ -39,7 +39,7 @@
 | --- | --- |
 | `npx tsc --noEmit` | 0 |
 | `npx eslint .` | 0 |
-| `npx vitest run 私有 GUI 测试（已迁出）` | 0；**32 passed**（6 文件；本检查点新增 4 用例） |
+| `npx vitest run 私有 GUI 测试` | 0；**32 passed**（6 文件；本检查点新增 4 用例） |
 | 关联回归（public-sdk / application-sdk-task-events / context-node-lifecycle / human-verification-controller） | 0；27 passed |
 | `npm run check` / `npm run test:coverage` | **未完成（不得视为通过）**：受限沙箱下 `tsup`（esbuild 服务）与 forks 池报 `spawn EPERM`；升级重试 2 次均在审批通道等待 600s 超时、命令未执行 |
 

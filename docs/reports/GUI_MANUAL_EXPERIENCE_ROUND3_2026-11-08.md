@@ -112,7 +112,7 @@ mission-status-done: mission 已处于终态（done/cancelled），禁止重复�
   没有去读页面**」—— 根因是 `#recovery` 等 **5 个会被整块替换的列表容器**自己挂着
   `aria-live="polite"`，翻页时整批 20 条被替换 ⇒ 念整批列表、**淹没状态播报**。
   已修（摘掉这 5 个容器的 `aria-live`，状态文本区全部保留，18 → 13 个 live 区），
-  提交 `0a81e8c`，反例 `私有 GUI 测试（已迁出）/integration/gui-accessibility-live-regions.test.ts`（首跑①红）。
+  提交 `0a81e8c`，反例 `私有 GUI 测试/integration/gui-accessibility-live-regions.test.ts`（首跑①红）。
   **⚠️ 精确边界**：人工确认的是**翻页状态区**（`#recovery-paging`）；
   其余状态区未被逐个念过，但"列表容器不得是 live 区"已由反例**自动守卫**。
 - 恢复中心的**分页/可恢复项优先显示**：待用户定夺后实施。

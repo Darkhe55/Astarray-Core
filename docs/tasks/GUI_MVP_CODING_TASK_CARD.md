@@ -42,7 +42,7 @@ B6R-10 → GUI-01 → T08B
 - 不引入 Electron、Tauri、Vite、WebSocket 库、图表库、CSS 框架或其他新依赖。
 - 开始编码前先询问用户是否已有完成任务所需的可用依赖或工具；现有依赖足够时不得执行安装。
 - 若确认必须增加依赖，本卡立即暂停，只有独立安装开关开启且用户对精确包名、版本和参数逐次授权后才能继续。
-- GUI 源码放在 `私有 GUI 包（已迁出）/src/`，测试放在 `私有 GUI 测试（已迁出）/`。
+- GUI 源码放在 `私有 GUI 包/src/`，测试放在 `私有 GUI 测试/`。
 - GUI 可以依赖 Core；Core、TUI 不得依赖 GUI，GUI 不得依赖 Ink 或 TUI 内部组件。
 
 ### 3.2 建议文件边界
@@ -50,7 +50,7 @@ B6R-10 → GUI-01 → T08B
 单卡最多修改 8 个生产代码文件。建议结构：
 
 ```text
-私有 GUI 包（已迁出）/src/
+私有 GUI 包/src/
 ├─ server/gui-server.ts              # loopback HTTP、SSE、Origin/Host/CSRF 校验
 ├─ application/gui-read-model.ts     # Core → GUI 脱敏公开 DTO
 ├─ application/gui-command-port.ts   # 用户输入 → 可信本地控制面
@@ -59,7 +59,7 @@ B6R-10 → GUI-01 → T08B
    ├─ index.html                      # 页面壳
    └─ styles.css                      # 响应式布局和主题
 
-私有 GUI 测试（已迁出）/
+私有 GUI 测试/
 ├─ unit/
 ├─ component/
 ├─ integration/
@@ -117,8 +117,8 @@ astarray gui --no-open
 
 ## 6. 编码任务链
 
-1. 读取必读文档和 `私有 GUI 包（已迁出）/README.md`，检查 Git 状态并记录现有未提交修改。
-2. 先建立 `私有 GUI 测试（已迁出）/`，编写 CLI 启动、loopback 限制、Host/Origin/CSRF、脱敏 DTO、状态 revision、SSE 重连和 HTML 注入失败测试。
+1. 读取必读文档和 `私有 GUI 包/README.md`，检查 Git 状态并记录现有未提交修改。
+2. 先建立 `私有 GUI 测试/`，编写 CLI 启动、loopback 限制、Host/Origin/CSRF、脱敏 DTO、状态 revision、SSE 重连和 HTML 注入失败测试。
 3. 定义 GUI 公开 read model 与 command port；应用接口只引用 Core 的公开类型和控制器。
 4. 实现本地服务器、静态资源响应、SSE 订阅和受控关闭。
 5. 实现响应式页面、用户输入、任务 SVG、Agent/反馈/请求面板和键盘导航。
@@ -210,7 +210,7 @@ completionGate: passed | failed | blocked
 完整读取 AGENTS.md、agent-main-architecture.md、designtodo.txt、
 IMPLEMENTATION_PLAN.md、PLAN_STATUS.md、AUDIT_REMEDIATION_TASKS.md、
 docs/tasks/BATCH6_REPAIR_TASK_CARDS.md、docs/tasks/GUI_MVP_CODING_TASK_CARD.md
-和 私有 GUI 包（已迁出）/README.md。
+和 私有 GUI 包/README.md。
 
 确认 B6R-10 已通过后，本轮只执行 GUI-01，不开始 T08B。开始前先询问用户
 是否已有所需依赖和工具；默认使用 Node 内置 HTTP/SSE 与浏览器原生能力，

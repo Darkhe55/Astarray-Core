@@ -132,7 +132,7 @@ Agent仅接收不透明授权引用和公开范围说明，不接收可外传的
 >
 > - **SDK 公开方法确已存在**（`readCrossProjectResource` / `importCrossProjectResource` /
 >   `grantCrossProjectAuthorizationForAcceptance` / `listCrossProjectAuthorizations`）；
-> - **GUI 侧已有视图与断言**：`私有 GUI 测试（已迁出）/unit/project01-cross-project-gui-view.test.ts`（11 处）
+> - **GUI 侧已有视图与断言**：`私有 GUI 测试/unit/project01-cross-project-gui-view.test.ts`（11 处）
 >   与 `gui-server.test.ts`（8 处）覆盖 `/state` 快照中的 `crossProject` 字段，
 >   且**端口缺失时返回空列表而不伪造授权**（有反例）。
 > ⇒ 故"入口尚未接线"**不是**准确说法。
@@ -384,14 +384,14 @@ Agent仅接收不透明授权引用和公开范围说明，不接收可外传的
 **GUI 只读入口（2026-10-10 续）**：卡内验收要求"可追溯、不串数据"且"**人工能分辨副本与原件**"，
 而 GUI 只读快照此前完全没有跨项目信息。
 
-- `私有 GUI 包（已迁出）/src/application/gui-read-model.ts`：新增 `GuiCrossProjectView` 与纯函数
+- `私有 GUI 包/src/application/gui-read-model.ts`：新增 `GuiCrossProjectView` 与纯函数
   `buildGuiCrossProjectView()`；`GuiSnapshot.crossProject` **始终存在**（未提供时为空列表）。
   副本回执 **恒标 `isCopyOfExternalSource: true`** 并给出含"副本"字样、来源项目与 revision 的
   `displayLabel`（人工可分辨副本与原件）；
-- `私有 GUI 包（已迁出）/src/server/gui-server.ts`：`GuiApplicationPort` 新增可选
+- `私有 GUI 包/src/server/gui-server.ts`：`GuiApplicationPort` 新增可选
   `listCrossProjectAuthorizations()`；`/state` 与 SSE 首帧快照均携带；
   能力缺失或读取抛错 ⇒ 空列表（**不伪造授权、不 500**）。
-- 反例（先红后绿）：`私有 GUI 测试（已迁出）/unit/project01-cross-project-gui-view.test.ts` 4 条
+- 反例（先红后绿）：`私有 GUI 测试/unit/project01-cross-project-gui-view.test.ts` 4 条
   （实现前 **3 failed**）+ `gui-server.test.ts` 新增 1 条（`/state` 携带授权列表；能力缺失空列表不 500）。
 - **如实登记的剩余缺口**：GUI 侧的 `copyReceipts` 目前恒为空列表 —— `GuiApplicationPort`
   只暴露了授权列表，副本回执尚未经该端口提供（未伪造、未用说明文字覆盖）。
