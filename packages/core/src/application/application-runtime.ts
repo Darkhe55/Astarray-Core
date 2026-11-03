@@ -122,7 +122,11 @@ import { RecoveryCenterController } from "../orchestration/recovery-center-contr
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
-import { ScopedSettingsStore, resolveScopedContextOverride } from "../orchestration/scoped-settings-store.js";
+import {
+  ScopedSettingsStore,
+  resolveScopedContextOverride,
+  resolveScopedPermissionOverride,
+} from "../orchestration/scoped-settings-store.js";
 import { ScopedPermissionChangeService } from "../orchestration/scoped-permission-change-service.js";
 import {
   WorkWindowDeferredMissionStore,
@@ -2906,6 +2910,8 @@ export async function createApplicationRuntime(
     workspaceRootPath?: string;
     /** 本任务所属项目（用于读取该项目的文件夹授权并扩展边界）。 */
     projectIdentifier?: string;
+    /** ADR-0205：稳定会话标识（会话级权限覆盖优先于项目）。 */
+    conversationIdentifier?: string;
     missionIdentifier?: string;
     taskIdentifier?: string;
   }): PolicyWrapper => {
@@ -2930,10 +2936,11 @@ export async function createApplicationRuntime(
                 .map((grant) => grant.normalizedRootPath);
             },
           });
-    const scopedPermission =
-      input.projectIdentifier === undefined
-        ? undefined
-        : scopedSettingsStore.getCached().projects[input.projectIdentifier]?.permission;
+    const scopedPermission = resolveScopedPermissionOverride({
+      document: scopedSettingsStore.getCached(),
+      projectIdentifier: input.projectIdentifier ?? null,
+      conversationIdentifier: input.conversationIdentifier ?? null,
+    });
     let effectivePermissionProfileReference: PermissionProfileReference =
       currentPermissionProfileReference;
     if (scopedPermission?.permissionProfileId != null) {
@@ -3855,6 +3862,7 @@ export async function createApplicationRuntime(
       workspaceRootPath?: string,
       projectIdentifier?: string,
       missionIdentifier?: string,
+      conversationIdentifier?: string,
     ) => {
       const policyPort = new ScopeGatedToolPort(
         createPolicyWrapperForAgent({
@@ -3867,6 +3875,7 @@ export async function createApplicationRuntime(
           taskIdentifier: task.id,
           ...(workspaceRootPath === undefined ? {} : { workspaceRootPath }),
           ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
+          ...(conversationIdentifier === undefined ? {} : { conversationIdentifier }),
         }),
         scopeAuthorizationGate,
       );

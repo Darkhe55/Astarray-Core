@@ -46,3 +46,12 @@ tests/core --no-file-parallelism → 496 files / 3677 tests 通过
 - 结论：GUI 可以写会话权限覆盖，但当前不会生效。**不得**把它当作已生效功能；
   后续需在任务启动时把 conversationIdentifier 解析好并传入策略层（异步预解析），或提供异步权限组 provider。
 - 本 ADR 的上下文预算修复不受影响（已有 `resolveScopedContextOverride`）。
+
+## 6. 2026-11-04 接线：会话权限覆盖已消费
+
+- 新增纯函数 `resolveScopedPermissionOverride`（会话优先、缺会话回退项目、mission 不得顶替）；
+- 控制器在 worker 工具端口工厂中传入 `missionConversationIdentifiers.get(missionId)`
+  （稳定会话标识，不是 missionId）；
+- 策略工厂用该标识解析会话权限覆盖，再回退项目覆盖；
+- 验证：解析器单测（会话优先/回退项目/mission 不替代）；公开库全量 **598 files / 4193 tests** 通过。
+- 仍受既有不可配置安全不变量与权限组校验约束。

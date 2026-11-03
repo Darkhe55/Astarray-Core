@@ -367,6 +367,8 @@ export interface MainControllerOptions {
     /** 可选：该任务所属项目（读取文件夹授权扩展边界）。 */
     projectIdentifier?: string,
     missionIdentifier?: string,
+    /** ADR-0205：稳定会话标识（会话级权限覆盖）。 */
+    conversationIdentifier?: string,
   ) => ToolPort;
   /**
    * E2E-01-03 S2b：把**恢复检查点装饰器**套在 worker 工具端口**最外层**。
@@ -4227,6 +4229,7 @@ export class MainController {
       this.missionWorkspaceRootPaths.get(missionId),
       this.missionProjectIdentifiers.get(missionId),
       missionId,
+      this.missionConversationIdentifiers.get(missionId),
     );
     const buildCheckpointingPort = this.options.buildRecoveryCheckpointingToolPort;
     const portWithCheckpointing =
