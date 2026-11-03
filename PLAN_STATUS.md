@@ -5004,3 +5004,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ⑥ 恢复后自动继续：replan 后同一 mission 再注入被接受（语义确认 + 测试）。
 > **验证**：全量 **3659 tests 全通过**；typecheck/lint/build 绿。ADR-0201。
 > **未做**：真实 12 组全只读 mission（模型稳定性限制）、真实混合组、自动重放失败任务（明确不做）。
+
+> **220（R147）：ALIGN-01-03 主 Agent 提案自动入口（部分闭合）**：新增
+> `extractMainAgentProposalPayload`（纯函数）与 `isMainAgentProposalAutoSubmitEnabled`（缺省关）——
+> ponder 回答若为提案 JSON 则调用既有 `submitMainAgentTaskProposal`，失败只升级说明；
+> 门面/运行时透传开关。**默认未开启**，assist 主 Agent 回合仍缺（架构项）。
+> **验证**：单测 5/5；全量 **3664 tests**；typecheck/lint/build 绿。ADR-0202。

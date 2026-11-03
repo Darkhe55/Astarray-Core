@@ -115,6 +115,7 @@ import type {
   RecordIndependentVerdictInput,
 } from "./independent-review-gate.js";
 import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
+import { extractMainAgentProposalPayload } from "./main-agent-proposal-autosubmit.js";
 import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
 import {
   MAIN_AGENT_TURN_BUDGET_MILLISECONDS,
@@ -501,6 +502,13 @@ export interface MainControllerOptions {
   reportArchiveIngestor?: MainAgentReportArchiveIngestor | null;
   /** B6R-09：对话任务插入控制面（主 Agent 提案；本地验证来源/优先级/锚点）。 */
   conversationTaskInsertionController?: ConversationTaskInsertionController | null;
+  /**
+   * R147（2026-11-03）：**主 Agent 自动提交任务提案**（缺省关）。
+   *
+   * 开启后，ponder 模式的主 Agent 输出若以 JSON 提案结尾，则由本地控制面解析并提交；
+   * 解析/校验失败只升级说明，不伪造"已提交"。
+   */
+  isMainAgentProposalAutoSubmitEnabled?: boolean;
   /**
    * ALIGN-01-01（2026-10-28）：**稳定会话 → 主个体 → 运行**的持久映射。
    *
@@ -1515,6 +1523,29 @@ export class MainController {
    * - 匿名（无认证用户）**不登记**：宁可没有序列记录，也不伪造用户来源；
    * - 未装配序列控制面 ⇒ 返回 null（旧行为），下游按"无权威来源"处理。
    */
+  /**
+   * R147（2026-11-03）：**从主 Agent 输出中自动提取并提交提案**（缺省关）。
+   *
+   * 只接受"整段就是 JSON 对象"的输出；不是 JSON / 不是提案结构 ⇒ 静默忽略。
+   * 解析成功但本地校验拒绝 ⇒ 抛出，由调用方升级说明（不伪造已提交）。
+   */
+  private async tryAutoSubmitMainAgentProposal(
+    answerText: string,
+    conversationIdentifier: string | null,
+  ): Promise<void> {
+    const record = extractMainAgentProposalPayload(answerText);
+    if (record === null) {
+      return;
+    }
+    const result = await this.submitMainAgentTaskProposal(
+      record,
+      conversationIdentifier === null ? {} : { conversationIdentifier },
+    );
+    this.options.streamOutput(
+      null,
+      `[主 Agent 提案已提交] ${result.proposalIdentifier} → ${result.targetSecondaryAgentInstanceIdentifier}`,
+    );
+  }
   private async registerUserTaskInSequence(input: {
     readonly missionId: string;
     readonly instructionText: string;
@@ -3502,6 +3533,7 @@ export class MainController {
       deadlineSignal,
     ]);
     let streamedCharacterCount = 0;
+    let answerText = "";
     let outcome: MainAgentTurnOutcome = "completed";
     try {
       const events =
@@ -3516,6 +3548,7 @@ export class MainController {
       for await (const event of events) {
         if (event.kind === "textDelta") {
           streamedCharacterCount += event.deltaText.length;
+          answerText += event.deltaText;
           this.options.streamOutput(null, event.deltaText);
         }
       }
@@ -3527,6 +3560,18 @@ export class MainController {
       } else {
         throw error;
       }
+    }
+    /** R147：可选自动提交提案（失败只升级，不改变本轮回答）。 */
+    if (this.options.isMainAgentProposalAutoSubmitEnabled === true) {
+      await this.tryAutoSubmitMainAgentProposal(
+        answerText,
+        conversationIdentity?.conversationIdentifier ?? null,
+      ).catch((error: unknown) => {
+        this.options.streamOutput(
+          null,
+          `[主 Agent 提案未提交] ${(error as Error).message}`,
+        );
+      });
     }
     const endedAtMilliseconds = Date.now();
     const progressRecord = buildMainAgentTurnProgressRecord({

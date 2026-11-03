@@ -553,6 +553,8 @@ export interface ApplicationRuntime {
 }
 
 export interface ApplicationRuntimeOptions {
+  /** R147：主 Agent 自动提交提案（缺省关；ponder 模式）。 */
+  isMainAgentProposalAutoSubmitEnabled?: boolean;
   missionRuntimePreparer?: (input: {
     missionId: string;
     projectIdentifier: string | null;
@@ -3620,6 +3622,7 @@ export async function createApplicationRuntime(
     registeredAgentDirectory,
     reportArchiveIngestor,
     conversationTaskInsertionController,
+    isMainAgentProposalAutoSubmitEnabled: options.isMainAgentProposalAutoSubmitEnabled,
     secondaryDispatchLoop,
     tertiaryLifecycleController,
     tertiaryRuntimeComponents,
