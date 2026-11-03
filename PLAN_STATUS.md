@@ -5050,3 +5050,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 有界等待默认 5s，超时抛 `scoped-settings-lock-timeout`；仅持锁进程不存在时接管，存活者不删；
 > 释放校验 token。**验证**：存储测试 12/12；全量串行 **498 files / 3686 tests**；typecheck/lint/build 绿。
 > ADR-0204 §6。**未做**：历史回滚入口、GUI 保存事务（GUI-04-03）、自动恢复（GUI-04-06）。
+
+> **228（GUI-04-06）：工作时段受控自动恢复闭环（完成）**：新增
+> `WorkWindowDeferredMissionStore`（因休息被挡的 mission 去重记账）+ `resumeDeferredWorkWindowMissions`
+> （按序恢复、成功/已运行移除、被拒保留）；三处门禁拒绝登记；检测器 rest→working 自动恢复
+> （默认开、可关）；GUI 显式开启检测器；门面透传两个开关。
+> **验证**：纯语义 3/3 + 登记集成 1/1；UI 接线 1/1；公开串行 **500 files / 3690 tests**，外部 98/674。ADR-0207。
+> **未做**：跨时段真实触发端到端、被拒退避/告警、多进程恢复互斥（依赖 already-running 与移除）。

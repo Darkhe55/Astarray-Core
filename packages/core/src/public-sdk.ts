@@ -2069,6 +2069,10 @@ export interface PublicApplicationOptions {
    * 缺省时运行时按既有约定回退为 `"workspace"`（**行为不变**）。
    */
   projectIdentifier?: string;
+  /** GUI-04-06：开启时段检测器（缺省关闭；GUI 作为宿主显式开启）。 */
+  isWorkWindowResumeMonitorEnabled?: boolean;
+  /** GUI-04-06：rest→working 时自动恢复被休息挡住的 mission（缺省开启）。 */
+  isWorkWindowAutoResumeEnabled?: boolean;
   mode: AgentMode;
   /** 运行时选择：mock（离线）或 provider（真实 Provider，T07D-R2）。 */
   runtime?: "mock" | "provider";
@@ -2724,6 +2728,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       ...(options.projectIdentifier === undefined
         ? {}
         : { projectIdentifier: options.projectIdentifier }),
+      ...(options.isWorkWindowResumeMonitorEnabled === undefined
+        ? {}
+        : { isWorkWindowResumeMonitorEnabled: options.isWorkWindowResumeMonitorEnabled }),
+      ...(options.isWorkWindowAutoResumeEnabled === undefined
+        ? {}
+        : { isWorkWindowAutoResumeEnabled: options.isWorkWindowAutoResumeEnabled }),
       concurrency: options.concurrency ?? 1,
       failureThreshold: options.failureThreshold ?? 1,
       maxLoopIterations: options.maximumLoopIterations ?? 8,
