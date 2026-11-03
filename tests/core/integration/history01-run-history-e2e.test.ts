@@ -160,9 +160,14 @@ describe("HISTORY-01-02 端到端：真实任务产生运行历史", () => {
     }
     await application.shutdown();
 
-    // 关键断言：历史文件真的存在
+    // 关键断言：历史文件真的存在（落盘是异步的：轮询最多 5s，避免负载下假失败）
     const runHistoryDirectory = path.join(stateDirectory, "run-history");
-    const historyFiles = await fs.readdir(runHistoryDirectory).catch(() => [] as string[]);
+    let historyFiles = await fs.readdir(runHistoryDirectory).catch(() => [] as string[]);
+    const historyDeadline = Date.now() + 5_000;
+    while (historyFiles.length === 0 && Date.now() < historyDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      historyFiles = await fs.readdir(runHistoryDirectory).catch(() => [] as string[]);
+    }
     expect(historyFiles.length).toBeGreaterThan(0);
 
     const historyContent = await fs.readFile(
