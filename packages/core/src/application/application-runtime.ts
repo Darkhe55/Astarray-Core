@@ -122,7 +122,7 @@ import { RecoveryCenterController } from "../orchestration/recovery-center-contr
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
-import { ScopedSettingsStore } from "../orchestration/scoped-settings-store.js";
+import { ScopedSettingsStore, resolveScopedContextOverride } from "../orchestration/scoped-settings-store.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
 import type { MissionRuntimeLease } from "../orchestration/mission-runtime-registry.js";
@@ -2516,12 +2516,12 @@ export async function createApplicationRuntime(
         const globalPolicy = await globalContextBudgetStore.readPolicy();
         const scoped = await scopedSettingsStore.read();
         const missionSummary = await missionManager.readSummary(input.missionId).catch(() => null);
-        const projectIdentifier = missionSummary?.projectIdentifier ?? null;
-        const projectContext = projectIdentifier === null
-          ? undefined
-          : scoped.projects[projectIdentifier]?.context;
-        const sessionContext = scoped.sessions[input.missionId]?.context;
-        const override = sessionContext ?? projectContext;
+        /** GUI-04-04：会话覆盖按稳定会话解析，不用 missionId 顶替。 */
+        const override = resolveScopedContextOverride({
+          document: scoped,
+          projectIdentifier: missionSummary?.projectIdentifier ?? null,
+          conversationIdentifier: missionSummary?.conversationIdentifier ?? null,
+        });
         if (override === undefined) return globalPolicy;
         return {
           configuredMaximumGlobalContextTokenCount:
