@@ -2173,6 +2173,8 @@ export interface PublicApplicationOptions {
    * G5（2026-11-08 第 235 轮）：**早停 ⇒ 从检查点有界续跑**（缺省关）。
    * 仅当工具循环明确上报早停、且本任务续跑次数 < 2 时续跑。
    */
+  /** R147：主 Agent 自动提交提案（缺省关；ponder 模式输出为 JSON 提案时提交）。 */
+  isMainAgentProposalAutoSubmitEnabled?: boolean;
   isCheckpointResumeEnabled?: boolean;
   /** G1（第 245 轮）：**Git 集成**（缺省不启用）。传入即构造分配器/验证器/报告存储/恢复点/协调器。
    *  ⚠️ 不含目标分支合并（AGENTS.md 五道门禁）⇒ 本层无"自动合并"开关。 */
@@ -2751,6 +2753,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         ? {}
         : { missionToolCallBudget: options.missionToolCallBudget }),
       isCheckpointResumeEnabled: options.isCheckpointResumeEnabled ?? false,
+      ...(options.isMainAgentProposalAutoSubmitEnabled === undefined
+        ? {}
+        : { isMainAgentProposalAutoSubmitEnabled: options.isMainAgentProposalAutoSubmitEnabled }),
       streamOutput: options.streamOutput ?? (() => {}),
       // GUI-02-01 片①：权限询问的绝对身份透传（可选；未提供则不传字段）。
       ...(options.onPermissionAskWithIdentity === undefined
