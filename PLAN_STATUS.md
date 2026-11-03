@@ -5134,3 +5134,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **241（会话权限覆盖接线）**：新增 `resolveScopedPermissionOverride`（会话优先、回退项目、
 > mission 不替代）；控制器向 worker 工具端口传 `conversationIdentifier`，策略工厂据此读取会话权限覆盖。
 > **验证**：解析器单测；公开库全量 **598 files / 4193 tests** 通过，typecheck/lint/build 绿。ADR-0205 §6。
+
+> **242（GUI-04-02 收尾）：作用域配置历史回滚入口**：`listRecoveryEntries` + `restoreRecoveryEntry`
+> （CAS、恢复前再写 recovery point、以 revision+1 写回、未知恢复点拒绝）；门面两个方法需认证用户。
+> **验证**：存储测试 14/14；公开库全量 **598 files / 4194 tests** 通过，typecheck/lint/build 绿。ADR-0204 §7。

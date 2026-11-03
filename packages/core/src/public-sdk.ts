@@ -3456,6 +3456,41 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
   }
 
+  /** GUI-04-02：列出作用域配置的可恢复历史版本（只读；最新在前）。 */
+  async listScopedSettingsRecoveryEntries(): Promise<
+    Array<{
+      recordedAtIso: string;
+      reason: string;
+      previous: ScopedSettingsDocument;
+    }>
+  > {
+    this.assertOpen();
+    return this.runtime.scopedSettingsStore.listRecoveryEntries();
+  }
+
+  /** GUI-04-02：把指定历史版本恢复为**新 revision**（需认证用户 + CAS）。 */
+  async restoreScopedSettingsRecoveryEntry(input: {
+    recordedAtIso: string;
+    expectedRevision: number;
+  }): Promise<ScopedSettingsDocument> {
+    this.assertOpen();
+    const subject = this.runtime.getAuthenticatedUserId();
+    if (subject === null) {
+      throw new PublicApplicationError(
+        "task-sequence-permission-denied",
+        "恢复作用域配置需要已认证主体。",
+      );
+    }
+    try {
+      return await this.runtime.scopedSettingsStore.restoreRecoveryEntry(input);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new PublicApplicationError(error.errorCode, error.message);
+      }
+      throw error;
+    }
+  }
+
   /** GUI-04-01：生成权限变更预览（放宽/收紧都可用于差异展示）。 */
   async previewScopedPermissionChange(input: {
     scope: "project" | "session";

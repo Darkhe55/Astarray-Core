@@ -57,3 +57,14 @@ typecheck / lint / build → 全绿
 
 验证：存储测试 12/12（并发只成功一个、存活持锁超时拒绝、死锁接管、写后释放）；
 全量串行 498 files / 3686 tests。
+
+## 7. 追加：历史回滚入口（2026-11-04）
+
+- `ScopedSettingsStore.listRecoveryEntries()`：解析 `recovery/history.jsonl`，
+  跳过损坏行，最新在前；
+- `restoreRecoveryEntry({recordedAtIso, expectedRevision})`：
+  CAS 校验 revision → 先用**当前**文档写新的 recovery point（reason `restore`）→
+  把历史文档以 **revision+1** 写回（不降低 revision、不改写历史）→ 原子写 + `.bak`；
+- 门面：`listScopedSettingsRecoveryEntries()` / `restoreScopedSettingsRecoveryEntry()`（需认证用户）。
+- 验证：存储测试 14/14（列出、陈旧 revision 拒绝、回滚、未知恢复点）；
+  公开库全量 598 files / 4194 tests 通过。
