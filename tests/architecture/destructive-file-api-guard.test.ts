@@ -167,6 +167,46 @@ const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }>
     reason:
       "Provider 凭据写入（经受控备份路径）+ 受保护凭据写入：受限权限临时文件写入后 rename 原子替换，写完即删临时文件（唯一额外持有敏感值的中间文件）",
   },
+  "core/src/feedback-process/transport.ts": {
+    tokens: ["rm", "writeFile", "rename"],
+    reason:
+      "反馈进程 IPC 传输：临时请求/响应文件排他写入 + rename 原子发布 + 用完即删；不含用户正文（正文走既有受控通道）",
+  },
+  "core/src/orchestration/goal-dispatch-verdict-journal.ts": {
+    tokens: ["rename", "unlink"],
+    reason:
+      "目标派发裁决日志：临时文件 rename 原子替换 + 超限旧日志清理（只保留有限历史，不删除当前账本）",
+  },
+  "core/src/orchestration/goal-invariant-archive.ts": {
+    tokens: ["rename", "rm", "writeFile"],
+    reason:
+      "目标不变量归档：快照临时写→rename 发布，归档目录清理仅针对自身生成的临时/过期归档",
+  },
+  "core/src/orchestration/scoped-settings-store.ts": {
+    tokens: ["writeFile", "unlink"],
+    reason:
+      "GUI-04-02：覆盖前 recovery 历史追加 + 跨进程锁文件 token 校验后释放（只删自己持有的锁；配置写入仍走原子写）",
+  },
+  "core/src/orchestration/tertiary-lifecycle-hooks.ts": {
+    tokens: ["writeFile"],
+    reason:
+      "三级生命周期钩子：把钩子执行结果写入自身状态文件（不含删除/改名/复制覆盖）",
+  },
+  "core/src/orchestration/work-window-deferred-mission-store.ts": {
+    tokens: ["writeFile", "unlink"],
+    reason:
+      "GUI-04-06：因休息被挡 mission 的登记文件写入 + rest→working 恢复锁 token 校验后释放（配置/登记写入走原子写）",
+  },
+  "core/src/toolkit/tool-package-zip-installer.ts": {
+    tokens: ["rmSync"],
+    reason:
+      "工具包 zip 安装：仅清理自己解压出的临时目录（rmSync 递归删临时目录），安装内容经既有校验后原子落位",
+  },
+  "tui/src/cli/goal-mode-command.ts": {
+    tokens: ["writeFile"],
+    reason:
+      "CLI 目标模式：按用户显式输入创建/更新目标定义文件（单文件写入，不删除/改名/复制覆盖）",
+  },
 };
 
 export function detectDestructiveFileApiCalls(sourceCode: string): Set<string> {
