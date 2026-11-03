@@ -123,6 +123,7 @@ import { CrossAgentContextAttachmentController } from "../orchestration/cross-ag
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
 import { ScopedSettingsStore, resolveScopedContextOverride } from "../orchestration/scoped-settings-store.js";
+import { ScopedPermissionChangeService } from "../orchestration/scoped-permission-change-service.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
 import type { MissionRuntimeLease } from "../orchestration/mission-runtime-registry.js";
@@ -424,6 +425,27 @@ export interface ApplicationRuntime {
     readonly preferences: NotificationPreferences;
     readonly revision: number;
   }>;
+  /** GUI-04-01：读取当前认证主体（未认证 ⇒ null）。 */
+  getAuthenticatedUserId: () => string | null;
+  /** GUI-04-01：生成权限放宽预览（主体由服务端注入）。 */
+  previewScopedPermissionChange: (input: {
+    readonly scope: "project" | "session";
+    readonly identifier: string;
+    readonly permissionProfileId: string;
+    readonly expectedRevision: number;
+  }) => Promise<import("../orchestration/scoped-permission-change-service.js").ScopedPermissionChangePreview>;
+  /** GUI-04-01：判断目标 profile 相对当前是否放宽（不写配置）。 */
+  isScopedPermissionChangeWidening: (input: {
+    readonly permissionProfileId: string;
+    readonly scope?: "project" | "session";
+    readonly identifier?: string;
+  }) => Promise<boolean>;
+  /** GUI-04-01：确认预览（只对这一份变更有效；重复确认幂等）。 */
+  confirmScopedPermissionChange: (input: {
+    readonly previewIdentifier: string;
+    readonly fingerprint: string;
+    readonly expectedRevision: number;
+  }) => Promise<import("../orchestration/scoped-settings-store.js").ScopedSettingsDocument>;
   /** R138：暂停后恢复（重新规划确认；只清 requiresReplanning，不自动继续）。 */
   replanGoal: (input: {
     readonly goalIdentifier: string;
@@ -1204,6 +1226,89 @@ export async function createApplicationRuntime(
     baseDirectory: stateDirectory,
   });
   await scopedSettingsStore.read();
+  /** GUI-04-01：权限放宽预览/确认（复用 profile 逐项决定与服务端主体）。 */
+  const scopedPermissionChangeService = new ScopedPermissionChangeService({
+    profileStore: permissionProfileStore,
+    scopedStore: scopedSettingsStore,
+  });
+  const getAuthenticatedUserId = (): string | null => {
+    const id = options.authenticatedUserId?.trim();
+    return id === undefined || id === "" ? null : id;
+  };
+  const previewScopedPermissionChange = async (input: {
+    readonly scope: "project" | "session";
+    readonly identifier: string;
+    readonly permissionProfileId: string;
+    readonly expectedRevision: number;
+  }) => {
+    const subject = getAuthenticatedUserId();
+    if (subject === null) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "权限放宽预览需要已认证主体。",
+      );
+    }
+    const currentProfileReference =
+      await resolveCurrentScopedProfileReference(input);
+    return scopedPermissionChangeService.preview({
+      ...input,
+      currentProfileReference,
+      subjectIdentifier: subject,
+    });
+  };
+  const resolveCurrentScopedProfileReference = async (input: {
+    readonly scope?: "project" | "session";
+    readonly identifier?: string;
+  }): Promise<
+    import("../tools/permission-profile-store.js").PermissionProfileReference | null
+  > => {
+    if (input.scope !== undefined && input.identifier !== undefined) {
+      const document = await scopedSettingsStore.read();
+      const bucket =
+        input.scope === "project" ? document.projects : document.sessions;
+      const currentProfileId =
+        bucket[input.identifier]?.permission?.permissionProfileId;
+      if (typeof currentProfileId === "string" && currentProfileId !== "") {
+        const builtinIds = new Set(["ponder", "assist", "devolve"]);
+        return builtinIds.has(currentProfileId)
+          ? {
+              kind: "builtin",
+              profileId: currentProfileId as "ponder" | "assist" | "devolve",
+            }
+          : { kind: "custom", profileId: currentProfileId };
+      }
+    }
+    return controller.getCurrentPermissionProfileReference().catch(() => null);
+  };
+  const isScopedPermissionChangeWidening = async (input: {
+    readonly permissionProfileId: string;
+    readonly scope?: "project" | "session";
+    readonly identifier?: string;
+  }): Promise<boolean> => {
+    const currentProfileReference =
+      await resolveCurrentScopedProfileReference(input);
+    return scopedPermissionChangeService.isWideningChange({
+      permissionProfileId: input.permissionProfileId,
+      currentProfileReference,
+    });
+  };
+  const confirmScopedPermissionChange = async (input: {
+    readonly previewIdentifier: string;
+    readonly fingerprint: string;
+    readonly expectedRevision: number;
+  }) => {
+    const subject = getAuthenticatedUserId();
+    if (subject === null) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "权限放宽确认需要已认证主体。",
+      );
+    }
+    return scopedPermissionChangeService.confirm({
+      ...input,
+      subjectIdentifier: subject,
+    });
+  };
   const agentModelBindingStore = new AgentModelBindingStore({ baseDirectory: stateDirectory });
   const missionRuntimeRegistry = new MissionRuntimeRegistry();
   const artifactRecordStore = new ArtifactRecordStore({ baseDirectory: stateDirectory });
@@ -4013,6 +4118,10 @@ export async function createApplicationRuntime(
     reconcileGoalTaskGroup,
     replanGoal,
     getNotificationPreferences,
+    getAuthenticatedUserId,
+    previewScopedPermissionChange,
+    confirmScopedPermissionChange,
+    isScopedPermissionChangeWidening,
     updateNotificationPreferences,
     reconcileMissionTask,
     sendMissionInstruction,

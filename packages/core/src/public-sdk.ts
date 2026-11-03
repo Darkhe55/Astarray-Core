@@ -3396,7 +3396,15 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
   }
 
-  /** GUI-03-02：CAS 写入项目/会话权限覆盖；只存引用，不改权限门禁。 */
+  /**
+   * GUI-03-02 / GUI-04-01：CAS 写入项目/会话权限覆盖。
+   *
+   * - 主体由服务端认证上下文注入（不再使用固定字符串）；
+   * - **放宽**（目标 profile 比当前更宽）必须先经
+   *   `previewScopedPermissionChange` + `confirmScopedPermissionChange`，
+   *   直接写入会被拒绝（`permission-widening-confirmation-required`）；
+   * - 收紧或恢复继承（`null`）可直接写入。
+   */
   async updateScopedPermission(input: {
     scope: "project" | "session";
     identifier: string;
@@ -3404,11 +3412,66 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     permissionProfileId: string | null;
   }): Promise<ScopedSettingsDocument> {
     this.assertOpen();
+    const subject = this.runtime.getAuthenticatedUserId();
+    if (subject === null) {
+      throw new PublicApplicationError(
+        "task-sequence-permission-denied",
+        "作用域权限写入需要已认证主体。",
+      );
+    }
+    if (
+      input.permissionProfileId !== null &&
+      (await this.runtime.isScopedPermissionChangeWidening({
+        permissionProfileId: input.permissionProfileId,
+        scope: input.scope,
+        identifier: input.identifier,
+      }))
+    ) {
+      throw new PublicApplicationError(
+        "permission-widening-confirmation-required",
+        "该变更为放宽权限：请先预览并由用户单独确认。",
+      );
+    }
     try {
       return await this.runtime.scopedSettingsStore.updatePermission({
         ...input,
-        updatedByUserId: "authenticated-user",
+        updatedByUserId: subject,
       });
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new PublicApplicationError(error.errorCode, error.message);
+      }
+      throw error;
+    }
+  }
+
+  /** GUI-04-01：生成权限变更预览（放宽/收紧都可用于差异展示）。 */
+  async previewScopedPermissionChange(input: {
+    scope: "project" | "session";
+    identifier: string;
+    permissionProfileId: string;
+    expectedRevision: number;
+  }): Promise<import("./orchestration/scoped-permission-change-service.js").ScopedPermissionChangePreview> {
+    this.assertOpen();
+    try {
+      return await this.runtime.previewScopedPermissionChange(input);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new PublicApplicationError(error.errorCode, error.message);
+      }
+      throw error;
+    }
+  }
+
+  /** GUI-04-01：确认预览（只对这一份变更有效；重复确认幂等）。 */
+  async confirmScopedPermissionChange(input: {
+    previewIdentifier: string;
+    fingerprint: string;
+    expectedRevision: number;
+  }): Promise<ScopedSettingsDocument> {
+    this.assertOpen();
+    try {
+      return await this.runtime.confirmScopedPermissionChange(input);
     } catch (error) {
       if (error instanceof DomainError) {
         throw new PublicApplicationError(error.errorCode, error.message);
