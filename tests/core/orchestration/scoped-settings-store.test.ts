@@ -80,7 +80,7 @@ describe("项目/会话作用域配置", () => {
         scope: "project",
         identifier: "p",
         expectedRevision: 1,
-        configuredMaximumGlobalContextTokenCount: -1,
+        configuredMaximumGlobalContextTokenCount: -2,
         updatedByUserId: "user-a",
       }),
     ).rejects.toThrow("非负整数");
@@ -146,5 +146,60 @@ describe("GUI-04-02 覆盖前旧版本保全", () => {
     const reread = await store.read();
     expect(reread.revision).toBe(2);
     expect(reread.projects["project-a"]?.context?.configuredMaximumGlobalContextTokenCount).toBe(4096);
+  });
+});
+
+describe("GUI-04-02 恢复继承（删除覆盖字段）", () => {
+  it("上下文 -1 与权限 null ⇒ 删除对应字段，而非写 0/null", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "astarray-scoped-clear-"));
+    directories.push(directory);
+    const store = new ScopedSettingsStore({ baseDirectory: directory });
+    await store.updateContext({
+      scope: "project",
+      identifier: "project-a",
+      expectedRevision: 1,
+      configuredMaximumGlobalContextTokenCount: 4096,
+      updatedByUserId: "user-a",
+    });
+    await store.updatePermission({
+      scope: "project",
+      identifier: "project-a",
+      expectedRevision: 2,
+      permissionProfileId: "profile-x",
+      updatedByUserId: "user-a",
+    });
+
+    const clearedPermission = await store.updatePermission({
+      scope: "project",
+      identifier: "project-a",
+      expectedRevision: 3,
+      permissionProfileId: null,
+      updatedByUserId: "user-a",
+    });
+    expect(clearedPermission.projects["project-a"]?.permission).toBeUndefined();
+    expect(clearedPermission.projects["project-a"]?.context).toBeDefined();
+
+    const clearedContext = await store.updateContext({
+      scope: "project",
+      identifier: "project-a",
+      expectedRevision: 4,
+      configuredMaximumGlobalContextTokenCount: -1,
+      updatedByUserId: "user-a",
+    });
+    expect(clearedContext.projects["project-a"]).toBeUndefined();
+    expect(clearedContext.revision).toBe(5);
+  });
+
+  it("非法负值（-2）被拒", async () => {
+    const store = await createStore();
+    await expect(
+      store.updateContext({
+        scope: "project",
+        identifier: "project-a",
+        expectedRevision: 1,
+        configuredMaximumGlobalContextTokenCount: -2,
+        updatedByUserId: "user-a",
+      }),
+    ).rejects.toThrow(/恢复继承/);
   });
 });
