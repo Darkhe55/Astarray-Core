@@ -5130,3 +5130,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `scoped.sessions[...]` 权限覆盖无读取方，且同步策略工厂拿不到稳定会话标识。
 > 已在 ADR-0205 §5 记为已知缺口；GUI 写入该值当前不生效（不算已交付）。
 > 未改代码。
+
+> **241（会话权限覆盖接线）**：新增 `resolveScopedPermissionOverride`（会话优先、回退项目、
+> mission 不替代）；控制器向 worker 工具端口传 `conversationIdentifier`，策略工厂据此读取会话权限覆盖。
+> **验证**：解析器单测；公开库全量 **598 files / 4193 tests** 通过，typecheck/lint/build 绿。ADR-0205 §6。

@@ -47,6 +47,27 @@ export interface ScopedSettingsDocument {
   >;
 }
 
+/**
+ * ADR-0205 补充：**会话权限覆盖的解析**（会话优先于项目；mission 不得顶替会话）。
+ */
+export function resolveScopedPermissionOverride(input: {
+  readonly document: ScopedSettingsDocument;
+  readonly projectIdentifier: string | null;
+  readonly conversationIdentifier: string | null;
+}): ScopedPermissionOverride | undefined {
+  if (input.conversationIdentifier !== null && input.conversationIdentifier !== "") {
+    const sessionPermission =
+      input.document.sessions[input.conversationIdentifier]?.permission;
+    if (sessionPermission !== undefined) {
+      return sessionPermission;
+    }
+  }
+  if (input.projectIdentifier === null || input.projectIdentifier === "") {
+    return undefined;
+  }
+  return input.document.projects[input.projectIdentifier]?.permission;
+}
+
 export interface ScopedSettingsStoreOptions {
   baseDirectory: string;
   nowMilliseconds?: () => number;

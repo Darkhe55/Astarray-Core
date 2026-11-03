@@ -341,3 +341,54 @@ describe("GUI-04-02 跨进程写锁", () => {
     await expect(fs.stat(lockPath)).rejects.toThrow();
   });
 });
+
+describe("ADR-0205 会话权限覆盖解析", () => {
+  it("会话优先；缺会话回退项目；mission 不能顶替会话", async () => {
+    const { resolveScopedPermissionOverride } = await import(
+      "../../../packages/core/src/orchestration/scoped-settings-store.js"
+    );
+    const document = {
+      schemaVersion: 1 as const,
+      revision: 5,
+      projects: {
+        "project-a": {
+          permission: {
+            permissionProfileId: "assist",
+            updatedAtIso: "t",
+            updatedByUserId: "u",
+          },
+        },
+      },
+      sessions: {
+        "conversation-a": {
+          permission: {
+            permissionProfileId: "devolve",
+            updatedAtIso: "t",
+            updatedByUserId: "u",
+          },
+        },
+      },
+    };
+    expect(
+      resolveScopedPermissionOverride({
+        document,
+        projectIdentifier: "project-a",
+        conversationIdentifier: "conversation-a",
+      })?.permissionProfileId,
+    ).toBe("devolve");
+    expect(
+      resolveScopedPermissionOverride({
+        document,
+        projectIdentifier: "project-a",
+        conversationIdentifier: null,
+      })?.permissionProfileId,
+    ).toBe("assist");
+    expect(
+      resolveScopedPermissionOverride({
+        document,
+        projectIdentifier: null,
+        conversationIdentifier: "mission-1",
+      }),
+    ).toBeUndefined();
+  });
+});
