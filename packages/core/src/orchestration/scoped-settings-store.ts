@@ -4,6 +4,7 @@
  * 只存**覆盖值**，应用默认值仍由现有 store 提供；读取方必须显式合并。
  * 每次写入使用 expectedRevision CAS、原子写和备份，不直接改权限门禁。
  */
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -49,6 +50,12 @@ export interface ScopedSettingsDocument {
 export interface ScopedSettingsStoreOptions {
   baseDirectory: string;
   nowMilliseconds?: () => number;
+  /** GUI-04-02：跨进程写锁等待上限（默认 5000ms）。 */
+  lockTimeoutMilliseconds?: number;
+  /** GUI-04-02：锁持有者标识前缀（默认 scoped-settings；测试可注入）。 */
+  ownerIdentifier?: string;
+  /** GUI-04-02：进程存活判定（默认 process.kill(pid, 0)；测试可注入）。 */
+  isProcessAlive?: (pid: number) => boolean;
 }
 
 /**
@@ -76,6 +83,15 @@ export function resolveScopedContextOverride(input: {
   return input.document.projects[input.projectIdentifier]?.context;
 }
 
+function defaultIsProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 function emptyDocument(): ScopedSettingsDocument {
   return { schemaVersion: 1, revision: 1, projects: {}, sessions: {} };
 }
@@ -84,6 +100,10 @@ export class ScopedSettingsStore {
   private readonly filePath: string;
   private readonly backupFilePath: string;
   private readonly recoveryDirectoryPath: string;
+  private readonly lockFilePath: string;
+  private readonly lockTimeoutMilliseconds: number;
+  private readonly ownerIdentifier: string;
+  private readonly isProcessAlive: (pid: number) => boolean;
   private readonly nowMilliseconds: () => number;
   private readonly storeLock = new AsyncMutex();
   private cachedDocument: ScopedSettingsDocument | null = null;
@@ -93,7 +113,83 @@ export class ScopedSettingsStore {
     this.filePath = path.join(directory, "settings.json");
     this.backupFilePath = path.join(directory, "settings.json.bak");
     this.recoveryDirectoryPath = path.join(directory, "recovery");
+    this.lockFilePath = path.join(directory, "settings.lock");
+    this.lockTimeoutMilliseconds = options.lockTimeoutMilliseconds ?? 5_000;
+    this.ownerIdentifier = `${options.ownerIdentifier ?? "scoped-settings"}:${process.pid}`;
+    this.isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
     this.nowMilliseconds = options.nowMilliseconds ?? (() => Date.now());
+  }
+
+  /**
+   * GUI-04-02：**跨进程写锁**（目录级独占文件锁）。
+   *
+   * - 持锁者记录 pid + token；等待有界（默认 5s）；
+   * - 只有**持锁进程已不存在**时才接管；存活进程即使超过 expiresAt 也不删除（只等待到超时）；
+   * - 超时抛 `scoped-settings-lock-timeout`（不静默并发写）。
+   */
+  private async acquireCrossProcessLock(
+    reason: string,
+  ): Promise<{ release: () => Promise<void> }> {
+    const deadline = this.nowMilliseconds() + this.lockTimeoutMilliseconds;
+    const token = `${this.ownerIdentifier}:${randomUUID()}`;
+    const payload = JSON.stringify({
+      token,
+      pid: process.pid,
+      ownerIdentifier: this.ownerIdentifier,
+      reason,
+      acquiredAtIso: new Date(this.nowMilliseconds()).toISOString(),
+    });
+    await fs.mkdir(path.dirname(this.lockFilePath), { recursive: true });
+    for (;;) {
+      try {
+        const handle = await fs.open(this.lockFilePath, "wx");
+        try {
+          await handle.writeFile(payload, "utf8");
+        } finally {
+          await handle.close();
+        }
+        return {
+          release: async () => {
+            try {
+              const raw = await fs.readFile(this.lockFilePath, "utf8");
+              const holder = JSON.parse(raw) as { token?: unknown };
+              if (holder.token === token) {
+                await fs.unlink(this.lockFilePath);
+              }
+            } catch {
+              // 已被接管/删除 ⇒ 无需释放
+            }
+          },
+        };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+          throw error;
+        }
+      }
+      let holderPid: number | null = null;
+      let isParsed = false;
+      try {
+        const raw = await fs.readFile(this.lockFilePath, "utf8");
+        const holder = JSON.parse(raw) as { pid?: unknown };
+        holderPid = typeof holder.pid === "number" ? holder.pid : null;
+        isParsed = typeof holder.pid === "number";
+      } catch {
+        // 读不到/半写入 ⇒ 保持 isParsed=false，按"正在获取"等待。
+      }
+      if (isParsed && holderPid !== null && !this.isProcessAlive(holderPid)) {
+        // 持锁进程已不存在 ⇒ 允许接管；并发接管时 wx 仍只有一个赢家。
+        await fs.unlink(this.lockFilePath).catch(() => undefined);
+        continue;
+      }
+      // 锁刚创建但内容尚未写完（或损坏）⇒ 视为"正在获取"，等待而非抢占。
+      if (this.nowMilliseconds() >= deadline) {
+        throw new DomainError(
+          "scoped-settings-lock-timeout",
+          `作用域配置写锁等待超时（持有者 pid=${String(holderPid)}）。`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
   }
 
   async read(): Promise<ScopedSettingsDocument> {
@@ -179,47 +275,52 @@ export class ScopedSettingsStore {
       );
     }
     return this.storeLock.runExclusive(async () => {
-      const current = await this.read();
-      if (current.revision !== input.expectedRevision) {
-        throw new DomainError(
-          "stale-revision",
-          "作用域配置 revision 不匹配: 现有 " +
-            current.revision +
-            "，期望 " +
-            input.expectedRevision,
-        );
-      }
-      const bucket = input.scope === "project" ? current.projects : current.sessions;
-      const previous = bucket[input.identifier] ?? {};
-      /** GUI-04-02：`-1` 表示恢复继承 ⇒ 删除 context 字段（不是写 0）。 */
-      const isClear = input.configuredMaximumGlobalContextTokenCount === -1;
-      const nextEntry = { ...previous };
-      if (isClear) {
-        delete (nextEntry as { context?: unknown }).context;
-      } else {
-        (nextEntry as { context?: unknown }).context = {
-          configuredMaximumGlobalContextTokenCount:
-            input.configuredMaximumGlobalContextTokenCount,
-          updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
-          updatedByUserId: input.updatedByUserId,
+      const fileLock = await this.acquireCrossProcessLock("update-context");
+      try {
+        const current = await this.read();
+        if (current.revision !== input.expectedRevision) {
+          throw new DomainError(
+            "stale-revision",
+            "作用域配置 revision 不匹配: 现有 " +
+              current.revision +
+              "，期望 " +
+              input.expectedRevision,
+          );
+        }
+        const bucket = input.scope === "project" ? current.projects : current.sessions;
+        const previous = bucket[input.identifier] ?? {};
+        /** GUI-04-02：`-1` 表示恢复继承 ⇒ 删除 context 字段（不是写 0）。 */
+        const isClear = input.configuredMaximumGlobalContextTokenCount === -1;
+        const nextEntry = { ...previous };
+        if (isClear) {
+          delete (nextEntry as { context?: unknown }).context;
+        } else {
+          (nextEntry as { context?: unknown }).context = {
+            configuredMaximumGlobalContextTokenCount:
+              input.configuredMaximumGlobalContextTokenCount,
+            updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
+            updatedByUserId: input.updatedByUserId,
+          };
+        }
+        const nextBucket = { ...bucket };
+        if (Object.keys(nextEntry).length === 0) {
+          delete nextBucket[input.identifier];
+        } else {
+          nextBucket[input.identifier] = nextEntry;
+        }
+        const next: ScopedSettingsDocument = {
+          ...current,
+          revision: current.revision + 1,
+          [input.scope === "project" ? "projects" : "sessions"]: nextBucket,
         };
+        await this.captureRecoveryPoint(current, "update");
+        await writeAtomicJson(this.filePath, next);
+        await backupExistingFile(this.filePath, this.backupFilePath);
+        this.cachedDocument = next;
+        return next;
+      } finally {
+        await fileLock.release();
       }
-      const nextBucket = { ...bucket };
-      if (Object.keys(nextEntry).length === 0) {
-        delete nextBucket[input.identifier];
-      } else {
-        nextBucket[input.identifier] = nextEntry;
-      }
-      const next: ScopedSettingsDocument = {
-        ...current,
-        revision: current.revision + 1,
-        [input.scope === "project" ? "projects" : "sessions"]: nextBucket,
-      };
-      await this.captureRecoveryPoint(current, "update");
-      await writeAtomicJson(this.filePath, next);
-      await backupExistingFile(this.filePath, this.backupFilePath);
-      this.cachedDocument = next;
-      return next;
     });
   }
 
@@ -234,45 +335,50 @@ export class ScopedSettingsStore {
       throw new DomainError("invalid-task-chain", "作用域标识不能为空。");
     }
     return this.storeLock.runExclusive(async () => {
-      const current = await this.read();
-      if (current.revision !== input.expectedRevision) {
-        throw new DomainError(
-          "stale-revision",
-          "作用域配置 revision 不匹配: 现有 " +
-            current.revision +
-            "，期望 " +
-            input.expectedRevision,
-        );
-      }
-      const bucket = input.scope === "project" ? current.projects : current.sessions;
-      const previous = bucket[input.identifier] ?? {};
-      /** GUI-04-02：`null` 表示恢复继承 ⇒ 删除 permission 字段（不是写 null）。 */
-      const nextEntry = { ...previous };
-      if (input.permissionProfileId === null) {
-        delete (nextEntry as { permission?: unknown }).permission;
-      } else {
-        (nextEntry as { permission?: unknown }).permission = {
-          permissionProfileId: input.permissionProfileId,
-          updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
-          updatedByUserId: input.updatedByUserId,
+      const fileLock = await this.acquireCrossProcessLock("update-permission");
+      try {
+        const current = await this.read();
+        if (current.revision !== input.expectedRevision) {
+          throw new DomainError(
+            "stale-revision",
+            "作用域配置 revision 不匹配: 现有 " +
+              current.revision +
+              "，期望 " +
+              input.expectedRevision,
+          );
+        }
+        const bucket = input.scope === "project" ? current.projects : current.sessions;
+        const previous = bucket[input.identifier] ?? {};
+        /** GUI-04-02：`null` 表示恢复继承 ⇒ 删除 permission 字段（不是写 null）。 */
+        const nextEntry = { ...previous };
+        if (input.permissionProfileId === null) {
+          delete (nextEntry as { permission?: unknown }).permission;
+        } else {
+          (nextEntry as { permission?: unknown }).permission = {
+            permissionProfileId: input.permissionProfileId,
+            updatedAtIso: new Date(this.nowMilliseconds()).toISOString(),
+            updatedByUserId: input.updatedByUserId,
+          };
+        }
+        const nextBucket = { ...bucket };
+        if (Object.keys(nextEntry).length === 0) {
+          delete nextBucket[input.identifier];
+        } else {
+          nextBucket[input.identifier] = nextEntry;
+        }
+        const next: ScopedSettingsDocument = {
+          ...current,
+          revision: current.revision + 1,
+          [input.scope === "project" ? "projects" : "sessions"]: nextBucket,
         };
+        await this.captureRecoveryPoint(current, "update");
+        await writeAtomicJson(this.filePath, next);
+        await backupExistingFile(this.filePath, this.backupFilePath);
+        this.cachedDocument = next;
+        return next;
+      } finally {
+        await fileLock.release();
       }
-      const nextBucket = { ...bucket };
-      if (Object.keys(nextEntry).length === 0) {
-        delete nextBucket[input.identifier];
-      } else {
-        nextBucket[input.identifier] = nextEntry;
-      }
-      const next: ScopedSettingsDocument = {
-        ...current,
-        revision: current.revision + 1,
-        [input.scope === "project" ? "projects" : "sessions"]: nextBucket,
-      };
-      await this.captureRecoveryPoint(current, "update");
-      await writeAtomicJson(this.filePath, next);
-      await backupExistingFile(this.filePath, this.backupFilePath);
-      this.cachedDocument = next;
-      return next;
     });
   }
 }

@@ -5045,3 +5045,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：公开服务测试 4/4 + 门面 2/2；UI 路由/页面 1/1；外部 check 96 files/672 tests；
 > 公开全量（串行）3683 tests 中 1 个既有 drill 用例失败、单跑 3/3（负载相关，已如实记录）。ADR-0206。
 > **未做**：跨进程预览共享、项目/会话归属与不可配置规则的逐条反例、GUI 真实点击端到端。
+
+> **227（GUI-04-02 第三步）：跨进程写锁（完成）**：`settings.lock` 独占锁（wx + token/pid），
+> 有界等待默认 5s，超时抛 `scoped-settings-lock-timeout`；仅持锁进程不存在时接管，存活者不删；
+> 释放校验 token。**验证**：存储测试 12/12；全量串行 **498 files / 3686 tests**；typecheck/lint/build 绿。
+> ADR-0204 §6。**未做**：历史回滚入口、GUI 保存事务（GUI-04-03）、自动恢复（GUI-04-06）。

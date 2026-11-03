@@ -44,3 +44,16 @@ typecheck / lint / build → 全绿
 - 两种清除都走 `expectedRevision` CAS 与覆盖前 recovery point。
 
 验证：存储测试 8/8（新增清除与 -2 拒绝）；全量 3676 tests。
+
+## 6. 追加：跨进程写锁（2026-11-03）
+
+- 写入前后在 `scoped-settings/settings.lock` 上做**目录级独占锁**（`wx` 创建 + JSON 持有者
+  `{token,pid,ownerIdentifier,reason,acquiredAtIso}`）；
+- 等待有界（默认 5s，可配 `lockTimeoutMilliseconds`）；超时抛
+  `scoped-settings-lock-timeout`，**不静默并发写**；
+- 只有**持锁进程已不存在**（`process.kill(pid,0)` 失败）才接管；
+  存活进程即使超时也不删除其锁；锁文件刚创建、内容未写完时视为"正在获取"而等待，不抢占；
+- 释放时校验 token，避免误删他人锁。
+
+验证：存储测试 12/12（并发只成功一个、存活持锁超时拒绝、死锁接管、写后释放）；
+全量串行 498 files / 3686 tests。

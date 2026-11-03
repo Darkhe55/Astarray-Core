@@ -124,6 +124,8 @@ import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
 import { ScopedSettingsStore, resolveScopedContextOverride } from "../orchestration/scoped-settings-store.js";
 import { ScopedPermissionChangeService } from "../orchestration/scoped-permission-change-service.js";
+import type { ScopedPermissionChangePreview } from "../orchestration/scoped-permission-change-service.js";
+import type { ScopedSettingsDocument } from "../orchestration/scoped-settings-store.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
 import type { MissionRuntimeLease } from "../orchestration/mission-runtime-registry.js";
@@ -433,7 +435,7 @@ export interface ApplicationRuntime {
     readonly identifier: string;
     readonly permissionProfileId: string;
     readonly expectedRevision: number;
-  }) => Promise<import("../orchestration/scoped-permission-change-service.js").ScopedPermissionChangePreview>;
+  }) => Promise<ScopedPermissionChangePreview>;
   /** GUI-04-01：判断目标 profile 相对当前是否放宽（不写配置）。 */
   isScopedPermissionChangeWidening: (input: {
     readonly permissionProfileId: string;
@@ -445,7 +447,7 @@ export interface ApplicationRuntime {
     readonly previewIdentifier: string;
     readonly fingerprint: string;
     readonly expectedRevision: number;
-  }) => Promise<import("../orchestration/scoped-settings-store.js").ScopedSettingsDocument>;
+  }) => Promise<ScopedSettingsDocument>;
   /** R138：暂停后恢复（重新规划确认；只清 requiresReplanning，不自动继续）。 */
   replanGoal: (input: {
     readonly goalIdentifier: string;
@@ -1259,9 +1261,7 @@ export async function createApplicationRuntime(
   const resolveCurrentScopedProfileReference = async (input: {
     readonly scope?: "project" | "session";
     readonly identifier?: string;
-  }): Promise<
-    import("../tools/permission-profile-store.js").PermissionProfileReference | null
-  > => {
+  }): Promise<PermissionProfileReference | null> => {
     if (input.scope !== undefined && input.identifier !== undefined) {
       const document = await scopedSettingsStore.read();
       const bucket =
