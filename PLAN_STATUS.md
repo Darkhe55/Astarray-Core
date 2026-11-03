@@ -5078,3 +5078,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：注入函数单测 1/1 + 既有 5/5；全量串行 **501 files / 3698 tests**；typecheck/lint/build 绿。
 > **仍未做**：完整"主 Agent 回合 → 自动提交"端到端（本次尝试在本地假 Provider 下回合无文本增量，
 > 未能建立可重复的回合级夹具；已放弃提交失败用例，不伪造通过）。
+
+> **232（ALIGN-01-03 回合级端到端）：主 Agent 回合确实进入自动提交**：新增
+> `tests/core/integration/main-agent-proposal-turn.test.ts`（进程内 ScriptedRuntime，不依赖网络）：
+> ponder 回合输出提案 ⇒ 提交面被调用；因目标 "scheduler:mission-1" 不存在，本地拒绝为
+> "无权管理序列"；关键断言是**不再**出现"引用不一致/必须引用用户原始任务"（证明 harness 注入生效）。
+> **验证**：全量串行 **502 files / 3699 tests**；typecheck/lint/build 绿。
+> **仍未做**：真正成功的提交（需已存在的目标次级个体与序列）；默认关闭开关的默认开启决策未改。
