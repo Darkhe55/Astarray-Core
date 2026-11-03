@@ -5020,3 +5020,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **222（B3）：通知偏好 GUI 接线（完成）**：GUI 侧新增只读/写路由（能力缺失 501、未认证 403、
 > 陈旧 revision 409）与面板服务端读写；localStorage 降级为离线缓存；私有库测试 4/4、全量 85 文件/658 用例。
 > 公开侧 ADR-0203 已同步状态（不含私有细节）。**未做**：真实浏览器人工体验、旧偏好迁移、通知产生侧端到端。
+
+> **223（GUI-04-02 第一步）：作用域配置覆盖前保全旧版本（完成该半项）**：新增
+> `captureRecoveryPoint`（写入前追加 `scoped-settings/recovery/history.jsonl`；首次创建不造空备份；
+> 备份失败抛 `scoped-settings-backup-failed` 并拒绝覆盖）。`.bak` 仍为"最新健康副本"，语义分开。
+> **验证**：存储测试 6/6（含备份失败拒绝）；全量 **3674 tests**；typecheck/lint/build 绿。ADR-0204。
+> **未做**：跨进程写锁、恢复继承、放宽预览/确认（GUI-04-01）、历史回滚入口。

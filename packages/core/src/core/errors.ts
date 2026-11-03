@@ -64,6 +64,8 @@ export type DomainErrorCode =
   | "mission-not-found"
   | "mission-locked"
   | "stale-revision"
+  /** GUI-04-02：覆盖前旧版本备份失败（拒绝覆盖，不写半截）。 */
+  | "scoped-settings-backup-failed"
   | "journal-corrupted"
   | "operation-not-idempotent"
   | "tool-execution-failed"

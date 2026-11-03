@@ -4,6 +4,7 @@
  * 只存**覆盖值**，应用默认值仍由现有 store 提供；读取方必须显式合并。
  * 每次写入使用 expectedRevision CAS、原子写和备份，不直接改权限门禁。
  */
+import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
@@ -57,6 +58,7 @@ function emptyDocument(): ScopedSettingsDocument {
 export class ScopedSettingsStore {
   private readonly filePath: string;
   private readonly backupFilePath: string;
+  private readonly recoveryDirectoryPath: string;
   private readonly nowMilliseconds: () => number;
   private readonly storeLock = new AsyncMutex();
   private cachedDocument: ScopedSettingsDocument | null = null;
@@ -65,6 +67,7 @@ export class ScopedSettingsStore {
     const directory = path.join(options.baseDirectory, "scoped-settings");
     this.filePath = path.join(directory, "settings.json");
     this.backupFilePath = path.join(directory, "settings.json.bak");
+    this.recoveryDirectoryPath = path.join(directory, "recovery");
     this.nowMilliseconds = options.nowMilliseconds ?? (() => Date.now());
   }
 
@@ -88,6 +91,42 @@ export class ScopedSettingsStore {
       sessions: content.sessions ?? {},
     };
     return this.cachedDocument;
+  }
+
+  /**
+   * GUI-04-02：**覆盖前旧版本保全**。
+   *
+   * 首次创建（无任何覆盖且 revision ≤ 1）不制造空备份；其余写入先把当前文档
+   * 追加到 `recovery/history.jsonl`，失败则**拒绝覆盖**（抛错且不写主文件）。
+   */
+  private async captureRecoveryPoint(
+    current: ScopedSettingsDocument,
+    reason: string,
+  ): Promise<void> {
+    const hasExistingOverrides =
+      Object.keys(current.projects).length > 0 ||
+      Object.keys(current.sessions).length > 0;
+    if (!hasExistingOverrides && current.revision <= 1) {
+      return;
+    }
+    const line = JSON.stringify({
+      recordedAtIso: new Date(this.nowMilliseconds()).toISOString(),
+      reason,
+      previous: current,
+    });
+    try {
+      await fs.mkdir(this.recoveryDirectoryPath, { recursive: true });
+      await fs.appendFile(
+        path.join(this.recoveryDirectoryPath, "history.jsonl"),
+        `${line}\n`,
+        "utf8",
+      );
+    } catch (error) {
+      throw new DomainError(
+        "scoped-settings-backup-failed",
+        `旧版本备份失败，拒绝覆盖: ${(error as Error).message}`,
+      );
+    }
   }
 
   /** 同步只读缓存；启动时 preload，写入后更新。 */
@@ -140,6 +179,7 @@ export class ScopedSettingsStore {
           },
         },
       };
+      await this.captureRecoveryPoint(current, "update");
       await writeAtomicJson(this.filePath, next);
       await backupExistingFile(this.filePath, this.backupFilePath);
       this.cachedDocument = next;
@@ -185,6 +225,7 @@ export class ScopedSettingsStore {
           },
         },
       };
+      await this.captureRecoveryPoint(current, "update");
       await writeAtomicJson(this.filePath, next);
       await backupExistingFile(this.filePath, this.backupFilePath);
       this.cachedDocument = next;
