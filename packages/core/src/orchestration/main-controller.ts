@@ -115,7 +115,10 @@ import type {
   RecordIndependentVerdictInput,
 } from "./independent-review-gate.js";
 import { MainAgentTaskProposalContract } from "./main-agent-proposal-contract.js";
-import { extractMainAgentProposalPayload } from "./main-agent-proposal-autosubmit.js";
+import {
+  extractMainAgentProposalPayload,
+  injectHarnessUserTaskReference,
+} from "./main-agent-proposal-autosubmit.js";
 import type { MainAgentTaskProposalSubmissionResult } from "./main-agent-proposal-contract.js";
 import {
   MAIN_AGENT_TURN_BUDGET_MILLISECONDS,
@@ -1555,8 +1558,12 @@ export class MainController {
     if (record === null) {
       return;
     }
+    /** 模型无法知道本地随机引用 ⇒ 由 harness 注入（见 injectHarnessUserTaskReference）。 */
+    const harnessReference = this.latestUserMessageReferences.get(
+      conversationIdentifier ?? "",
+    );
     const result = await this.submitMainAgentTaskProposal(
-      record,
+      injectHarnessUserTaskReference(record, harnessReference),
       conversationIdentifier === null ? {} : { conversationIdentifier },
     );
     this.options.streamOutput(
