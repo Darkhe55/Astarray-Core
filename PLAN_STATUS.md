@@ -5117,3 +5117,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 以及 6 个历史模块）；② 子进程超时守卫指出 `tool-package-zip-installer.test.ts` 未设 testTimeout。
 > 修复：为 8 个模块补最小令牌 + 理由白名单；zip 安装测试补 `testTimeout: 60_000`。
 > **验证**：`npm run check:low-parallel` → **598 files / 4192 tests 通过**，typecheck/lint/build 绿。
+
+> **238（第 57 轮补验，2026-11-04）**：私有库 `npm run build` 通过；公开库隐私扫描
+> （排除 `tests/` 守卫）无 `private-ui`/`user`/`packages/gui`/`tests/gui` 命中；
+> 全量门禁维持 598 files / 4192 tests 通过。
