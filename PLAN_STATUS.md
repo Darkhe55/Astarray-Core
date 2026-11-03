@@ -5154,3 +5154,6 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 公开全量门禁 **599 files / 4196 tests** 全绿（含破坏性 API 与子进程超时守卫）。
 > 私有 UI 侧状态页见私有仓库 `docs/reports/UX02_FINAL_STATUS_2026-11-04.md`（该文件不入公开库）。
 > 明确未完成：真实浏览器/Electron/跨平台人工验收；ALIGN-01-03 成功提交路径需真实次级派生。
+
+> **246（最终复验，2026-11-04）**：公开库 HEAD 全量 **599 files / 4196 tests** 通过（typecheck/lint/build 绿）；
+> 私有库 **103 files / 685 tests** 通过。两仓库无未推送提交；公开工作树仅剩用户本地 3 个未提交文档。
