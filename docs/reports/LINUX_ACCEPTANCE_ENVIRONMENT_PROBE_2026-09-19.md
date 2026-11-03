@@ -85,4 +85,4 @@ npm run check
 ## 7. 侦察脚本与产物
 
 - `.tmp/linux-evidence/probe.sh`、`.tmp/linux-evidence/probe2.sh`（`.tmp/` 已 gitignore，不入库）
-- 命令：`wsl.exe -d Ubuntu -- bash /mnt/c/Users/<user>/Documents/astarray/.tmp/linux-evidence/probe2.sh`
+- 命令：`wsl.exe -d Ubuntu -- bash <workspace>/.tmp/linux-evidence/probe2.sh`

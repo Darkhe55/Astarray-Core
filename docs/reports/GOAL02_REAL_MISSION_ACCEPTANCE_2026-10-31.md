@@ -7,8 +7,8 @@
 
 | 项 | 值 |
 |---|---|
-| 工作区 | `C:\Users\<user>\Documents\astarray\test\workspace`（本次新建，独立于两个仓库） |
-| 状态目录 | `C:\Users\<user>\Documents\astarray\test\state`（`ASTARRAY_DATA_DIR=…\test` ⇒ state=…\test\state） |
+| 工作区 | `<test>/workspace`（本次新建，独立于两个仓库） |
+| 状态目录 | `<test>/state`（`ASTARRAY_DATA_DIR=…\test` ⇒ state=…\test\state） |
 | Provider | `unisound`（`https://maas-api.unisound.com`），模型 `u2`，凭据引用 `prov-unisound-1` |
 | 端点 | 必须给**完整路径** `https://maas-api.unisound.com/v1/chat/completions`（只给 `/v1` ⇒ 404 `path error: /v1`） |
 | 权限 | 非交互运行需在 stdin 提供 `allow-once`（按**精确参数**授权；参数变化会再次询问） |

@@ -10,9 +10,9 @@
 | 检索 | 范围 | 结果 |
 |---|---|---|
 | `webhook\|feishu\|dingtalk\|slack\|telegram\|wecom\|nodemailer\|\bsmtp\b` | `astarray/packages/**/*.ts` | **0 命中** |
-| 同模式 + `RemoteEvidenceExportService\|RemoteDeliveryTransportPort` | `外部 UI 仓库/**/*.{ts,tsx}` | **0 命中** |
+| 同模式 + `RemoteEvidenceExportService\|RemoteDeliveryTransportPort` | `外部 UI（路径已隐去）` | **0 命中** |
 | `fetch\(` / `http.request` / `undici` | `astarray/packages/core/src/**/*.ts` | **0 命中**（core 的网络出口只有注入的 `fetchImpl`/transport 端口） |
-| `fetch\(` / `axios` / `http.request` | `外部 UI 仓库/**/*.{ts,tsx}` | 46 命中，**全部指向 UI 自己的本地 GUI server**（`/state`、`/settings`、`/commands/*`）或 GUI 集成测试 |
+| `fetch\(` / `axios` / `http.request` | `外部 UI（路径已隐去）` | 46 命中，**全部指向 UI 自己的本地 GUI server**（`/state`、`/settings`、`/commands/*`）或 GUI 集成测试 |
 
 ## 2. 现有契约（已就绪，可直接接）
 
