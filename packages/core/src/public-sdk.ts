@@ -3461,11 +3461,16 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     Array<{
       recordedAtIso: string;
       reason: string;
-      previous: ScopedSettingsDocument;
+      previousRevision: number;
     }>
   > {
     this.assertOpen();
-    return this.runtime.scopedSettingsStore.listRecoveryEntries();
+    const entries = await this.runtime.scopedSettingsStore.listRecoveryEntries();
+    return entries.map((entry) => ({
+      recordedAtIso: entry.recordedAtIso,
+      reason: entry.reason,
+      previousRevision: entry.previous.revision,
+    }));
   }
 
   /** GUI-04-02：把指定历史版本恢复为**新 revision**（需认证用户 + CAS）。 */

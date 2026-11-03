@@ -5138,3 +5138,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **242（GUI-04-02 收尾）：作用域配置历史回滚入口**：`listRecoveryEntries` + `restoreRecoveryEntry`
 > （CAS、恢复前再写 recovery point、以 revision+1 写回、未知恢复点拒绝）；门面两个方法需认证用户。
 > **验证**：存储测试 14/14；公开库全量 **598 files / 4194 tests** 通过，typecheck/lint/build 绿。ADR-0204 §7。
+
+> **243（GUI-04-02 GUI 接线）：历史回滚入口接线**：门面 `listScopedSettingsRecoveryEntries` 改为返回
+> `{recordedAtIso, reason, previousRevision}` 摘要（不把完整旧文档送前端）；GUI 新增
+> `GET /settings/scoped-recovery` 与 `POST /commands/restore-scoped-settings`，数据面板提供
+> "作用域配置历史"列表与"恢复到该版本"按钮。
+> **验证**：公开库该存储测试通过；私有库 `npm run check` 103 files / 684 tests。
