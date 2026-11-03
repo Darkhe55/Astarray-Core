@@ -5031,3 +5031,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 权限 `null` ⇒ 删除 `permission`；空条目移除；仍走 CAS 与覆盖前 recovery point。
 > **验证**：存储测试 8/8；全量 **3676 tests**；typecheck/lint/build 绿。ADR-0204 §5。
 > **未做**：跨进程写锁、放宽预览/确认（GUI-04-01）、历史回滚入口。
+
+> **225（GUI-04-04）：会话作用域覆盖按稳定会话解析（完成）**：新增
+> `resolveScopedContextOverride`（会话优先、缺会话回退项目、missionId 不可顶替）；运行时改用
+> mission 摘要的 `conversationIdentifier`；GUI 三处 `sessionId()` 去掉 mission 回退。
+> **验证**：存储测试 9/9；公开全量（串行）**496 files / 3677 tests 通过**；私有库 94/670 通过。ADR-0205。
+> **未做**：会话级权限覆盖的键未逐条核对、无会话选择器时的提示、真实浏览器体验。

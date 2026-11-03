@@ -203,3 +203,54 @@ describe("GUI-04-02 恢复继承（删除覆盖字段）", () => {
     ).rejects.toThrow(/恢复继承/);
   });
 });
+
+describe("GUI-04-04 会话覆盖按稳定会话解析", () => {
+  it("会话覆盖优先；缺会话标识时回退项目；missionId 不能顶替", async () => {
+    const { resolveScopedContextOverride } = await import(
+      "../../../packages/core/src/orchestration/scoped-settings-store.js"
+    );
+    const document = {
+      schemaVersion: 1 as const,
+      revision: 3,
+      projects: {
+        "project-a": {
+          context: {
+            configuredMaximumGlobalContextTokenCount: 4096,
+            updatedAtIso: "t",
+            updatedByUserId: "u",
+          },
+        },
+      },
+      sessions: {
+        "conversation-a": {
+          context: {
+            configuredMaximumGlobalContextTokenCount: 1024,
+            updatedAtIso: "t",
+            updatedByUserId: "u",
+          },
+        },
+      },
+    };
+    expect(
+      resolveScopedContextOverride({
+        document,
+        projectIdentifier: "project-a",
+        conversationIdentifier: "conversation-a",
+      })?.configuredMaximumGlobalContextTokenCount,
+    ).toBe(1024);
+    expect(
+      resolveScopedContextOverride({
+        document,
+        projectIdentifier: "project-a",
+        conversationIdentifier: null,
+      })?.configuredMaximumGlobalContextTokenCount,
+    ).toBe(4096);
+    expect(
+      resolveScopedContextOverride({
+        document,
+        projectIdentifier: null,
+        conversationIdentifier: "mission-123",
+      }),
+    ).toBeUndefined();
+  });
+});

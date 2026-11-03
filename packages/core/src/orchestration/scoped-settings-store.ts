@@ -51,6 +51,31 @@ export interface ScopedSettingsStoreOptions {
   nowMilliseconds?: () => number;
 }
 
+/**
+ * GUI-04-04（2026-11-03）：**会话上下文覆盖的解析**。
+ *
+ * 会话作用域只认**稳定会话标识**（`conversationIdentifier`）；mission 只是执行投影，
+ * **不得用 missionId 顶替**（旧摘要缺会话时按"无会话覆盖"处理）。
+ * 会话覆盖优先于项目覆盖。
+ */
+export function resolveScopedContextOverride(input: {
+  readonly document: ScopedSettingsDocument;
+  readonly projectIdentifier: string | null;
+  readonly conversationIdentifier: string | null;
+}): ScopedContextOverride | undefined {
+  if (input.conversationIdentifier !== null && input.conversationIdentifier !== "") {
+    const sessionContext =
+      input.document.sessions[input.conversationIdentifier]?.context;
+    if (sessionContext !== undefined) {
+      return sessionContext;
+    }
+  }
+  if (input.projectIdentifier === null || input.projectIdentifier === "") {
+    return undefined;
+  }
+  return input.document.projects[input.projectIdentifier]?.context;
+}
+
 function emptyDocument(): ScopedSettingsDocument {
   return { schemaVersion: 1, revision: 1, projects: {}, sessions: {} };
 }
