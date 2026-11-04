@@ -186,3 +186,29 @@ describe("查询 mission 历史（只读）", () => {
   });
 });
 
+
+describe("ALIGN-01-01 会话标识（历史视图）", () => {
+  it("summary 带会话标识 ⇒ 原样返回；空白/缺失 ⇒ null（不拿 missionId 顶替）", async () => {
+    await writeSummary(
+      "mission-conversation-a",
+      JSON.stringify({
+        missionId: "mission-conversation-a",
+        prompt: "第一轮",
+        status: "done",
+        projectIdentifier: "project-a",
+        conversationIdentifier: "conversation-a",
+      }),
+    );
+    await writeSummary(
+      "mission-conversation-blank",
+      JSON.stringify({ missionId: "mission-conversation-blank", status: "done", conversationIdentifier: "  " }),
+    );
+    const page = await queryMissionHistory({
+      stateDirectory,
+      isMissionActivelyRunning: () => false,
+    });
+    const byId = new Map(page.entries.map((entry) => [entry.missionIdentifier, entry]));
+    expect(byId.get("mission-conversation-a")?.conversationIdentifier).toBe("conversation-a");
+    expect(byId.get("mission-conversation-blank")?.conversationIdentifier).toBeNull();
+  });
+});
