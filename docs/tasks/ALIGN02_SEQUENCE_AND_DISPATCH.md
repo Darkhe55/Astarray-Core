@@ -234,3 +234,16 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 - 证据：`align02-project-summary-planning.test.ts`（规划=model、摘要提供者收到 projectIdentifier、
   节点 priorityTier=1）；公开全量 **607 files / 4211 tests** 通过。
 - **仍缺**：真实模型规划验证（本轮用 scripted runtime 走同一契约）；真实项目摘要来源由宿主注入（公开核心不读项目文件）。
+
+### 05 追加（2026-11-05）：运行中状态 + 迁移规则修正
+
+**发现的规则缺陷**：`transitionTaskStatus` 对 done/cancelled 等只允许 `pending/blocked` 前态
+⇒ 任何被标为 `running` 的任务**永远无法收口**。已把 `running` 加入非 pending 目标的允许前态。
+
+- mission 启动时（`recordMissionRelation` 之后）把序列原始任务 CAS 迁移到 `running`；
+  失败只流式告知，不阻断 mission；
+- 证据：`task-sequence-controllers` 新增 "running → done" 用例（16/16）；
+  `align02-terminal-status-sync` 新增 "mission 运行期间序列任务为 running"（0 并发，2/2）；
+- 公开全量 **607 files / 4213 tests** 通过。
+
+**仍缺**：running → cancelled/blocked 的端到端（规则已允许，取消路径未专门测试）。

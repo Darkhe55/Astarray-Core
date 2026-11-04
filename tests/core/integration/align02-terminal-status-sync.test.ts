@@ -79,3 +79,43 @@ describe("ALIGN-02 终态回执同步", () => {
     }
   });
 });
+
+  it("mission 运行期间，序列里的原始任务为 running", async () => {
+    const stateDirectory = await mkdtemp(path.join(tmpdir(), "astarray-align02-running-"));
+    directories.push(stateDirectory);
+    const runtime = await createApplicationRuntime({
+      mode: "assist",
+      stateDirectory,
+      /** 0 并发：mission 保持 running，便于观察序列状态。 */
+      concurrency: 0,
+      failureThreshold: 1,
+      maxLoopIterations: 8,
+      runtimeKind: "mock",
+      useFeedbackProcess: false,
+      authenticatedUserId: "user-1",
+      streamOutput: () => {},
+    });
+    try {
+      const missionId = await runtime.controller.handleUserMessage("运行状态", {
+        projectIdentifier: "project-a",
+      });
+      const status = await runtime.controller.queryMissionStatus(missionId);
+      const sequenceId = String(status?.summary?.taskSequenceIdentifier);
+      const taskId = String(status?.summary?.originalTaskIdentifier);
+      const ownerAgentInstanceId = sequenceId.slice("sequence-".length);
+      const store = new AgentTaskSequenceStore({ baseDirectory: stateDirectory });
+      const deadline = Date.now() + 10_000;
+      let nodeStatus: string | null = null;
+      while (Date.now() < deadline) {
+        const document = await store.readSequence(ownerAgentInstanceId, sequenceId);
+        nodeStatus =
+          document?.nodes.find((candidate) => candidate.taskId === taskId)?.status ??
+          null;
+        if (nodeStatus === "running") break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(nodeStatus).toBe("running");
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  });

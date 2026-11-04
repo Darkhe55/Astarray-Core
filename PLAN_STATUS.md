@@ -5269,3 +5269,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 修复任务链 schema 未声明 `priorityTier` 导致优先级被 zod 静默剥离的缺陷。
 > **验证**：`align02-project-summary-planning`（model 规划 + 摘要 + 节点 1 层）；公开全量 **607 files / 4211 tests** 通过。
 > 仍缺：真实模型验证；摘要来源由宿主注入（公开核心不读项目文件）。
+
+> **268（ALIGN-02-05 running 状态/迁移规则，2026-11-05）**：修复 `transitionTaskStatus` 不允许
+> running→终态的真实缺陷；mission 启动时把序列原始任务标为 running（CAS，失败仅告知）。
+> **验证**：running→done 单测 + 运行期间 running 集成测试；公开全量 **607 files / 4213 tests** 通过。
+> 仍缺：running→cancelled/blocked 端到端。
