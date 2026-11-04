@@ -165,6 +165,19 @@ describe("ALIGN-02 运行中插入", () => {
       expect(
         pending.some((entry) => entry.taskIdentifier === deferredTaskIdentifier),
       ).toBe(true);
+
+      /** ALIGN-02-06：组边界消费（消费 ≠ 派发），重复消费幂等。 */
+      await runtime.controller.consumeDeferredInsertionsForMission(missionId);
+      const afterConsume = await queue.listPending(missionId);
+      expect(afterConsume).toHaveLength(0);
+      const state = await queue.read();
+      expect(
+        state.consumed.some(
+          (entry) => entry.taskIdentifier === deferredTaskIdentifier,
+        ),
+      ).toBe(true);
+      await runtime.controller.consumeDeferredInsertionsForMission(missionId);
+      expect(await queue.listPending(missionId)).toHaveLength(0);
     } finally {
       await runtime.shutdown().catch(() => undefined);
     }

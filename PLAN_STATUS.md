@@ -5283,3 +5283,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 派发抛错释放、恢复后再领取的循环级测试（14/14）。
 > **验证**：公开全量 **608 files / 4217 tests** 通过。
 > 仍缺：与真实 MissionOrchestrator 组合的端到端。
+
+> **271（ALIGN-02-06 推迟队列消费，2026-11-05）**：新增 `consumeDeferredInsertionsForMission`
+> 公开入口（生产仍由组边界端口调用）；测试消费后 pending 清空、consumed 有记录、重复消费幂等。
+> **验证**：`align02-runtime-insertion` 2/2；公开全量 **608 files / 4217 tests** 通过。
+> 仍缺：真实"下一组"自动触发的端到端。

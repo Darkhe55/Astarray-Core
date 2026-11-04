@@ -2795,6 +2795,16 @@ export class MainController {
    * 只在编排器确认"无在途任务"时调用；逐条标记已消费并记录差异快照。
    * **消费 ≠ 派发**：不改运行中图、不启动任务，输出里明确说明。
    */
+  /**
+   * ALIGN-02-06（2026-11-05）：公开的"消费推迟插入"入口。
+   *
+   * 生产调用方是组边界端口（同一 mission 开始下一组时）；这里显式暴露，
+   * 供运维/测试在组边界之外驱动同一条消费逻辑（消费 ≠ 派发）。
+   */
+  async consumeDeferredInsertionsForMission(missionIdentifier: string): Promise<void> {
+    await this.consumeDeferredInsertions(missionIdentifier);
+  }
+
   private async consumeDeferredInsertions(missionIdentifier: string): Promise<void> {
     const queueStore = this.options.deferredInsertionQueueStore;
     if (queueStore === null || queueStore === undefined) {
