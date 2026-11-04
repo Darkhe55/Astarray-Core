@@ -5231,3 +5231,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （ADR-0208；`align01-03-proposal-success` / `align01-03-persisted-derivation` 两个集成测试）；
 > 其余未闭合检查点（01-04 直投、01-06）保持原状，整卡仍不判通过。
 > 私有 UI 侧的对账记录在其仓库（本卡不含 UI 细节）。
+
+> **261（ALIGN-02-05 终态回执，2026-11-05）**：mission 终态后把权威序列的原始用户任务写回
+> done/cancelled/blocked（所有者个体 CAS 迁移；已是终态不动；失败仅告知）。
+> **验证**：`align02-terminal-status-sync`；公开全量 **602 files / 4201 tests** 通过。
+> 仍缺：运行中 running 状态、真实派发端点/端口注册、运行中插入端口、逐任务事件源。

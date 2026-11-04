@@ -1323,6 +1323,72 @@ export class MainController {
       return;
     }
     await this.options.missionManager.updateMissionStatus(missionId, status);
+    /**
+     * ALIGN-02-05（2026-11-05）：**终态回执回到同一权威序列**。
+     *
+     * 此前 mission 完成后，权威序列里的原始用户任务永远停在 pending（两套记账）。
+     * 这里按序列 id 推导所有者（`sequence-<secondaryAgentInstanceId>`），
+     * 以**所有者个体**身份做一次 CAS 迁移；已是终态则不动。
+     * 同步失败不掩盖 mission 终态，只如实告知。
+     */
+    await this.syncSequenceTaskTerminalStatus(missionId, status);
+  }
+
+  /**
+   * 把 mission 终态写回权威序列的原始用户任务。
+   *
+   * 只处理 `sequence-<owner>` 形式的序列；其它/缺失映射一律跳过（不猜）。
+   */
+  private async syncSequenceTaskTerminalStatus(
+    missionId: string,
+    status: "done" | "cancelled" | "blocked",
+  ): Promise<void> {
+    const statusController = this.options.taskSequenceStatusController;
+    const manageController = this.options.taskSequenceManageController;
+    if (statusController === null || statusController === undefined) return;
+    if (manageController === null || manageController === undefined) return;
+    const summary = await this.options.missionManager
+      .getMissionStatus(missionId)
+      .then((missionStatus) => missionStatus.summary)
+      .catch(() => null);
+    const sequenceId = summary?.taskSequenceIdentifier ?? null;
+    const taskId = summary?.originalTaskIdentifier ?? null;
+    if (sequenceId === null || taskId === null) return;
+    const ownerPrefix = "sequence-";
+    if (!sequenceId.startsWith(ownerPrefix) || sequenceId.length <= ownerPrefix.length) {
+      return;
+    }
+    const ownerAgentInstanceId = sequenceId.slice(ownerPrefix.length);
+    const actor = { sourceKind: "agent" as const, actorId: ownerAgentInstanceId };
+    try {
+      const snapshot = await statusController.getSnapshot({
+        ownerAgentInstanceId,
+        sequenceId,
+        viewer: actor,
+      });
+      const node = snapshot.nodes.find((candidate) => candidate.taskId === taskId);
+      if (node === undefined) return;
+      if (["done", "cancelled", "blocked", "failed"].includes(node.status)) return;
+      await manageController.transitionTaskStatus({
+        ownerAgentInstanceId,
+        sequenceId,
+        taskId,
+        nextStatus: status,
+        blockReason: status === "blocked" ? "mission blocked" : null,
+        expectedRevision: snapshot.revision,
+        actor,
+      });
+    } catch (error) {
+      this.options.streamOutput(
+        missionId,
+        "[序列同步] 未能把 " +
+          taskId +
+          " 标为 " +
+          status +
+          "：" +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
   }
 
   /**

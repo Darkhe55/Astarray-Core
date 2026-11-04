@@ -146,3 +146,13 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 未跑任何一次真实计时（"连续失败 3 次停手""退避序列""空闲等待"均未实测）。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 05 追加（2026-11-05）：终态回执写回权威序列
+
+- `finalizeMissionStatus` 在写终态后调用 `syncSequenceTaskTerminalStatus`：
+  从 `sequence-<ownerAgentInstanceId>` 推导所有者，以**所有者个体**身份做一次 CAS 迁移，
+  把原始用户任务置为 done/cancelled/blocked；已是终态则不动；同步失败只流式告知、不掩盖 mission 终态。
+- 证据：`tests/core/integration/align02-terminal-status-sync.test.ts`（轮询到同步完成，3/3 隔离稳定）。
+- 公开全量 **602 files / 4201 tests** 通过（首次全量出现 1 条既有 drill 负载抖动，隔离 3/3 通过，重跑全绿）。
+- **仍缺**：序列任务在 mission 运行期间不标 running（当前迁移规则 done 只允许 pending/blocked 前态）；
+  真实派发端点/按 mission 注册端口（03/05 剩余）、运行中插入端口（06）、逐任务事件源（07）。
