@@ -34,7 +34,7 @@ node node_modules/astarray/dist/cli.js __nope__
 | 平台 | 结果 |
 |---|---|---|
 | Windows | 601 files / 4200 tests |
-| Linux（WSL2 Ubuntu） | 600 files / 4195 + 4 skip（截至上次复验） |
+| Linux（WSL2 Ubuntu） | 601 files / 4196 + 4 skip（2026-11-05 复验） |
 
 配套 UI 产物的验收记录不在公开仓库。
 
