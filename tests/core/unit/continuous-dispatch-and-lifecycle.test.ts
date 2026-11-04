@@ -274,3 +274,56 @@ describe("TertiaryAgentLifecycleController 幂等与恢复", () => {
     expect(newTrace).toHaveLength(9); // 全新收口 9 个阶段
   });
 });
+
+describe("ALIGN-02-07 事件唤醒、退避与失败上限", () => {
+  it("notifySchedulingEvent 唤醒并返回真实原因", async () => {
+    const registry = new UnboundedAgentInstanceRegistry({
+      maxConcurrentSlots: 2,
+      maxQueueLength: 2,
+    });
+    const loop = new SecondaryContinuousDispatchLoop({ registry });
+    const pending = loop.waitForNextWake(5_000);
+    loop.notifySchedulingEvent("dependency-unlocked");
+    expect((await pending).reason).toBe("dependency-unlocked");
+  });
+
+  it("连续失败按 250→500→…退避，达上限后停手；无工作时空闲等待", async () => {
+    const registry = new UnboundedAgentInstanceRegistry({
+      maxConcurrentSlots: 1,
+      maxQueueLength: 2,
+    });
+    let shouldAccept = false;
+    const loop = new SecondaryContinuousDispatchLoop({
+      registry,
+      dispatchChain: async () => shouldAccept,
+      currentOccupiedSlots: () => 0,
+    });
+    const nodes = [makeNode("T-1", 0)];
+    const first = await loop.runRound({ nodes });
+    expect(first.dispatchedTaskIds).toEqual([]);
+    expect(first.recommendedWaitMilliseconds).toBe(250);
+    const second = await loop.runRound({ nodes });
+    expect(second.recommendedWaitMilliseconds).toBe(500);
+    const third = await loop.runRound({ nodes });
+    expect(third.recommendedWaitMilliseconds).toBe(1_000);
+    const fourth = await loop.runRound({ nodes });
+    expect(fourth.skippedReasons["T-1"]).toContain("停止自动重派");
+    expect(fourth.recommendedWaitMilliseconds).toBe(2_000);
+
+    const noWork = await loop.runRound({
+      nodes: [{ ...nodes[0]!, status: "done" }],
+    });
+    expect(noWork.recommendedWaitMilliseconds).toBe(
+      SecondaryContinuousDispatchLoop.IDLE_WAIT_MILLISECONDS,
+    );
+
+    shouldAccept = true;
+    loop.resetDispatchFailureCounts();
+    const success = await loop.runRound({ nodes });
+    expect(success.dispatchedTaskIds).toEqual(["T-1"]);
+    expect(success.consecutiveNoProgressRoundCount).toBe(0);
+    expect(success.recommendedWaitMilliseconds).toBe(
+      SecondaryContinuousDispatchLoop.PROGRESS_WAIT_MILLISECONDS,
+    );
+  });
+});

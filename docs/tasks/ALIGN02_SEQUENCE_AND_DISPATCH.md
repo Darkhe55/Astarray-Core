@@ -169,3 +169,14 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
   `align02-dispatch-consumer.test.ts`（注册→runRound→终态注销）；公开全量 **604 files / 4203 tests** 通过。
 - **仍缺**：mission 任务链节点没有 priorityTier（本轮按 0 参与排序），需在链上引入优先级或从序列映射；
   运行中插入端口（06）、逐任务事件源（07）、失败重派实测。
+
+### 07 追加（2026-11-05）：逐任务事件源补齐 + 行为测试
+
+- 事件源现状（代码核对）：`task-ready`（mission 启动）、`task-finished`（收口）、
+  `work-window-resumed`（时段恢复）此前已接；本轮补上
+  **`dependency-unlocked` 与 `resource-released`**（任务收口时同时发出）；
+- 新增测试覆盖：`notifySchedulingEvent` 唤醒返回真实原因；
+  连续失败退避 250→500→1000→2000ms、达到上限 3 次后停手（`skippedReasons` 说明）、
+  无工作时空闲 30s、成功后计数清零并回到 1s；
+- 公开全量 **604 files / 4205 tests** 通过。
+- **仍缺**：退避未与真实时钟/取消联动；"领取→失败→释放→再领取"的端到端实测。

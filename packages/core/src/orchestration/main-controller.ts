@@ -3982,6 +3982,9 @@ export class MainController {
               void this.registerMissionArtifacts(missionId);
               /** ALIGN-02-07：任务收口 ⇒ 事件唤醒（让依赖解锁/补位不再靠轮询）。 */
               this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
+              /** ALIGN-02-07：任务完成同时解锁后继并释放资源。 */
+              this.options.secondaryDispatchLoop?.notifySchedulingEvent("dependency-unlocked");
+              this.options.secondaryDispatchLoop?.notifySchedulingEvent("resource-released");
               await this.finalizeMissionStatus(missionId, status);
               try {
                 await this.ingestMissionTerminalReport(missionId, status);
@@ -3996,6 +3999,8 @@ export class MainController {
           void this.registerMissionArtifacts(missionId);
           /** ALIGN-02-07：任务收口 ⇒ 事件唤醒（让依赖解锁/补位不再靠轮询）。 */
           this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
+          this.options.secondaryDispatchLoop?.notifySchedulingEvent("dependency-unlocked");
+          this.options.secondaryDispatchLoop?.notifySchedulingEvent("resource-released");
           return this.finalizeMissionStatus(missionId, status)
             .then(async () => {
               /**
@@ -4186,6 +4191,8 @@ export class MainController {
         this.options.onMissionFinished?.(missionId, status);
         /** ALIGN-02-07：终态事件唤醒调度。 */
         this.options.secondaryDispatchLoop?.notifySchedulingEvent("task-finished");
+        this.options.secondaryDispatchLoop?.notifySchedulingEvent("dependency-unlocked");
+        this.options.secondaryDispatchLoop?.notifySchedulingEvent("resource-released");
       },
       onUserEscalation: (message) => {
         this.options.streamOutput(missionId, `[需要用户] ${message}`);
