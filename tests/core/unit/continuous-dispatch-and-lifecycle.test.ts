@@ -8,7 +8,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UnboundedAgentInstanceRegistry } from "../../../packages/core/src/orchestration/unbounded-agent-registry.js";
 import { SecondaryContinuousDispatchLoop } from "../../../packages/core/src/orchestration/secondary-continuous-dispatch-loop.js";
@@ -325,5 +325,98 @@ describe("ALIGN-02-07 事件唤醒、退避与失败上限", () => {
     expect(success.recommendedWaitMilliseconds).toBe(
       SecondaryContinuousDispatchLoop.PROGRESS_WAIT_MILLISECONDS,
     );
+  });
+});
+
+describe("ALIGN-02-05 原子领取与释放", () => {
+  it("没有注册端口 ⇒ blockedReason=dispatch-handler-missing（不领取、不假装派发）", async () => {
+    const registry = new UnboundedAgentInstanceRegistry({
+      maxConcurrentSlots: 1,
+      maxQueueLength: 1,
+    });
+    const loop = new SecondaryContinuousDispatchLoop({ registry });
+    const round = await loop.runRound({ nodes: [makeNode("T-1", 0)] });
+    expect(round.blockedReason).toBe("dispatch-handler-missing");
+    expect(round.dispatchedTaskIds).toEqual([]);
+  });
+
+  it("领取失败 ⇒ 跳过；派发被拒 ⇒ 释放；恢复后可再次领取", async () => {
+    const registry = new UnboundedAgentInstanceRegistry({
+      maxConcurrentSlots: 1,
+      maxQueueLength: 1,
+    });
+    const dispatched: string[] = [];
+    const released: string[] = [];
+    const claim = vi.fn(async () => false);
+    const release = vi.fn(async (taskId: string) => {
+      released.push(taskId);
+    });
+    const loop = new SecondaryContinuousDispatchLoop({ registry });
+    loop.registerMissionPorts("mission-1", {
+      claimTask: claim,
+      releaseTask: release,
+      dispatchChain: async (chain) => {
+        dispatched.push(...chain.taskIds);
+        return true;
+      },
+    });
+    const nodes = [makeNode("T-1", 0)];
+    const first = await loop.runRound({ nodes, missionIdentifier: "mission-1" });
+    expect(first.dispatchedTaskIds).toEqual([]);
+    expect(first.skippedReasons["T-1"]).toContain("领取失败");
+    expect(dispatched).toEqual([]);
+
+    claim.mockResolvedValue(true);
+    const second = await loop.runRound({ nodes, missionIdentifier: "mission-1" });
+    expect(second.dispatchedTaskIds).toEqual(["T-1"]);
+    expect(dispatched).toEqual(["T-1"]);
+    expect(released).toEqual([]);
+
+    /** 换一个新的 pending 任务验证"派发被拒 ⇒ 释放领取"。 */
+    const rejectedRegistry = new UnboundedAgentInstanceRegistry({
+      maxConcurrentSlots: 1,
+      maxQueueLength: 1,
+    });
+    const rejectedLoop = new SecondaryContinuousDispatchLoop({
+      registry: rejectedRegistry,
+    });
+    const releasedRejected: string[] = [];
+    rejectedLoop.registerMissionPorts("mission-2", {
+      claimTask: async () => true,
+      releaseTask: async (taskId: string) => {
+        releasedRejected.push(taskId);
+      },
+      dispatchChain: async () => false,
+    });
+    const rejected = await rejectedLoop.runRound({
+      nodes: [makeNode("T-2", 0)],
+      missionIdentifier: "mission-2",
+    });
+    expect(rejected.skippedReasons["T-2"]).toContain("派发被拒绝");
+    expect(releasedRejected).toEqual(["T-2"]);
+  });
+
+  it("派发抛错 ⇒ 释放并记录原因（不占住槽位）", async () => {
+    const registry = new UnboundedAgentInstanceRegistry({
+      maxConcurrentSlots: 1,
+      maxQueueLength: 1,
+    });
+    const released: string[] = [];
+    const loop = new SecondaryContinuousDispatchLoop({ registry });
+    loop.registerMissionPorts("mission-3", {
+      claimTask: async () => true,
+      releaseTask: async (taskId: string) => {
+        released.push(taskId);
+      },
+      dispatchChain: async () => {
+        throw new Error("执行者不可用");
+      },
+    });
+    const round = await loop.runRound({
+      nodes: [makeNode("T-3", 0)],
+      missionIdentifier: "mission-3",
+    });
+    expect(round.skippedReasons["T-3"]).toContain("执行者不可用");
+    expect(released).toEqual(["T-3"]);
   });
 });
