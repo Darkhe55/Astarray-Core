@@ -5209,3 +5209,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ④ 本地仓库 reset 到新历史、`reflog expire` + `gc --prune=now` 清理旧对象，用户未提交文件保留。
 > **影响**：`66267330` 之后的提交 SHA 已变化，文档中引用的旧 SHA 可能过期；
 > 更早的旧 SHA/fork/镜像仍不受控（已如实告知）。
+
+> **256（改写后完整性复验，2026-11-04）**：公开库 `typecheck`/`lint` 通过；历史 `f8a4dcca`
+> （改写基线 `4e0f2adf`）与远端一致；私有库 `npm run check` **106 files / 692 tests** 通过。
+> 历史上被替换的仅是文档文本中的私有标识，代码与测试内容未变。
