@@ -277,3 +277,17 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
   `consumed` 含该任务、重复消费保持空（幂等）。
 - 公开全量 **608 files / 4217 tests** 通过。
 - **仍缺**：真实"下一组"自动触发（goal 多组/恢复组）的端到端。
+
+### 03 追加（2026-11-05）：ready set 选择的直接测试
+
+新增 `ready-task-group-selection.test.ts`（5/5）：
+
+1. 依赖未满足的任务**永不入选**（即使层级更高）；
+2. 用户层（0）排在 Agent 层（1）前；必要前驱经 `min(自身, 后继)` 提升；
+3. 包内存在非 pending ⇒ 整包推迟（`deferredReasons` 说明）；
+4. 预算按单元计：包算 1 个单元、**不截断包内任务**；
+5. `maximumUnitCount=0` 拒绝，不静默按 1 处理。
+
+公开全量 **609 files / 4222 tests** 通过。
+
+**仍缺**：`createTaskBundle` 生产调用；选择结果与真实派发在同一次任务组中的组合（当前是纯函数证据）。
