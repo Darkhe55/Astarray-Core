@@ -37,3 +37,12 @@ ALIGN-01-03 的"成功提交"长期缺失。审计发现这是一个**规则组�
 
 - 创建关系持久化（重启后仍可管理）未做；
 - GUI/CLI 没有"登记派生关系"的用户入口（属宿主装配职责）。
+
+## 6. 追加（2026-11-04）：派生关系持久化
+
+- 原实现只在运行时 `Map` 里记 owner→creator，**重启即丢**；
+- 现在 `registerAgentIdentity(createdByAgentInstanceId)` 同时写入
+  `AgentCreationRegistry`（`<state>/agent-creation-registry.json`），运行时启动时预加载；
+- 落盘失败不阻塞身份登记，但如实降级（下次启动失去该派生关系）；
+- 验证：`align01-03-persisted-derivation.test.ts`（登记 → 等待落盘 → 关停 → 新运行时 → 仍可提交）；
+  公开全量 **601 files / 4200 tests** 通过。
