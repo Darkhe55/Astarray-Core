@@ -5278,3 +5278,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **269（ALIGN-02 在途插入/取消终态，2026-11-05）**：`HangingRuntime` 保持任务 running，
 > 验证在途插入推迟到下一组；取消后 mission 终态且序列任务离开 running。
 > **验证**：`align02-inflight-insertion`；公开全量 **608 files / 4214 tests** 通过。
+
+> **270（ALIGN-02-05 领取/释放测试，2026-11-05）**：新增未注册端口、领取失败、派发被拒释放、
+> 派发抛错释放、恢复后再领取的循环级测试（14/14）。
+> **验证**：公开全量 **608 files / 4217 tests** 通过。
+> 仍缺：与真实 MissionOrchestrator 组合的端到端。

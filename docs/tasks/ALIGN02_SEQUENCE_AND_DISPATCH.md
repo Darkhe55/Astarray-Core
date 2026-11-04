@@ -255,3 +255,15 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 - 有 running 任务时插入 → `deferred-to-sequence`（保守策略：不把插入塞进已发出工具调用的组）；
 - `cancelMission` 后：mission 进入 cancelled/blocked，序列原始任务**离开 running**（终态同步生效）；
 - 证据：`align02-inflight-insertion.test.ts`；公开全量 **608 files / 4214 tests** 通过。
+
+### 05 追加（2026-11-05）：原子领取/失败释放的循环级测试
+
+新增 3 个用例（连续调度测试 14/14）：
+
+1. 未注册端口 ⇒ `blockedReason=dispatch-handler-missing`，不领取、不派发；
+2. `claimTask` 返回 false ⇒ 跳过并写明"领取失败"；改为 true 后**可再次领取并派发**；
+3. 派发被拒 ⇒ `releaseTask` 收到 `dispatch-rejected`；派发抛错 ⇒ 释放并记录 `dispatch-error`。
+
+公开全量 **608 files / 4217 tests** 通过。
+
+**仍缺**：与真实编排器组合的"领取→失败→释放→再领取"（本轮是端口级，不是 MissionOrchestrator 级）。
