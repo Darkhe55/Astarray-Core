@@ -5259,3 +5259,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 导致运行中插入被误判 stale 的缺陷；新增"组关闭 → deferred-to-sequence → 序列节点 + 推迟队列"测试。
 > **验证**：`align02-runtime-insertion` 2/2；公开全量 **605 files / 4207 tests** 通过。
 > 仍缺：跨组消费端到端、在途 running 导致的推迟。
+
+> **266（ALIGN-02-03 节点优先级，2026-11-05）**：任务链节点新增 `priorityTier`；规划节点固定 Agent 层 1，
+> 候选稿越权字段仍拒绝；派发消费者按 `?? 0` 参与 ready set 排序。
+> **验证**：`task-decomposition-priority` 3/3 + 消费者断言；公开全量 **606 files / 4210 tests** 通过。
+> 仍缺：跨层同场排序真实场景、任务包生产调用。

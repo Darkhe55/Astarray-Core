@@ -135,6 +135,8 @@ export function parseAndValidateTaskDecomposition(
       resultLocation: null,
       /** 执行节点的验收要求随节点走；它不是"已完成"的证明。 */
       acceptanceCriteria,
+      /** ALIGN-02-03：规划节点恒为 Agent 层（1），不由候选稿决定。 */
+      priorityTier: 1,
     });
   }
 
