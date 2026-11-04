@@ -63,6 +63,11 @@ describe("ALIGN-02 派发消费者", () => {
       expect(runSpy).toHaveBeenCalledWith(
         expect.objectContaining({ missionIdentifier: missionId }),
       );
+      const roundInput = runSpy.mock.calls[0]?.[0] as {
+        nodes: { priorityTier?: number }[];
+      };
+      /** ALIGN-02-03：旧单节点链没有优先级字段 ⇒ 按用户层 0 参与排序。 */
+      expect(roundInput.nodes[0]?.priorityTier).toBe(0);
 
       const deadline = Date.now() + 20_000;
       let status = await runtime.controller.queryMissionStatus(missionId);

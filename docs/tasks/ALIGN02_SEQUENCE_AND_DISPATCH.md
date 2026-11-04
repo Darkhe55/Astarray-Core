@@ -212,3 +212,13 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 公开全量 **605 files / 4207 tests** 通过。
 
 **仍缺**：跨组消费端到端；在途任务（有 running）导致的推迟（组关闭路径已测）。
+
+### 03 追加（2026-11-05）：执行节点优先级进入 ready set
+
+- `TaskDependencyNode` 增加可选 `priorityTier`；
+- 本地规划契约把**模型规划的节点固定为 1（Agent 层）**，候选稿自带 `priorityTier` 仍被拒绝
+  （`task-decomposition-priority`：规划=1、越权字段被拒、单节点降级保持用户层）；
+- 派发消费者构造 ready set 节点时使用 `task.priorityTier ?? 0`（旧链/降级按用户层 0）；
+- 公开全量 **606 files / 4210 tests** 通过。
+- **仍缺**：任务链节点进入 `ready set` 后与用户层任务**同场排序**的真实场景（当前 mission 内全部同层）；
+  任务包（bundle）仍是整包参与但无生产 `createTaskBundle` 调用。

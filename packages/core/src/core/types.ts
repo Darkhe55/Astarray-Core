@@ -338,6 +338,13 @@ export interface TaskDependencyNode {
    */
   acceptanceCriteria?: string;
   /**
+   * ALIGN-02-03（2026-11-05）：执行节点优先级（缺省 0 = 用户层）。
+   *
+   * 由本地规划契约固定：模型规划的节点恒为 1（Agent 派生），候选稿不得自带；
+   * ready set 选择按此值参与稳定排序。
+   */
+  priorityTier?: number;
+  /**
    * COMM-01-02（2026-10-25）：**本任务的发布者信箱**。
    *
    * 用户澄清："反馈…**每条任务的反馈路径默认走任务发布者的反向通道**"。

@@ -1366,7 +1366,8 @@ export class MainController {
           taskId: task.id,
           status: task.status as never,
           dependsOn: [...task.dependsOn],
-          priorityTier: 0,
+          /** ALIGN-02-03：缺失时按用户层 0（旧链），规划节点为 1。 */
+          priorityTier: task.priorityTier ?? 0,
         })) as never,
         missionIdentifier: missionId,
       })
