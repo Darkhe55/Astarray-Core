@@ -5274,3 +5274,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > running→终态的真实缺陷；mission 启动时把序列原始任务标为 running（CAS，失败仅告知）。
 > **验证**：running→done 单测 + 运行期间 running 集成测试；公开全量 **607 files / 4213 tests** 通过。
 > 仍缺：running→cancelled/blocked 端到端。
+
+> **269（ALIGN-02 在途插入/取消终态，2026-11-05）**：`HangingRuntime` 保持任务 running，
+> 验证在途插入推迟到下一组；取消后 mission 终态且序列任务离开 running。
+> **验证**：`align02-inflight-insertion`；公开全量 **608 files / 4214 tests** 通过。

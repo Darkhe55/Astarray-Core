@@ -247,3 +247,11 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 - 公开全量 **607 files / 4213 tests** 通过。
 
 **仍缺**：running → cancelled/blocked 的端到端（规则已允许，取消路径未专门测试）。
+
+### 06 追加（2026-11-05）：在途任务导致推迟 + 取消终态
+
+用 `HangingRuntime`（只在取消时收口）让任务保持 running：
+
+- 有 running 任务时插入 → `deferred-to-sequence`（保守策略：不把插入塞进已发出工具调用的组）；
+- `cancelMission` 后：mission 进入 cancelled/blocked，序列原始任务**离开 running**（终态同步生效）；
+- 证据：`align02-inflight-insertion.test.ts`；公开全量 **608 files / 4214 tests** 通过。
