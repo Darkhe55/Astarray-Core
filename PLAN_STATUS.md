@@ -5236,3 +5236,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > done/cancelled/blocked（所有者个体 CAS 迁移；已是终态不动；失败仅告知）。
 > **验证**：`align02-terminal-status-sync`；公开全量 **602 files / 4201 tests** 通过。
 > 仍缺：运行中 running 状态、真实派发端点/端口注册、运行中插入端口、逐任务事件源。
+
+> **262（ALIGN-02-05 真实派发端口/消费者，2026-11-05）**：`createMissionDispatchPorts` 包装编排器
+> "优先派发"入口；assist/devolve 启动时注册端口并真实跑一轮 `runRound`，终态注销；
+> 运行时暴露 `secondaryDispatchLoop`。
+> **验证**：两个新测试；公开全量 **604 files / 4203 tests** 通过（首轮 3 条失败均为负载相关，
+> 其中 ponder 隔离 2/2 通过，重跑全绿，未改断言）。
+> 仍缺：任务链无 priorityTier（按 0）、运行中插入端口、逐任务事件源、失败重派实测。
