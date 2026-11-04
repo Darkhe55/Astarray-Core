@@ -5791,6 +5791,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     readonly missionId: string | null;
     readonly owningSecondaryAgentInstanceId: string | null;
     readonly boundTaskBundleId?: string | null;
+    /** ALIGN-01-03：创建者（派生关系；宿主注入，用于主 Agent 管理派生序列）。 */
+    readonly createdByAgentInstanceId?: string | null;
   }): void {
     this.assertOpen();
     this.runtime.registerAgentIdentity(input);

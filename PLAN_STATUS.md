@@ -5178,3 +5178,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 外部仓库 HEAD `e4a83b1`，`npm run check` **103 files / 686 tests** 通过。
 > 公开工作树仅剩用户本地 3 个未提交文档（`B6R-11`、`NEXT60`、`RESUME02`），未替用户提交。
 > 剩余未完成均为外部条件：真实浏览器/Electron 窗口/Linux、macOS/屏幕阅读器验收；ALIGN-01-03 成功提交需真实次级派生。
+
+> **251（ALIGN-01-03 成功路径，2026-11-04）**：定位到"成功提交"缺失不是接线而是**规则矛盾**：
+> 提案契约禁止主 Agent 投自己，序列层又只允许"用户/所有者本人"管理 ⇒ 没有可成功的组合。
+> 决策（ADR-0208）：允许**创建者**管理被创建者的序列，创建关系只能由
+> `registerAgentIdentity(createdByAgentInstanceId)` 由宿主登记，模型不可声明；未登记时行为不变。
+> **新增** `align01-03-proposal-success.test.ts`（成功插入 2 节点 + 非创建者仍拒绝）。
+> **验证**：公开库全量 **600 files / 4198 tests** 通过，typecheck/lint/build 绿。
+> 遗留：创建关系未持久化（重启丢失）；无 GUI/CLI 登记入口。

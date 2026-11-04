@@ -483,6 +483,8 @@ export interface ApplicationRuntime {
     readonly missionId: string | null;
     readonly owningSecondaryAgentInstanceId: string | null;
     readonly boundTaskBundleId?: string | null;
+    /** ALIGN-01-03：创建者（派生关系；宿主注入）。 */
+    readonly createdByAgentInstanceId?: string | null;
   }) => void;
   /** R91：任命执行/测试/验收三级个体（复用既有门禁规则）。 */
   appointIndependentReview: (input: {
@@ -1069,8 +1071,16 @@ export async function createApplicationRuntime(
   const agentTaskSequenceStore = new sequenceStoreModule.AgentTaskSequenceStore({
     baseDirectory: stateDirectory,
   });
+  /**
+   * ALIGN-01-03：派生关系表（owner → creator）。
+   * 只由 `registerAgentIdentity(createdByAgentInstanceId)` 写入，模型无法声明。
+   */
+  const agentCreationCreators = new Map<string, string>();
   const sequenceManageController =
-    new sequenceControllerModule.TaskSequenceManageController(agentTaskSequenceStore);
+    new sequenceControllerModule.TaskSequenceManageController(agentTaskSequenceStore, {
+      resolveCreatorOf: (ownerAgentInstanceId) =>
+        agentCreationCreators.get(ownerAgentInstanceId) ?? null,
+    });
   /**
    * 接线缺口第 ① 项（2026-10-28）：状态控制面与管里面**共享同一个 store 实例**，
    * 使"两套记账对照"读到同一份序列文件。
@@ -2139,6 +2149,8 @@ export async function createApplicationRuntime(
     readonly missionId: string | null;
     readonly owningSecondaryAgentInstanceId: string | null;
     readonly boundTaskBundleId?: string | null;
+    /** ALIGN-01-03：谁创建了该个体（派生关系；宿主注入，模型不可填）。 */
+    readonly createdByAgentInstanceId?: string | null;
   }): void => {
     registeredAgentDirectory.registerAgent({
       agentInstanceId: input.agentInstanceId,
@@ -2148,6 +2160,15 @@ export async function createApplicationRuntime(
       boundTaskBundleId: input.boundTaskBundleId ?? null,
       registeredAtIso: new Date().toISOString(),
     });
+    if (
+      typeof input.createdByAgentInstanceId === "string" &&
+      input.createdByAgentInstanceId !== ""
+    ) {
+      agentCreationCreators.set(
+        input.agentInstanceId,
+        input.createdByAgentInstanceId,
+      );
+    }
   };
   const appointIndependentReview = (input: {
     readonly appointmentIdentifier: string;

@@ -97,13 +97,26 @@ export interface CancelTaskInput {
   cancelReason: string;
 }
 
+export interface TaskSequenceManageControllerOptions {
+  /**
+   * ALIGN-01-03：序列所有者的**创建者**（同步查表）。
+   *
+   * 主 Agent 只能管理"由它派生"的次级的序列：创建者匹配才放行；
+   * 缺省 ⇒ 维持旧规则（仅用户或所有者本人）。
+   */
+  readonly resolveCreatorOf?: (ownerAgentInstanceId: string) => string | null;
+}
+
 export class TaskSequenceManageController {
   private readonly priorityPolicy = new TaskPriorityPolicy();
   private readonly bundlePlanner = new TaskBundlePlanner();
   /** 创建序号计数器：保证同毫秒内多个任务的稳定排序可重放。 */
   private ordinalCounter = 0;
 
-  constructor(private readonly store: AgentTaskSequenceStore) {}
+  constructor(
+    private readonly store: AgentTaskSequenceStore,
+    private readonly options: TaskSequenceManageControllerOptions = {},
+  ) {}
 
   /** 创建序列并发布首个任务。首任务同样必须带锚点约束不可变：发布即创建。 */
   async publishSequence(
@@ -544,6 +557,15 @@ export class TaskSequenceManageController {
       return;
     }
     if (actor.actorId !== ownerAgentInstanceId) {
+      /**
+       * ALIGN-01-03：主 Agent 对自己**派生创建**的次级序列有管理权
+       * （创建关系由运行时登记，不经模型声明）。
+       */
+      const creator =
+        this.options.resolveCreatorOf?.(ownerAgentInstanceId) ?? null;
+      if (creator !== null && creator === actor.actorId) {
+        return;
+      }
       throw new DomainError(
         "task-sequence-permission-denied",
         `${actor.sourceKind} ${actor.actorId} 无权管理序列 ${ownerAgentInstanceId}`,
