@@ -1850,11 +1850,38 @@ export class MainController {
           sequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
           trigger: "runtime-insert-injected",
         });
+        /**
+         * ALIGN-02-06（2026-11-05）：注入成功也必须回到**同一权威序列**。
+         * 此前只写 mission 链 + 差异快照，序列里没有这条任务 ⇒ 又是两套记账。
+         */
+        const insertedTaskIdentifier = `task-runtime-insert-${createHash("sha256")
+          .update(request.requestIdentifier)
+          .digest("hex")
+          .slice(0, 12)}`;
+        const sequenceRegistration = await sequenceController.publishOrInsertTask({
+          ownerAgentInstanceId: sequenceMapping.ownerAgentInstanceIdentifier,
+          actor: {
+            sourceKind: "agent",
+            actorId: sequenceMapping.ownerAgentInstanceIdentifier,
+          },
+          sequenceId: sequenceMapping.taskSequenceIdentifier,
+          task: {
+            taskId: insertedTaskIdentifier,
+            title: request.title,
+            priorityTier: null,
+            externalReference: `insert-request:${request.requestIdentifier}`,
+          },
+          anchor: {
+            predecessorTaskIds: [sequenceMapping.taskIdentifier],
+            successorTaskIds: [],
+          },
+        });
+        sequenceMapping.sequenceRevision = sequenceRegistration.document.revision;
         return {
           outcome: "inserted",
-          reason: "已在安全上下文边界注入当前组",
+          reason: "已在安全上下文边界注入当前组，并登记到权威序列",
           taskSequenceIdentifier: sequenceMapping.taskSequenceIdentifier,
-          taskIdentifier: null,
+          taskIdentifier: insertedTaskIdentifier,
         };
       }
     }

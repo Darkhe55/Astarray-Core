@@ -180,3 +180,20 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
   无工作时空闲 30s、成功后计数清零并回到 1s；
 - 公开全量 **604 files / 4205 tests** 通过。
 - **仍缺**：退避未与真实时钟/取消联动；"领取→失败→释放→再领取"的端到端实测。
+
+### 06 追加（2026-11-05）：插入端口真正可达 + 双账登记
+
+**真实缺陷**：运行时 `controllerHolder.current` **从未指向控制器** ⇒
+`taskGroupInsertionPort` 永远拿到 null，运行中插入因此**永远推迟**（代码看似接好，实际不可达）。
+
+修复：
+1. 构造控制器后立即 `controllerHolder.current = controller`；
+2. 安全点注入成功后，除 mission 链外**同时登记权威序列节点**
+   （`task-runtime-insert-<hash>`，`externalReference=insert-request:<id>`，锚点为原用户任务）；
+3. 返回 `taskIdentifier`（此前恒 null）。
+
+证据：`align02-runtime-insertion.test.ts`（concurrency=0 保持 pending 安全点）：
+插入结果 `inserted`；mission 链与序列都出现该任务；同幂等键重复请求返回 `duplicate` 且序列只有一条。
+公开全量 **605 files / 4206 tests** 通过。
+
+**仍缺**：在途任务时的"推迟"路径端到端测试；推迟队列消费。
