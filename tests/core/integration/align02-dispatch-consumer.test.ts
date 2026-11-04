@@ -77,6 +77,12 @@ describe("ALIGN-02 派发消费者", () => {
       }
       expect(status?.summary?.status).toBe("done");
       expect(unregisterSpy).toHaveBeenCalledWith(missionId);
+
+      /** ALIGN-02-07：shutdown 必须停止调度循环（先恢复被 mock 的 runRound）。 */
+      runSpy.mockRestore();
+      await runtime.shutdown();
+      const afterShutdown = await loop.runRound({ nodes: [] });
+      expect(afterShutdown.blockedReason).toBe("loop-stopped");
     } finally {
       await runtime.shutdown().catch(() => undefined);
     }

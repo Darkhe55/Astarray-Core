@@ -5293,3 +5293,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 整包推迟/预算按单元/非法预算拒绝的 5 个用例。
 > **验证**：公开全量 **609 files / 4222 tests** 通过。
 > 仍缺：`createTaskBundle` 生产调用与"选择+派发"同组组合。
+
+> **273（ALIGN-02-07 停止/等待，2026-11-05）**：runtime.shutdown 停止调度循环并唤醒等待者；
+> 新增 stop 立即唤醒、停止后 loop-stopped、shutdown 后 loop-stopped 的测试。
+> **验证**：公开全量 **609 files / 4223 tests** 通过。
+> 仍缺：真实时钟退避、外部取消信号注入。
