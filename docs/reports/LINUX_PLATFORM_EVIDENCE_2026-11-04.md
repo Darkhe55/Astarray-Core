@@ -55,3 +55,15 @@ check 退出码 0（typecheck + lint + test + build）
 - 本证据是 **WSL2 Ubuntu**，不是原生 Linux 发行版，也不是 macOS；
 - 桌面窗口/浏览器体验未在 Linux 验证（WSL 无 GUI 会话）；
 - macOS 证据仍缺。
+
+## 6. 追加复验（2026-11-04，会话/暗色相关改动之后）
+
+同步 `mission-history-reader` 的 `conversationIdentifier` 后重跑：
+
+```
+Test Files  600 passed (600)
+Tests       4195 passed | 4 skipped (4199)
+exit 0
+```
+
+（新增的 1 条历史会话标识用例计入了总数。）
