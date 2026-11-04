@@ -5186,3 +5186,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **新增** `align01-03-proposal-success.test.ts`（成功插入 2 节点 + 非创建者仍拒绝）。
 > **验证**：公开库全量 **600 files / 4198 tests** 通过，typecheck/lint/build 绿。
 > 遗留：创建关系未持久化（重启丢失）；无 GUI/CLI 登记入口。
+
+> **252（Linux 证据 + 跨平台缺口修复，2026-11-04）**：WSL2 Ubuntu（Node 22.22.1 / npm 9.2.0）
+> 复制源码到 Linux 家目录后 `npm ci` + `npm run check` ⇒ **600 files / 4194 passed + 4 skipped**，退出码 0。
+> 期间修掉两个真实缺口：① zip 解压除 `unzip` 外**回退 `python3 -m zipfile`**（无 unzip 的 Linux 可用）；
+> ② zip 测试夹具按平台选 `Compress-Archive` / `python3 -m zipfile -c`。
+> 另把确定性图变更演练的异步等待上限从 3s 提到 10s（断言不变）。
+> **Windows 复验**：全量 **600 files / 4198 tests** 通过。详见 `docs/reports/LINUX_PLATFORM_EVIDENCE_2026-11-04.md`。
