@@ -5264,3 +5264,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 候选稿越权字段仍拒绝；派发消费者按 `?? 0` 参与 ready set 排序。
 > **验证**：`task-decomposition-priority` 3/3 + 消费者断言；公开全量 **606 files / 4210 tests** 通过。
 > 仍缺：跨层同场排序真实场景、任务包生产调用。
+
+> **267（ALIGN-02-02 项目摘要/优先级落盘，2026-11-05）**：运行时新增并透传 `projectSummaryProvider`；
+> 修复任务链 schema 未声明 `priorityTier` 导致优先级被 zod 静默剥离的缺陷。
+> **验证**：`align02-project-summary-planning`（model 规划 + 摘要 + 节点 1 层）；公开全量 **607 files / 4211 tests** 通过。
+> 仍缺：真实模型验证；摘要来源由宿主注入（公开核心不读项目文件）。

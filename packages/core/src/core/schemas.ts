@@ -134,6 +134,8 @@ export const taskDependencyNodeSchema = z.object({
   resultLocation: z.string().min(1).nullable(),
   /** ALIGN-02-02：执行节点的验收要求（可选；旧文档没有该字段）。 */
   acceptanceCriteria: z.string().min(1).optional(),
+  /** ALIGN-02-03：执行节点优先级（可选；旧文档没有该字段 ⇒ 按用户层 0）。 */
+  priorityTier: z.number().int().min(0).max(3).optional(),
 });
 
 export const taskChainSchema = z.object({

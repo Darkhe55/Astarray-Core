@@ -806,6 +806,15 @@ export interface ApplicationRuntimeOptions {
   feedbackProcessModulePath?: string | null;
   /** 主 Agent 运行时工厂覆盖（Provider 接线；缺省为 mock ScriptedRuntime）。 */
   mainRuntimeFactory?: (agentInstanceId: string) => AgentRuntime;
+  /**
+   * ALIGN-02-02（2026-11-05）：必要项目摘要提供者（宿主注入；缺省 null）。
+   *
+   * 只提供摘要文本，不提供整份项目内容；规划器不读源文件。
+   */
+  projectSummaryProvider?: (input: {
+    readonly projectIdentifier: string | null;
+    readonly conversationIdentifier: string | null;
+  }) => Promise<string | null> | string | null;
   /** Worker 运行时工厂覆盖（Provider 接线；缺省为 mock ScriptedRuntime）。 */
   workerRuntimeFactory?: (
     agentInstanceId: string,
@@ -3667,6 +3676,9 @@ export async function createApplicationRuntime(
     ...(taskDecompositionDraftProvider === undefined
       ? {}
       : { taskDecompositionDraftProvider }),
+    ...(options.projectSummaryProvider === undefined
+      ? {}
+      : { projectSummaryProvider: options.projectSummaryProvider }),
     /**
      * ALIGN-01-05（2026-10-28）：主 Agent 单条处理预算（默认 180 秒）+ 超期落库。
      *
