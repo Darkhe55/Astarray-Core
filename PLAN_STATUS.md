@@ -5201,3 +5201,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **254（第 91 轮全量复验，2026-11-04）**：公开 `check:low-parallel` → **600 files / 4199 tests**，
 > typecheck/lint/build 全绿；外部 `npm run check` → **105 files / 691 tests**。
 > Linux（WSL）此前复验：公开 600 files / 4195 + 4 skip；外部 105 / 691。两仓库无未推送提交。
+
+> **255（公开历史二次改写，2026-11-04）**：发现历史中有 2 个提交含有具体外部标识（仓库名/本机用户名），
+> 来自此前隐私扫描说明的自指引用。已按用户确认执行：
+> ① 在克隆中用 `filter-branch --tree-filter` 替换 `66267330..HEAD` 范围内的外部标识；
+> ② 强推 `main`（远端 `4e0f2adf`）；③ 全新克隆复核：历史与工作树 **0 命中**；
+> ④ 本地仓库 reset 到新历史、`reflog expire` + `gc --prune=now` 清理旧对象，用户未提交文件保留。
+> **影响**：`66267330` 之后的提交 SHA 已变化，文档中引用的旧 SHA 可能过期；
+> 更早的旧 SHA/fork/镜像仍不受控（已如实告知）。
