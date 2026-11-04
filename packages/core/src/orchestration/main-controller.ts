@@ -1025,6 +1025,13 @@ export class MainController {
       targetAgentInstanceIdentifier: requestedTargetAgentInstanceIdentifier,
       mode,
     });
+    /**
+     * ALIGN-02-05：mission 开始执行 ⇒ 权威序列的原始任务进入 running。
+     * 失败只流式告知，不阻断 mission（状态同步是观测，不是执行前提）。
+     */
+    if (userTaskSequence !== null) {
+      await this.markSequenceTaskRunning(missionId);
+    }
     const requestedWorkspaceRootPath = options?.workspaceRootPath?.trim();
     if (
       requestedWorkspaceRootPath !== undefined &&
@@ -1378,6 +1385,51 @@ export class MainController {
             (error instanceof Error ? error.message : String(error)),
         );
       });
+  }
+
+  /**
+   * ALIGN-02-05：mission 开始执行时把序列原始任务标为 running（CAS；非 pending 不动）。
+   */
+  private async markSequenceTaskRunning(missionId: string): Promise<void> {
+    const mapping = this.missionTaskSequences.get(missionId);
+    const statusController = this.options.taskSequenceStatusController;
+    const manageController = this.options.taskSequenceManageController;
+    if (mapping === undefined) return;
+    if (statusController === null || statusController === undefined) return;
+    if (manageController === null || manageController === undefined) return;
+    const actor = {
+      sourceKind: "agent" as const,
+      actorId: mapping.ownerAgentInstanceIdentifier,
+    };
+    try {
+      const snapshot = await statusController.getSnapshot({
+        ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
+        sequenceId: mapping.taskSequenceIdentifier,
+        viewer: actor,
+      });
+      const node = snapshot.nodes.find(
+        (candidate) => candidate.taskId === mapping.taskIdentifier,
+      );
+      if (node === undefined || node.status !== "pending") return;
+      const transitioned = await manageController.transitionTaskStatus({
+        ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
+        sequenceId: mapping.taskSequenceIdentifier,
+        taskId: mapping.taskIdentifier,
+        nextStatus: "running",
+        blockReason: null,
+        expectedRevision: snapshot.revision,
+        actor,
+      });
+      mapping.sequenceRevision = transitioned.revision;
+    } catch (error) {
+      this.options.streamOutput(
+        missionId,
+        "[序列同步] 未能把 " +
+          mapping.taskIdentifier +
+          " 标为 running：" +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
   }
 
   /**

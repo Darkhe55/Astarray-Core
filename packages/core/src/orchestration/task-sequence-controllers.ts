@@ -403,7 +403,12 @@ export class TaskSequenceManageController {
         const allowedPreviousStatuses =
           input.nextStatus === "pending"
             ? (["running", "blocked", "failed"] as const)
-            : (["pending", "blocked"] as const);
+            : /**
+               * ALIGN-02-05（2026-11-05）：运行中的任务必须能收口到
+               * done/cancelled/blocked/failed —— 此前只允许 pending/blocked，
+               * 导致标了 running 的任务永远无法完成。
+               */
+              (["pending", "blocked", "running"] as const);
         const transitionedNode = partialOrder.transitionStatus(
           input.taskId,
           input.nextStatus,

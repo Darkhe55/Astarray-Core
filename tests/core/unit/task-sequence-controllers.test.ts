@@ -504,3 +504,50 @@ describe("taskSequenceStatus 内置工具（harness 注入身份）", () => {
     ).rejects.toThrowError(/未装配/);
   });
 });
+
+describe("ALIGN-02-05 运行中状态", () => {
+  it("running 可以收口到 done（此前前态只允许 pending/blocked）", async () => {
+    const { manageController, statusController } = makeControllers();
+    await manageController.publishSequence({
+      ownerAgentInstanceId: OWNER,
+      actor: { sourceKind: "agent", actorId: OWNER },
+      sequenceId: "seq-running",
+      firstTask: {
+        taskId: "t1",
+        title: "执行",
+        priorityTier: null,
+        externalReference: null,
+      },
+    });
+    const before = await statusController.getSnapshot({
+      ownerAgentInstanceId: OWNER,
+      sequenceId: "seq-running",
+      viewer: { sourceKind: "agent", actorId: OWNER },
+    });
+    const running = await manageController.transitionTaskStatus({
+      ownerAgentInstanceId: OWNER,
+      actor: { sourceKind: "agent", actorId: OWNER },
+      sequenceId: "seq-running",
+      expectedRevision: before.revision,
+      taskId: "t1",
+      nextStatus: "running",
+      blockReason: null,
+    });
+    const finished = await manageController.transitionTaskStatus({
+      ownerAgentInstanceId: OWNER,
+      actor: { sourceKind: "agent", actorId: OWNER },
+      sequenceId: "seq-running",
+      expectedRevision: running.revision,
+      taskId: "t1",
+      nextStatus: "done",
+      blockReason: null,
+    });
+    expect(finished.revision).toBeGreaterThan(running.revision);
+    const after = await statusController.getSnapshot({
+      ownerAgentInstanceId: OWNER,
+      sequenceId: "seq-running",
+      viewer: { sourceKind: "agent", actorId: OWNER },
+    });
+    expect(after.nodes.find((node) => node.taskId === "t1")?.status).toBe("done");
+  });
+});
