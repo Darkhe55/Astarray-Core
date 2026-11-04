@@ -267,3 +267,13 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 公开全量 **608 files / 4217 tests** 通过。
 
 **仍缺**：与真实编排器组合的"领取→失败→释放→再领取"（本轮是端口级，不是 MissionOrchestrator 级）。
+
+### 06 追加（2026-11-05）：推迟队列消费入口与幂等
+
+- 新增公开入口 `MainController.consumeDeferredInsertionsForMission(missionId)`；
+  生产调用方仍是**同一 mission 下一组**的组边界端口（`taskGroupBoundaryPort`），
+  公开入口用于运维/测试在边界外驱动同一逻辑（**消费 ≠ 派发**，不改图、不启动任务）。
+- 测试扩展（`align02-runtime-insertion` 推迟用例）：消费后 `listPending` 为空、
+  `consumed` 含该任务、重复消费保持空（幂等）。
+- 公开全量 **608 files / 4217 tests** 通过。
+- **仍缺**：真实"下一组"自动触发（goal 多组/恢复组）的端到端。
