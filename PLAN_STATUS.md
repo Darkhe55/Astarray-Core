@@ -5193,3 +5193,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ② zip 测试夹具按平台选 `Compress-Archive` / `python3 -m zipfile -c`。
 > 另把确定性图变更演练的异步等待上限从 3s 提到 10s（断言不变）。
 > **Windows 复验**：全量 **600 files / 4198 tests** 通过。详见 `docs/reports/LINUX_PLATFORM_EVIDENCE_2026-11-04.md`。
+
+> **253（GUI 反馈修复：会话标识进入历史视图，2026-11-04）**：`MissionHistoryEntry` 新增
+> `conversationIdentifier`（summary 有值则原样返回；空白/缺失 ⇒ null，**不拿 missionId 顶替**）。
+> 用途：GUI 把同一稳定会话的多轮 mission 合并为一个列表项并合并气泡。反例：空白串归 null。

@@ -68,6 +68,8 @@ export interface MissionHistoryEntry {
    * 历史遗留记录没有该字段、或值为空白 ⇒ `null`（**不伪造项目名**）。
    */
   projectIdentifier: string | null;
+  /** ALIGN-01-01：稳定会话标识；历史遗留/空白 ⇒ null（不得用 missionId 顶替）。 */
+  conversationIdentifier: string | null;
   createdAtIso: string | null;
   /** **历史状态**：磁盘上如实记录的当时状态（损坏时为 null）。 */
   recordedStatus: MissionRecordedStatus | null;
@@ -183,6 +185,7 @@ async function readMissionHistoryEntry(input: {
     prompt: null as string | null,
     mode: null as string | null,
     projectIdentifier: null as string | null,
+    conversationIdentifier: null as string | null,
     createdAtIso: null as string | null,
     recordedStatus: null as MissionRecordedStatus | null,
     isActivelyRunning: false,
@@ -236,6 +239,12 @@ async function readMissionHistoryEntry(input: {
     typeof rawProjectIdentifier === "string" && rawProjectIdentifier.trim().length > 0
       ? rawProjectIdentifier.trim()
       : null;
+  const rawConversationIdentifier = parsed["conversationIdentifier"];
+  const conversationIdentifier =
+    typeof rawConversationIdentifier === "string" &&
+    rawConversationIdentifier.trim().length > 0
+      ? rawConversationIdentifier.trim()
+      : null;
   const createdAtIso =
     typeof parsed["createdAtIso"] === "string" ? parsed["createdAtIso"] : null;
 
@@ -262,6 +271,7 @@ async function readMissionHistoryEntry(input: {
     prompt,
     mode,
     projectIdentifier,
+    conversationIdentifier,
     createdAtIso,
     recordedStatus,
     isActivelyRunning,
