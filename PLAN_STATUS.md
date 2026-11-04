@@ -5197,3 +5197,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **253（GUI 反馈修复：会话标识进入历史视图，2026-11-04）**：`MissionHistoryEntry` 新增
 > `conversationIdentifier`（summary 有值则原样返回；空白/缺失 ⇒ null，**不拿 missionId 顶替**）。
 > 用途：GUI 把同一稳定会话的多轮 mission 合并为一个列表项并合并气泡。反例：空白串归 null。
+
+> **254（第 91 轮全量复验，2026-11-04）**：公开 `check:low-parallel` → **600 files / 4199 tests**，
+> typecheck/lint/build 全绿；私有 `npm run check` → **105 files / 691 tests**。
+> Linux（WSL）此前复验：公开 600 files / 4195 + 4 skip；私有 105 / 691。两仓库无未推送提交。
