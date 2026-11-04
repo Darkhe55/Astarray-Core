@@ -1414,7 +1414,7 @@ export class MainController {
       const node = snapshot.nodes.find((candidate) => candidate.taskId === taskId);
       if (node === undefined) return;
       if (["done", "cancelled", "blocked", "failed"].includes(node.status)) return;
-      await manageController.transitionTaskStatus({
+      const transitioned = await manageController.transitionTaskStatus({
         ownerAgentInstanceId,
         sequenceId,
         taskId,
@@ -1423,6 +1423,14 @@ export class MainController {
         expectedRevision: snapshot.revision,
         actor,
       });
+      /**
+       * 映射里的 revision 也要跟着走，否则同一 mission 之后的运行中插入
+       * 会拿旧 revision 被判 stale（实测：序列 4、映射 2）。
+       */
+      const mapping = this.missionTaskSequences.get(missionId);
+      if (mapping !== undefined) {
+        mapping.sequenceRevision = transitioned.revision;
+      }
     } catch (error) {
       this.options.streamOutput(
         missionId,

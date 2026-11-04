@@ -5254,3 +5254,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：`align02-runtime-insertion`（插入成功 + 双账存在 + 幂等 duplicate）；
 > 公开全量 **605 files / 4206 tests** 通过。
 > 仍缺：在途推迟路径端到端、推迟队列消费。
+
+> **265（ALIGN-02-06 推迟路径 + revision 映射，2026-11-05）**：修复终态同步后映射 revision 未更新
+> 导致运行中插入被误判 stale 的缺陷；新增"组关闭 → deferred-to-sequence → 序列节点 + 推迟队列"测试。
+> **验证**：`align02-runtime-insertion` 2/2；公开全量 **605 files / 4207 tests** 通过。
+> 仍缺：跨组消费端到端、在途 running 导致的推迟。

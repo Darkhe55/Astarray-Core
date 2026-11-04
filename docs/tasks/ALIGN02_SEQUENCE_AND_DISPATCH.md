@@ -197,3 +197,18 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 公开全量 **605 files / 4206 tests** 通过。
 
 **仍缺**：在途任务时的"推迟"路径端到端测试；推迟队列消费。
+
+### 06 追加（2026-11-05）：推迟路径 + 又一个 revision 缺陷
+
+**发现的真实缺陷**：终态回执把序列 revision 推进后，**控制器映射里的 revision 没有更新**
+（实测序列 4、映射 2）⇒ 同一 mission 之后的运行中插入被误判 `stale-revision`。
+修复：`syncSequenceTaskTerminalStatus` 迁移成功后同步 `missionTaskSequences` 的 revision。
+
+**推迟路径测试**（`align02-runtime-insertion` 第二个用例）：
+mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务登记进权威序列，
+并进入 `deferred-insertions.json` 的 pending 队列（`DeferredInsertionQueueStore.listPending` 验证）。
+推迟队列消费方（组边界 `consumeDeferredInsertions`）已在代码中接线，但本轮未做跨组消费的端到端实测。
+
+公开全量 **605 files / 4207 tests** 通过。
+
+**仍缺**：跨组消费端到端；在途任务（有 running）导致的推迟（组关闭路径已测）。
