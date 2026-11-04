@@ -222,3 +222,15 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 - 公开全量 **606 files / 4210 tests** 通过。
 - **仍缺**：任务链节点进入 `ready set` 后与用户层任务**同场排序**的真实场景（当前 mission 内全部同层）；
   任务包（bundle）仍是整包参与但无生产 `createTaskBundle` 调用。
+
+### 02 追加（2026-11-05）：项目摘要注入 + 优先级落盘缺陷
+
+- `ApplicationRuntimeOptions` 新增 `projectSummaryProvider`，并真正传给控制器
+  （此前既不在运行时选项，也没传给控制器 ⇒ 规划器永远拿到 null）；
+- 规划启用条件保持：`isModelTaskPlanningEnabled === true` **且** 存在 `workerRuntimeFactory`
+  （默认关闭，不把未验证行为推给所有任务）；
+- **发现的真实缺陷**：`taskDependencyNodeSchema` 未声明 `priorityTier` ⇒ zod 会把 03 新加的
+  优先级**静默剥离**（测试先失败再修）；已加入可选字段（0–3）并随任务链落盘。
+- 证据：`align02-project-summary-planning.test.ts`（规划=model、摘要提供者收到 projectIdentifier、
+  节点 priorityTier=1）；公开全量 **607 files / 4211 tests** 通过。
+- **仍缺**：真实模型规划验证（本轮用 scripted runtime 走同一契约）；真实项目摘要来源由宿主注入（公开核心不读项目文件）。
