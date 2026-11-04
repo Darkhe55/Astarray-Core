@@ -249,6 +249,8 @@ export interface ApplicationRuntime {
   reconnaissanceController: ProjectReconnaissanceController;
   /** T08A：任务序列管理面（发布序列/插入任务/状态流转的本地控制面入口）。 */
   taskSequenceManageController: TaskSequenceManageController;
+  /** ALIGN-02-05：持续调度循环（诊断/测试可见；生产由编排层驱动）。 */
+  secondaryDispatchLoop: SecondaryContinuousDispatchLoop;
   /** T07D-07：独立工作助手纵向闭环（场景 A 只读分析 / 场景 B 小型代码任务）。 */
   standaloneWorkflowRunner: StandaloneWorkflowRunner;
   /** 产品入口实际选用的运行时种类（mock/provider）。 */
@@ -4166,6 +4168,7 @@ export async function createApplicationRuntime(
     registeredAgentDirectory,
     reconnaissanceController,
     taskSequenceManageController: sequenceManageController,
+    secondaryDispatchLoop,
     standaloneWorkflowRunner,
     readMissionResultSummaries,
     globalContextBudgetStore,

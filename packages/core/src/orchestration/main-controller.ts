@@ -129,6 +129,7 @@ import type {
   MainAgentTurnProgressRecord,
 } from "./main-agent-turn-budget.js";
 import type { TaskInsertionProposal } from "./conversation-task-insertion-controller.js";
+import { createMissionDispatchPorts } from "./secondary-continuous-dispatch-loop.js";
 import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dispatch-loop.js";
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
@@ -1323,6 +1324,7 @@ export class MainController {
       return;
     }
     await this.options.missionManager.updateMissionStatus(missionId, status);
+    this.options.secondaryDispatchLoop?.unregisterMissionPorts(missionId);
     /**
      * ALIGN-02-05（2026-11-05）：**终态回执回到同一权威序列**。
      *
@@ -1332,6 +1334,49 @@ export class MainController {
      * 同步失败不掩盖 mission 终态，只如实告知。
      */
     await this.syncSequenceTaskTerminalStatus(missionId, status);
+  }
+
+  /**
+   * ALIGN-02-05（2026-11-05）：注册**真实派发消费者**并跑一轮。
+   *
+   * 此前 `SecondaryContinuousDispatchLoop.runRound` 没有任何生产调用方，
+   * 等于第二套调度器只存在于测试里。这里在 mission 启动时：
+   * 1) 注册该 mission 的派发端口（真实编排器按 taskId 优先派发入口）；
+   * 2) 用 mission 任务链跑一轮（只挑选/优先，不伪造"已执行"）；
+   * 3) mission 终态时注销端口。
+   */
+  private registerMissionDispatchConsumer(
+    missionId: string,
+    taskNodes: readonly TaskChainDocument["tasks"][number][],
+  ): void {
+    const dispatchLoop = this.options.secondaryDispatchLoop;
+    if (dispatchLoop === null || dispatchLoop === undefined) return;
+    const orchestrator = this.activeOrchestrators.get(missionId)?.scheduler;
+    if (orchestrator === undefined) return;
+    dispatchLoop.registerMissionPorts(
+      missionId,
+      createMissionDispatchPorts({
+        dispatchTaskByTaskIdentifier: (taskId) =>
+          orchestrator.dispatchTaskByTaskIdentifier(taskId),
+      }),
+    );
+    void dispatchLoop
+      .runRound({
+        nodes: taskNodes.map((task) => ({
+          taskId: task.id,
+          status: task.status as never,
+          dependsOn: [...task.dependsOn],
+          priorityTier: 0,
+        })) as never,
+        missionIdentifier: missionId,
+      })
+      .catch((error: unknown) => {
+        this.options.streamOutput(
+          missionId,
+          "[调度] 派发轮次失败：" +
+            (error instanceof Error ? error.message : String(error)),
+        );
+      });
   }
 
   /**
@@ -3982,6 +4027,7 @@ export class MainController {
       processInstanceId: this.options.processInstanceId,
     });
     this.activeOrchestrators.set(missionId, { scheduler, mode: "assist" });
+    this.registerMissionDispatchConsumer(missionId, taskNodes);
     void this.startSchedulerSafely(missionId, scheduler);
   }
 
@@ -4160,6 +4206,7 @@ export class MainController {
       processInstanceId: this.options.processInstanceId,
     });
     this.activeOrchestrators.set(missionId, { scheduler, mode: "devolve" });
+    this.registerMissionDispatchConsumer(missionId, taskNodes);
     void this.startSchedulerSafely(missionId, scheduler);
   }
 

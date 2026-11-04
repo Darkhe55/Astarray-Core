@@ -82,6 +82,32 @@ export interface SchedulingWakeReport {
   readonly waitedMilliseconds: number;
 }
 
+/**
+ * ALIGN-02-05（2026-11-05）：把**真实编排器的按 taskId 派发入口**包装成 mission 端口。
+ *
+ * 说明（不夸大能力）：
+ * - 编排器的 `dispatchTaskByTaskIdentifier` 语义是"**优先派发**"（下一轮优先启动），
+ *   不是"立即开始执行"；因此这里只把 accepted 映射为 true，不伪造"已运行"。
+ * - 原子性由编排器自身校验（任务必须 pending、依赖已满足；重复调用幂等），
+ *   故不额外实现 claim；失败由调用方按"未接受"处理。
+ */
+export function createMissionDispatchPorts(dispatcher: {
+  dispatchTaskByTaskIdentifier(taskId: string): {
+    readonly outcome: "accepted" | "refused";
+  };
+}): MissionDispatchPorts {
+  return {
+    dispatchChain: async (chain) => {
+      let accepted = false;
+      for (const taskId of chain.taskIds) {
+        const decision = dispatcher.dispatchTaskByTaskIdentifier(taskId);
+        if (decision.outcome === "accepted") accepted = true;
+      }
+      return accepted;
+    },
+  };
+}
+
 export class SecondaryContinuousDispatchLoop {
   /** ALIGN-02-07：同一任务连续派发失败的自动重派上限（超过即停手，等状态变化）。 */
   static readonly MAXIMUM_DISPATCH_ATTEMPTS_PER_TASK = 3;

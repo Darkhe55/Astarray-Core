@@ -156,3 +156,16 @@ mission 成了唯一"待办" —— 正是本卡要纠正的口径。
 - 公开全量 **602 files / 4201 tests** 通过（首次全量出现 1 条既有 drill 负载抖动，隔离 3/3 通过，重跑全绿）。
 - **仍缺**：序列任务在 mission 运行期间不标 running（当前迁移规则 done 只允许 pending/blocked 前态）；
   真实派发端点/按 mission 注册端口（03/05 剩余）、运行中插入端口（06）、逐任务事件源（07）。
+
+### 05 追加（2026-11-05）：真实派发端口与消费者
+
+- 新增 `createMissionDispatchPorts`：把编排器 `dispatchTaskByTaskIdentifier`（语义是**优先派发**，
+  不是立即执行）包装为 mission 端口；任一 taskId 被接受即 true；原子性由编排器自身校验（pending/依赖/幂等）。
+- mission 启动（assist/devolve）时 `registerMissionDispatchConsumer`：
+  注册端口 + 用 mission 任务链跑一轮 `runRound`（真实消费 ready set；派发失败只流式告知）；
+  mission 终态时 `unregisterMissionPorts`。
+- 运行时暴露 `secondaryDispatchLoop`（诊断/测试可见）。
+- 证据：`mission-dispatch-ports.test.ts`（接受/拒绝/混合）、
+  `align02-dispatch-consumer.test.ts`（注册→runRound→终态注销）；公开全量 **604 files / 4203 tests** 通过。
+- **仍缺**：mission 任务链节点没有 priorityTier（本轮按 0 参与排序），需在链上引入优先级或从序列映射；
+  运行中插入端口（06）、逐任务事件源（07）、失败重派实测。
