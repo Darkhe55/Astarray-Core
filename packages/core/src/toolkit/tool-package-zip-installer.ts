@@ -19,7 +19,7 @@ import {
   cpSync,
 } from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 
 import { DomainError } from "../core/errors.js";
 import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
@@ -125,7 +125,34 @@ function validateManifest(value: unknown): ToolPackageManifest {
   };
 }
 
+/**
+ * Linux/macOS 解压：优先 `unzip`；机器上没有 `unzip` 时回退到 Python 标准库
+ * （`python3 -m zipfile -e`）。两者都失败才如实报错。
+ */
+function extractZipWithUnixTools(
+  zipPath: string,
+  destination: string,
+  environment: NodeJS.ProcessEnv,
+): SpawnSyncReturns<string> {
+  const unzipResult = spawnSync("unzip", ["-q", zipPath, "-d", destination], {
+    encoding: "utf8",
+    timeout: 120_000,
+    env: environment,
+  });
+  if (unzipResult.status === 0) {
+    return unzipResult;
+  }
+  return spawnSync("python3", ["-m", "zipfile", "-e", zipPath, destination], {
+    encoding: "utf8",
+    timeout: 120_000,
+    env: environment,
+  });
+}
+
 function extractZip(zipPath: string, destination: string): void {
+  const restrictedEnvironment = buildRestrictedSubprocessEnvironment({
+    hostEnvironment: process.env,
+  }).environment;
   const result =
     process.platform === "win32"
       ? spawnSync(
@@ -150,17 +177,10 @@ function extractZip(zipPath: string, destination: string): void {
             windowsHide: true,
             timeout: 120_000,
             /** SEC-02-07：解压子进程不继承宿主凭据环境。 */
-            env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
-              .environment,
+            env: restrictedEnvironment,
           },
         )
-      : spawnSync("unzip", ["-q", zipPath, "-d", destination], {
-          encoding: "utf8",
-          timeout: 120_000,
-          /** SEC-02-07：解压子进程不继承宿主凭据环境。 */
-          env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
-            .environment,
-        });
+      : extractZipWithUnixTools(zipPath, destination, restrictedEnvironment);
   if (result.status !== 0) {
     throw new DomainError(
       "invalid-task-chain",

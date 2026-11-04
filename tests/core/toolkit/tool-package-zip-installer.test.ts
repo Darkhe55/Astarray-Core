@@ -32,23 +32,31 @@ async function createZip(): Promise<{ zipPath: string; baseDirectory: string }> 
   );
   await writeFile(path.join(packageDirectory, "src", "index.js"), "export {};\n", "utf8");
   const zipPath = path.join(root, "package.zip");
-  const result = spawnSync(
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-NonInteractive",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-Command",
-      "Compress-Archive -Path '" +
-        packageDirectory.replace(/'/g, "''") +
-        "\\*' -DestinationPath '" +
-        zipPath.replace(/'/g, "''") +
-        "' -Force",
-    ],
-    /** R68（2026-10-30）：外部 PowerShell 启动在并行满载下会变慢；给它明确上限，避免挂死。 */
-    { encoding: "utf8", windowsHide: true, timeout: 60_000 },
-  );
+  /** Linux/macOS 无 PowerShell：用系统 zip；Windows 保持既有 Compress-Archive 行为。 */
+  const result =
+    process.platform === "win32"
+      ? spawnSync(
+          "powershell.exe",
+          [
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "Compress-Archive -Path '" +
+              packageDirectory.replace(/'/g, "''") +
+              "\\*' -DestinationPath '" +
+              zipPath.replace(/'/g, "''") +
+              "' -Force",
+          ],
+          /** R68（2026-10-30）：外部 PowerShell 启动在并行满载下会变慢；给它明确上限，避免挂死。 */
+          { encoding: "utf8", windowsHide: true, timeout: 60_000 },
+        )
+      : spawnSync("python3", ["-m", "zipfile", "-c", zipPath, "."], {
+          cwd: packageDirectory,
+          encoding: "utf8",
+          timeout: 60_000,
+        });
   if (result.status !== 0) throw new Error(result.stderr);
   return { zipPath, baseDirectory: path.join(root, "state") };
 }
