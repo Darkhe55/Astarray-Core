@@ -133,6 +133,7 @@ import {
   resumeDeferredWorkWindowMissions,
 } from "../orchestration/work-window-deferred-mission-store.js";
 import type { ScopedPermissionChangePreview } from "../orchestration/scoped-permission-change-service.js";
+import { AgentCreationRegistry } from "../orchestration/agent-parent-binding-store.js";
 import type { ScopedSettingsDocument } from "../orchestration/scoped-settings-store.js";
 import { AgentModelBindingStore } from "../orchestration/agent-model-binding-store.js";
 import { MissionRuntimeRegistry } from "../orchestration/mission-runtime-registry.js";
@@ -1074,8 +1075,23 @@ export async function createApplicationRuntime(
   /**
    * ALIGN-01-03：派生关系表（owner → creator）。
    * 只由 `registerAgentIdentity(createdByAgentInstanceId)` 写入，模型无法声明。
+   * 同时持久化到 AgentCreationRegistry，启动时预加载 —— 重启后仍能管理派生序列。
    */
   const agentCreationCreators = new Map<string, string>();
+  const agentCreationRegistry = new AgentCreationRegistry({
+    stateDirectory,
+  });
+  for (const creationRecord of await agentCreationRegistry.listAllRecords()) {
+    if (
+      creationRecord.createdByAgentInstanceId !== null &&
+      creationRecord.createdByAgentInstanceId !== ""
+    ) {
+      agentCreationCreators.set(
+        creationRecord.agentInstanceId,
+        creationRecord.createdByAgentInstanceId,
+      );
+    }
+  }
   const sequenceManageController =
     new sequenceControllerModule.TaskSequenceManageController(agentTaskSequenceStore, {
       resolveCreatorOf: (ownerAgentInstanceId) =>
@@ -2168,6 +2184,13 @@ export async function createApplicationRuntime(
         input.agentInstanceId,
         input.createdByAgentInstanceId,
       );
+      /** 落盘失败不阻塞身份登记，但下次启动会失去这条派生关系（如实降级）。 */
+      void agentCreationRegistry
+        .registerCreatedAgent({
+          agentInstanceId: input.agentInstanceId,
+          createdByAgentInstanceId: input.createdByAgentInstanceId,
+        })
+        .catch(() => undefined);
     }
   };
   const appointIndependentReview = (input: {
