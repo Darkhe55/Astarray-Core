@@ -420,3 +420,22 @@ describe("ALIGN-02-05 原子领取与释放", () => {
     expect(released).toEqual(["T-3"]);
   });
 });
+
+describe("ALIGN-02-07 停止与等待", () => {
+  it("stop() 立即唤醒等待中的循环；停止后不再派发", async () => {
+    const registry = new UnboundedAgentInstanceRegistry({
+      maxConcurrentSlots: 1,
+      maxQueueLength: 1,
+    });
+    const loop = new SecondaryContinuousDispatchLoop({ registry });
+    const pending = loop.waitForNextWake(5_000);
+    loop.stop();
+    const report = await pending;
+    expect(report.reason).toBe("external");
+    expect(report.waitedMilliseconds).toBeLessThan(1_000);
+
+    const round = await loop.runRound({ nodes: [makeNode("T-1", 0)] });
+    expect(round.blockedReason).toBe("loop-stopped");
+    expect(round.dispatchedTaskIds).toEqual([]);
+  });
+});

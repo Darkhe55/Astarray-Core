@@ -4118,6 +4118,8 @@ export async function createApplicationRuntime(
   const shutdown = async (): Promise<void> => {
     /** 接线缺口第 ④ 项：先停时段检测器（幂等；未启动时返回 not-running）。 */
     workWindowTransitionMonitor.stop();
+    /** ALIGN-02-07：停止持续调度循环，唤醒所有等待者（幂等）。 */
+    secondaryDispatchLoop.stop();
     // T07D-R1-03：先收敛在途编排（取消并等待 Worker/循环），再释放反馈进程资源。
     await controller.shutdown().catch(() => {});
     // 反馈进程**由 supervisor 独占收口**：`stop()` 内部即 `client.shutdown()` +

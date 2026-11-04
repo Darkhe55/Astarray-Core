@@ -291,3 +291,12 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 公开全量 **609 files / 4222 tests** 通过。
 
 **仍缺**：`createTaskBundle` 生产调用；选择结果与真实派发在同一次任务组中的组合（当前是纯函数证据）。
+
+### 07 追加（2026-11-05）：停止与等待联动
+
+- 运行时 `shutdown` 现在调用 `secondaryDispatchLoop.stop()`（幂等），
+  使所有等待者立即被唤醒（`stop()` → `wake("external")`）；
+- 测试：`stop()` 立即唤醒 `waitForNextWake`（<1s）；停止后 `runRound` 返回
+  `blockedReason="loop-stopped"`；runtime.shutdown 后同样为 `loop-stopped`。
+- 公开全量 **609 files / 4223 tests** 通过。
+- **仍缺**：真实时钟驱动的退避（测试使用短等待）与外部取消信号直接注入循环。
