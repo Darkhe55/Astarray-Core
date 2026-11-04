@@ -189,3 +189,13 @@ token 预算仍是"JSON 长度/4"的粗估。**没有**用真实 mission 跑通"
 ALIGN-04 尚未消费；**没有在真实旧状态目录上跑过**；run-history/报告索引里的旧身份未纳入。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+
+## 2026-11-05 对账：01-03 成功提交已补齐
+
+- 规则矛盾已修复（ADR-0208）：提案契约禁止主 Agent 投自己，而序列层只允许用户/所有者管理
+  ⇒ 允许**创建者**管理派生次级的序列，创建关系只能由宿主登记；
+- 派生关系**持久化**到 `AgentCreationRegistry`，重启后仍可提交；
+- 证据：`tests/core/integration/align01-03-proposal-success.test.ts`、
+  `align01-03-persisted-derivation.test.ts`；公开全量 601 files / 4200 tests 通过。
+- 本卡 01-04（直投消费）与 01-06 仍为部分交付，整卡不判通过。
