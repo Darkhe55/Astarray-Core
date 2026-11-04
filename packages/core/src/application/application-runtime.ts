@@ -4097,6 +4097,11 @@ export async function createApplicationRuntime(
       ? {}
       : { onPermissionAsk: options.onPermissionAsk }),
   });
+  /**
+   * 接线缺口第 ① 项收尾（2026-11-05）：holder 之前从未指向控制器，
+   * 导致 `taskGroupInsertionPort` 永远拿到 null ⇒ 运行中插入永远推迟。
+   */
+  controllerHolder.current = controller;
 
   const shutdown = async (): Promise<void> => {
     /** 接线缺口第 ④ 项：先停时段检测器（幂等；未启动时返回 not-running）。 */
