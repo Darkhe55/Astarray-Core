@@ -5298,3 +5298,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 新增 stop 立即唤醒、停止后 loop-stopped、shutdown 后 loop-stopped 的测试。
 > **验证**：公开全量 **609 files / 4223 tests** 通过。
 > 仍缺：真实时钟退避、外部取消信号注入。
+
+> **274（STARTUP-RECOVERY Phase 1，2026-11-05）**：新增启动自动恢复策略存储（严格校验/默认关闭/
+> 每次 3 个/并发 1/含写需确认）与**只读候选扫描**：关系索引 + mission 状态 + 租约过期 + 序列任务
+> running/blocked + 策略过滤/排序/上限；运行时新增 `scanStartupRecovery()`，**不恢复任何任务**。
+> **验证**：`startup-recovery-phase1` 9/9、`startup-recovery-scan` 1/1；
+> 公开全量 **611 files / 4233 tests** 通过（期间两次 Windows 临时文件/既有用例抖动，隔离均通过，重跑全绿）。
+> Phase 1 边界：标签恒 unknown（默认策略不会选中）、无恢复执行、GUI 未展示。
