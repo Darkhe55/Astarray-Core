@@ -220,6 +220,10 @@ export interface StartupRecoveryScanPorts {
     readonly mode: string | null;
   } | null>;
   readonly readLeaseExpiresAtIso: (missionIdentifier: string) => Promise<string | null>;
+  /** Phase 3：从 mission 元数据派生标签（含写/需授权/普通）；缺省按 unknown。 */
+  readonly readMissionLabels?: (
+    missionIdentifier: string,
+  ) => Promise<readonly string[]>;
   readonly readSequenceTask: (input: {
     readonly ownerAgentInstanceIdentifier: string;
     readonly sequenceIdentifier: string;
@@ -306,7 +310,8 @@ export async function scanStartupRecoveryCandidates(input: {
       leaseExpiresAtIso: await input.ports.readLeaseExpiresAtIso(
         relation.missionIdentifier,
       ),
-      labels: ["unknown"],
+      labels:
+        (await input.ports.readMissionLabels?.(relation.missionIdentifier)) ?? ["unknown"],
     });
   }
 

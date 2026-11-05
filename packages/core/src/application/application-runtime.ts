@@ -4253,6 +4253,39 @@ export async function createApplicationRuntime(
                 mode: mission.summary?.mode ?? null,
               };
         },
+        /**
+         * Phase 3（2026-11-05）：从 mission 元数据派生恢复标签。
+         * - 任务链工具含非 none 的 mutationKind ⇒ has-writes；
+         * - 有 blocked 且原因含授权/权限 ⇒ needs-permission；
+         * - 都不命中 ⇒ normal；读不到 mission ⇒ unknown（不猜）。
+         */
+        readMissionLabels: async (missionIdentifier) => {
+          const mission = await missionManager
+            .getMissionStatus(missionIdentifier)
+            .catch(() => null);
+          if (mission === null || mission.taskChain === null) return ["unknown"];
+          const toolNames = new Set(
+            mission.taskChain.tasks.flatMap((task) => task.toolNames),
+          );
+          const hasWrites = registry
+            .getFullDescriptors()
+            .some(
+              (descriptor) =>
+                toolNames.has(descriptor.name) &&
+                descriptor.mutationKind !== "none",
+            );
+          const needsPermission = registry
+            .getFullDescriptors()
+            .some(
+              (descriptor) =>
+                toolNames.has(descriptor.name) &&
+                descriptor.authorizationPolicy !== "standard",
+            );
+          const labels: string[] = [];
+          if (hasWrites) labels.push("has-writes");
+          if (needsPermission) labels.push("needs-permission");
+          return labels.length === 0 ? ["normal"] : labels;
+        },
         readLeaseExpiresAtIso: async (missionIdentifier) => {
           const summary = await missionLeaseStore
             .readLeaseSummary(missionIdentifier, processInstanceId)

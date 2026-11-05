@@ -106,3 +106,18 @@ Phase 1 相应调整：
   `startup-recovery-scan` 2/2（sequence-only 真实跳过）。
 - **边界**：仅 `mission-resume` 会真正调用核心 `resumeMission`（其自带对账/目标/租约/就绪门禁）；
   sequence-only 需要"派发成新 mission"，尚未实现；**启动时自动触发**仍属 Phase 4，当前需显式调用。
+
+## 7. Phase 3 交付（2026-11-05）：标签派生
+
+运行时从 mission 元数据派生（不读 prompt 文本）：
+
+- `has-writes`：任务链工具中存在 `mutationKind !== "none"` 的工具；
+- `needs-permission`：存在 `authorizationPolicy !== "standard"` 的工具；
+- `normal`：两者都不命中；
+- 读不到 mission / 无任务链 ⇒ `unknown`（不猜）。
+
+选中项 `requiresNotification` 由标签驱动（含写/需授权 ⇒ true），供 UI 提示；
+`goal` 标签暂未派生（mission 摘要没有目标组字段，Phase 4 再接目标状态）。
+
+证据：`startup-recovery-labels.test.ts`（写工具 ⇒ has-writes + 通知；只读 ⇒ normal）。
+注意：本机内存压力较高时动态上限可能收缩到 1，测试因此用 missionId 排序保证写任务被选中。
