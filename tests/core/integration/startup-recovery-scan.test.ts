@@ -41,7 +41,7 @@ describe("启动恢复只读扫描（运行时）", () => {
         ...DEFAULT_STARTUP_RECOVERY_POLICY,
         isEnabled: true,
         maximumResumePerStartup: 3,
-        allowedTaskLabels: ["unknown"],
+        allowedTaskLabels: ["normal", "unknown"],
       },
     });
     try {
@@ -128,7 +128,7 @@ describe("启动恢复执行（运行时）", () => {
       startupRecoveryPolicy: {
         ...DEFAULT_STARTUP_RECOVERY_POLICY,
         isEnabled: true,
-        allowedTaskLabels: ["unknown"],
+        allowedTaskLabels: ["normal", "unknown"],
       },
     });
     try {

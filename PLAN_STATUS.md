@@ -5321,3 +5321,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 运行时 `runStartupRecovery()` 串起扫描与执行；sequence-only 明确跳过（不假装恢复）。
 > **验证**：runner 3/3、scan 2/2；公开全量门禁随后跑。
 > 边界：启动自动触发仍属 Phase 4。
+
+> **278（STARTUP-RECOVERY Phase 3 标签，2026-11-05）**：从任务链工具元数据派生 `has-writes`
+> （mutationKind）与 `needs-permission`（authorizationPolicy），普通任务为 `normal`，未知为 `unknown`；
+> `requiresNotification` 由标签驱动。
+> **验证**：`startup-recovery-labels`（写工具→has-writes+通知、只读→normal）；公开全量随后跑。
