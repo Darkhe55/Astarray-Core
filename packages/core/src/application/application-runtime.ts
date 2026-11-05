@@ -127,6 +127,10 @@ import {
   type StartupRecoveryRunReport,
 } from "../orchestration/startup-recovery-runner.js";
 import {
+  StartupRecoveryReportStore,
+  type StartupRecoveryBootReport,
+} from "../orchestration/startup-recovery-report.js";
+import {
   FileTertiaryLifecyclePhaseStore,
   TertiaryAgentLifecycleController,
 } from "../orchestration/tertiary-lifecycle.js";
@@ -272,7 +276,9 @@ export interface ApplicationRuntime {
     scan: StartupRecoveryReport;
     run: StartupRecoveryRunReport;
   }>;
+  readStartupRecoveryReport: () => Promise<StartupRecoveryBootReport | null>;
   startupRecoveryPolicyStore: StartupRecoveryPolicyStore;
+  startupRecoveryReportStore: StartupRecoveryReportStore;
   /** T07D-07：独立工作助手纵向闭环（场景 A 只读分析 / 场景 B 小型代码任务）。 */
   standaloneWorkflowRunner: StandaloneWorkflowRunner;
   /** 产品入口实际选用的运行时种类（mock/provider）。 */
@@ -833,6 +839,8 @@ export interface ApplicationRuntimeOptions {
    * 只影响启动期扫描/恢复，不改变运行中的调度行为。
    */
   startupRecoveryPolicy?: StartupRecoveryPolicy;
+  /** Phase 4：启动后自动执行恢复（默认 false；策略关闭时仍不会恢复）。 */
+  isStartupRecoveryOnBootEnabled?: boolean;
   /**
    * ALIGN-02-02（2026-11-05）：必要项目摘要提供者（宿主注入；缺省 null）。
    *
@@ -3362,6 +3370,9 @@ export async function createApplicationRuntime(
   const startupRecoveryPolicyStore = new StartupRecoveryPolicyStore({
     baseDirectory: stateDirectory,
   });
+  const startupRecoveryReportStore = new StartupRecoveryReportStore({
+    baseDirectory: stateDirectory,
+  });
   const startupRecoveryAttemptStore = new StartupRecoveryAttemptStore({
     baseDirectory: stateDirectory,
   });
@@ -4148,8 +4159,27 @@ export async function createApplicationRuntime(
    */
   controllerHolder.current = controller;
 
+  let startupRecoveryBootTimer: ReturnType<typeof setTimeout> | null = null;
+  if (options.isStartupRecoveryOnBootEnabled === true) {
+    const bootPolicy = options.startupRecoveryPolicy;
+    const delayMilliseconds = bootPolicy?.startupDelayMilliseconds ?? 3000;
+    startupRecoveryBootTimer = setTimeout(() => {
+      void runStartupRecovery().catch((error: unknown) => {
+        process.stderr.write(
+          "astarray: 启动自动恢复失败: " +
+            (error instanceof Error ? error.message : String(error)) +
+            "\n",
+        );
+      });
+    }, delayMilliseconds);
+  }
+
   const shutdown = async (): Promise<void> => {
     /** 接线缺口第 ④ 项：先停时段检测器（幂等；未启动时返回 not-running）。 */
+    if (startupRecoveryBootTimer !== null) {
+      clearTimeout(startupRecoveryBootTimer);
+      startupRecoveryBootTimer = null;
+    }
     workWindowTransitionMonitor.stop();
     /** ALIGN-02-07：停止持续调度循环，唤醒所有等待者（幂等）。 */
     secondaryDispatchLoop.stop();
@@ -4361,14 +4391,41 @@ export async function createApplicationRuntime(
         sleep: (milliseconds) =>
           new Promise((resolve) => setTimeout(resolve, milliseconds)),
         nowIso: () => new Date().toISOString(),
+        readWorkWindowState: async (missionIdentifier) => {
+          const relation = await missionRelationIndexStore
+            .read(missionIdentifier)
+            .catch(() => null);
+          const rules = await projectWorkWindowStore
+            .readRules(relation?.projectIdentifier ?? undefined)
+            .catch(() => []);
+          const decision = evaluateWorkWindowGate({
+            gatePoint: "dispatch",
+            nowIso: new Date().toISOString(),
+            rules,
+            pauseReasonState: createPauseReasonState(),
+          });
+          return decision.kind === "allow"
+            ? { isOpen: true, reason: decision.reason }
+            : { isOpen: false, reason: decision.reason };
+        },
       },
+    });
+    await startupRecoveryReportStore.writeReport({
+      scan,
+      run,
+      generatedAtIso: new Date().toISOString(),
     });
     return { scan, run };
   };
 
+  const readStartupRecoveryReport = async (): Promise<StartupRecoveryBootReport | null> =>
+    startupRecoveryReportStore.readReport();
+
   return {
     scanStartupRecovery,
     runStartupRecovery,
+    readStartupRecoveryReport,
+    startupRecoveryReportStore,
     startupRecoveryPolicyStore,
     controller,
     missionManager,

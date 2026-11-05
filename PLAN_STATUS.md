@@ -5326,3 +5326,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （mutationKind）与 `needs-permission`（authorizationPolicy），普通任务为 `normal`，未知为 `unknown`；
 > `requiresNotification` 由标签驱动。
 > **验证**：`startup-recovery-labels`（写工具→has-writes+通知、只读→normal）；公开全量随后跑。
+
+> **279（STARTUP-RECOVERY Phase 4，2026-11-05）**：启动触发（默认关，延迟可配）、工作时段跳过、
+> 启动报告 `last-report.json` 与只读入口；目标门禁沿用核心 resumeMission。
+> **验证**：boot 2/2、runner 4/4；公开全量随后跑。
+> 边界：UI 设置/状态与提示下一步单独提交；sequence-only 仍不自动派发。

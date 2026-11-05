@@ -150,3 +150,23 @@ describe("启动恢复执行器", () => {
     expect(reloaded.policy.maximumConcurrentResumes).toBe(1);
   });
 });
+
+describe("启动恢复 Phase 4：工作时段", () => {
+  it("工作时段关闭 ⇒ 不调用 resumeMission，如实跳过", async () => {
+    const resumeMission = vi.fn(async () => {});
+    const report = await runStartupRecoveryPlan({
+      plan: plan([selected("m-1", "t1")]),
+      policy: policy(),
+      ports: {
+        resumeMission,
+        readAttemptCount: async () => 0,
+        recordAttempt: async () => {},
+        sleep: async () => {},
+        nowIso: () => "2026-11-05T12:00:00.000Z",
+        readWorkWindowState: async () => ({ isOpen: false, reason: "22:00–08:00 休息" }),
+      },
+    });
+    expect(resumeMission).not.toHaveBeenCalled();
+    expect(report.skipped[0]?.reason).toContain("工作时段外");
+  });
+});
