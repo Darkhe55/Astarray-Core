@@ -117,6 +117,10 @@ export interface StartupRecoveryRunPorts {
   }) => Promise<void>;
   readonly sleep: (milliseconds: number) => Promise<void>;
   readonly nowIso: () => string;
+  /** Phase 4：工作时段关闭时跳过（不把任务在错误时间拉起来）。 */
+  readonly readWorkWindowState?: (
+    missionIdentifier: string,
+  ) => Promise<{ readonly isOpen: boolean; readonly reason: string }>;
 }
 
 export interface StartupRecoveryRunReport {
@@ -160,6 +164,19 @@ export async function runStartupRecoveryPlan(input: {
         reason: "sequence-only-not-dispatched（序列任务需派发成 mission，Phase 3 未实现）",
       });
       continue;
+    }
+    if (input.ports.readWorkWindowState !== undefined) {
+      const workWindow = await input.ports
+        .readWorkWindowState(String(entry.missionIdentifier))
+        .catch(() => ({ isOpen: true, reason: "工作时段状态不可读：按原样处理" }));
+      if (!workWindow.isOpen) {
+        skipped.push({
+          missionIdentifier: entry.missionIdentifier,
+          taskIdentifier: entry.taskIdentifier,
+          reason: `工作时段外：${workWindow.reason}`,
+        });
+        continue;
+      }
     }
     const attemptCount = await input.ports.readAttemptCount(
       String(entry.missionIdentifier),

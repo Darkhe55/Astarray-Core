@@ -121,3 +121,19 @@ Phase 1 相应调整：
 
 证据：`startup-recovery-labels.test.ts`（写工具 ⇒ has-writes + 通知；只读 ⇒ normal）。
 注意：本机内存压力较高时动态上限可能收缩到 1，测试因此用 missionId 排序保证写任务被选中。
+
+## 8. Phase 4 交付（2026-11-05）
+
+- 启动触发：运行时选项 `isStartupRecoveryOnBootEnabled`（默认 false）；
+  开启后按 `startupDelayMilliseconds` 延迟执行 `runStartupRecovery()`，`shutdown` 清除定时器；
+- 工作时段：执行器新增 `readWorkWindowState` 端口；时段关闭 ⇒ 跳过并写"工作时段外"，
+  **不调用** `resumeMission`；
+- 启动报告：每次执行落 `startup-recovery/last-report.json`
+  （`{schemaVersion, generatedAtIso, scan, run}`），运行时 `readStartupRecoveryReport()` 只读；
+- 目标门禁：核心 `resumeMission` 自带目标对账/恢复门禁，失败会进入 `failed` 并记录原因。
+
+证据：`startup-recovery-boot` 2/2（延迟触发+报告落盘；未开启不触发）、
+`startup-recovery-runner` 4/4（新增时段关闭跳过）。
+
+**边界**：GUI 设置/状态展示与"含写任务恢复前提示"的界面属于私有仓库，下一步单独提交；
+`sequence-only` 仍不自动派发。
