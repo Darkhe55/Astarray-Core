@@ -112,6 +112,15 @@ import { ConversationTaskInsertionController } from "../orchestration/conversati
 import { UnboundedAgentInstanceRegistry } from "../orchestration/unbounded-agent-registry.js";
 import { SecondaryContinuousDispatchLoop } from "../orchestration/secondary-continuous-dispatch-loop.js";
 import {
+  StartupRecoveryPolicyStore,
+  parseStartupRecoveryPolicy,
+  type StartupRecoveryPolicy,
+} from "../orchestration/startup-recovery-policy.js";
+import {
+  scanStartupRecoveryCandidates,
+  type StartupRecoveryReport,
+} from "../orchestration/startup-recovery-scanner.js";
+import {
   FileTertiaryLifecyclePhaseStore,
   TertiaryAgentLifecycleController,
 } from "../orchestration/tertiary-lifecycle.js";
@@ -251,6 +260,9 @@ export interface ApplicationRuntime {
   taskSequenceManageController: TaskSequenceManageController;
   /** ALIGN-02-05：持续调度循环（诊断/测试可见；生产由编排层驱动）。 */
   secondaryDispatchLoop: SecondaryContinuousDispatchLoop;
+  /** 启动自动恢复 Phase 1：只读扫描（不恢复）。 */
+  scanStartupRecovery: () => Promise<StartupRecoveryReport>;
+  startupRecoveryPolicyStore: StartupRecoveryPolicyStore;
   /** T07D-07：独立工作助手纵向闭环（场景 A 只读分析 / 场景 B 小型代码任务）。 */
   standaloneWorkflowRunner: StandaloneWorkflowRunner;
   /** 产品入口实际选用的运行时种类（mock/provider）。 */
@@ -806,6 +818,11 @@ export interface ApplicationRuntimeOptions {
   feedbackProcessModulePath?: string | null;
   /** 主 Agent 运行时工厂覆盖（Provider 接线；缺省为 mock ScriptedRuntime）。 */
   mainRuntimeFactory?: (agentInstanceId: string) => AgentRuntime;
+  /**
+   * 启动自动恢复策略（可选覆盖；缺省读 <state>/startup-recovery/policy.json 或内置默认）。
+   * 只影响启动期扫描/恢复，不改变运行中的调度行为。
+   */
+  startupRecoveryPolicy?: StartupRecoveryPolicy;
   /**
    * ALIGN-02-02（2026-11-05）：必要项目摘要提供者（宿主注入；缺省 null）。
    *
@@ -3332,6 +3349,9 @@ export async function createApplicationRuntime(
    * 只由显式登记写入；重启时 `hydratePersistedMissionRelations()` 只恢复"记录里写过"的
    * 关联，不按昵称/路径猜测归属。
    */
+  const startupRecoveryPolicyStore = new StartupRecoveryPolicyStore({
+    baseDirectory: stateDirectory,
+  });
   const missionRelationIndexStore = new MissionRelationIndexStore({
     baseDirectory: stateDirectory,
   });
@@ -4173,7 +4193,79 @@ export async function createApplicationRuntime(
     );
   }
 
+  /**
+   * 启动自动恢复 Phase 1（2026-11-05）：**只读**扫描，不恢复。
+   * 返回"如果现在启动会恢复哪些/跳过哪些/为什么"，供 GUI/CLI 展示与测试使用。
+   */
+  const scanStartupRecovery = async (): Promise<StartupRecoveryReport> => {
+    const policySource =
+      options.startupRecoveryPolicy === undefined
+        ? (await startupRecoveryPolicyStore.readPolicy()).policy
+        : parseStartupRecoveryPolicy(options.startupRecoveryPolicy);
+    const nowIso = new Date().toISOString();
+    const relations = await missionRelationIndexStore.listAll();
+    return scanStartupRecoveryCandidates({
+      nowIso,
+      policy: {
+        isEnabled: policySource.isEnabled,
+        maximumResumePerStartup: policySource.maximumResumePerStartup,
+        maximumConcurrentResumes: policySource.maximumConcurrentResumes,
+        allowedTaskLabels: policySource.allowedTaskLabels,
+        requireConfirmationFor: policySource.requireConfirmationFor,
+      },
+      ports: {
+        listMissionRelations: async () =>
+          relations.map((relation) => ({
+            missionIdentifier: relation.missionIdentifier,
+            projectIdentifier: relation.projectIdentifier,
+            conversationIdentifier: relation.conversationIdentifier,
+            taskSequenceIdentifier: relation.taskSequenceIdentifier,
+            taskIdentifier: relation.taskIdentifier,
+            sequenceOwnerAgentInstanceIdentifier:
+              relation.sequenceOwnerAgentInstanceIdentifier,
+          })),
+        readMissionSummary: async (missionIdentifier) => {
+          const mission = await missionManager
+            .getMissionStatus(missionIdentifier)
+            .catch(() => null);
+          return mission === null
+            ? null
+            : {
+                status: mission.summary?.status ?? null,
+                mode: mission.summary?.mode ?? null,
+              };
+        },
+        readLeaseExpiresAtIso: async (missionIdentifier) => {
+          const summary = await missionLeaseStore
+            .readLeaseSummary(missionIdentifier, processInstanceId)
+            .catch(() => null);
+          return summary?.renewsUntilIso ?? null;
+        },
+        readSequenceTask: async (input) => {
+          const snapshot = await sequenceStatusController
+            .getSnapshot({
+              ownerAgentInstanceId: input.ownerAgentInstanceIdentifier,
+              sequenceId: input.sequenceIdentifier,
+              viewer: input.viewer,
+            })
+            .catch(() => null);
+          const node = snapshot?.nodes.find(
+            (candidate) => candidate.taskId === input.taskIdentifier,
+          );
+          if (node === undefined) return null;
+          return {
+            status: node.status,
+            priorityTier: node.priorityTier ?? null,
+            sequenceOrdinal: node.sequenceOrdinal ?? null,
+          };
+        },
+      },
+    });
+  };
+
   return {
+    scanStartupRecovery,
+    startupRecoveryPolicyStore,
     controller,
     missionManager,
     taskStore,
