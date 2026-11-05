@@ -95,3 +95,14 @@ Phase 1 相应调整：
 - 运行时时序采样：核数、loadavg（Windows 传 null）、空闲/总内存。
 
 证据：`startup-recovery-phase1` 13/13（含动态上限三档、pending 可恢复、序列独有任务、通知标记）。
+
+## 6. Phase 2 交付（2026-11-05）
+
+- `startup-recovery-runner.ts`：按 `maximumConcurrentResumes` 分批、批间 `cooldownMilliseconds`；
+  失败计数落 `startup-recovery/attempts.json`，达 `maximumAttemptsPerTask` 后停手；
+  `sequence-only` 明确跳过（`sequence-only-not-dispatched`，不假装已恢复）。
+- 运行时新增 `runStartupRecovery()` = 只读扫描 + 执行报告（`scan` + `run`）。
+- 证据：`startup-recovery-runner` 3/3（分批/冷却/成功失败/上限持久化/清零）、
+  `startup-recovery-scan` 2/2（sequence-only 真实跳过）。
+- **边界**：仅 `mission-resume` 会真正调用核心 `resumeMission`（其自带对账/目标/租约/就绪门禁）；
+  sequence-only 需要"派发成新 mission"，尚未实现；**启动时自动触发**仍属 Phase 4，当前需显式调用。

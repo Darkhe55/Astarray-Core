@@ -5316,3 +5316,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 扫描同时聚合无 mission 映射的序列任务（sequence-only）。
 > **验证**：`startup-recovery-phase1` 13/13（动态上限三档、pending、sequence-only、通知标记）；
 > 公开全量 **611 files / 4236 tests** 通过（drill 抖动隔离 3/3 后重跑全绿）。
+
+> **277（STARTUP-RECOVERY Phase 2，2026-11-05）**：执行器按并发分批 + 冷却 + 失败上限（持久化 attempts），
+> 运行时 `runStartupRecovery()` 串起扫描与执行；sequence-only 明确跳过（不假装恢复）。
+> **验证**：runner 3/3、scan 2/2；公开全量门禁随后跑。
+> 边界：启动自动触发仍属 Phase 4。
