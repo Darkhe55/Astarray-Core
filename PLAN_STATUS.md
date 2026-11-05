@@ -5309,3 +5309,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **275（ALIGN-02-06 推迟登记并发，2026-11-05）**：推迟插入登记遇 `stale-revision` 有界重试 3 次，
 > 避免与终态回执并发时把请求直接打回。
 > **验证**：`align02-runtime-insertion` 3/3 压力复跑；公开全量 **611 files / 4233 tests** 通过。
+
+> **276（STARTUP-RECOVERY 口径修订，2026-11-05）**：按用户决定改为——可恢复=序列中**所有未完成**节点
+> （pending/running/blocked，排除终态）；上限按机器压力**动态缩放**（上限 8、下界 1、CPU/内存取大，
+> Windows loadavg 不可靠仅用内存）；含写/需授权**默认恢复但标记 `requiresNotification`**；
+> 扫描同时聚合无 mission 映射的序列任务（sequence-only）。
+> **验证**：`startup-recovery-phase1` 13/13（动态上限三档、pending、sequence-only、通知标记）；
+> 公开全量 **611 files / 4236 tests** 通过（drill 抖动隔离 3/3 后重跑全绿）。

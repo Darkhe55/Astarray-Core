@@ -3,6 +3,7 @@
  * 交互端口由界面层注入；本模块不依赖 TUI/GUI（依赖方向：core 不反向依赖界面）。
  */
 import { createHash, randomUUID } from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 
 import { resolveHostUserIdentifier } from "../core/host-user-context.js";
@@ -4206,12 +4207,17 @@ export async function createApplicationRuntime(
     const relations = await missionRelationIndexStore.listAll();
     return scanStartupRecoveryCandidates({
       nowIso,
-      policy: {
-        isEnabled: policySource.isEnabled,
-        maximumResumePerStartup: policySource.maximumResumePerStartup,
-        maximumConcurrentResumes: policySource.maximumConcurrentResumes,
-        allowedTaskLabels: policySource.allowedTaskLabels,
-        requireConfirmationFor: policySource.requireConfirmationFor,
+      policy: policySource,
+      /**
+       * 机器负载采样：Windows 的 loadavg 不可靠（通常为 0），
+       * 由内存占用兜底；真正无负载时动态上限取配置上限。
+       */
+      capacitySample: {
+        cpuCount: Math.max(1, os.cpus().length),
+        loadAverage1m:
+          process.platform === "win32" ? null : (os.loadavg()[0] ?? null),
+        freeMemoryBytes: os.freemem(),
+        totalMemoryBytes: os.totalmem(),
       },
       ports: {
         listMissionRelations: async () =>
@@ -4240,6 +4246,30 @@ export async function createApplicationRuntime(
             .readLeaseSummary(missionIdentifier, processInstanceId)
             .catch(() => null);
           return summary?.renewsUntilIso ?? null;
+        },
+        listSequenceTasks: async () => {
+          const sequences = await agentTaskSequenceStore.listAllSequences();
+          const tasks: {
+            ownerAgentInstanceIdentifier: string;
+            sequenceIdentifier: string;
+            taskIdentifier: string;
+            status: string;
+            priorityTier: number | null;
+            sequenceOrdinal: number | null;
+          }[] = [];
+          for (const entry of sequences) {
+            for (const node of entry.sequence.nodes) {
+              tasks.push({
+                ownerAgentInstanceIdentifier: entry.ownerAgentInstanceId,
+                sequenceIdentifier: entry.sequence.sequenceId,
+                taskIdentifier: node.taskId,
+                status: node.status,
+                priorityTier: node.priorityTier ?? null,
+                sequenceOrdinal: node.sequenceOrdinal ?? null,
+              });
+            }
+          }
+          return tasks;
         },
         readSequenceTask: async (input) => {
           const snapshot = await sequenceStatusController
