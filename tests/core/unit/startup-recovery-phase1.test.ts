@@ -1,5 +1,5 @@
 /**
- * 启动自动恢复 Phase 1（2026-11-05）：策略 + 只读扫描 + 选择。
+ * 启动自动恢复（2026-11-05，口径按用户修订）：策略 + 自适应上限 + 扫描 + 选择。
  */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,6 +12,7 @@ import {
   StartupRecoveryPolicyStore,
   parseStartupRecoveryPolicy,
 } from "../../../packages/core/src/orchestration/startup-recovery-policy.js";
+import { computeAdaptiveResumeLimit } from "../../../packages/core/src/orchestration/startup-recovery-capacity.js";
 import {
   evaluateStartupRecoveryCandidate,
   scanStartupRecoveryCandidates,
@@ -35,6 +36,7 @@ function makeView(
   overrides: Partial<StartupRecoveryCandidateView> = {},
 ): StartupRecoveryCandidateView {
   return {
+    kind: "mission-resume",
     missionIdentifier: "mission-1",
     missionStatus: "running",
     missionMode: "assist",
@@ -47,98 +49,152 @@ function makeView(
     priorityTier: 0,
     sequenceOrdinal: 1,
     leaseExpiresAtIso: "2026-11-05T11:00:00.000Z",
-    labels: ["normal"],
+    labels: ["unknown"],
     ...overrides,
   };
 }
 
-describe("启动恢复策略", () => {
-  it("默认值：关闭、每次最多 3、并发 1、含写需确认", () => {
+function policy(overrides: Partial<typeof DEFAULT_STARTUP_RECOVERY_POLICY> = {}) {
+  return { ...DEFAULT_STARTUP_RECOVERY_POLICY, ...overrides };
+}
+
+describe("启动恢复策略（修订口径）", () => {
+  it("默认：关闭、8 个上限、1 并发、动态、含写默认恢复但提示", () => {
     expect(DEFAULT_STARTUP_RECOVERY_POLICY.isEnabled).toBe(false);
-    expect(DEFAULT_STARTUP_RECOVERY_POLICY.maximumResumePerStartup).toBe(3);
-    expect(DEFAULT_STARTUP_RECOVERY_POLICY.maximumConcurrentResumes).toBe(1);
-    expect(DEFAULT_STARTUP_RECOVERY_POLICY.allowedTaskLabels).toEqual(["normal"]);
-    expect(DEFAULT_STARTUP_RECOVERY_POLICY.requireConfirmationFor).toContain("has-writes");
+    expect(DEFAULT_STARTUP_RECOVERY_POLICY.maximumResumePerStartup).toBe(8);
+    expect(DEFAULT_STARTUP_RECOVERY_POLICY.minimumResumePerStartup).toBe(1);
+    expect(DEFAULT_STARTUP_RECOVERY_POLICY.isLoadAdaptive).toBe(true);
+    expect(DEFAULT_STARTUP_RECOVERY_POLICY.allowedTaskLabels).toContain("has-writes");
+    expect(DEFAULT_STARTUP_RECOVERY_POLICY.requireConfirmationFor).toEqual([]);
+    expect(DEFAULT_STARTUP_RECOVERY_POLICY.notifyOnAutoResume).toBe(true);
   });
 
   it("非法值直接拒绝（不静默 clamp）", () => {
     expect(() => parseStartupRecoveryPolicy({ maximumResumePerStartup: 99 })).toThrow(
-      /0\.\.20/u,
+      /1\.\.50/u,
     );
-    expect(() => parseStartupRecoveryPolicy({ allowedTaskLabels: ["nope"] })).toThrow(
-      /未知标签/u,
+    expect(() =>
+      parseStartupRecoveryPolicy({
+        maximumResumePerStartup: 5,
+        minimumResumePerStartup: 6,
+      }),
+    ).toThrow(/不能大于/u);
+    expect(() => parseStartupRecoveryPolicy({ targetCpuUtilization: 1 })).toThrow(
+      /\(0,1\)/u,
     );
-    expect(() => parseStartupRecoveryPolicy({ isEnabled: "yes" })).toThrow(/布尔值/u);
   });
 
-  it("未落盘 ⇒ 返回默认且 isPersisted=false；写入后可读回", async () => {
+  it("未落盘 ⇒ 默认且 isPersisted=false；写入后可读回", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "astarray-startup-recovery-"));
     directories.push(directory);
     const store = new StartupRecoveryPolicyStore({ baseDirectory: directory });
     const initial = await store.readPolicy();
     expect(initial.isPersisted).toBe(false);
     expect(initial.policy).toEqual(DEFAULT_STARTUP_RECOVERY_POLICY);
-
-    const written = await store.writePolicy({
-      ...DEFAULT_STARTUP_RECOVERY_POLICY,
-      isEnabled: true,
-      maximumResumePerStartup: 5,
-    });
-    expect(written.isEnabled).toBe(true);
+    await store.writePolicy(policy({ isEnabled: true, maximumResumePerStartup: 5 }));
     const reloaded = await store.readPolicy();
     expect(reloaded.isPersisted).toBe(true);
     expect(reloaded.policy.maximumResumePerStartup).toBe(5);
   });
 });
 
-describe("启动恢复候选判定", () => {
-  it("租约仍有效 ⇒ 不恢复", () => {
-    const decision = evaluateStartupRecoveryCandidate(
-      makeView({ leaseExpiresAtIso: "2026-11-05T12:05:00.000Z" }),
-      NOW,
-    );
-    expect(decision.isResumable).toBe(false);
-    expect(decision.skippedReason).toContain("租约仍有效");
+describe("动态上限", () => {
+  it("空载 ⇒ 上限；压力达到目标 ⇒ 下界；中间线性", () => {
+    const base = policy();
+    const idle = computeAdaptiveResumeLimit(base, {
+      cpuCount: 8,
+      loadAverage1m: 0,
+      freeMemoryBytes: 1000,
+      totalMemoryBytes: 1000,
+    });
+    expect(idle.effectiveLimit).toBe(8);
+
+    const busy = computeAdaptiveResumeLimit(base, {
+      cpuCount: 8,
+      loadAverage1m: 8,
+      freeMemoryBytes: 100,
+      totalMemoryBytes: 1000,
+    });
+    expect(busy.effectiveLimit).toBe(1);
+
+    const middle = computeAdaptiveResumeLimit(base, {
+      cpuCount: 8,
+      loadAverage1m: 0,
+      freeMemoryBytes: 500,
+      totalMemoryBytes: 1000,
+    });
+    expect(middle.effectiveLimit).toBeGreaterThan(1);
+    expect(middle.effectiveLimit).toBeLessThan(8);
   });
 
-  it("终态 / 缺映射 / 非可恢复状态均跳过", () => {
-    expect(
-      evaluateStartupRecoveryCandidate(makeView({ missionStatus: "done" }), NOW)
-        .skippedReason,
-    ).toContain("终态");
-    expect(
-      evaluateStartupRecoveryCandidate(
-        makeView({ sequenceIdentifier: null }),
-        NOW,
-      ).skippedReason,
-    ).toContain("缺少序列");
-    expect(
-      evaluateStartupRecoveryCandidate(
-        makeView({ sequenceTaskStatus: "pending" }),
-        NOW,
-      ).skippedReason,
-    ).toContain("不属于被中断");
+  it("关闭动态 ⇒ 直接使用上限", () => {
+    const decision = computeAdaptiveResumeLimit(
+      policy({ isLoadAdaptive: false }),
+      {
+        cpuCount: 1,
+        loadAverage1m: 99,
+        freeMemoryBytes: 0,
+        totalMemoryBytes: 1000,
+      },
+    );
+    expect(decision.effectiveLimit).toBe(8);
   });
 });
 
-describe("启动恢复选择", () => {
-  it("关闭时只扫描：全部跳过，selected 为空", () => {
+describe("候选判定（未完成即可恢复）", () => {
+  it("pending 也算可恢复（用户口径：序列里未完成的内容）", () => {
+    expect(
+      evaluateStartupRecoveryCandidate(makeView({ sequenceTaskStatus: "pending" }), NOW)
+        .isResumable,
+    ).toBe(true);
+  });
+
+  it("租约有效 / 终态 / 序列终态 跳过", () => {
+    expect(
+      evaluateStartupRecoveryCandidate(
+        makeView({ leaseExpiresAtIso: "2026-11-05T12:05:00.000Z" }),
+        NOW,
+      ).isResumable,
+    ).toBe(false);
+    expect(
+      evaluateStartupRecoveryCandidate(makeView({ missionStatus: "done" }), NOW)
+        .isResumable,
+    ).toBe(false);
+    expect(
+      evaluateStartupRecoveryCandidate(makeView({ sequenceTaskStatus: "done" }), NOW)
+        .isResumable,
+    ).toBe(false);
+  });
+
+  it("序列独有任务（无 mission）也可恢复", () => {
+    expect(
+      evaluateStartupRecoveryCandidate(
+        makeView({
+          kind: "sequence-only",
+          missionIdentifier: null,
+          missionStatus: null,
+          leaseExpiresAtIso: null,
+          sequenceTaskStatus: "pending",
+        }),
+        NOW,
+      ).isResumable,
+    ).toBe(true);
+  });
+});
+
+describe("选择与报告", () => {
+  it("关闭时只扫描：全部跳过", () => {
     const plan = selectStartupRecoveryPlan({
-      views: [makeView(), makeView({ missionIdentifier: "mission-2" })],
-      policy: {
-        isEnabled: false,
-        maximumResumePerStartup: 3,
-        maximumConcurrentResumes: 1,
-        allowedTaskLabels: ["normal"],
-        requireConfirmationFor: [],
-      },
+      views: [makeView()],
+      policy: policy({ isEnabled: false }),
+      effectiveLimit: 0,
       nowIso: NOW,
     });
     expect(plan.selected).toHaveLength(0);
-    expect(plan.skipped.every((entry) => entry.reason.includes("已关闭"))).toBe(true);
+    expect(plan.skipped[0]?.reason).toContain("已关闭");
   });
 
-  it("按优先级/中断时间排序，并按上限截断", () => {
+  it("按优先级/中断时间排序，并按动态上限截断", () => {
     const plan = selectStartupRecoveryPlan({
       views: [
         makeView({ missionIdentifier: "m-low", priorityTier: 1 }),
@@ -153,13 +209,8 @@ describe("启动恢复选择", () => {
           leaseExpiresAtIso: "2026-11-05T11:10:00.000Z",
         }),
       ],
-      policy: {
-        isEnabled: true,
-        maximumResumePerStartup: 2,
-        maximumConcurrentResumes: 1,
-        allowedTaskLabels: ["normal"],
-        requireConfirmationFor: [],
-      },
+      policy: policy({ isEnabled: true }),
+      effectiveLimit: 2,
       nowIso: NOW,
     });
     expect(plan.selected.map((entry) => entry.missionIdentifier)).toEqual([
@@ -168,32 +219,46 @@ describe("启动恢复选择", () => {
     ]);
     expect(
       plan.skipped.find((entry) => entry.missionIdentifier === "m-low")?.reason,
-    ).toContain("超出本次启动上限");
+    ).toContain("动态上限");
   });
 
-  it("类型不允许 / 需确认 ⇒ 跳过", () => {
+  it("含写任务默认恢复但 requiresNotification=true；显式允许空标签时跳过", () => {
     const plan = selectStartupRecoveryPlan({
       views: [
         makeView({ missionIdentifier: "m-writes", labels: ["has-writes"] }),
-        makeView({ missionIdentifier: "m-unknown", labels: ["unknown"] }),
+        makeView({ missionIdentifier: "m-goal", labels: ["goal"] }),
       ],
-      policy: {
-        isEnabled: true,
-        maximumResumePerStartup: 3,
-        maximumConcurrentResumes: 1,
-        allowedTaskLabels: ["normal"],
-        requireConfirmationFor: [],
-      },
+      policy: policy({ isEnabled: true }),
+      effectiveLimit: 5,
       nowIso: NOW,
     });
-    expect(plan.selected).toHaveLength(0);
-    expect(plan.skipped.map((entry) => entry.reason).join("\n")).toContain("类型未允许");
+    expect(plan.selected).toHaveLength(2);
+    expect(
+      plan.selected.find((entry) => entry.missionIdentifier === "m-writes")
+        ?.requiresNotification,
+    ).toBe(true);
+
+    const restricted = selectStartupRecoveryPlan({
+      views: [makeView({ labels: ["unknown"] })],
+      policy: policy({ isEnabled: true, allowedTaskLabels: ["normal"] }),
+      effectiveLimit: 5,
+      nowIso: NOW,
+    });
+    expect(restricted.selected).toHaveLength(0);
   });
 });
 
-describe("启动恢复只读扫描", () => {
-  it("从关系索引/租约/序列读取候选，不恢复", async () => {
+describe("只读扫描", () => {
+  it("聚合 mission 关系 + 序列独有任务，不恢复", async () => {
     const report = await scanStartupRecoveryCandidates({
+      policy: policy({ isEnabled: true }),
+      capacitySample: {
+        cpuCount: 8,
+        loadAverage1m: 0,
+        freeMemoryBytes: 800,
+        totalMemoryBytes: 1000,
+      },
+      nowIso: NOW,
       ports: {
         listMissionRelations: async () => [
           {
@@ -207,28 +272,25 @@ describe("启动恢复只读扫描", () => {
         ],
         readMissionSummary: async () => ({ status: "running", mode: "assist" }),
         readLeaseExpiresAtIso: async () => "2026-11-05T11:00:00.000Z",
-        readSequenceTask: async (input) => {
-          expect(input.ownerAgentInstanceIdentifier).toBe("secondary-1");
-          expect(input.viewer).toEqual({
-            sourceKind: "agent",
-            actorId: "secondary-1",
-          });
-          return { status: "running", priorityTier: 0, sequenceOrdinal: 2 };
-        },
+        readSequenceTask: async () => ({
+          status: "pending",
+          priorityTier: 0,
+          sequenceOrdinal: 2,
+        }),
+        listSequenceTasks: async () => [
+          {
+            ownerAgentInstanceIdentifier: "secondary-2",
+            sequenceIdentifier: "sequence-secondary-2",
+            taskIdentifier: "task-only-1",
+            status: "blocked",
+            priorityTier: 1,
+            sequenceOrdinal: 3,
+          },
+        ],
       },
-      policy: {
-        isEnabled: true,
-        maximumResumePerStartup: 3,
-        maximumConcurrentResumes: 1,
-        allowedTaskLabels: ["normal"],
-        requireConfirmationFor: [],
-      },
-      nowIso: NOW,
     });
-    expect(report.views).toHaveLength(1);
-    expect(report.views[0]?.sequenceTaskStatus).toBe("running");
-    /** Phase 1 标签恒为 unknown ⇒ 默认策略不会选中。 */
-    expect(report.selected).toHaveLength(0);
-    expect(report.skipped[0]?.reason).toContain("类型未允许");
+    expect(report.views).toHaveLength(2);
+    expect(report.selected).toHaveLength(2);
+    expect(report.selected.some((entry) => entry.kind === "sequence-only")).toBe(true);
   });
 });

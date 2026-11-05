@@ -1,11 +1,10 @@
 /**
- * 启动自动恢复：策略模型（Phase 1，2026-11-05）。
+ * 启动自动恢复：策略模型（2026-11-05，用户已修订口径）。
  *
- * 只做**策略读写**与默认值；不恢复、不启动任务。默认值按建议：
- * - 仅恢复被中断的任务（running / blocked 且租约过期）；
- * - 每次启动最多 3 个、并发 1；
- * - 含写任务默认不自动恢复（需显式勾选）；
- * - 类型标签未知 ⇒ 按"未确认"处理，不自动恢复。
+ * 用户口径：
+ * - **可恢复范围**：之前写入任务序列、仍未完成的内容（不再只看 running/blocked）；
+ * - **上限按机器运行情况动态调整占用率**（不是固定 3）；
+ * - **含写任务默认也自动恢复**，但要有提示（`notifyOnAutoResume`）。
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -16,7 +15,6 @@ import { cleanStaleTempFiles, readJsonWithBackupRecovery, writeAtomicJson } from
 
 export const STARTUP_RECOVERY_POLICY_SCHEMA_VERSION = 1;
 
-/** 恢复类型标签（Phase 3 会从 mission 元数据派生；Phase 1 只认显式标签）。 */
 export type StartupRecoveryTaskLabel =
   | "normal"
   | "goal"
@@ -28,30 +26,44 @@ export interface StartupRecoveryPolicy {
   readonly schemaVersion: typeof STARTUP_RECOVERY_POLICY_SCHEMA_VERSION;
   /** 总开关；关闭时只允许只读扫描，不自动恢复。 */
   readonly isEnabled: boolean;
-  /** 每次启动最多恢复几个 mission（0 = 只扫描不恢复）。 */
+  /** 每次启动恢复数量的**上限**（动态上限不会超过它）。 */
   readonly maximumResumePerStartup: number;
+  /** 动态上限的下界（机器很忙时仍至少恢复几个）。 */
+  readonly minimumResumePerStartup: number;
+  /** 是否按机器负载动态收缩到 `[minimum, maximum]` 区间。 */
+  readonly isLoadAdaptive: boolean;
+  /** CPU 占用目标（达到即收缩到最小值）。 */
+  readonly targetCpuUtilization: number;
+  /** 内存占用目标（达到即收缩到最小值）。 */
+  readonly targetMemoryUtilization: number;
   /** 同时恢复的 mission 数（1..4）。 */
   readonly maximumConcurrentResumes: number;
-  /** 允许自动恢复的标签；空数组表示"不按类型恢复任何任务"。 */
+  /** 允许自动恢复的标签（默认包含含写/需授权：用户要求默认都恢复）。 */
   readonly allowedTaskLabels: readonly StartupRecoveryTaskLabel[];
-  /** 需要用户逐项确认的标签（即使 allowed 也先确认）。 */
+  /** 需要用户逐项确认的标签（默认空：含写也自动恢复）。 */
   readonly requireConfirmationFor: readonly StartupRecoveryTaskLabel[];
-  /** 单个任务连续失败达到上限后停手（Phase 4）。 */
+  /** 自动恢复含写/需授权任务时是否先提示（默认 true）。 */
+  readonly notifyOnAutoResume: boolean;
+  /** 单个任务连续失败达到上限后停手。 */
   readonly maximumAttemptsPerTask: number;
-  /** 两批恢复之间的冷却（毫秒，Phase 4）。 */
   readonly cooldownMilliseconds: number;
-  /** 启动后延迟多久开始恢复（毫秒），避免与初始化竞争。 */
+  /** 启动后延迟多久开始恢复（毫秒）。 */
   readonly startupDelayMilliseconds: number;
 }
 
 export const DEFAULT_STARTUP_RECOVERY_POLICY: StartupRecoveryPolicy = {
   schemaVersion: STARTUP_RECOVERY_POLICY_SCHEMA_VERSION,
   isEnabled: false,
-  maximumResumePerStartup: 3,
+  maximumResumePerStartup: 8,
+  minimumResumePerStartup: 1,
+  isLoadAdaptive: true,
+  targetCpuUtilization: 0.7,
+  targetMemoryUtilization: 0.8,
   maximumConcurrentResumes: 1,
-  /** 含写任务默认不自动恢复：默认只允许普通任务。 */
-  allowedTaskLabels: ["normal"],
-  requireConfirmationFor: ["has-writes", "needs-permission"],
+  /** 用户要求：未完成内容默认都恢复（unknown 也会在 Phase 3 被细化）。 */
+  allowedTaskLabels: ["normal", "goal", "has-writes", "needs-permission", "unknown"],
+  requireConfirmationFor: [],
+  notifyOnAutoResume: true,
   maximumAttemptsPerTask: 2,
   cooldownMilliseconds: 30_000,
   startupDelayMilliseconds: 3_000,
@@ -65,7 +77,6 @@ const ALLOWED_LABELS: readonly StartupRecoveryTaskLabel[] = [
   "unknown",
 ];
 
-/** 读取时做边界校验（不 clamp 静默修正；越界即拒绝，避免"以为改了其实没改"）。 */
 export function parseStartupRecoveryPolicy(value: unknown): StartupRecoveryPolicy {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new DomainError("invalid-task-chain", "启动恢复策略必须是 JSON 对象。");
@@ -95,7 +106,21 @@ export function parseStartupRecoveryPolicy(value: unknown): StartupRecoveryPolic
     }
     return raw as number;
   };
-  const readLabels = (fieldName: string, fallback: readonly StartupRecoveryTaskLabel[]) => {
+  const readRatio = (fieldName: string, fallback: number): number => {
+    const raw = record[fieldName];
+    if (raw === undefined) return fallback;
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0 || raw >= 1) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `启动恢复策略字段 ${fieldName} 必须是 (0,1) 之间的小数。`,
+      );
+    }
+    return raw;
+  };
+  const readLabels = (
+    fieldName: string,
+    fallback: readonly StartupRecoveryTaskLabel[],
+  ): readonly StartupRecoveryTaskLabel[] => {
     const raw = record[fieldName];
     if (raw === undefined) return fallback;
     if (!Array.isArray(raw)) {
@@ -111,19 +136,30 @@ export function parseStartupRecoveryPolicy(value: unknown): StartupRecoveryPolic
     }
     return [...new Set(raw as StartupRecoveryTaskLabel[])];
   };
+
+  const maximumResumePerStartup = readInteger("maximumResumePerStartup", 8, 1, 50);
+  const minimumResumePerStartup = readInteger("minimumResumePerStartup", 1, 1, 20);
+  if (minimumResumePerStartup > maximumResumePerStartup) {
+    throw new DomainError(
+      "invalid-task-chain",
+      "minimumResumePerStartup 不能大于 maximumResumePerStartup。",
+    );
+  }
   return {
     schemaVersion: STARTUP_RECOVERY_POLICY_SCHEMA_VERSION,
     isEnabled: readBoolean("isEnabled", DEFAULT_STARTUP_RECOVERY_POLICY.isEnabled),
-    maximumResumePerStartup: readInteger("maximumResumePerStartup", 3, 0, 20),
+    maximumResumePerStartup,
+    minimumResumePerStartup,
+    isLoadAdaptive: readBoolean("isLoadAdaptive", true),
+    targetCpuUtilization: readRatio("targetCpuUtilization", 0.7),
+    targetMemoryUtilization: readRatio("targetMemoryUtilization", 0.8),
     maximumConcurrentResumes: readInteger("maximumConcurrentResumes", 1, 1, 4),
     allowedTaskLabels: readLabels(
       "allowedTaskLabels",
       DEFAULT_STARTUP_RECOVERY_POLICY.allowedTaskLabels,
     ),
-    requireConfirmationFor: readLabels(
-      "requireConfirmationFor",
-      DEFAULT_STARTUP_RECOVERY_POLICY.requireConfirmationFor,
-    ),
+    requireConfirmationFor: readLabels("requireConfirmationFor", []),
+    notifyOnAutoResume: readBoolean("notifyOnAutoResume", true),
     maximumAttemptsPerTask: readInteger("maximumAttemptsPerTask", 2, 1, 10),
     cooldownMilliseconds: readInteger("cooldownMilliseconds", 30_000, 0, 3_600_000),
     startupDelayMilliseconds: readInteger("startupDelayMilliseconds", 3_000, 0, 60_000),
@@ -140,7 +176,6 @@ export class StartupRecoveryPolicyStore {
     this.filePath = path.join(this.directoryPath, "policy.json");
   }
 
-  /** 文件不存在 ⇒ 返回默认策略（不落盘），让"未配置"与"显式关闭"可区分。 */
   async readPolicy(): Promise<{ policy: StartupRecoveryPolicy; isPersisted: boolean }> {
     const result = await readJsonWithBackupRecovery(
       this.filePath,

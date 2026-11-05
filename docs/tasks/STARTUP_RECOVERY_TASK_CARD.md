@@ -73,3 +73,25 @@
 - Phase 3：从 mission 元数据派生标签（mode/goal/写工具/权限询问），不读 prompt 文本；
   `has-writes`/`needs-permission` 默认 `requireConfirmationFor`。
 - Phase 4：启动延迟 + 工作时段/目标门禁复核 + 启动报告（selected/skipped/failed）+ GUI 展示。
+
+## 5. 口径修订（2026-11-05，用户决定）
+
+1. **可恢复范围 = 之前写入任务序列、仍未完成的内容**（`pending` / `running` / `blocked` 都算；
+   仅排除 `done` / `cancelled` / `failed`），不再只限"被中断"；
+2. **上限按机器运行情况动态调整占用率**：
+   - 配置 `maximumResumePerStartup`（上限）、`minimumResumePerStartup`（下界）；
+   - 压力 = max(CPU 压力, 内存压力)，CPU 压力 = loadavg/核数（Windows loadavg 不可靠 ⇒ 仅用内存）；
+   - 压力 0 ⇒ 上限；压力 ≥ max(targetCpu, targetMemory) ⇒ 下界；中间线性；
+3. **含写任务默认也自动恢复**，但必须**有提示**：
+   - `allowedTaskLabels` 默认包含 `has-writes` / `needs-permission` / `unknown`；
+   - `requireConfirmationFor` 默认空；
+   - 选中项的 `requiresNotification=true`（含写/需授权）供 UI 提示。
+
+Phase 1 相应调整：
+
+- 默认值改为上限 8、下界 1、动态开、允许全部标签、通知开；
+- 扫描同时聚合**序列里没有 mission 映射**的未完成任务（`kind=sequence-only`）；
+- 报告新增 `capacity`（实际生效上限与压力解释）与 `effectiveLimit`；
+- 运行时时序采样：核数、loadavg（Windows 传 null）、空闲/总内存。
+
+证据：`startup-recovery-phase1` 13/13（含动态上限三档、pending 可恢复、序列独有任务、通知标记）。

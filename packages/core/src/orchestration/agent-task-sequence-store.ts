@@ -6,6 +6,7 @@
  * 保证：schema 校验、revision 单调递增（expected revision 校验）、原子替换、
  *       写入前自动备份、损坏文件进入恢复绝不静默覆盖。
  */
+import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
@@ -19,7 +20,7 @@ import {
   readJsonWithBackupRecovery,
   writeAtomicJson,
 } from "../infra/atomic-json.js";
-import { sanitizePathSegment } from "./work-archive-store.js";
+import { decodePathSegment, sanitizePathSegment } from "./work-archive-store.js";
 
 export interface AgentTaskSequenceStoreOptions {
   baseDirectory: string;
@@ -77,6 +78,50 @@ export class AgentTaskSequenceStore {
     return lock;
   }
 
+  /**
+   * 列出所有序列（启动恢复扫描用；只读）。
+   *
+   * 目录结构固定为 `agent-memory/<owner>/task-sequences/<sequenceId>/task-sequence.json`；
+   * 损坏/不可读的序列**跳过**（扫描是尽力而为，不因一个坏文件挡住全部候选）。
+   */
+  async listAllSequences(): Promise<
+    readonly {
+      readonly ownerAgentInstanceId: string;
+      readonly sequence: AgentTaskSequenceDocument;
+    }[]
+  > {
+    const entries: { ownerAgentInstanceId: string; sequence: AgentTaskSequenceDocument }[] = [];
+    let ownerDirectories: string[];
+    try {
+      ownerDirectories = await fs.readdir(this.agentMemoryDirectoryPath);
+    } catch {
+      return entries;
+    }
+    for (const ownerDirectory of ownerDirectories) {
+      const sequenceRoot = path.join(
+        this.agentMemoryDirectoryPath,
+        ownerDirectory,
+        "task-sequences",
+      );
+      let sequenceDirectories: string[];
+      try {
+        sequenceDirectories = await fs.readdir(sequenceRoot);
+      } catch {
+        continue;
+      }
+      const ownerAgentInstanceId = decodePathSegment(ownerDirectory);
+      for (const sequenceDirectory of sequenceDirectories) {
+        const sequence = await this.readSequence(
+          ownerAgentInstanceId,
+          decodePathSegment(sequenceDirectory),
+        ).catch(() => null);
+        if (sequence !== null) {
+          entries.push({ ownerAgentInstanceId, sequence });
+        }
+      }
+    }
+    return entries;
+  }
   async readSequence(
     ownerAgentInstanceId: string,
     sequenceId: string,
