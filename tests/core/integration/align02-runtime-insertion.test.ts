@@ -59,7 +59,14 @@ describe("ALIGN-02 运行中插入", () => {
       const sequenceId = String(status?.summary?.taskSequenceIdentifier);
       const ownerAgentInstanceId = sequenceId.slice("sequence-".length);
       const store = new AgentTaskSequenceStore({ baseDirectory: stateDirectory });
-      const before = await store.readSequence(ownerAgentInstanceId, sequenceId);
+      /** 终态回执与插入可能并发：先等 revision 稳定再读（有界）。 */
+      let before = await store.readSequence(ownerAgentInstanceId, sequenceId);
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const next = await store.readSequence(ownerAgentInstanceId, sequenceId);
+        if (next?.revision === before?.revision) break;
+        before = next;
+      }
       expect(before).not.toBeNull();
 
       const outcome = await runtime.controller.requestRuntimeTaskInsertion({
@@ -139,7 +146,14 @@ describe("ALIGN-02 运行中插入", () => {
       const sequenceId = String(status?.summary?.taskSequenceIdentifier);
       const ownerAgentInstanceId = sequenceId.slice("sequence-".length);
       const store = new AgentTaskSequenceStore({ baseDirectory: stateDirectory });
-      const before = await store.readSequence(ownerAgentInstanceId, sequenceId);
+      /** 终态回执与插入可能并发：先等 revision 稳定再读（有界）。 */
+      let before = await store.readSequence(ownerAgentInstanceId, sequenceId);
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const next = await store.readSequence(ownerAgentInstanceId, sequenceId);
+        if (next?.revision === before?.revision) break;
+        before = next;
+      }
       expect(before).not.toBeNull();
 
       const outcome = await runtime.controller.requestRuntimeTaskInsertion({

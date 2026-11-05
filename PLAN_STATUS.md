@@ -5305,3 +5305,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：`startup-recovery-phase1` 9/9、`startup-recovery-scan` 1/1；
 > 公开全量 **611 files / 4233 tests** 通过（期间两次 Windows 临时文件/既有用例抖动，隔离均通过，重跑全绿）。
 > Phase 1 边界：标签恒 unknown（默认策略不会选中）、无恢复执行、GUI 未展示。
+
+> **275（ALIGN-02-06 推迟登记并发，2026-11-05）**：推迟插入登记遇 `stale-revision` 有界重试 3 次，
+> 避免与终态回执并发时把请求直接打回。
+> **验证**：`align02-runtime-insertion` 3/3 压力复跑；公开全量 **611 files / 4233 tests** 通过。

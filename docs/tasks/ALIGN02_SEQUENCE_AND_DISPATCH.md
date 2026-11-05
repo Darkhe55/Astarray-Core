@@ -300,3 +300,10 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
   `blockedReason="loop-stopped"`；runtime.shutdown 后同样为 `loop-stopped`。
 - 公开全量 **609 files / 4223 tests** 通过。
 - **仍缺**：真实时钟驱动的退避（测试使用短等待）与外部取消信号直接注入循环。
+
+### 06 追加（2026-11-05）：推迟登记并发写同一序列
+
+负载下暴露：mission 刚 done、终态回执同步仍在写序列时，推迟插入的
+"读 revision → insert" 会被抢先 ⇒ `stale-revision` 直接把用户请求打回。
+修复：推迟登记遇 `stale-revision` **有界重试 3 次**（20ms 间隔），仍失败才如实报错；
+测试先等 revision 稳定再发起请求。公开全量 **611 files / 4233 tests** 通过。
