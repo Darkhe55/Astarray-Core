@@ -137,3 +137,12 @@ Phase 1 相应调整：
 
 **边界**：GUI 设置/状态展示与"含写任务恢复前提示"的界面属于外部仓库，下一步单独提交；
 `sequence-only` 仍不自动派发。
+
+## 9. 公开 facade 透传（2026-11-05）
+
+`AstarrayApplicationFacade.create` 新增并透传：
+
+- `startupRecoveryPolicy`（宿主覆盖，不落盘）；
+- `isStartupRecoveryOnBootEnabled`（启动自动执行）。
+
+证据：`startup-recovery-facade.test.ts`（facade 创建后按延迟执行并落 `last-report.json`）。

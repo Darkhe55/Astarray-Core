@@ -12,6 +12,7 @@ import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-stor
 import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
+import type { StartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
 import type { ArtifactRecord } from "./orchestration/artifact-record-store.js";
 import { EXPERIMENT_CATALOG } from "./orchestration/experiment-catalog.js";
 import { AgentModelBindingStore } from "./orchestration/agent-model-binding-store.js";
@@ -2073,6 +2074,13 @@ export interface PublicApplicationOptions {
   isWorkWindowResumeMonitorEnabled?: boolean;
   /** GUI-04-06：rest→working 时自动恢复被休息挡住的 mission（缺省开启）。 */
   isWorkWindowAutoResumeEnabled?: boolean;
+  /**
+   * 启动自动恢复策略（可选）：缺省读状态目录里的 policy.json；
+   * 宿主可整体覆盖（测试/嵌入式）而不落盘。
+   */
+  startupRecoveryPolicy?: StartupRecoveryPolicy;
+  /** 启动后自动执行恢复（默认 false；策略关闭时仍不会恢复）。 */
+  isStartupRecoveryOnBootEnabled?: boolean;
   mode: AgentMode;
   /** 运行时选择：mock（离线）或 provider（真实 Provider，T07D-R2）。 */
   runtime?: "mock" | "provider";
@@ -2734,6 +2742,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       ...(options.isWorkWindowAutoResumeEnabled === undefined
         ? {}
         : { isWorkWindowAutoResumeEnabled: options.isWorkWindowAutoResumeEnabled }),
+      ...(options.startupRecoveryPolicy === undefined
+        ? {}
+        : { startupRecoveryPolicy: options.startupRecoveryPolicy }),
+      ...(options.isStartupRecoveryOnBootEnabled === undefined
+        ? {}
+        : { isStartupRecoveryOnBootEnabled: options.isStartupRecoveryOnBootEnabled }),
       concurrency: options.concurrency ?? 1,
       failureThreshold: options.failureThreshold ?? 1,
       maxLoopIterations: options.maximumLoopIterations ?? 8,
