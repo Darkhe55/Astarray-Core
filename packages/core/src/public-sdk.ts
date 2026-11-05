@@ -13,6 +13,10 @@ import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
 import type { StartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
+import { parseStartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
+import type { StartupRecoveryBootReport } from "./orchestration/startup-recovery-report.js";
+import type { StartupRecoveryReport } from "./orchestration/startup-recovery-scanner.js";
+import type { StartupRecoveryRunReport } from "./orchestration/startup-recovery-runner.js";
 import type { ArtifactRecord } from "./orchestration/artifact-record-store.js";
 import { EXPERIMENT_CATALOG } from "./orchestration/experiment-catalog.js";
 import { AgentModelBindingStore } from "./orchestration/agent-model-binding-store.js";
@@ -3259,6 +3263,31 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       case "rollback":
         return service.rollback(input);
     }
+  }
+  async queryStartupRecoveryState(): Promise<{
+    policy: StartupRecoveryPolicy;
+    isPersisted: boolean;
+    report: StartupRecoveryBootReport | null;
+  }> {
+    this.assertOpen();
+    const { policy, isPersisted } = await this.runtime.startupRecoveryPolicyStore.readPolicy();
+    const report = await this.runtime.readStartupRecoveryReport();
+    return { policy, isPersisted, report };
+  }
+
+  async updateStartupRecoveryPolicy(input: unknown): Promise<StartupRecoveryPolicy> {
+    this.assertOpen();
+    return this.runtime.startupRecoveryPolicyStore.writePolicy(
+      parseStartupRecoveryPolicy(input),
+    );
+  }
+
+  async runStartupRecoveryNow(): Promise<{
+    scan: StartupRecoveryReport;
+    run: StartupRecoveryRunReport;
+  }> {
+    this.assertOpen();
+    return this.runtime.runStartupRecovery();
   }
   async queryExperimentCatalog() {
     this.assertOpen();

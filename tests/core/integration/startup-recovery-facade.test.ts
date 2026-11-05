@@ -54,3 +54,32 @@ describe("启动恢复 facade 透传", () => {
     }
   });
 });
+
+describe("启动恢复 facade 读写", () => {
+  it("query 默认未落盘；update 后持久化并可读回", async () => {
+    const stateDirectory = await mkdtemp(path.join(tmpdir(), "astarray-startup-facade2-"));
+    directories.push(stateDirectory);
+    const application = await AstarrayApplicationFacade.create({
+      stateDirectory,
+      mode: "assist",
+      runtime: "mock",
+    });
+    try {
+      const initial = await application.queryStartupRecoveryState();
+      expect(initial.isPersisted).toBe(false);
+      expect(initial.policy.isEnabled).toBe(false);
+
+      const updated = await application.updateStartupRecoveryPolicy({
+        ...DEFAULT_STARTUP_RECOVERY_POLICY,
+        isEnabled: true,
+        maximumResumePerStartup: 5,
+      });
+      expect(updated.isEnabled).toBe(true);
+      const reloaded = await application.queryStartupRecoveryState();
+      expect(reloaded.isPersisted).toBe(true);
+      expect(reloaded.policy.maximumResumePerStartup).toBe(5);
+    } finally {
+      await application.shutdown().catch(() => undefined);
+    }
+  });
+});
