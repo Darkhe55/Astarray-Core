@@ -1955,18 +1955,52 @@ export class MainController {
       .update(request.requestIdentifier)
       .digest("hex")
       .slice(0, 12)}`;
-    const registration = await sequenceController.publishOrInsertTask({
-      ownerAgentInstanceId: sequenceMapping.ownerAgentInstanceIdentifier,
-      actor: { sourceKind: "agent", actorId: sequenceMapping.ownerAgentInstanceIdentifier },
-      sequenceId: sequenceMapping.taskSequenceIdentifier,
-      task: {
-        taskId: deferredTaskIdentifier,
-        title: request.title,
-        priorityTier: null,
-        externalReference: `insert-request:${request.requestIdentifier}`,
-      },
-      anchor: { predecessorTaskIds: [sequenceMapping.taskIdentifier], successorTaskIds: [] },
-    });
+    /**
+     * ALIGN-02-06（2026-11-05）：推迟登记与终态回执可能并发写同一序列
+     * （mission 刚 done、回执同步还在写）⇒ 读 revision 与插入之间会被抢先。
+     * 遇到 stale-revision 时**有界重试**，而不是把用户请求直接失败或丢掉。
+     */
+    let registration: Awaited<ReturnType<typeof sequenceController.publishOrInsertTask>> | null =
+      null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        registration = await sequenceController.publishOrInsertTask({
+          ownerAgentInstanceId: sequenceMapping.ownerAgentInstanceIdentifier,
+          actor: {
+            sourceKind: "agent",
+            actorId: sequenceMapping.ownerAgentInstanceIdentifier,
+          },
+          sequenceId: sequenceMapping.taskSequenceIdentifier,
+          task: {
+            taskId: deferredTaskIdentifier,
+            title: request.title,
+            priorityTier: null,
+            externalReference: `insert-request:${request.requestIdentifier}`,
+          },
+          anchor: {
+            predecessorTaskIds: [sequenceMapping.taskIdentifier],
+            successorTaskIds: [],
+          },
+        });
+        break;
+      } catch (error) {
+        const isStaleRevision =
+          typeof error === "object" &&
+          error !== null &&
+          "errorCode" in error &&
+          (error as { errorCode?: unknown }).errorCode === "stale-revision";
+        if (!isStaleRevision || attempt === 2) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    }
+    if (registration === null) {
+      throw new DomainError(
+        "stale-revision",
+        "推迟插入登记未能获得一致 revision（已重试 3 次）：请重读序列后重试。",
+      );
+    }
     sequenceMapping.sequenceRevision = registration.document.revision;
     this.insertionRequestFingerprints.set(
       request.requestIdentifier,
