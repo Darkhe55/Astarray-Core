@@ -122,6 +122,11 @@ import {
   type StartupRecoveryReport,
 } from "../orchestration/startup-recovery-scanner.js";
 import {
+  StartupRecoveryAttemptStore,
+  runStartupRecoveryPlan,
+  type StartupRecoveryRunReport,
+} from "../orchestration/startup-recovery-runner.js";
+import {
   FileTertiaryLifecyclePhaseStore,
   TertiaryAgentLifecycleController,
 } from "../orchestration/tertiary-lifecycle.js";
@@ -263,6 +268,10 @@ export interface ApplicationRuntime {
   secondaryDispatchLoop: SecondaryContinuousDispatchLoop;
   /** 启动自动恢复 Phase 1：只读扫描（不恢复）。 */
   scanStartupRecovery: () => Promise<StartupRecoveryReport>;
+  runStartupRecovery: () => Promise<{
+    scan: StartupRecoveryReport;
+    run: StartupRecoveryRunReport;
+  }>;
   startupRecoveryPolicyStore: StartupRecoveryPolicyStore;
   /** T07D-07：独立工作助手纵向闭环（场景 A 只读分析 / 场景 B 小型代码任务）。 */
   standaloneWorkflowRunner: StandaloneWorkflowRunner;
@@ -3353,6 +3362,9 @@ export async function createApplicationRuntime(
   const startupRecoveryPolicyStore = new StartupRecoveryPolicyStore({
     baseDirectory: stateDirectory,
   });
+  const startupRecoveryAttemptStore = new StartupRecoveryAttemptStore({
+    baseDirectory: stateDirectory,
+  });
   const missionRelationIndexStore = new MissionRelationIndexStore({
     baseDirectory: stateDirectory,
   });
@@ -4293,8 +4305,37 @@ export async function createApplicationRuntime(
     });
   };
 
+  /**
+   * 启动自动恢复 Phase 2（2026-11-05）：扫描 + 执行（默认策略关闭时不会恢复任何任务）。
+   * 只恢复 mission-backed 候选；sequence-only 如实标"待派发"。
+   */
+  const runStartupRecovery = async (): Promise<{
+    scan: StartupRecoveryReport;
+    run: StartupRecoveryRunReport;
+  }> => {
+    const scan = await scanStartupRecovery();
+    const run = await runStartupRecoveryPlan({
+      plan: scan,
+      policy: scan.policy,
+      ports: {
+        resumeMission: (missionIdentifier) => controller.resumeMission(missionIdentifier),
+        readAttemptCount: async (missionIdentifier) =>
+          (await startupRecoveryAttemptStore.readAttempt(missionIdentifier))
+            ?.attemptCount ?? 0,
+        recordAttempt: async (input) => {
+          await startupRecoveryAttemptStore.recordAttempt(input);
+        },
+        sleep: (milliseconds) =>
+          new Promise((resolve) => setTimeout(resolve, milliseconds)),
+        nowIso: () => new Date().toISOString(),
+      },
+    });
+    return { scan, run };
+  };
+
   return {
     scanStartupRecovery,
+    runStartupRecovery,
     startupRecoveryPolicyStore,
     controller,
     missionManager,

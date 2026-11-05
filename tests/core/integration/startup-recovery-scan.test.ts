@@ -110,3 +110,47 @@ describe("启动恢复只读扫描（运行时）", () => {
     }
   });
 });
+
+describe("启动恢复执行（运行时）", () => {
+  it("sequence-only 任务不会假装恢复：报告 skip 原因", async () => {
+    const stateDirectory = await mkdtemp(path.join(tmpdir(), "astarray-startup-run-"));
+    directories.push(stateDirectory);
+    const runtime = await createApplicationRuntime({
+      mode: "assist",
+      stateDirectory,
+      concurrency: 1,
+      failureThreshold: 1,
+      maxLoopIterations: 8,
+      runtimeKind: "mock",
+      useFeedbackProcess: false,
+      authenticatedUserId: "user-1",
+      streamOutput: () => {},
+      startupRecoveryPolicy: {
+        ...DEFAULT_STARTUP_RECOVERY_POLICY,
+        isEnabled: true,
+        allowedTaskLabels: ["unknown"],
+      },
+    });
+    try {
+      await runtime.taskSequenceManageController.publishSequence({
+        ownerAgentInstanceId: "secondary-run-1",
+        actor: { sourceKind: "user", actorId: "user-1" },
+        sequenceId: "sequence-secondary-run-1",
+        firstTask: {
+          taskId: "task-run-1",
+          title: "未完成但无 mission",
+          priorityTier: 0,
+          externalReference: null,
+        },
+      });
+      const result = await runtime.runStartupRecovery();
+      expect(result.scan.selected.some((entry) => entry.kind === "sequence-only")).toBe(true);
+      expect(result.run.resumed).toHaveLength(0);
+      expect(result.run.skipped.map((entry) => entry.reason).join("\n")).toContain(
+        "sequence-only-not-dispatched",
+      );
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  });
+});
