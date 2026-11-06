@@ -33,6 +33,38 @@ function makeKeyParts(overrides: Partial<CacheKeyParts> = {}): CacheKeyParts {
     toolSubsetHash: "tools-hash",
     contextSummaryHash: "ctx-hash",
     fileFingerprint: "fp-1234",
+    projectIdentifier: "project-a",
+    agentInstanceId: "agent-1",
+    permissionProfileId: "assist",
+    permissionRevision: 1,
+    toolImplementationVersion: "v1",
+    cacheSchemaVersion: 1,
+    ...overrides,
+  };
+}
+
+/** 固定时钟：TTL 测试不得依赖真实 sleep。 */
+const FIXED_NOW = Date.parse("2026-08-12T10:00:00.000Z");
+function fixedClock() {
+  return FIXED_NOW;
+}
+function makeDiskCache(options: { maximumEntryAgeMilliseconds?: number; nowMilliseconds?: () => number } = {}) {
+  return new DiskCache(temporaryDirectory, {
+    nowMilliseconds: options.nowMilliseconds ?? fixedClock,
+    ...(options.maximumEntryAgeMilliseconds === undefined
+      ? {}
+      : { maximumEntryAgeMilliseconds: options.maximumEntryAgeMilliseconds }),
+  });
+}
+function makeEntry(key: string, overrides: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: 1,
+    key,
+    cachedAtIso: new Date(FIXED_NOW).toISOString(),
+    expiresAtIso: new Date(FIXED_NOW + 300_000).toISOString(),
+    resultText: "缓存结果",
+    estimatedTokenCount: 42,
+    fileFingerprint: "fp-1234",
     ...overrides,
   };
 }
@@ -82,44 +114,32 @@ describe("CacheKeyBuilder", () => {
 
 describe("DiskCache", () => {
   it("put 后 get 命中（文件指纹一致）", async () => {
-    const cache = new DiskCache(temporaryDirectory);
+    const cache = makeDiskCache();
     const key = CacheKeyBuilder.buildKey(makeKeyParts());
-    await cache.put({
-      key,
-      cachedAtIso: "2026-08-12T10:00:00.000Z",
-      resultText: "缓存结果",
-      estimatedTokenCount: 42,
-      fileFingerprint: "fp-1234",
-    });
+    await cache.put(makeEntry(key));
     const result = await cache.get(key, "fp-1234");
     expect(result.status).toBe("hit");
     expect(result.entry?.resultText).toBe("缓存结果");
   });
 
   it("未命中返回 miss", async () => {
-    const cache = new DiskCache(temporaryDirectory);
-    const result = await cache.get("不存在之key", "fp");
+    const cache = makeDiskCache();
+    const result = await cache.get("a".repeat(64), "fp");
     expect(result.status).toBe("miss");
     expect(result.entry).toBeNull();
   });
 
   it("文件指纹不一致返回 stale-reject（不复用）", async () => {
-    const cache = new DiskCache(temporaryDirectory);
+    const cache = makeDiskCache();
     const key = CacheKeyBuilder.buildKey(makeKeyParts());
-    await cache.put({
-      key,
-      cachedAtIso: "2026-08-12T10:00:00.000Z",
-      resultText: "旧结果",
-      estimatedTokenCount: 10,
-      fileFingerprint: "fp-old",
-    });
+    await cache.put(makeEntry(key, { resultText: "旧结果", fileFingerprint: "fp-old" }));
     const result = await cache.get(key, "fp-new");
     expect(result.status).toBe("stale-reject");
     expect(result.entry).toBeNull();
   });
 
   it("损坏的缓存条目按 miss 处理", async () => {
-    const cache = new DiskCache(temporaryDirectory);
+    const cache = makeDiskCache();
     const key = CacheKeyBuilder.buildKey(makeKeyParts());
     await fs.mkdir(path.join(temporaryDirectory, "cache"), { recursive: true });
     await fs.writeFile(path.join(temporaryDirectory, "cache", `${key}.json`), "损坏", "utf8");
