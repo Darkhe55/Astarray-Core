@@ -16,6 +16,11 @@ import type { StartupRecoveryPolicy } from "./orchestration/startup-recovery-pol
 import { parseStartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
 import type { StartupRecoveryBootReport } from "./orchestration/startup-recovery-report.js";
 import type { ToolHelpResponseV1 } from "./tools/tool-help-recall-controller.js";
+import type {
+  DelegatedAgentCommunicationGrant,
+  DelegatedMessageType,
+  DelegationValidationContext,
+} from "./orchestration/agent-communication-delegation.js";
 import type { StartupRecoveryReport } from "./orchestration/startup-recovery-scanner.js";
 import type { StartupRecoveryRunReport } from "./orchestration/startup-recovery-runner.js";
 import type { ArtifactRecord } from "./orchestration/artifact-record-store.js";
@@ -3265,6 +3270,48 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         return service.rollback(input);
     }
   }
+  /**
+   * AUDIT-REPAIR-01 检查点 04：**受权通信转交**（受认证控制面入口）。
+   *
+   * 必须带用户裁决引用；只创建限定句柄，不转移任务/记忆/工具权限。
+   */
+  async delegateAgentCommunication(input: {
+    readonly authorizationSource: string;
+    readonly userDecisionReference: string;
+    readonly grantorSuperiorAgentInstanceId: string;
+    readonly recipientPeerAgentInstanceId: string;
+    readonly targetAgentInstanceId: string;
+    readonly grantorRole: "main" | "secondary" | "tertiary";
+    readonly recipientRole: "main" | "secondary" | "tertiary";
+    readonly targetRole: "main" | "secondary" | "tertiary";
+    readonly isTargetAlive: boolean;
+    readonly missionId: string;
+    readonly taskScope: string | null;
+    readonly allowedMessageTypes: readonly DelegatedMessageType[];
+    readonly isInstructionAllowed: boolean;
+    readonly replyRoute: DelegatedAgentCommunicationGrant["replyRoute"];
+    readonly isCopyToGrantorRequired: boolean;
+    readonly expiresAtIso: string | null;
+    readonly maxInFlightMessages: number;
+  }): Promise<DelegatedAgentCommunicationGrant> {
+    this.assertOpen();
+    return this.runtime.controller.createCommunicationDelegationGrant(input);
+  }
+
+  /** 投递前复检（撤销/回收/父子变化/mission 结束/revision/到期/类型/在途量）。 */
+  async assertDelegatedCommunicationDeliverable(input: {
+    readonly communicationHandleIdentifier: string;
+    readonly senderAgentInstanceId: string;
+    readonly messageType: DelegatedMessageType;
+    readonly missionId: string;
+    readonly currentProfileRevision: number;
+    readonly context: DelegationValidationContext;
+    readonly currentInFlightMessages: number;
+  }): Promise<void> {
+    this.assertOpen();
+    this.runtime.controller.assertCommunicationDelegationDeliverable(input);
+  }
+
   /**
    * AUDIT-REPAIR-01 检查点 04：**工具说明回访**（宿主控制面入口）。
    *
