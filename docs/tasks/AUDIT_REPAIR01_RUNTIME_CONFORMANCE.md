@@ -275,3 +275,14 @@ bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
 | 05 包级验收 | **已执行**：报告 `docs/reports/AUDIT_REPAIR01_PACKAGE_2026-11-06.md`；prepack 失败如实记录 |
 
 **整卡不宣称 done**：01 的应用矩阵、03 生产接线、04 的"被替代"行为等价核查仍未完成。
+
+### 01 应用矩阵：尝试与阻塞（2026-11-06）
+
+尝试用 assist + `grantSessionAuthorization("proposeGoal", args)` + 脚本化 worker 发出工具调用：
+
+- 观察到 worker 工厂被调用 1 次，任务链 T-001 正常 `done`；
+- 但 `proposeGoalContract` 未落任何提案文件，**没有**权限询问回调，工具调用是否被执行无法从现有观测确认；
+- 怀疑 worker 运行路径未迭代脚本事件 / 工具调用被更早拒绝，但未定位；失败用例已删除（不阻塞门禁）。
+
+结论：应用装配级 allow 矩阵**仍未取得证据**；检查点 01 保持"部分交付"。
+后继需要 worker 工具执行的可观测端口（工具调用/结果事件）才能闭环，不在本批擅自加测试专用生产 API。

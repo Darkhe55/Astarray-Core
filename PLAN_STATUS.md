@@ -5384,3 +5384,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 隔离安装 43 包；包内 Anthropic fake-server 闭环 1 次请求 + done；目标提案创建/确认绑定拒绝。
 > 常规 prepack 连续两次失败（未定位），改用 `--ignore-scripts` 并如实记录。
 > 同时更正 `STARTUP_RECOVERY` 卡状态。
+
+> **290（AUDIT-REPAIR-01 检查点 01 应用矩阵：阻塞记录，2026-11-06）**：assist + 预授权 + 脚本 worker
+> 尝试未落提案且无权限询问；worker 工厂被调用但工具是否执行不可观测。失败用例已移除；
+> 01 维持部分交付，后继需工具执行可观测端口。
