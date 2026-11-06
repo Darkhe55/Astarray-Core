@@ -3183,6 +3183,30 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.runtime.controller.deletePermissionProfile(input);
   }
+  /**
+   * UI-ALIGN-01：只读查询 mission 的权威任务序列投影（节点/依赖/就绪/revision）。
+   * 未建立映射时返回 null；不触发派发或改状态。
+   */
+  async queryMissionTaskSequence(missionIdentifier: string): Promise<{
+    readonly missionIdentifier: string;
+    readonly sequenceIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly ownerAgentInstanceIdentifier: string;
+    readonly revision: number;
+    readonly readyTaskIdentifiers: readonly string[];
+    readonly nodes: ReadonlyArray<{
+      taskIdentifier: string;
+      title: string;
+      status: string;
+      dependsOn: readonly string[];
+      priorityTier: number | null;
+      sequenceOrdinal: number;
+      blockReason: string | null;
+    }>;
+  } | null> {
+    this.assertOpen();
+    return this.runtime.controller.queryMissionTaskSequence(missionIdentifier);
+  }
   async getCurrentPermissionProfileReference() {
     return this.runtime.controller.getCurrentPermissionProfileReference();
   }
