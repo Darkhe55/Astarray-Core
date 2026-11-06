@@ -5344,3 +5344,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 历史参数严格解析、system 指导合入顶层。
 > **验证**：`anthropic-messages-runtime` 24/24；公开全量随后跑。
 > 未完成：ToolLoop 级"工具执行计数为 0"矩阵、独立超时用例、取消/部分工具组合。
+
+> **282（AUDIT-REPAIR-01 检查点 02 收口矩阵，2026-11-06）**：新增 fake-server + 真实运行时 + 真实
+> ToolLoop 的 5 用例矩阵（部分工具后 error/完整工具后 error/截断/重复 ID/max_tokens/超时/取消），
+> 逐例断言工具执行计数为 0；顺带修复取消时 AbortError 冒泡（统一收敛为 cancelled）。
+> **验证**：公开全量 **617 files / 4259 passed + 3 skipped**。
+> 仍未覆盖：ToolLoop 正向单/多工具成功执行计数（运行时级正向用例已有）。
