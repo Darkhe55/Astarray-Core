@@ -50,6 +50,14 @@ export interface PolicyWrapperOptions {
   temporaryDirectoryPath: string;
   /** null 表示不限（Devolve/次级 Agent）；非空表示 Worker 的工具子集。 */
   workerAllowedToolNames: Set<string> | null;
+  /**
+   * AUDIT-REPAIR-01：无内置实现、但必须走完整权限/门禁链路的工具处理器。
+   * 只有通过 registry 注册且被允许列表放行的工具才会到达这里。
+   */
+  customToolHandlers?: ReadonlyMap<
+    string,
+    (argumentsJson: string, callId: string) => Promise<ToolCallResult>
+  >;
   nowUnixSeconds: () => number;
   getCurrentMode: () => "ponder" | "assist" | "devolve";
   auditSink?: (event: ToolAuditEvent) => void;
@@ -438,6 +446,25 @@ export class PolicyWrapper implements ToolPort {
           sideEffectStatus:
             error instanceof SideEffectNoneError ||
             (error instanceof DomainError && isExecutionRefusalErrorCode(error.errorCode))
+              ? ("none" as const)
+              : ("unknown" as const),
+        };
+      }
+    }
+    const customHandler = this.options.customToolHandlers?.get(toolName);
+    if (customHandler !== undefined) {
+      try {
+        return await customHandler(argumentsJson, callId);
+      } catch (error) {
+        return {
+          kind: "error",
+          callId,
+          errorCode:
+            error instanceof DomainError ? error.errorCode : "tool-execution-failed",
+          errorMessage: (error as Error).message,
+          isIdempotencyConfirmed: false,
+          sideEffectStatus:
+            error instanceof DomainError && isExecutionRefusalErrorCode(error.errorCode)
               ? ("none" as const)
               : ("unknown" as const),
         };

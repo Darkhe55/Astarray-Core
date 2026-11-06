@@ -58,6 +58,8 @@ const PUBLIC_CAPABILITY_NAMESPACES = [
   "external",
   "financial",
   "git",
+  /** AUDIT-REPAIR-01：目标提议写提案（产品能力，不是内部强制层）。 */
+  "goal",
   "memory",
   "network",
   "process",

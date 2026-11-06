@@ -13,6 +13,8 @@ import { PermissionCapabilityCatalog } from "./permission-capability-catalog.js"
 
 export class ToolRegistry {
   private readonly descriptorsByName = new Map<string, ToolDescriptor>();
+  /** 不进入主 Agent 预览、但仍可按允许列表执行的工具（如目标提议）。 */
+  private readonly previewHiddenToolNames = new Set<string>();
   /** T06F：权限目录（工具注册校验；未映射工具拒绝注册/执行）。 */
   private readonly capabilityCatalog: PermissionCapabilityCatalog;
 
@@ -20,7 +22,7 @@ export class ToolRegistry {
     this.capabilityCatalog = capabilityCatalog ?? new PermissionCapabilityCatalog();
   }
 
-  register(descriptor: ToolDescriptor): void {
+  register(descriptor: ToolDescriptor, options?: { isHiddenFromPreview?: boolean }): void {
     if (this.descriptorsByName.has(descriptor.name)) {
       throw new Error(`工具重复注册: ${descriptor.name}`);
     }
@@ -48,6 +50,9 @@ export class ToolRegistry {
       throw new Error(`删除备份工具未使用专用授权策略，拒绝注册: ${descriptor.name}`);
     }
     this.descriptorsByName.set(descriptor.name, descriptor);
+    if (options?.isHiddenFromPreview === true) {
+      this.previewHiddenToolNames.add(descriptor.name);
+    }
   }
 
   registerMany(descriptors: ToolDescriptor[]): void {
@@ -65,10 +70,12 @@ export class ToolRegistry {
   }
 
   getPreviewDescriptors(): ToolDescriptorPreview[] {
-    return [...this.descriptorsByName.values()].map((descriptor) => ({
-      name: descriptor.name,
-      summary: descriptor.summary,
-    }));
+    return [...this.descriptorsByName.values()]
+      .filter((descriptor) => !this.previewHiddenToolNames.has(descriptor.name))
+      .map((descriptor) => ({
+        name: descriptor.name,
+        summary: descriptor.summary,
+      }));
   }
 
   getFullDescriptors(): ToolDescriptor[] {
