@@ -191,3 +191,13 @@ max_tokens、system 指导与参数损坏）。
 bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
 
 **边界**：本检查点**不把 DiskCache 接进模型执行链**；生产接线状态如实为"组件已验证、未接线"。
+
+### 04 进度（2026-11-06）：分诊报告 + 结构化输出
+
+- `scripts/audit-product-reachability.mjs` 新增 `--json` 结构化输出（候选数变化不使构建失败）；
+- 生成 [`AUDIT_REPAIR01_REACHABILITY_2026-11-06.md`](../reports/AUDIT_REPAIR01_REACHABILITY_2026-11-06.md)：
+  24 个候选的 生产提及/测试构造/SDK 导出/成员调用 + 初步分类；
+- 明确两项**已确认零生产入口**的目标：`ToolDocumentationRecallController`、
+  `AgentCommunicationDelegationController`；DiskCache 标注"组件完成、生产接线未完成"。
+
+**未完成**：两项能力尚未真正接线；其余候选仍为初步分诊（"待核"），检查点 04 不关闭。

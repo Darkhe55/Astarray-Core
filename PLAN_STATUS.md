@@ -5356,3 +5356,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 64 位 hex key 防穿越、authorizeRead 读取门禁、指纹 unavailable 与敏感/工具指令 bypass。
 > **验证**：`cache-safety` 11/11、`cache-metrics` 17/17；公开全量随后跑。
 > 边界：组件完成，**未接生产执行链**。
+
+> **284（AUDIT-REPAIR-01 检查点 04 进度，2026-11-06）**：可达性脚本新增 `--json`；生成 24 候选
+> 分诊报告（六列证据 + 初步分类），确认 `ToolDocumentationRecallController` 与
+> `AgentCommunicationDelegationController` 为零生产入口目标；DiskCache 标注未接线。
+> **未完成**：两项接线与逐候选调用链核查。
