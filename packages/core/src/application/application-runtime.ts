@@ -4067,7 +4067,15 @@ export async function createApplicationRuntime(
     resolveToolDescriptors: (task: TaskDependencyNode): ToolDescriptor[] => {
       const descriptors = task.toolNames
         .map((toolName) => registry.getDescriptor(toolName))
-        .filter((descriptor): descriptor is ToolDescriptor => descriptor !== undefined);
+        .filter((descriptor): descriptor is ToolDescriptor => descriptor !== undefined)
+        /**
+         * AUDIT-REPAIR-01：目标提议工具只在目标模式激活时可见；
+         * 规划器现在也能看到注册表里的它，必须在执行面再挡一次。
+         */
+        .filter(
+          (descriptor) =>
+            isGoalModeActivated || descriptor.name !== GOAL_PROPOSAL_TOOL_NAME,
+        );
       /**
        * R92（③-B）：目标模式激活时，模型**额外**看到 `proposeGoal`（只能提议）。
        * 未激活时不暴露（避免"能调但一定失败"的工具面）。
