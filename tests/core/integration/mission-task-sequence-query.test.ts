@@ -59,6 +59,7 @@ describe("mission 任务序列只读查询", () => {
       expect(sequence?.nodes[0]?.taskIdentifier).toBe(sequence?.taskIdentifier);
       expect(sequence?.nodes[0]?.status).toBe("done");
       expect(sequence?.nodes[0]?.priorityTier).toBe(0);
+      expect(sequence?.nodes[0]).toHaveProperty("assignedAgentInstanceIdentifier");
       expect(sequence?.readyTaskIdentifiers).toEqual([]);
     } finally {
       await runtime.shutdown().catch(() => undefined);

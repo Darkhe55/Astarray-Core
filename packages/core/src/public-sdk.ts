@@ -3202,6 +3202,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       priorityTier: number | null;
       sequenceOrdinal: number;
       blockReason: string | null;
+      assignedAgentInstanceIdentifier: string | null;
     }>;
   } | null> {
     this.assertOpen();
