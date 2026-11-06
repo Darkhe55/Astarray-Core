@@ -127,3 +127,28 @@ fake-server 驱动真实运行时和 ToolLoop：正常文本、正常单/多工�
 尚缺端到端测试；主 Agent 预览隐藏已有注册级证据，尚无装配级断言。
 - 追加（同日）：`resolveToolDescriptors` 在目标模式未激活时过滤掉 `proposeGoal`，
   避免规划器把它带进 worker 工具面（注册级隐藏之外的执行级第二道门）。
+
+### 02 部分交付：Anthropic 流严格性
+
+已编码：
+
+- SSE 按**事件边界**组装（CRLF、跨 chunk UTF-8、多行 data；注释/event/id/retry 忽略）；
+  非法 JSON data 事件 ⇒ `provider-protocol-error`，不再静默丢弃；
+- `error` 事件 ⇒ 脱敏 `provider-protocol-error`（只保留安全事件类型，不回显原文）；
+- 跟踪 `message_start` / `content_block_stop` / `message_delta.stop_reason` / `message_stop`；
+- 工具调用**整批校验后才释放**：要求 stop_reason=tool_use、块已闭合、id/name 非空且唯一、
+  参数为非空合法 JSON 对象；任一失败整批不释放；
+- 非 end_turn/stop_sequence（含 max_tokens、未知）⇒ `provider-protocol-error`，不再伪装 timeout；
+- 超时（非外部取消）单独转 `provider-timeout`；
+- 历史工具参数空串/缺失/非法 JSON ⇒ `invalid-tool-arguments`（不再替换成 `{}`，合法 `{}` 保留）；
+- ToolLoop 的 system 指导按原顺序合入顶层 `system`，不升格工具正文。
+
+证据（`anthropic-messages-runtime` 24/24）：原有 17 例（夹具补全协议信封）+ 新增 7 例
+（CRLF/多行、跨 chunk UTF-8、error 事件、EOF 缺 message_stop、未闭合/重复 ID/非法参数、
+max_tokens、system 指导与参数损坏）。
+
+**未完成（不宣称检查点关闭）**：
+
+- 卡片要求的 fake-server 驱动 **ToolLoop**、断言"工具执行计数为 0"的矩阵（当前是 runtime 级事件断言）；
+- 超时路径只有分类代码，尚无独立超时用例；
+- 部分工具后 error / 完整工具后 error / 取消 的组合矩阵。

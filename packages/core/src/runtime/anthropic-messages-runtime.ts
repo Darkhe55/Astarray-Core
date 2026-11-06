@@ -85,6 +85,7 @@ interface AnthropicStreamEvent {
   // `usage` 可为显式 null（与 OpenAI 兼容侧同一类厂商形态），故类型与判空都必须容忍。
   message?: { usage?: AnthropicUsagePayload | null };
   usage?: AnthropicUsagePayload | null;
+  error?: { type?: string; message?: string };
 }
 
 function readNonNegativeTokenCount(value: unknown): number | null {
@@ -232,6 +233,9 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
 
       // 按 content block 累积：文本块直接转发；tool_use 块累积 id/name/部分 JSON。
       const toolCallsByIndex = new Map<number, { id: string; name: string; arguments: string }>();
+      const closedToolBlockIndices = new Set<number>();
+      let hasMessageStart = false;
+      let hasMessageStop = false;
       let finalStopReason: string | null = null;
       hasStartedStream = true;
 
@@ -245,7 +249,19 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
           };
           return;
         }
+        if (event.type === "error") {
+          const safeType =
+            typeof event.error?.type === "string" &&
+            /^[A-Za-z0-9_.-]{1,64}$/u.test(event.error.type)
+              ? event.error.type
+              : "unknown";
+          throw new DomainError(
+            "provider-protocol-error",
+            `Provider 返回错误事件（${safeType}）：请求失败，未释放任何工具调用。`,
+          );
+        }
         if (event.type === "message_start") {
+          hasMessageStart = true;
           // 输入侧 usage 在 message_start 的 message.usage 内（权威值，不是本地估算）。
           const startUsage = event.message?.usage;
           if (startUsage !== undefined && startUsage !== null) {
@@ -283,6 +299,16 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
           }
           continue;
         }
+        if (event.type === "content_block_stop") {
+          if (event.index !== undefined) {
+            closedToolBlockIndices.add(event.index);
+          }
+          continue;
+        }
+        if (event.type === "message_stop") {
+          hasMessageStop = true;
+          continue;
+        }
         if (event.type === "message_delta") {
           /**
            * usage 在 `message_delta.usage`（累计终值）。
@@ -318,20 +344,87 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
         }
       }
 
-      for (const toolCall of toolCallsByIndex.values()) {
-        yield {
-          kind: "toolCallRequested",
-          callId: toolCall.id,
-          toolName: toolCall.name,
-          argumentsJson: toolCall.arguments,
-        };
+      if (!hasMessageStart) {
+        throw new DomainError(
+          "provider-protocol-error",
+          "流缺少 message_start：拒绝按不完整协议释放结果。",
+        );
+      }
+      if (!hasMessageStop) {
+        throw new DomainError(
+          "provider-protocol-error",
+          "流在 message_stop 前结束（EOF）：拒绝释放工具调用。",
+        );
       }
       if (toolCallsByIndex.size > 0) {
+        if (finalStopReason !== "tool_use") {
+          throw new DomainError(
+            "provider-protocol-error",
+            `存在工具块但 stop_reason 不是 tool_use（${finalStopReason ?? "缺失"}）：整批不释放。`,
+          );
+        }
+        const seenCallIdentifiers = new Set<string>();
+        const validatedToolCalls: { id: string; name: string; arguments: string }[] = [];
+        for (const [index, toolCall] of toolCallsByIndex) {
+          if (!closedToolBlockIndices.has(index)) {
+            throw new DomainError(
+              "provider-protocol-error",
+              `工具块 #${String(index)} 未闭合：整批不释放。`,
+            );
+          }
+          if (toolCall.id.trim() === "" || toolCall.name.trim() === "") {
+            throw new DomainError(
+              "provider-protocol-error",
+              "工具调用缺少 id 或名称：整批不释放。",
+            );
+          }
+          if (seenCallIdentifiers.has(toolCall.id)) {
+            throw new DomainError(
+              "provider-protocol-error",
+              `工具调用 ID 重复（${toolCall.id}）：整批不释放。`,
+            );
+          }
+          seenCallIdentifiers.add(toolCall.id);
+          if (toolCall.arguments.trim() === "") {
+            throw new DomainError(
+              "provider-protocol-error",
+              `工具调用 ${toolCall.id} 缺少参数：整批不释放。`,
+            );
+          }
+          let parsedArguments: unknown;
+          try {
+            parsedArguments = JSON.parse(toolCall.arguments);
+          } catch {
+            throw new DomainError(
+              "provider-protocol-error",
+              `工具调用 ${toolCall.id} 的参数不是合法 JSON：整批不释放。`,
+            );
+          }
+          if (
+            parsedArguments === null ||
+            typeof parsedArguments !== "object" ||
+            Array.isArray(parsedArguments)
+          ) {
+            throw new DomainError(
+              "provider-protocol-error",
+              `工具调用 ${toolCall.id} 的参数不是 JSON 对象：整批不释放。`,
+            );
+          }
+          validatedToolCalls.push(toolCall);
+        }
+        for (const toolCall of validatedToolCalls) {
+          yield {
+            kind: "toolCallRequested",
+            callId: toolCall.id,
+            toolName: toolCall.name,
+            argumentsJson: toolCall.arguments,
+          };
+        }
         yield {
           kind: "runFinished",
           agentId: agentRunInput.agentId,
           reason: "tool-calls",
-          detail: `请求工具调用 ${toolCallsByIndex.size} 个`,
+          detail: `请求工具调用 ${String(toolCallsByIndex.size)} 个`,
         };
         return;
       }
@@ -346,9 +439,25 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
         return;
       }
       throw new DomainError(
-        "provider-timeout",
+        "provider-protocol-error",
         `Provider 异常结束: stop_reason=${finalStopReason ?? "未知"}`,
       );
+    } catch (error) {
+      /**
+       * AUDIT-REPAIR-01：超时与协议错误必须使用不同错误类别。
+       * 只有内部超时（非外部取消）且尚未形成领域错误时才转成 provider-timeout。
+       */
+      if (
+        abortController.signal.aborted &&
+        !cancellationSignal.aborted &&
+        !(error instanceof DomainError)
+      ) {
+        throw new DomainError(
+          "provider-timeout",
+          `Provider 流在超时内未完成（${String(this.options.requestTimeoutMilliseconds)}ms）。`,
+        );
+      }
+      throw error;
     } finally {
       clearTimeout(timeoutHandle);
       cancellationSignal.removeEventListener("abort", cancellationListener);
@@ -364,11 +473,26 @@ export function buildMessagesRequestBody(
   model: string,
   maxTokens: number,
 ): unknown {
+  /**
+   * AUDIT-REPAIR-01：ToolLoop 的本地 system 指导不能丢，也不能把工具正文升为 system。
+   * 按原顺序追加到顶层 system 字段。
+   */
+  const guidanceTexts: string[] = [];
+  for (const rawMessage of agentRunInput.toolResultMessages ?? []) {
+    if (rawMessage === null || typeof rawMessage !== "object") continue;
+    const message = rawMessage as { role?: unknown; content?: unknown };
+    if (message.role === "system" && typeof message.content === "string") {
+      guidanceTexts.push(message.content);
+    }
+  }
+  const systemText = [agentRunInput.systemPrompt, ...guidanceTexts]
+    .filter((text) => text.trim() !== "")
+    .join("\n\n");
   return {
     model,
     max_tokens: maxTokens,
     stream: true,
-    system: agentRunInput.systemPrompt,
+    system: systemText,
     messages: [
       { role: "user", content: agentRunInput.userPrompt },
       ...convertPriorMessagesToAnthropicMessages(agentRunInput.toolResultMessages ?? []),
@@ -471,16 +595,33 @@ function appendAnthropicMessage(
   converted.push({ role, content: contentBlocks });
 }
 
+/**
+ * AUDIT-REPAIR-01：历史工具参数**不得**被替换成 {}。
+ * 空串/缺失/非法 JSON 都是协议错误；合法字符串 "{}" 保留。
+ */
 function parseToolArguments(rawArguments: unknown): unknown {
   if (typeof rawArguments !== "string" || rawArguments.trim() === "") {
-    return {};
+    throw new DomainError(
+      "invalid-tool-arguments",
+      "历史工具调用缺少参数：拒绝伪造空对象。",
+    );
   }
+  let parsed: unknown;
   try {
-    return JSON.parse(rawArguments);
+    parsed = JSON.parse(rawArguments);
   } catch {
-    // 参数不是合法 JSON：按空对象传递（由工具层给出参数校验错误）。
-    return {};
+    throw new DomainError(
+      "invalid-tool-arguments",
+      "历史工具调用参数不是合法 JSON：拒绝替换为空对象。",
+    );
   }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new DomainError(
+      "invalid-tool-arguments",
+      "历史工具调用参数必须是 JSON 对象。",
+    );
+  }
+  return parsed;
 }
 
 /**
@@ -492,47 +633,57 @@ export async function* readAnthropicStreamEvents(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let bufferedText = "";
+  /** 按 SSE 事件边界累积 data 行（多行 data 用换行连接）。 */
+  let dataLines: string[] = [];
+  function* flushEvent(): Iterable<AnthropicStreamEvent> {
+    if (dataLines.length === 0) return;
+    const payload = dataLines.join("\n");
+    dataLines = [];
+    if (payload.trim() === "" || payload.trim() === "[DONE]") return;
+    try {
+      yield JSON.parse(payload) as AnthropicStreamEvent;
+    } catch {
+      throw new DomainError(
+        "provider-protocol-error",
+        "SSE 数据事件不是合法 JSON：拒绝静默丢弃。",
+      );
+    }
+  }
+  function* processLine(rawLine: string): Iterable<AnthropicStreamEvent> {
+    const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
+    if (line === "") {
+      yield* flushEvent();
+      return;
+    }
+    /** 注释/心跳字段（以冒号开头）与 event/id/retry 字段不承载 JSON。 */
+    if (line.startsWith(":")) return;
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).replace(/^ /u, ""));
+    }
+  }
   try {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) {
-        break;
-      }
+      if (done) break;
       if (value !== undefined) {
         bufferedText += decoder.decode(value, { stream: true });
       }
-      const lines = bufferedText.split("\n");
-      bufferedText = lines.pop() ?? "";
-      for (const line of lines) {
-        const parsed = parseAnthropicSseDataLine(line);
-        if (parsed !== null) {
-          yield parsed;
-        }
+      let newlineIndex = bufferedText.indexOf("\n");
+      while (newlineIndex >= 0) {
+        const line = bufferedText.slice(0, newlineIndex);
+        bufferedText = bufferedText.slice(newlineIndex + 1);
+        yield* processLine(line);
+        newlineIndex = bufferedText.indexOf("\n");
       }
     }
     bufferedText += decoder.decode();
-    for (const line of bufferedText.split("\n")) {
-      const parsed = parseAnthropicSseDataLine(line);
-      if (parsed !== null) {
-        yield parsed;
-      }
+    if (bufferedText.length > 0) {
+      yield* processLine(bufferedText);
+      bufferedText = "";
     }
+    yield* flushEvent();
   } finally {
     reader.releaseLock();
   }
 }
 
-function parseAnthropicSseDataLine(line: string): AnthropicStreamEvent | null {
-  if (!line.startsWith("data:")) {
-    return null;
-  }
-  const payload = line.slice("data:".length).trim();
-  if (payload === "" || payload === "[DONE]") {
-    return null;
-  }
-  try {
-    return JSON.parse(payload) as AnthropicStreamEvent;
-  } catch {
-    return null;
-  }
-}

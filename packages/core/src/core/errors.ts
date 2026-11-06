@@ -55,6 +55,8 @@ export type DomainErrorCode =
   | "provider-timeout"
   | "provider-cancelled"
   | "provider-protocol-error"
+  /** 历史消息里的工具参数缺失/非法 JSON（AUDIT-REPAIR-01）。 */
+  | "invalid-tool-arguments"
   | "provider-network-error"
   | "provider-auth-failed"
   | "provider-endpoint-not-found"
