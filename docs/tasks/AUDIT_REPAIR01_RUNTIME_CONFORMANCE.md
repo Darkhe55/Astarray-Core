@@ -201,3 +201,29 @@ bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
   `AgentCommunicationDelegationController`；DiskCache 标注"组件完成、生产接线未完成"。
 
 **未完成**：两项能力尚未真正接线；其余候选仍为初步分诊（"待核"），检查点 04 不关闭。
+
+### 04 接线设计（2026-11-06，待实现）
+
+**ToolDocumentationRecallController**
+
+- 现状：模型侧已有标准请求格式提示（worker 提示词）；G4 注入只负责"首次完整用法 / 后续提醒"，
+  **没有**处理模型返回的 `ASTARRAY_TOOL_HELP_REQUEST_V1`。
+- 计划入口：`MainController.answerToolHelpRequest(input)`：
+  - 由宿主/控制面传入 `request` + 已注入的 `requesterAgentInstanceId` / 默认上级 / mission；
+  - 由 mission 任务链与注册表构造 `assignedToolIdentifiers` 与 `assignedToolDocumentation`；
+  - escalationSink 走现有反馈通道发给默认上级（不新增网络/默认全连接）；
+  - 公开 SDK 暴露只读响应；**不授予工具/权限/安装**。
+- 反例：未分配工具不得返回 schema；缺失工具必须 escalation；陈旧 revision 必须 stale；
+  同一 request 幂等。
+
+**AgentCommunicationDelegationController**
+
+- 现状：grant store/控制器/失效检查齐全，生产无构造。
+- 计划入口：复用现有受认证控制面（权限裁决 + 通信路由）：
+  - 仅直属上级可授予；目标必须恰低一级且存活；recipient 与 grantor 同级；
+  - 不透明句柄不得转授；撤销/到期/revocation revision 变化后拒绝；
+  - 不新增默认全连接、不转移任务/记忆/工具权限。
+- 反例优先写：非直属上级、跨级 recipient、已回收 target、过期 grant、revision 变化。
+
+**阻塞/依赖**：两项都需要接入真实控制面路由；当前公开层没有对应的命令入口，
+先补 `MainController` 方法 + SDK 导出，再接 GUI/CLI（外部仓库）的界面入口。

@@ -5361,3 +5361,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 分诊报告（六列证据 + 初步分类），确认 `ToolDocumentationRecallController` 与
 > `AgentCommunicationDelegationController` 为零生产入口目标；DiskCache 标注未接线。
 > **未完成**：两项接线与逐候选调用链核查。
+
+> **285（AUDIT-REPAIR-01 检查点 04 接线设计，2026-11-06）**：明确两项能力的生产入口设计
+> （`MainController` 方法 + SDK 导出 + 现有反馈/授权路由），并列出反例清单；
+> 尚未实现接线，检查点 04 不关闭。
