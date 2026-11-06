@@ -65,6 +65,42 @@ describe("mission 任务序列只读查询", () => {
     }
   });
 
+  it("运行中补充任务：登记进权威序列或如实推迟（不静默丢弃）", async () => {
+    const stateDirectory = await mkdtemp(path.join(tmpdir(), "astarray-seq-insert-"));
+    directories.push(stateDirectory);
+    const runtime = await createRuntime(stateDirectory);
+    try {
+      const missionId = await runtime.controller.handleUserMessage("插入测试", {
+        projectIdentifier: "project-a",
+      });
+      const deadline = Date.now() + 15_000;
+      let status = await runtime.controller.queryMissionStatus(missionId);
+      while (status?.summary?.status !== "done" && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        status = await runtime.controller.queryMissionStatus(missionId);
+      }
+      const sequence = await runtime.controller.queryMissionTaskSequence(missionId);
+      expect(sequence).not.toBeNull();
+      const outcome = await runtime.controller.requestRuntimeTaskInsertion({
+        missionIdentifier: missionId,
+        requestIdentifier: "insert-1",
+        expectedGroupRevision: sequence?.revision ?? 0,
+        anchorTaskIdentifier: null,
+        title: "补充任务",
+        description: "运行中补充",
+        acceptanceCriteria: "可见且不丢",
+        dependsOn: [],
+      });
+      expect(["insert-now", "deferred-to-next-group", "inserted", "deferred-to-sequence"]).toContain(
+        outcome.outcome,
+      );
+      expect(outcome.taskSequenceIdentifier).not.toBeNull();
+      expect(outcome.reason.length).toBeGreaterThan(0);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  });
+
   it("无映射/未知 mission ⇒ null（不猜序列）", async () => {
     const stateDirectory = await mkdtemp(path.join(tmpdir(), "astarray-seq-query2-"));
     directories.push(stateDirectory);
