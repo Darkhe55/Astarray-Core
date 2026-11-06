@@ -5396,3 +5396,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **292（BATCH6/B6R-04b 状态对账，2026-11-06）**：`B6R-04b` 更新为 implemented-unverified
 > （核心生命周期 + TUI 交互；真实 TTY 未验收）；BATCH6 批次说明 B6R-00～09 已在后续工作中进入生产路径，
 > `B6R-10` 覆盖率/macOS 平台证据缺口保留，整批不判 done。
+
+> **293（剩余任务卡状态对账，2026-11-06）**：新增 `docs/reports/REMAINING_CARDS_TRIAGE_2026-11-06.md`：
+> AUDIT-01 部分（缺工具执行观测）、B6R-04b implemented-unverified、BATCH6 10 覆盖率/macOS 缺口、
+> RESUME-02/WB-00/2026-09-16 增量卡为设计/gated、E2E-01 仅缺人工与平台证据。
+> 私有 UI 卡的阻塞分别登记在各自卡片。
