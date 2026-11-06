@@ -1014,6 +1014,7 @@ export class MainController {
       priorityTier: number | null;
       sequenceOrdinal: number;
       blockReason: string | null;
+      assignedAgentInstanceIdentifier: string | null;
     }>;
   } | null> {
     const mapping = this.missionTaskSequences.get(missionId);
@@ -1029,6 +1030,10 @@ export class MainController {
             sourceKind: "agent" as const,
             actorId: mapping.ownerAgentInstanceIdentifier,
           };
+    const missionStatus = await this.options.missionManager.getMissionStatus(missionId);
+    const assignedAgentByTaskIdentifier = new Map(
+      (missionStatus.taskChain?.tasks ?? []).map((task) => [task.id, task.assignedAgentId]),
+    );
     const snapshot = await statusController.getSnapshot({
       ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
       sequenceId: mapping.taskSequenceIdentifier,
@@ -1049,6 +1054,8 @@ export class MainController {
         priorityTier: node.priorityTier ?? null,
         sequenceOrdinal: node.sequenceOrdinal,
         blockReason: node.blockReason,
+        assignedAgentInstanceIdentifier:
+          assignedAgentByTaskIdentifier.get(node.taskId) ?? null,
       })),
     };
   }
