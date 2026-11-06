@@ -3147,6 +3147,39 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     });
   }
 
+  /** B6R-04b：创建自定义权限组（认证设置控制面；非 Agent 工具）。 */
+  async createPermissionProfile(input: {
+    readonly displayName: string;
+    readonly source:
+      | { readonly kind: "blank" }
+      | { readonly kind: "builtin"; readonly profileId: "ponder" | "assist" | "devolve" }
+      | { readonly kind: "custom"; readonly permissionProfileId: string };
+  }): Promise<{ permissionProfileId: string; displayName: string; revision: number }> {
+    this.assertOpen();
+    return this.runtime.controller.createPermissionProfile(input);
+  }
+
+  /** B6R-04b：重置自定义权限组到指定来源。 */
+  async resetPermissionProfile(input: {
+    readonly permissionProfileId: string;
+    readonly source:
+      | { readonly kind: "blank" }
+      | { readonly kind: "builtin"; readonly profileId: "ponder" | "assist" | "devolve" }
+      | { readonly kind: "custom"; readonly permissionProfileId: string };
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; revision: number }> {
+    this.assertOpen();
+    return this.runtime.controller.resetPermissionProfile(input);
+  }
+
+  /** B6R-04b：删除自定义权限组（内置/当前使用组由控制器拒绝）。 */
+  async deletePermissionProfile(input: {
+    readonly permissionProfileId: string;
+    readonly isCurrentlyActive: boolean;
+  }): Promise<{ permissionProfileId: string; deleted: true }> {
+    this.assertOpen();
+    return this.runtime.controller.deletePermissionProfile(input);
+  }
   async getCurrentPermissionProfileReference() {
     return this.runtime.controller.getCurrentPermissionProfileReference();
   }

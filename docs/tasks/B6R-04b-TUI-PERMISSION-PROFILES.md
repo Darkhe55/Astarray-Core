@@ -44,3 +44,21 @@ remainingRisks/completionGate。
 
 - 不修改 B6R-01~04 已验收行为；不引入新的数量配额或内部执行层披露。
 - 不把设置控制面注册为模型工具；headless 契约维持不变。
+
+## 6. 进展（2026-11-06）
+
+已核对：`getCurrentPermissionProfileReference` / `listPermissionProfiles` / `switchPermissionProfile`
+早已存在并导出到 SDK；外部 TUI 也已有头栏显示与只读权限组面板。
+
+本轮补齐**核心生命周期控制面**：
+
+- `MainController.createPermissionProfile` / `resetPermissionProfile` / `deletePermissionProfile`
+  （复用 CLI 已使用的 `CustomPermissionProfileController`；名称唯一、来源校验、备份、
+  内置/当前组删除保护均由该控制器负责）；
+- 公开 SDK 同步导出三个方法；
+- 证据：`permission-profile-lifecycle-production.test.ts` 3/3
+  （创建/列表/重置/删除、重名拒绝、内置删除拒绝、当前组删除拒绝、
+  切换持久化重启仍生效、切到不存在组拒绝）。
+
+**仍未完成（TUI 交互）**：外部 TUI 面板当前是只读展示，缺少
+"面板内切换/创建/复制/重置/删除、搜索与分页交互、80×24/120×40/60×20 组件测试"。
