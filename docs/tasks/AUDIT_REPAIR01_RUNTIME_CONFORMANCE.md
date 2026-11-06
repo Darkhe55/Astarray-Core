@@ -258,3 +258,8 @@ bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
 证据：`agent-communication-delegation-production.test.ts` 4/4（合法创建+投递通过；
 层级/存活/缺裁决拒绝；撤销/回收/父子/mission/revision/类型/在途/非 recipient 拒绝；
 未知句柄与过期拒绝）。
+
+### 04 收口（2026-11-06）
+
+两项能力均已接线并有反例；24 个候选完成最终分诊（报告 §6），分类使用固定六类，
+"被替代/未接入"标注后继核查边界，不宣称已删除或已验收。
