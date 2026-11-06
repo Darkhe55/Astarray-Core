@@ -5401,3 +5401,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > AUDIT-01 部分（缺工具执行观测）、B6R-04b implemented-unverified、BATCH6 10 覆盖率/macOS 缺口、
 > RESUME-02/WB-00/2026-09-16 增量卡为设计/gated、E2E-01 仅缺人工与平台证据。
 > 外部 UI 卡的阻塞分别登记在各自卡片。
+
+> **294（RESUME-02 语义修正，2026-11-06）**：用户裁决断点续接为**断点驱动的会话内卡片**，不是实验开关；
+> 不点击则一直保留；恢复/完成/取消后转终态（选 A）。记录于
+> `docs/reports/RESUME02_BREAKPOINT_DESIGN_CORRECTION_2026-11-06.md`；卡文件待用户允许后回写。
