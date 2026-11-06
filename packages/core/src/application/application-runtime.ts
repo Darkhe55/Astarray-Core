@@ -57,6 +57,7 @@ import type { ForkFeedbackClient } from "../feedback-process/transport.js";
 import type {
   AgentRuntime,
   TaskDependencyNode,
+  ToolCallResult,
   ToolDescriptor,
   ToolPort,
 } from "../core/types.js";
@@ -178,6 +179,7 @@ import { GoalRequirementMappingStore } from "../orchestration/goal-requirement-m
 import {
   GOAL_PROPOSAL_TOOL_DESCRIPTOR,
   GOAL_PROPOSAL_TOOL_NAME,
+  createGoalProposalToolHandler,
 } from "../tools/goal-proposal-tool.js";
 import { partitionInvariantViolations } from "../orchestration/goal-invariant-catalog.js";
 import { rotateInvariantViolationArchiveIfNeeded } from "../orchestration/goal-invariant-archive.js";
@@ -916,6 +918,11 @@ export async function createApplicationRuntime(
   const sessionManager = new SessionAuthorizationManager();
   const registry = new ToolRegistry();
   registry.registerMany(BUILTIN_TOOL_DESCRIPTORS);
+  /**
+   * AUDIT-REPAIR-01：目标提议工具也走注册表（权限目录已映射 goal.propose），
+   * 但对主 Agent 预览隐藏（主 Agent 不获得该写工具）。
+   */
+  registry.register(GOAL_PROPOSAL_TOOL_DESCRIPTOR, { isHiddenFromPreview: true });
   // AUTH-SCOPE-03：范围判定只使用显式登记的工程根，不再隐式读取 cwd。
   const registeredProjectRoots: RegisteredProjectRoot[] = [
     {
@@ -3004,6 +3011,10 @@ export async function createApplicationRuntime(
     conversationIdentifier?: string;
     missionIdentifier?: string;
     taskIdentifier?: string;
+    customToolHandlers?: ReadonlyMap<
+      string,
+      (argumentsJson: string, callId: string) => Promise<ToolCallResult>
+    >;
   }): PolicyWrapper => {
     const folderGrantStore = new FolderGrantStore({ baseDirectory: stateDirectory });
     const taskWorkspaceBoundary =
@@ -3050,6 +3061,9 @@ export async function createApplicationRuntime(
       workspaceBoundary: taskWorkspaceBoundary,
       temporaryDirectoryPath,
       workerAllowedToolNames: input.allowedToolNames,
+      ...(input.customToolHandlers === undefined
+        ? {}
+        : { customToolHandlers: input.customToolHandlers }),
       nowUnixSeconds: () => Math.floor(Date.now() / 1000),
       getCurrentMode: () => modeMachine.getCurrentMode(),
       auditSink: undefined,
@@ -3966,115 +3980,41 @@ export async function createApplicationRuntime(
       missionIdentifier?: string,
       conversationIdentifier?: string,
     ) => {
+      /**
+       * AUDIT-REPAIR-01（2026-11-06）：**不再对 proposeGoal 走旁路**。
+       *
+       * 它与其它工具一样经过 ScopeGatedToolPort → PolicyWrapper：
+       * 注册表存在性、允许列表、权限/询问、安装/工作时段门禁全部先生效；
+       * 处理器只做「目标已激活 + mission 存在」校验并落提案。
+       */
+      const effectiveAllowedToolNames = new Set(allowedToolNames);
+      if (isGoalModeActivated) {
+        effectiveAllowedToolNames.add(GOAL_PROPOSAL_TOOL_NAME);
+      }
+      const goalProposalHandler = createGoalProposalToolHandler({
+        isGoalModeActivated: () => isGoalModeActivated,
+        missionIdentifier,
+        proposeGoalContract,
+      });
       const policyPort = new ScopeGatedToolPort(
         createPolicyWrapperForAgent({
           agentInstanceId: agentInstanceId ?? `worker:${task.id}`,
-          allowedToolNames,
+          allowedToolNames: effectiveAllowedToolNames,
           factVerificationClaimIdentifier: `task-exec:${agentInstanceId ?? task.id}`,
           taskExecutionId: `task-exec:${agentInstanceId ?? task.id}`,
           useConfigurablePermissionProfileEngine: true,
           missionIdentifier: missionIdentifier ?? "unknown-mission",
           taskIdentifier: task.id,
+          customToolHandlers: new Map([
+            [GOAL_PROPOSAL_TOOL_NAME, goalProposalHandler],
+          ]),
           ...(workspaceRootPath === undefined ? {} : { workspaceRootPath }),
           ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
           ...(conversationIdentifier === undefined ? {} : { conversationIdentifier }),
         }),
         scopeAuthorizationGate,
       );
-      /**
-       * R92（2026-11-01，③-B）：**目标提议工具**的执行分派。
-       *
-       * - 仅目标模式已激活时可用；
-       * - 只**落提案**（`proposeGoalContract`），绝不创建契约、不启用目标模式；
-       * - 来源引用用 `mission:<id>`（由本地派生，模型无法伪造"用户说过"）。
-       */
-      return {
-        execute: async (toolName, argumentsJson, callId, cancellationSignal) => {
-          if (toolName !== GOAL_PROPOSAL_TOOL_NAME) {
-            return policyPort.execute(
-              toolName,
-              argumentsJson,
-              callId,
-              cancellationSignal,
-            );
-          }
-          if (!isGoalModeActivated) {
-            return {
-              kind: "error",
-              callId,
-              errorCode: "goal-mode-not-active",
-              errorMessage: "目标模式未激活：不能提议目标。",
-              isIdempotencyConfirmed: false,
-              sideEffectStatus: "none",
-            };
-          }
-          if (missionIdentifier === undefined) {
-            return {
-              kind: "error",
-              callId,
-              errorCode: "mission-context-missing",
-              errorMessage: "缺少 mission 上下文：无法为提案生成来源引用。",
-              isIdempotencyConfirmed: false,
-              sideEffectStatus: "none",
-            };
-          }
-          let parsedArguments: {
-            objectiveText?: unknown;
-            requirements?: unknown;
-          };
-          try {
-            parsedArguments = JSON.parse(argumentsJson) as typeof parsedArguments;
-          } catch {
-            return {
-              kind: "error",
-              callId,
-              errorCode: "invalid-arguments",
-              errorMessage: "proposeGoal 参数不是合法 JSON。",
-              isIdempotencyConfirmed: false,
-              sideEffectStatus: "none",
-            };
-          }
-          const draft: GoalContractProposalDraft = {
-            objectiveText:
-              typeof parsedArguments.objectiveText === "string"
-                ? parsedArguments.objectiveText
-                : "",
-            requirements: Array.isArray(parsedArguments.requirements)
-              ? (parsedArguments.requirements as GoalContractProposalDraft["requirements"])
-              : [],
-            scope: { projectIdentifiers: [], allowedToolNames: null },
-            nonViolableInvariants: [],
-            resourceLimits: {
-              maximumToolCalls: null,
-              maximumWallClockSeconds: null,
-              maximumCostUnits: null,
-            },
-            deadlineIso: null,
-            pauseConditions: [],
-          };
-          try {
-            const proposal = await proposeGoalContract({
-              draft,
-              sourceRequestReference: `mission:${missionIdentifier}`,
-            });
-            return {
-              kind: "success",
-              callId,
-              outputText: `目标提案已创建: ${proposal.proposalIdentifier}（需用户确认；owner 确认后才生成契约）`,
-              isSideEffectFree: false,
-            };
-          } catch (error) {
-            return {
-              kind: "error",
-              callId,
-              errorCode: "goal-proposal-invalid",
-              errorMessage: (error as Error).message,
-              isIdempotencyConfirmed: false,
-              sideEffectStatus: "none",
-            };
-          }
-        },
-      };
+      return policyPort;
     },
     buildRecoveryCheckpointingToolPort,
     // T06B/ADR-0014：思索模式本地只读白名单（查看项目文件、检索文本和查询只读任务状态）。

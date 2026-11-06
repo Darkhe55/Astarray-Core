@@ -5331,3 +5331,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 启动报告 `last-report.json` 与只读入口；目标门禁沿用核心 resumeMission。
 > **验证**：boot 2/2、runner 4/4；公开全量随后跑。
 > 边界：UI 设置/状态与提示下一步单独提交；sequence-only 仍不自动派发。
+
+> **280（AUDIT-REPAIR-01 检查点 01 部分交付，2026-11-06）**：`proposeGoal` 删除专属旁路，
+> 改为注册表（隐藏预览）+ 权限目录 `goal.propose` + PolicyWrapper 自定义处理器；
+> 写描述符改为 restricted/create-only，处理器按 callId 幂等落提案。
+> **验证**：`goal-proposal-tool` 5/5、`goal-proposal-gate` 2/2（ponder 拒绝/处理器不调用）、
+> 公开全量 **616 files / 4250 tests** 通过。
+> 未完成：应用装配级完整权限矩阵与装配级"主 Agent 不可见"断言。

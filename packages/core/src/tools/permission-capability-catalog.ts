@@ -79,6 +79,7 @@ const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
   { capabilityId: "agent.delegate", displayName: "三级 Agent 派发", description: "次级 Agent 向所属三级 Agent 发布或重派任务", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["agent"], riskSummary: "中" },
   { capabilityId: "agent.manage", displayName: "三级 Agent 管理", description: "次级 Agent 暂停、取消和回收所属三级 Agent", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["agent"], riskSummary: "高" },
   { capabilityId: "agent.communication-delegate", displayName: "沟通句柄转交", description: "直属上级把直属低一级 Agent 的限定沟通句柄授权给具体同级 Agent", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["agent"], riskSummary: "高" },
+  { capabilityId: "goal.propose", displayName: "提议目标", description: "写入待用户确认的目标提案（不创建契约、不启用目标模式）", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["task"], riskSummary: "中" },
   { capabilityId: "task.read", displayName: "任务读取", description: "查询任务和偏序集状态", devolveDefault: "allow", assistDefault: "allow", applicableResources: ["task"], riskSummary: "低" },
   { capabilityId: "task.manage", displayName: "任务管理", description: "创建、插入、改序、取消任务", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["task"], riskSummary: "中" },
   { capabilityId: "memory.read-selected", displayName: "记忆选择性读取", description: "读取明确选择的 Agent 存档条目", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["memory"], riskSummary: "中" },
@@ -87,8 +88,8 @@ const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
 
 /** 内置工具 → 权限映射（注册校验与执行裁决用）。 */
 const DEFAULT_TOOL_CAPABILITY_MAPPINGS: Record<string, string[]> = {
-  /** R92：目标提议只写本地提案（需用户确认后才生效），按最低风险归入项目读取能力。 */
-  proposeGoal: ["project.read"],
+  /** AUDIT-REPAIR-01：目标提议写本地提案（需用户确认后生效），使用专用能力，不冒充只读。 */
+  proposeGoal: ["goal.propose"],
   readFile: ["project.read"],
   listDirectory: ["project.read"],
   writeFileTemporary: ["project.create"],
