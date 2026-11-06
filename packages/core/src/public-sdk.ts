@@ -3207,6 +3207,27 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.runtime.controller.queryMissionTaskSequence(missionIdentifier);
   }
+  /**
+   * UI-ALIGN-01：运行中补充任务（登记进权威序列；不等同于改写正在执行的工具调用）。
+   * 返回值如实区分 inserted / deferred / duplicate / 拒绝原因。
+   */
+  async requestRuntimeTaskInsertion(payload: unknown): Promise<{
+    readonly outcome:
+      | "insert-now"
+      | "deferred-to-next-group"
+      | "duplicate"
+      | "stale-revision-rejected"
+      | "invalid-anchor-rejected"
+      | "idempotency-conflict"
+      | "inserted"
+      | "deferred-to-sequence";
+    readonly reason: string;
+    readonly taskSequenceIdentifier: string | null;
+    readonly taskIdentifier: string | null;
+  }> {
+    this.assertOpen();
+    return this.runtime.controller.requestRuntimeTaskInsertion(payload);
+  }
   async getCurrentPermissionProfileReference() {
     return this.runtime.controller.getCurrentPermissionProfileReference();
   }
