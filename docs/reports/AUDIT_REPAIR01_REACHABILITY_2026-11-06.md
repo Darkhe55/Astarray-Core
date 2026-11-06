@@ -81,3 +81,40 @@
 ```powershell
 node scripts/audit-product-reachability.mjs --json
 ```
+
+## 6. 最终分诊（脚本 + 定向 grep，2026-11-06）
+
+证据列：`new` = 生产构造命中；`mention` = 生产模块提及；`sdk` = public-sdk 导入；`test` = 测试构造数。
+
+| 候选 | 最终分类 | 证据 |
+|---|---|---|
+| `AgentCommunicationDelegationController` | **已接入** | `new` main-controller.ts:1007；SDK 方法 |
+| `DelegatedAgentCommunicationGrantStore` | **已接入** | `new` main-controller.ts:1006 |
+| `ToolDocumentationRecallController` | **已接入** | `new` main-controller.ts:956；SDK 方法 |
+| `AgentAddressGuard` | **需宿主注入** | sdk 导入（public-sdk.ts:115） |
+| `TokenMeasurementService` | **需宿主注入** | sdk 导入（public-sdk.ts:825） |
+| `AzureOpenAiAdapter` | **被替代** | 无生产构造；生产用协议运行时直接实现 |
+| `AnthropicMessagesAdapter` | **被替代** | 同上；`AnthropicMessagesRuntime` 为生产实现 |
+| `GenericOpenAiCompatibleAdapter` | **被替代** | 无生产构造；`OpenAiCompatibleRuntime` 为生产实现 |
+| `OpenAiChatCompletionsAdapter` | **被替代** | 无生产构造；仅被 Azure 适配器继承（同样未构造） |
+| `OpenAiResponsesAdapter` | **被替代** | 无生产构造 |
+| `LocalCompletionVerifier` | **被替代（待核）** | 零构造；完成门禁在 MainController/编排层另行实现 |
+| `MetricsRegistry` | **未接入** | 生产无 `new MetricsRegistry(`；仅测试构造 |
+| `BedrockConverseAdapter` | **未接入** | 无生产构造/提及 |
+| `GeminiInteractionsAdapter` | **未接入** | 无生产构造/提及 |
+| `AgentModelAssignmentController` | **未接入** | 无生产构造 |
+| `BoundedProviderFallbackGuard` | **未接入** | 无生产构造 |
+| `QuaternaryPermissionIntersectionGuard` | **未接入** | 无生产构造 |
+| `TaskChainCumulativeBudgetController` | **未接入** | 无生产构造 |
+| `SecondaryAgentSessionController` | **未接入** | 无生产构造 |
+| `HumanWorktreeObserver` | **未接入** | 无生产构造 |
+| `TertiaryAgentAssignmentPlanner` | **未接入** | 无生产构造 |
+| `TertiarySingleChainExecutionGuard` | **未接入** | 无生产构造 |
+| `ContinuationCoordinator` | **测试专用** | 仅测试构造；watchdog 组件无产品入口 |
+| `FaultInjectionRecoveryVerifier` | **测试专用** | 仅测试构造 |
+
+**分诊边界（如实）**：
+
+- "被替代"基于"生产无构造 + 存在等价运行时实现"，未逐项比对行为差异；后继工作需核对等价性。
+- "未接入"只说明当前无生产构造/入口，不等于应删除；后继按缺口清单排期。
+- 本轮未对 24 项逐一读完整调用链（脚本信号 + 定向 grep）；"待核"保持原样。
