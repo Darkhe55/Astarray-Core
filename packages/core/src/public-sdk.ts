@@ -1697,6 +1697,9 @@ export type PublicApplicationService = Pick<
   | "getCurrentPermissionProfileReference"
   | "listPermissionProfiles"
   | "switchPermissionProfile"
+  | "createPermissionProfile"
+  | "resetPermissionProfile"
+  | "deletePermissionProfile"
 >;
 
 /** 公开 mission 状态（SDK/CLI 共用视图）。 */
