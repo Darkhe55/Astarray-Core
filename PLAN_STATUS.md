@@ -5392,3 +5392,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **291（B6R-04b 核心生命周期，2026-11-06）**：新增权限组 create/reset/delete 控制面与 SDK 导出，
 > 复用 CustomPermissionProfileController；3/3 测试（重名/内置/当前组保护、切换持久化、悬空引用拒绝）。
 > 未完成：外部 TUI 面板交互（切换/创建/复制/重置/删除、搜索分页、尺寸测试）。
+
+> **292（BATCH6/B6R-04b 状态对账，2026-11-06）**：`B6R-04b` 更新为 implemented-unverified
+> （核心生命周期 + TUI 交互；真实 TTY 未验收）；BATCH6 批次说明 B6R-00～09 已在后续工作中进入生产路径，
+> `B6R-10` 覆盖率/macOS 平台证据缺口保留，整批不判 done。
