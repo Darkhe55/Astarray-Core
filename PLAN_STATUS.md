@@ -5350,3 +5350,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 逐例断言工具执行计数为 0；顺带修复取消时 AbortError 冒泡（统一收敛为 cancelled）。
 > **验证**：公开全量 **617 files / 4259 passed + 3 skipped**。
 > 仍未覆盖：ToolLoop 正向单/多工具成功执行计数（运行时级正向用例已有）。
+
+> **283（AUDIT-REPAIR-01 检查点 03，2026-11-06）**：DiskCache 增加可注入时钟/最大年龄（默认 300s、
+> 0 禁用、非法拒绝）、schemaVersion+expiresAtIso、身份/项目/profile/revision/工具版本/schema 键隔离、
+> 64 位 hex key 防穿越、authorizeRead 读取门禁、指纹 unavailable 与敏感/工具指令 bypass。
+> **验证**：`cache-safety` 11/11、`cache-metrics` 17/17；公开全量随后跑。
+> 边界：组件完成，**未接生产执行链**。

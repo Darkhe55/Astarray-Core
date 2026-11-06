@@ -168,3 +168,26 @@ max_tokens、system 指导与参数损坏）。
 `runFinished(cancelled)`。
 
 仍未覆盖：ToolLoop 正向"单/多工具成功执行"计数（运行时级正向用例已有）。
+
+### 03 交付：确定性磁盘缓存安全边界（组件，未接线）
+
+已编码（`packages/core/src/infra/cache.ts`）：
+
+- 注入时钟 `nowMilliseconds` + `maximumEntryAgeMilliseconds`（默认 300000；0 禁用读写；
+  负数/NaN/Infinity 拒绝）；
+- 条目含 `schemaVersion` + `expiresAtIso`；读取校验结构、键一致、时间可解析、
+  `cachedAt` 不在未来、`now < expiresAt`、实际年龄 < 当前上限；过期 ⇒ `stale-reject`；
+  旧格式/损坏 ⇒ `miss`；
+- 键加入 project/agent/profile/revision/toolImplementationVersion/cacheSchemaVersion；
+  缺必填隔离字段 ⇒ `findBypassReason`/`cache-key-incomplete`；键只接受 64 位十六进制，
+  拒绝路径穿越；
+- `get(key, fingerprint|null, {authorizeRead})`：指纹不可用 ⇒ bypass；`authorizeRead=false`
+  ⇒ bypass（命中不能绕过权限）；
+- `shouldBypass` 新增敏感内容/工具调用指令；写/时间敏感/失败保持 bypass；
+- `readFileFingerprintOrUnavailable`：读取失败返回 `unavailable`，不返回空串。
+
+证据：`cache-safety` 11/11（TTL 到期前/恰好/之后、时钟回拨、配置缩短、TTL=0、非法配置、
+键隔离 6 维、缺字段、路径穿越、旧格式/键不一致/schema 拒绝、authorizeRead、指纹不可用、
+bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
+
+**边界**：本检查点**不把 DiskCache 接进模型执行链**；生产接线状态如实为"组件已验证、未接线"。

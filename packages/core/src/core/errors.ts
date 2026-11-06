@@ -57,6 +57,11 @@ export type DomainErrorCode =
   | "provider-protocol-error"
   /** 历史消息里的工具参数缺失/非法 JSON（AUDIT-REPAIR-01）。 */
   | "invalid-tool-arguments"
+  /** AUDIT-REPAIR-01：确定性缓存的键/条目/配置错误。 */
+  | "cache-key-incomplete"
+  | "invalid-cache-key"
+  | "invalid-cache-entry"
+  | "invalid-cache-configuration"
   | "provider-network-error"
   | "provider-auth-failed"
   | "provider-endpoint-not-found"
