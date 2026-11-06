@@ -5370,3 +5370,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `MainController.answerToolHelpRequest` + SDK `requestToolHelp`；已分配返回公开用法、
 > 未分配/未登记不泄露、缺失升级、陈旧/非法/幂等；拔掉登记装配正向退化。
 > **验证**：5/5；公开全量随后跑。未完成：通信转交、其余候选核查。
+
+> **287（AUDIT-REPAIR-01 检查点 04 之二：通信转交，2026-11-06）**：MainController 构造 grant store
+> 与 delegation controller；新增受认证授权入口、投递前复检、不可转授防线；SDK 两个方法。
+> **验证**：4/4；公开全量随后跑。未完成：其余 22 候选逐项调用链核查。

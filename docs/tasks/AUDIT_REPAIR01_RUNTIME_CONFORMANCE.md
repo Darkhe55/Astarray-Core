@@ -242,3 +242,19 @@ bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
   同 request 幂等；**拔掉登记装配 ⇒ 已分配工具退化为 known-but-not-usable**（正向依赖可证）。
 
 **未完成**：通信转交接线；其余候选逐项核查。
+
+### 04 交付（二）：受权通信转交生产入口
+
+- `MainController` 构造 `DelegatedAgentCommunicationGrantStore` 与
+  `AgentCommunicationDelegationController`；
+- `createCommunicationDelegationGrant`：必须带 `authorizationSource` + 用户裁决引用；
+  层级/存活/同级校验由控制器执行；只产生不透明句柄，不转移任务/记忆/工具权限；
+- `assertCommunicationDelegationDeliverable`：撤销/回收/父子变化/mission 结束/
+  profile revision/到期/消息类型/在途量逐项拒绝；
+- `assertCommunicationDelegationNotReDelegable`：未知句柄拒绝（无导出/转授路径）；
+- 公开 SDK：`delegateAgentCommunication` / `assertDelegatedCommunicationDeliverable`；
+- 接线清单：`AgentCommunicationDelegationController` 记为 constructed。
+
+证据：`agent-communication-delegation-production.test.ts` 4/4（合法创建+投递通过；
+层级/存活/缺裁决拒绝；撤销/回收/父子/mission/revision/类型/在途/非 recipient 拒绝；
+未知句柄与过期拒绝）。

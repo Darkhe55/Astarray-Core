@@ -95,6 +95,12 @@ const WIRING_MANIFEST: readonly WiringEntry[] = [
     reason: "G3b（总表 §5.6）：证据包内容门禁仍是零使用",
   },
   {
+    componentClassName: "AgentCommunicationDelegationController",
+    state: "constructed",
+    reason:
+      "AUDIT-REPAIR-01 检查点 04：MainController 构造并暴露受认证的转交/投递复检入口",
+  },
+  {
     componentClassName: "ToolDocumentationRecallController",
     state: "constructed",
     reason:

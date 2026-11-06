@@ -14,6 +14,13 @@ import {
   type ToolHelpResponseV1,
 } from "../tools/tool-help-recall-controller.js";
 import type { ToolPublicDocumentation } from "../tools/tool-documentation-recall.js";
+import {
+  AgentCommunicationDelegationController,
+  DelegatedAgentCommunicationGrantStore,
+  type DelegatedAgentCommunicationGrant,
+  type DelegatedMessageType,
+  type DelegationValidationContext,
+} from "./agent-communication-delegation.js";
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
 import type { RunHistoryStore } from "./run-history-store.js";
 import type { MissionRuntimeLease, MissionRuntimeRegistry } from "./mission-runtime-registry.js";
@@ -828,6 +835,68 @@ export class MainController {
 
   /** ALIGN-02-01：mission → 权威任务序列/任务 的投影映射（只读；未登记返回 null）。 */
   /**
+   * AUDIT-REPAIR-01 检查点 04（2026-11-06）：**受权通信转交**的生产入口。
+   *
+   * 身份/层级/存活/mission 由宿主注入（模型不可覆盖）；必须带用户裁决引用，
+   * 否则拒绝。只创建"同级可发消息"的限定句柄，不转移任务/记忆/工具权限。
+   */
+  createCommunicationDelegationGrant(input: {
+    readonly authorizationSource: string;
+    readonly userDecisionReference: string;
+    readonly grantorSuperiorAgentInstanceId: string;
+    readonly recipientPeerAgentInstanceId: string;
+    readonly targetAgentInstanceId: string;
+    readonly grantorRole: "main" | "secondary" | "tertiary";
+    readonly recipientRole: "main" | "secondary" | "tertiary";
+    readonly targetRole: "main" | "secondary" | "tertiary";
+    readonly isTargetAlive: boolean;
+    readonly missionId: string;
+    readonly taskScope: string | null;
+    readonly allowedMessageTypes: readonly DelegatedMessageType[];
+    readonly isInstructionAllowed: boolean;
+    readonly replyRoute: DelegatedAgentCommunicationGrant["replyRoute"];
+    readonly isCopyToGrantorRequired: boolean;
+    readonly expiresAtIso: string | null;
+    readonly maxInFlightMessages: number;
+  }): DelegatedAgentCommunicationGrant {
+    if (
+      input.authorizationSource.trim() === "" ||
+      input.userDecisionReference.trim() === ""
+    ) {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "通信转交必须来自受认证的授权入口并带用户裁决引用。",
+      );
+    }
+    return this.communicationDelegationController.createGrant({
+      ...input,
+      allowedMessageTypes: [...input.allowedMessageTypes],
+    });
+  }
+
+  /** 投递前复检：撤销/回收/父子变化/mission 结束/profile revision/到期/类型/在途量。 */
+  assertCommunicationDelegationDeliverable(input: {
+    readonly communicationHandleIdentifier: string;
+    readonly senderAgentInstanceId: string;
+    readonly messageType: DelegatedMessageType;
+    readonly missionId: string;
+    readonly currentProfileRevision: number;
+    readonly context: DelegationValidationContext;
+    readonly currentInFlightMessages: number;
+  }): void {
+    this.communicationDelegationController.assertDeliverable(input);
+  }
+
+  /** 句柄不可转授权（显式防线；存储层无句柄→句柄转换路径）。 */
+  assertCommunicationDelegationNotReDelegable(
+    communicationHandleIdentifier: string,
+  ): void {
+    this.communicationDelegationController.assertNotReDelegable(
+      communicationHandleIdentifier,
+    );
+  }
+
+  /**
    * AUDIT-REPAIR-01 检查点 04（2026-11-06）：**工具说明回访的生产入口**。
    *
    * 宿主/控制面把模型返回的 `ASTARRAY_TOOL_HELP_REQUEST_V1` 原样交给本方法；
@@ -930,7 +999,16 @@ export class MainController {
     return this.missionTaskSequences.get(missionId) ?? null;
   }
 
-  constructor(private readonly options: MainControllerOptions) {}
+  private readonly communicationDelegationGrantStore: DelegatedAgentCommunicationGrantStore;
+  private readonly communicationDelegationController: AgentCommunicationDelegationController;
+
+  constructor(private readonly options: MainControllerOptions) {
+    this.communicationDelegationGrantStore = new DelegatedAgentCommunicationGrantStore();
+    this.communicationDelegationController = new AgentCommunicationDelegationController(
+      this.communicationDelegationGrantStore,
+      () => Date.now(),
+    );
+  }
 
   /** 模式切换（TUI 调用）：交由状态机校验，非法迁移抛 DomainError。 */
   transitionMode(nextMode: AgentMode): void {
