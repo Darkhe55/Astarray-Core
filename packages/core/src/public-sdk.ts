@@ -15,6 +15,7 @@ import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-sto
 import type { StartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
 import { parseStartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
 import type { StartupRecoveryBootReport } from "./orchestration/startup-recovery-report.js";
+import type { ToolHelpResponseV1 } from "./tools/tool-help-recall-controller.js";
 import type { StartupRecoveryReport } from "./orchestration/startup-recovery-scanner.js";
 import type { StartupRecoveryRunReport } from "./orchestration/startup-recovery-runner.js";
 import type { ArtifactRecord } from "./orchestration/artifact-record-store.js";
@@ -3264,6 +3265,21 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         return service.rollback(input);
     }
   }
+  /**
+   * AUDIT-REPAIR-01 检查点 04：**工具说明回访**（宿主控制面入口）。
+   *
+   * 只返回已分配工具的公开说明或升级；不授予工具/权限/安装能力。
+   */
+  async requestToolHelp(input: {
+    readonly request: unknown;
+    readonly requesterAgentInstanceId: string;
+    readonly defaultSuperiorAgentInstanceId: string;
+    readonly missionId: string;
+  }): Promise<ToolHelpResponseV1> {
+    this.assertOpen();
+    return this.runtime.controller.answerToolHelpRequest(input);
+  }
+
   async queryStartupRecoveryState(): Promise<{
     policy: StartupRecoveryPolicy;
     isPersisted: boolean;
