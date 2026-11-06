@@ -15,6 +15,10 @@ import {
 } from "../tools/tool-help-recall-controller.js";
 import type { ToolPublicDocumentation } from "../tools/tool-documentation-recall.js";
 import {
+  CustomPermissionProfileController,
+  type CreateCustomProfileInput,
+} from "../tools/custom-permission-profile-controller.js";
+import {
   AgentCommunicationDelegationController,
   DelegatedAgentCommunicationGrantStore,
   type DelegatedAgentCommunicationGrant,
@@ -1757,6 +1761,68 @@ export class MainController {
       page,
       pageSize,
     };
+  }
+
+  /**
+   * B6R-04b（2026-11-06）：**权限组生命周期**（认证设置控制面，非 Agent 工具）。
+   *
+   * 复用 CLI 已使用的 `CustomPermissionProfileController`；名称唯一性、来源校验、
+   * 备份、内置组/当前组删除保护均由该控制器负责。
+   */
+  private createCustomPermissionProfileController(): CustomPermissionProfileController {
+    const profileStore = this.options.permissionProfileStore;
+    const capabilityCatalog = this.options.permissionCapabilityCatalog;
+    if (profileStore === null || profileStore === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "权限组存储未装配：拒绝权限组生命周期操作。",
+      );
+    }
+    if (capabilityCatalog === null || capabilityCatalog === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "权限能力目录未装配：拒绝权限组生命周期操作。",
+      );
+    }
+    return new CustomPermissionProfileController(profileStore, capabilityCatalog);
+  }
+
+  async createPermissionProfile(
+    input: CreateCustomProfileInput,
+  ): Promise<{ permissionProfileId: string; displayName: string; revision: number }> {
+    const controller = this.createCustomPermissionProfileController();
+    const profile = await controller.createProfile(input);
+    return {
+      permissionProfileId: profile.permissionProfileId,
+      displayName: profile.displayName,
+      revision: profile.revision,
+    };
+  }
+
+  async resetPermissionProfile(input: {
+    readonly permissionProfileId: string;
+    readonly source: CreateCustomProfileInput["source"];
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; revision: number }> {
+    const controller = this.createCustomPermissionProfileController();
+    const profile = await controller.resetProfile({
+      permissionProfileId: input.permissionProfileId,
+      source: input.source,
+      expectedRevision: input.expectedRevision,
+    });
+    return {
+      permissionProfileId: profile.permissionProfileId,
+      revision: profile.revision,
+    };
+  }
+
+  async deletePermissionProfile(input: {
+    readonly permissionProfileId: string;
+    readonly isCurrentlyActive: boolean;
+  }): Promise<{ permissionProfileId: string; deleted: true }> {
+    const controller = this.createCustomPermissionProfileController();
+    await controller.deleteProfile(input);
+    return { permissionProfileId: input.permissionProfileId, deleted: true };
   }
 
   /** 认证用户切换当前权限组（持久化；写入自动备份）。 */
