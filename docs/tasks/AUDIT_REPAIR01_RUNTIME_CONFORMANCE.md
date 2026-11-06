@@ -125,3 +125,5 @@ fake-server 驱动真实运行时和 ToolLoop：正常文本、正常单/多工�
 **未完成（不宣称检查点关闭）**：应用装配级的完整矩阵（allow 成功、deny/未分配/ponder/取消/
 未激活/无 mission 均无提案文件、ask 未批准无文件/批准后一个、参数或权限 revision 变化需重裁）
 尚缺端到端测试；主 Agent 预览隐藏已有注册级证据，尚无装配级断言。
+- 追加（同日）：`resolveToolDescriptors` 在目标模式未激活时过滤掉 `proposeGoal`，
+  避免规划器把它带进 worker 工具面（注册级隐藏之外的执行级第二道门）。
