@@ -5378,3 +5378,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **288（AUDIT-REPAIR-01 检查点 04 收口，2026-11-06）**：两项能力接线完成；24 候选最终分诊
 > （已接入 3 / 需宿主注入 2 / 被替代 6 / 测试专用 2 / 未接入 11），并标注"被替代"未逐项比对行为。
 > 检查点 04 完成（后继核查清单保留）。
+
+> **289（AUDIT-REPAIR-01 检查点 05 包级验收，2026-11-06）**：代码 `2e408a1b`、tarball
+> SHA256 `251C4C74…`；typecheck/lint/build/test:serial/check:low-parallel 均 0（620 files / 4279 + 3）；
+> 隔离安装 43 包；包内 Anthropic fake-server 闭环 1 次请求 + done；目标提案创建/确认绑定拒绝。
+> 常规 prepack 连续两次失败（未定位），改用 `--ignore-scripts` 并如实记录。
+> 同时更正 `STARTUP_RECOVERY` 卡状态。
