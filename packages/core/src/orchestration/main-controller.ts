@@ -993,6 +993,66 @@ export class MainController {
     }
   }
 
+  /**
+   * UI-ALIGN-01（2026-11-06）：只读查询 mission 对应的**权威任务序列投影**。
+   *
+   * 返回节点（依赖/优先层/状态/就绪标记）、revision 与 owner；不触发派发、
+   * 不改状态。GUI/TUI 用它呈现"任务序列"而不是只看 mission 链。
+   */
+  async queryMissionTaskSequence(missionId: string): Promise<{
+    readonly missionIdentifier: string;
+    readonly sequenceIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly ownerAgentInstanceIdentifier: string;
+    readonly revision: number;
+    readonly readyTaskIdentifiers: readonly string[];
+    readonly nodes: ReadonlyArray<{
+      taskIdentifier: string;
+      title: string;
+      status: string;
+      dependsOn: readonly string[];
+      priorityTier: number | null;
+      sequenceOrdinal: number;
+      blockReason: string | null;
+    }>;
+  } | null> {
+    const mapping = this.missionTaskSequences.get(missionId);
+    const statusController = this.options.taskSequenceStatusController;
+    if (mapping === undefined || statusController === null || statusController === undefined) {
+      return null;
+    }
+    const authenticatedUserId = this.options.authenticatedUserId?.trim();
+    const viewer =
+      authenticatedUserId !== undefined && authenticatedUserId !== ""
+        ? { sourceKind: "user" as const, actorId: authenticatedUserId }
+        : {
+            sourceKind: "agent" as const,
+            actorId: mapping.ownerAgentInstanceIdentifier,
+          };
+    const snapshot = await statusController.getSnapshot({
+      ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
+      sequenceId: mapping.taskSequenceIdentifier,
+      viewer,
+    });
+    return {
+      missionIdentifier: missionId,
+      sequenceIdentifier: mapping.taskSequenceIdentifier,
+      taskIdentifier: mapping.taskIdentifier,
+      ownerAgentInstanceIdentifier: mapping.ownerAgentInstanceIdentifier,
+      revision: snapshot.revision,
+      readyTaskIdentifiers: [...snapshot.readyTaskIds],
+      nodes: snapshot.nodes.map((node) => ({
+        taskIdentifier: node.taskId,
+        title: node.title,
+        status: node.status,
+        dependsOn: [...node.dependsOn],
+        priorityTier: node.priorityTier ?? null,
+        sequenceOrdinal: node.sequenceOrdinal,
+        blockReason: node.blockReason,
+      })),
+    };
+  }
+
   getMissionTaskSequence(missionId: string): {
     readonly taskSequenceIdentifier: string;
     readonly taskIdentifier: string;
