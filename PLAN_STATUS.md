@@ -5338,3 +5338,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **验证**：`goal-proposal-tool` 5/5、`goal-proposal-gate` 2/2（ponder 拒绝/处理器不调用）、
 > 公开全量 **616 files / 4250 tests** 通过。
 > 未完成：应用装配级完整权限矩阵与装配级"主 Agent 不可见"断言。
+
+> **281（AUDIT-REPAIR-01 检查点 02 部分交付，2026-11-06）**：Anthropic SSE 事件边界/CRLF/多行/
+> chunk UTF-8、error 事件脱敏、工具整批校验后释放、stop_reason 分类、超时单独分类、
+> 历史参数严格解析、system 指导合入顶层。
+> **验证**：`anthropic-messages-runtime` 24/24；公开全量随后跑。
+> 未完成：ToolLoop 级"工具执行计数为 0"矩阵、独立超时用例、取消/部分工具组合。

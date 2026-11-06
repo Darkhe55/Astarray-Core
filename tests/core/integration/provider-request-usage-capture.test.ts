@@ -52,7 +52,15 @@ function buildSseResponse(sseText: string): Response {
 }
 
 function buildFetchReturning(sseText: string): typeof fetch {
-  return (async () => buildSseResponse(sseText)) as unknown as typeof fetch;
+  /** AUDIT-REPAIR-01：严格运行时要求完整信封；本文件只关心 usage，这里补齐。 */
+  let normalized = sseText;
+  if (!normalized.includes('"message_start"')) {
+    normalized = anthropicSseEvent({ type: "message_start" }) + normalized;
+  }
+  if (!normalized.includes('"message_stop"')) {
+    normalized += anthropicSseEvent({ type: "message_stop" });
+  }
+  return (async () => buildSseResponse(normalized)) as unknown as typeof fetch;
 }
 
 function anthropicSseEvent(payload: unknown): string {

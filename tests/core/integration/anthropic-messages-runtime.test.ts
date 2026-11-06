@@ -53,7 +53,53 @@ interface CapturedRequest {
 }
 
 /** 起一个本地服务器，按给定 SSE 片段回放，并捕获请求。 */
-async function startFakeAnthropicServer(sseBody: string): Promise<{
+/**
+ * 旧夹具只写"关注的事件"，缺 message_start/message_stop 与 content_block_stop。
+ * AUDIT-REPAIR-01 要求严格协议，这里补齐信封；需要测"缺 message_stop"的用例
+ * 用 { rawBody: true } 跳过补全。
+ */
+function completeAnthropicSseFixture(sseBody: string): string {
+  const events: Record<string, unknown>[] = [];
+  for (const line of sseBody.split("\n")) {
+    if (!line.startsWith("data:")) continue;
+    try {
+      events.push(JSON.parse(line.slice("data:".length).trim()) as Record<string, unknown>);
+    } catch {
+      // 保留原始非法行，让被测代码自己报错
+    }
+  }
+  const hasMessageStart = events.some((event) => event["type"] === "message_start");
+  const hasMessageStop = events.some((event) => event["type"] === "message_stop");
+  const startedIndices: number[] = [];
+  const stoppedIndices = new Set<number>();
+  for (const event of events) {
+    if (event["type"] === "content_block_start" && typeof event["index"] === "number") {
+      startedIndices.push(event["index"]);
+    }
+    if (event["type"] === "content_block_stop" && typeof event["index"] === "number") {
+      stoppedIndices.add(event["index"]);
+    }
+  }
+  let prefix = "";
+  let suffix = "";
+  if (!hasMessageStart) {
+    prefix = sse({ type: "message_start", message: { usage: { input_tokens: 1 } } });
+  }
+  if (!hasMessageStop) {
+    for (const index of startedIndices) {
+      if (!stoppedIndices.has(index)) {
+        suffix += sse({ type: "content_block_stop", index });
+      }
+    }
+    suffix += sse({ type: "message_stop" });
+  }
+  return prefix + sseBody + suffix;
+}
+
+async function startFakeAnthropicServer(
+  sseBody: string,
+  options: { rawBody?: boolean } = {},
+): Promise<{
   baseUrl: string;
   capturedRequests: CapturedRequest[];
 }> {
@@ -67,7 +113,9 @@ async function startFakeAnthropicServer(sseBody: string): Promise<{
         body: JSON.parse(rawBody) as Record<string, unknown>,
       });
       response.writeHead(200, { "content-type": "text/event-stream; charset=utf-8" });
-      response.write(sseBody);
+      response.write(
+        options.rawBody === true ? sseBody : completeAnthropicSseFixture(sseBody),
+      );
       response.end();
     });
   });
@@ -475,7 +523,7 @@ describe("Anthropic Messages runtime：错误路径与选项分支", () => {
     await expect(collectEvents(runtime, buildAgentRunInput())).rejects.toThrow();
   });
 
-  it("⑭ 非法 SSE 行：必须跳过而不是抛错，正常事件仍可产出", async () => {
+  it("⑭ 非法 SSE 数据事件：报明确协议错误（不静默丢弃）", async () => {
     const { baseUrl } = await startFakeAnthropicServer(
       "event: message\ndata: 这不是 JSON\n\n" +
         sse({ type: "message_start", message: { usage: { input_tokens: 1 } } }) +
@@ -483,9 +531,9 @@ describe("Anthropic Messages runtime：错误路径与选项分支", () => {
         sse({ type: "message_delta", usage: { output_tokens: 1 }, delta: { stop_reason: "end_turn" } }),
     );
     const runtime = buildRuntime(baseUrl);
-    const events = await collectEvents(runtime, buildAgentRunInput());
-    expect(events).toContainEqual({ kind: "textDelta", deltaText: "好" });
-    expect(events.at(-1)).toMatchObject({ kind: "runFinished", reason: "success" });
+    await expect(collectEvents(runtime, buildAgentRunInput())).rejects.toMatchObject({
+      errorCode: "provider-protocol-error",
+    });
   });
 
   it("⑮ 缺少 stop_reason：必须报错（不得当成正常结束）", async () => {
@@ -555,5 +603,186 @@ describe("Anthropic Messages runtime：错误路径与选项分支", () => {
     await collectEvents(runtime, buildAgentRunInput());
     expect(capturedRecords).toHaveLength(1);
     expect(capturedRecords[0]?.["providerIdentifier"]).toBe("custom-provider-label");
+  });
+});
+
+describe("AUDIT-REPAIR-01：Anthropic 流严格性", () => {
+  function buildRuntime(baseUrl: string): AnthropicMessagesRuntime {
+    return new AnthropicMessagesRuntime({
+      baseUrl,
+      apiKey: "test-key",
+      model: "u2-flash",
+      requestTimeoutMilliseconds: 5_000,
+    });
+  }
+
+  it("CRLF + 多行 data：按 SSE 事件边界组装", async () => {
+    const body =
+      'event: message\r\ndata: {"type":"message_start"}\r\n\r\n' +
+      'event: message\r\ndata: {"type":"content_block_delta","index":0,\r\ndata: "delta":{"type":"text_delta","text":"跨行"}}\r\n\r\n' +
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\r\n\r\n' +
+      'data: {"type":"message_stop"}\r\n\r\n';
+    const { baseUrl } = await startFakeAnthropicServer(body, { rawBody: true });
+    const events = await collectEvents(buildRuntime(baseUrl), buildAgentRunInput());
+    expect(events).toContainEqual({ kind: "textDelta", deltaText: "跨行" });
+    expect(events.at(-1)).toMatchObject({ kind: "runFinished", reason: "success" });
+  });
+
+  it("跨 chunk UTF-8：多字节字符不被截断", async () => {
+    const { readAnthropicStreamEvents } = await import(
+      "../../../packages/core/src/runtime/anthropic-messages-runtime.js"
+    );
+    const text = sse({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "你好" } });
+    const bytes = new TextEncoder().encode(text);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 4));
+        controller.enqueue(bytes.slice(4, 9));
+        controller.enqueue(bytes.slice(9));
+        controller.close();
+      },
+    });
+    const events: unknown[] = [];
+    for await (const event of readAnthropicStreamEvents(stream)) events.push(event);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "content_block_delta" });
+  });
+
+  it("error 事件：脱敏协议错误，不释放工具调用", async () => {
+    const body =
+      sse({ type: "message_start" }) +
+      sse({ type: "error", error: { type: "overloaded_error", message: "secret sk-zzz" } });
+    const { baseUrl } = await startFakeAnthropicServer(body, { rawBody: true });
+    await expect(collectEvents(buildRuntime(baseUrl), buildAgentRunInput())).rejects.toMatchObject({
+      errorCode: "provider-protocol-error",
+      message: expect.not.stringContaining("sk-zzz"),
+    });
+  });
+
+  it("EOF 缺 message_stop：整批不释放", async () => {
+    const body =
+      sse({ type: "message_start" }) +
+      sse({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "toolu_1", name: "createProjectFile" },
+      }) +
+      sse({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } }) +
+      sse({ type: "content_block_stop", index: 0 }) +
+      sse({ type: "message_delta", delta: { stop_reason: "tool_use" } });
+    const { baseUrl } = await startFakeAnthropicServer(body, { rawBody: true });
+    await expect(collectEvents(buildRuntime(baseUrl), buildAgentRunInput())).rejects.toMatchObject({
+      errorCode: "provider-protocol-error",
+    });
+  });
+
+  it("工具块未闭合 / ID 重复 / 参数非法：均整批不释放", async () => {
+    const unclosed =
+      sse({ type: "message_start" }) +
+      sse({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "toolu_1", name: "createProjectFile" },
+      }) +
+      sse({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } }) +
+      sse({ type: "message_delta", delta: { stop_reason: "tool_use" } }) +
+      sse({ type: "message_stop" });
+    const { baseUrl } = await startFakeAnthropicServer(unclosed, { rawBody: true });
+    await expect(collectEvents(buildRuntime(baseUrl), buildAgentRunInput())).rejects.toMatchObject({
+      errorCode: "provider-protocol-error",
+    });
+
+    const duplicateIds =
+      sse({ type: "message_start" }) +
+      [0, 1]
+        .map((index) =>
+          sse({
+            type: "content_block_start",
+            index,
+            content_block: { type: "tool_use", id: "toolu_same", name: "createProjectFile" },
+          }) +
+          sse({ type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: "{}" } }) +
+          sse({ type: "content_block_stop", index }),
+        )
+        .join("") +
+      sse({ type: "message_delta", delta: { stop_reason: "tool_use" } }) +
+      sse({ type: "message_stop" });
+    const duplicateServer = await startFakeAnthropicServer(duplicateIds, { rawBody: true });
+    await expect(
+      collectEvents(buildRuntime(duplicateServer.baseUrl), buildAgentRunInput()),
+    ).rejects.toMatchObject({ errorCode: "provider-protocol-error" });
+
+    const invalidArguments =
+      sse({ type: "message_start" }) +
+      sse({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "toolu_1", name: "createProjectFile" },
+      }) +
+      sse({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "不是 JSON" } }) +
+      sse({ type: "content_block_stop", index: 0 }) +
+      sse({ type: "message_delta", delta: { stop_reason: "tool_use" } }) +
+      sse({ type: "message_stop" });
+    const invalidServer = await startFakeAnthropicServer(invalidArguments, { rawBody: true });
+    await expect(
+      collectEvents(buildRuntime(invalidServer.baseUrl), buildAgentRunInput()),
+    ).rejects.toMatchObject({ errorCode: "provider-protocol-error" });
+  });
+
+  it("max_tokens：失败而不是成功", async () => {
+    const body =
+      sse({ type: "message_start" }) +
+      sse({ type: "message_delta", delta: { stop_reason: "max_tokens" } }) +
+      sse({ type: "message_stop" });
+    const { baseUrl } = await startFakeAnthropicServer(body, { rawBody: true });
+    await expect(collectEvents(buildRuntime(baseUrl), buildAgentRunInput())).rejects.toMatchObject({
+      errorCode: "provider-protocol-error",
+    });
+  });
+
+  it("历史 system 指导合入顶层 system（保留顺序），参数损坏报错", async () => {
+    const { buildMessagesRequestBody } = await import(
+      "../../../packages/core/src/runtime/anthropic-messages-runtime.js"
+    );
+    const baseInput = buildAgentRunInput([
+      { role: "system", name: "runtime-guidance", content: "指导一" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "toolu_1",
+            function: { name: "createProjectFile", arguments: "{}" },
+          },
+        ],
+      },
+      { role: "tool", tool_call_id: "toolu_1", content: "完成" },
+      { role: "system", name: "runtime-guidance", content: "指导二" },
+    ]);
+    const body = buildMessagesRequestBody(baseInput, "m", 1024) as {
+      system: string;
+      messages: { role: string; content: { type: string; input?: unknown }[] }[];
+    };
+    expect(body.system.indexOf("你是执行 Agent。")).toBeLessThan(body.system.indexOf("指导一"));
+    expect(body.system.indexOf("指导一")).toBeLessThan(body.system.indexOf("指导二"));
+    expect(body.messages.some((message) => message.role === "system")).toBe(false);
+    const toolUse = body.messages
+      .flatMap((message) => message.content)
+      .find((block) => block.type === "tool_use");
+    expect(toolUse?.input).toEqual({});
+
+    expect(() =>
+      buildMessagesRequestBody(
+        buildAgentRunInput([
+          {
+            role: "assistant",
+            content: "",
+            tool_calls: [{ id: "toolu_1", function: { name: "x", arguments: "不是 JSON" } }],
+          },
+        ]),
+        "m",
+        1024,
+      ),
+    ).toThrow(/不是合法 JSON/u);
   });
 });
