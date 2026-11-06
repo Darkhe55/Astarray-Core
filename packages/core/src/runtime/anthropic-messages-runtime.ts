@@ -444,6 +444,19 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
       );
     } catch (error) {
       /**
+       * 外部取消：即使流读取抛 AbortError，也必须收敛为 cancelled，
+       * 而不是把取消伪装成协议/网络失败。
+       */
+      if (cancellationSignal.aborted) {
+        yield {
+          kind: "runFinished",
+          agentId: agentRunInput.agentId,
+          reason: "cancelled",
+          detail: "Provider 流被取消",
+        };
+        return;
+      }
+      /**
        * AUDIT-REPAIR-01：超时与协议错误必须使用不同错误类别。
        * 只有内部超时（非外部取消）且尚未形成领域错误时才转成 provider-timeout。
        */

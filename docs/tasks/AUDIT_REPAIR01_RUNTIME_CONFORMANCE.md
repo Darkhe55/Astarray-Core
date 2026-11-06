@@ -152,3 +152,19 @@ max_tokens、system 指导与参数损坏）。
 - 卡片要求的 fake-server 驱动 **ToolLoop**、断言"工具执行计数为 0"的矩阵（当前是 runtime 级事件断言）；
 - 超时路径只有分类代码，尚无独立超时用例；
 - 部分工具后 error / 完整工具后 error / 取消 的组合矩阵。
+
+### 02 追加（2026-11-06，收口矩阵）
+
+新增 `anthropic-tool-loop-failclosed.test.ts`：**fake-server + 真实 Anthropic 运行时 + 真实 ToolLoop**，
+5 个用例逐一断言工具执行计数为 0：
+
+1. 部分工具后 `error` 事件；
+2. 完整工具后 `error` 事件；
+3. 截断（EOF 缺 `message_stop`）；
+4. `max_tokens` 与重复 ID；
+5. 超时（`provider-timeout`）与取消（收敛为 `cancelled`，不再 reject）。
+
+顺带修复：流读取期间的 AbortError 之前会冒泡为失败；现在外部取消统一收敛为
+`runFinished(cancelled)`。
+
+仍未覆盖：ToolLoop 正向"单/多工具成功执行"计数（运行时级正向用例已有）。
