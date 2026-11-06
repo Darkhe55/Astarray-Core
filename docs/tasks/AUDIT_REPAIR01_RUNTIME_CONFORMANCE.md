@@ -227,3 +227,18 @@ bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
 
 **阻塞/依赖**：两项都需要接入真实控制面路由；当前公开层没有对应的命令入口，
 先补 `MainController` 方法 + SDK 导出，再接 GUI/CLI（外部仓库）的界面入口。
+
+### 04 交付（一）：工具说明回访生产入口
+
+- `MainController.answerToolHelpRequest`：
+  - 校验请求 schema；从 mission 任务链 + 注册表构造**已分配**工具公开说明；
+    公开用法登记不完整/缺失 ⇒ 该工具不暴露（fail-closed）；
+  - escalation 经现有 `streamOutput` 面向默认上级（不新增网络连接）；
+  - 响应 `isAuthorizationGranted` 恒 false；不授予工具/权限/安装。
+- 公开 SDK 新增 `requestToolHelp(input)`（只读响应）。
+- 证据：`tool-help-recall-production.test.ts` 5/5：
+  已分配 ⇒ usage-provided；未分配/未登记 ⇒ known-but-not-usable（不泄露 schema）；
+  缺失 ⇒ escalated-missing-tool；陈旧 revision ⇒ stale-request；非法请求 ⇒ rejected；
+  同 request 幂等；**拔掉登记装配 ⇒ 已分配工具退化为 known-but-not-usable**（正向依赖可证）。
+
+**未完成**：通信转交接线；其余候选逐项核查。

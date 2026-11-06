@@ -7,6 +7,13 @@
 import { createHash, randomUUID } from "node:crypto";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
+import { buildToolPublicDocumentation } from "../tools/tool-public-documentation-registry.js";
+import {
+  ToolDocumentationRecallController,
+  toolHelpRequestSchema,
+  type ToolHelpResponseV1,
+} from "../tools/tool-help-recall-controller.js";
+import type { ToolPublicDocumentation } from "../tools/tool-documentation-recall.js";
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
 import type { RunHistoryStore } from "./run-history-store.js";
 import type { MissionRuntimeLease, MissionRuntimeRegistry } from "./mission-runtime-registry.js";
@@ -820,6 +827,99 @@ export class MainController {
   }
 
   /** ALIGN-02-01：mission → 权威任务序列/任务 的投影映射（只读；未登记返回 null）。 */
+  /**
+   * AUDIT-REPAIR-01 检查点 04（2026-11-06）：**工具说明回访的生产入口**。
+   *
+   * 宿主/控制面把模型返回的 `ASTARRAY_TOOL_HELP_REQUEST_V1` 原样交给本方法；
+   * 身份/上级/mission 由宿主注入（模型字段不能覆盖）。只返回说明或升级，
+   * **不授予工具、权限或安装能力**。
+   */
+  async answerToolHelpRequest(input: {
+    readonly request: unknown;
+    readonly requesterAgentInstanceId: string;
+    readonly defaultSuperiorAgentInstanceId: string;
+    readonly missionId: string;
+  }): Promise<ToolHelpResponseV1> {
+    const parsedRequest = toolHelpRequestSchema.safeParse(input.request);
+    if (!parsedRequest.success) {
+      return {
+        controlEventType: "ASTARRAY_TOOL_HELP_RESPONSE_V1",
+        requestIdentifier: "unknown",
+        resolution: "rejected",
+        toolIdentifier: null,
+        toolDefinitionRevision: null,
+        usageDocumentation: null,
+        escalationIdentifier: null,
+        isAuthorizationGranted: false,
+      };
+    }
+    const mission = await this.options.missionManager.getMissionStatus(input.missionId);
+    if (mission.taskChain === null) {
+      throw new DomainError("mission-not-found", `任务不存在: ${input.missionId}`);
+    }
+    /** 已分配工具：优先取该 Agent 的任务；找不到归属时退回任务链并集（不共享未分配工具）。 */
+    const tasksAssignedToRequester = mission.taskChain.tasks.filter(
+      (task) => task.assignedAgentId === input.requesterAgentInstanceId,
+    );
+    const documentationSourceTasks =
+      tasksAssignedToRequester.length > 0
+        ? tasksAssignedToRequester
+        : mission.taskChain.tasks;
+    const assignedDocumentation = new Map<string, ToolPublicDocumentation>();
+    for (const task of documentationSourceTasks) {
+      for (const toolName of task.toolNames) {
+        if (assignedDocumentation.has(toolName)) continue;
+        const descriptor = this.options.registry.getDescriptor(toolName);
+        if (descriptor === undefined) continue;
+        try {
+          assignedDocumentation.set(
+            toolName,
+            buildToolPublicDocumentation({
+              descriptor,
+              registryEntry: this.options.toolDocumentationRegistry?.[toolName],
+            }),
+          );
+        } catch {
+          /** 公开用法登记不完整 ⇒ 不暴露半套说明（fail-closed），该工具视为未分配。 */
+        }
+      }
+    }
+    const controller = new ToolDocumentationRecallController({
+      assignedToolDocumentation: assignedDocumentation,
+      assignedToolIdentifiers: new Set(assignedDocumentation.keys()),
+      currentToolGroupRevision: mission.taskChain.revision,
+      escalationSink: (escalation) => {
+        this.options.streamOutput(
+          input.missionId,
+          `[工具能力升级] ${escalation.status}: ${escalation.capabilityIntent} → ${escalation.defaultSuperiorAgentInstanceId}`,
+        );
+      },
+    });
+    try {
+      return controller.handleRequest({
+        request: parsedRequest.data,
+        requesterAgentInstanceId: input.requesterAgentInstanceId,
+        defaultSuperiorAgentInstanceId: input.defaultSuperiorAgentInstanceId,
+        missionId: input.missionId,
+      });
+    } catch (error) {
+      this.options.streamOutput(
+        input.missionId,
+        `[工具说明] 请求被拒绝: ${(error as Error).message}`,
+      );
+      return {
+        controlEventType: "ASTARRAY_TOOL_HELP_RESPONSE_V1",
+        requestIdentifier: parsedRequest.data.requestIdentifier,
+        resolution: "rejected",
+        toolIdentifier: parsedRequest.data.toolIdentifier,
+        toolDefinitionRevision: null,
+        usageDocumentation: null,
+        escalationIdentifier: null,
+        isAuthorizationGranted: false,
+      };
+    }
+  }
+
   getMissionTaskSequence(missionId: string): {
     readonly taskSequenceIdentifier: string;
     readonly taskIdentifier: string;

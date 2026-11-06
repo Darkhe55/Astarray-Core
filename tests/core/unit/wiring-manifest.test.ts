@@ -96,8 +96,9 @@ const WIRING_MANIFEST: readonly WiringEntry[] = [
   },
   {
     componentClassName: "ToolDocumentationRecallController",
-    state: "unreachableByDesign",
-    reason: "G4（总表 §D.4）：工具说明首次下发/后续回访未接线，且用户要求保留在返修清单",
+    state: "constructed",
+    reason:
+      "AUDIT-REPAIR-01 检查点 04：MainController.answerToolHelpRequest 构造并按已分配工具返回说明/升级",
   },
 ];
 

@@ -5365,3 +5365,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **285（AUDIT-REPAIR-01 检查点 04 接线设计，2026-11-06）**：明确两项能力的生产入口设计
 > （`MainController` 方法 + SDK 导出 + 现有反馈/授权路由），并列出反例清单；
 > 尚未实现接线，检查点 04 不关闭。
+
+> **286（AUDIT-REPAIR-01 检查点 04 之一：工具说明回访，2026-11-06）**：
+> `MainController.answerToolHelpRequest` + SDK `requestToolHelp`；已分配返回公开用法、
+> 未分配/未登记不泄露、缺失升级、陈旧/非法/幂等；拔掉登记装配正向退化。
+> **验证**：5/5；公开全量随后跑。未完成：通信转交、其余候选核查。
