@@ -159,20 +159,41 @@ candidates.sort((left, right) => {
   return left.name.localeCompare(right.name);
 });
 
-console.log("候选数 = " + String(candidates.length) + "（按「生产提及」升序；提及为 0 者最可疑）");
-console.log(
-  "  " + "名称".padEnd(42) + "生产提及  测试构造  门面提及  成员调用  定义文件",
-);
-for (const candidate of candidates) {
+const isJsonOutput = process.argv.includes("--json");
+if (isJsonOutput) {
   console.log(
-    "  " +
-      candidate.name.padEnd(42) +
-      String(candidate.productionMentionCount).padStart(6) +
-      String(candidate.testConstructionCount).padStart(10) +
-      "  " +
-      (candidate.isMentionedByPublicSdk ? "是" : "否").padEnd(8) +
-      String(candidate.memberCallCount).padStart(8) +
-      "  " +
-      candidate.definedIn.replace("packages/core/src/", ""),
+    JSON.stringify(
+      {
+        candidateCount: candidates.length,
+        candidates: candidates.map((candidate) => ({
+          name: candidate.name,
+          definedIn: candidate.definedIn,
+          productionMentionCount: candidate.productionMentionCount,
+          testConstructionCount: candidate.testConstructionCount,
+          isMentionedByPublicSdk: candidate.isMentionedByPublicSdk,
+          memberCallCount: candidate.memberCallCount,
+        })),
+      },
+      null,
+      2,
+    ),
   );
+} else {
+  console.log("候选数 = " + String(candidates.length) + "（按「生产提及」升序；提及为 0 者最可疑）");
+  console.log(
+    "  " + "名称".padEnd(42) + "生产提及  测试构造  门面提及  成员调用  定义文件",
+  );
+  for (const candidate of candidates) {
+    console.log(
+      "  " +
+        candidate.name.padEnd(42) +
+        String(candidate.productionMentionCount).padStart(6) +
+        String(candidate.testConstructionCount).padStart(10) +
+        "  " +
+        (candidate.isMentionedByPublicSdk ? "是" : "否").padEnd(8) +
+        String(candidate.memberCallCount).padStart(8) +
+        "  " +
+        candidate.definedIn.replace("packages/core/src/", ""),
+    );
+  }
 }
