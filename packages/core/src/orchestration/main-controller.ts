@@ -1148,6 +1148,7 @@ export class MainController {
           prompt: summary.prompt,
           status: summary.status,
           createdAtIso: summary.createdAtIso,
+          statusUpdatedAtIso: summary.statusUpdatedAtIso ?? null,
           hasTrustedCheckpoint: false,
         };
       },
