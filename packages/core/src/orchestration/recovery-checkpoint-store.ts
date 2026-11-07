@@ -171,6 +171,30 @@ export class RecoveryCheckpointStore {
     return null;
   }
 
+  /**
+   * RESUME-02（2026-11-07）：该 mission 是否有**可信**检查点。
+   *
+   * “可信”= 能被 schema 解析 + 哈希链校验通过（复用本 store 的既有判定），
+   * 与 `selectLatestTrustedCheckpoint` 同口径；只读、不改任何状态。
+   */
+  async hasTrustedCheckpointForMission(missionIdentifier: string): Promise<boolean> {
+    let fileNames: string[];
+    try {
+      fileNames = await fs.readdir(this.checkpointRootDirectory);
+    } catch {
+      return false;
+    }
+    for (const fileName of fileNames.filter((name) => name.endsWith(".json"))) {
+      const parsed = await this.readCheckpointFile(
+        this.checkpointFilePath(fileName.slice(0, -".json".length)),
+      );
+      if (parsed === null) continue;
+      if (parsed.checkpoint.missionIdentifier !== missionIdentifier) continue;
+      if (await this.isCheckpointChainValid(parsed.checkpoint)) return true;
+    }
+    return false;
+  }
+
   /** 读取检查点文件（schema/哈希校验；失败返回 null）。 */
   private async readCheckpointFile(filePath: string): Promise<{
     checkpoint: RecoveryCheckpoint;
