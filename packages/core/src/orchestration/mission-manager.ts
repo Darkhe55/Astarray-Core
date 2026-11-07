@@ -55,6 +55,13 @@ export interface MissionSummary {
    * - `legacy-single-node`：未装配规划器（旧行为），**不是**"已规划"。
    * 旧摘要没有该字段 ⇒ 读取方按"未知来源"处理，不得当作已规划。
    */
+  /**
+   * RESUME-02（2026-11-07）：**最近一次状态变更时间**（毫秒精度）。
+   *
+   * 断点卡据此区分"同一个 mission 的多次中断"（blocked → 恢复 → 再次 blocked）。
+   * 旧摘要没有该字段 ⇒ 读取方退回 `createdAtIso`（视为单次中断，不伪造历史）。
+   */
+  statusUpdatedAtIso?: string;
   taskPlanningOutcome?: "model" | "single-node-fallback" | "legacy-single-node";
   /** ALIGN-02-02：降级原因（仅 `single-node-fallback` 时有值）。 */
   taskPlanningFallbackReason?: string;
@@ -92,6 +99,13 @@ export interface CreateMissionInput {
   /** ALIGN-02-01：序列中承载用户原始任务的任务标识（可选）。 */
   originalTaskIdentifier?: string;
   /** ALIGN-02-02：任务分解来源（可选；缺省 ⇒ 摘要不写，读取方按未知处理）。 */
+  /**
+   * RESUME-02（2026-11-07）：**最近一次状态变更时间**（毫秒精度）。
+   *
+   * 断点卡据此区分"同一个 mission 的多次中断"（blocked → 恢复 → 再次 blocked）。
+   * 旧摘要没有该字段 ⇒ 读取方退回 `createdAtIso`（视为单次中断，不伪造历史）。
+   */
+  statusUpdatedAtIso?: string;
   taskPlanningOutcome?: "model" | "single-node-fallback" | "legacy-single-node";
   /** ALIGN-02-02：降级原因（可选）。 */
   taskPlanningFallbackReason?: string;
@@ -202,6 +216,8 @@ export class MissionManager {
       await writeAtomicJson(this.summaryFilePath(missionId), {
         ...summary,
         status,
+        /** RESUME-02：记录状态变更时刻（同一 mission 多次中断据此区分）。 */
+        statusUpdatedAtIso: new Date().toISOString(),
       });
     });
   }

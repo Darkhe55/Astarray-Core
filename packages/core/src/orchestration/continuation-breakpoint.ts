@@ -9,14 +9,19 @@
  * - **点了才恢复**：`requestContinuation` 是唯一入口；普通消息"继续"仍是普通消息；
  * - **终态留档（用户选 A）**：恢复成功/任务完成/取消后卡片转终态并保留，不从会话移除。
  *
+ * ## 同一 mission 的**多次中断**
+ *
+ * 断点标识 = `mission + 中断轮次`（轮次取摘要的 `statusUpdatedAtIso`，旧摘要退回创建时间）。
+ * 于是"blocked → 恢复 → 再次 blocked"会得到**两张独立卡**：最新一张可操作，
+ * 更早的按覆盖层原样留档（没有覆盖层的旧轮次标 `superseded`，不允许点旧卡恢复过期状态）。
+ *
  * ## 为什么"派生 + 覆盖"而不是"事件时写一条记录"
  *
  * 中断时刻**没有可靠的单点事件**（任务可能崩溃、断电、被外部杀掉）。若只在事件里写记录，
  * 崩溃场景恰好会丢卡片 —— 那正是最需要它的时候。
  *
- * 因此：断点**列表由已持久化的 mission 摘要派生**（确定、可重建、天然去重），
+ * 因此：当前轮次的断点**由已持久化的 mission 摘要派生**（确定、可重建、天然去重），
  * 只把**用户操作产生的状态**（requested/resumed/cancelled）持久化为覆盖层。
- * 重启后派生结果相同，覆盖层仍在 ⇒ 卡片既不丢也不重复。
  */
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -48,6 +53,11 @@ export interface ContinuationBreakpointView {
   readonly breakpointIdentifier: string;
   readonly conversationIdentifier: string;
   readonly missionIdentifier: string;
+  /**
+   * 中断轮次标识：同一 mission 多次中断时区分（取状态变更时刻）。
+   * 旧摘要没有该字段 ⇒ 退回创建时间（视为首轮，不编造历史）。
+   */
+  readonly interruptionRevision: string;
   readonly projectIdentifier: string | null;
   /** 任务短名（用于卡片标题；取摘要提示词截断，不是模型摘要）。 */
   readonly taskShortName: string;
@@ -69,10 +79,17 @@ export interface ContinuationBreakpointView {
   readonly lastRequestIdentifier: string | null;
 }
 
-/** 持久化覆盖层（只有用户操作会写它）。 */
+/** 持久化覆盖层（只有用户操作会写它）；自带定位字段，便于跨重启列出历史轮次。 */
 interface ContinuationOverlayRecord {
   schemaVersion: 1;
   breakpointIdentifier: string;
+  conversationIdentifier: string;
+  missionIdentifier: string;
+  interruptionRevision: string;
+  taskShortName: string;
+  interruptionReason: ContinuationInterruptionReason;
+  projectIdentifier: string | null;
+  recordedAtIso: string;
   status: ContinuationBreakpointState;
   revision: number;
   updatedAtIso: string;
@@ -90,13 +107,34 @@ export interface ContinuationMissionFacts {
   readonly prompt: string;
   readonly status: "running" | "done" | "cancelled" | "blocked";
   readonly createdAtIso: string;
+  /** 最近一次状态变更时刻（用于区分多次中断；缺省退回 createdAtIso）。 */
+  readonly statusUpdatedAtIso?: string | null;
   readonly hasTrustedCheckpoint: boolean;
 }
 
-/** 断点标识是**确定**的：同一 mission 永远同一张卡（去重的根据）。 */
-export function continuityBreakpointIdentifier(missionIdentifier: string): string {
-  const digest = createHash("sha256").update(missionIdentifier).digest("hex").slice(0, 16);
+/**
+ * 断点标识：`mission + 中断轮次` 的确定性哈希。
+ *
+ * 同一 mission 的**同一轮**中断永远同一标识（去重依据）；
+ * 再次中断时刻不同 ⇒ 标识不同 ⇒ 新卡（历史轮次留档）。
+ */
+export function continuityBreakpointIdentifier(
+  missionIdentifier: string,
+  interruptionRevision: string,
+): string {
+  const digest = createHash("sha256")
+    .update(`${missionIdentifier}\u0000${interruptionRevision}`)
+    .digest("hex")
+    .slice(0, 16);
   return `breakpoint-${digest}`;
+}
+
+/** 中断轮次标识：优先状态变更时刻，其次创建时刻（绝不编造）。 */
+export function interruptionRevisionOf(
+  facts: Pick<ContinuationMissionFacts, "createdAtIso" | "statusUpdatedAtIso">,
+): string {
+  const candidate = facts.statusUpdatedAtIso ?? facts.createdAtIso;
+  return candidate.trim() === "" ? "unknown" : candidate;
 }
 
 function shortTaskName(prompt: string): string {
@@ -121,7 +159,11 @@ export function deriveContinuationBreakpoint(
     /** 没有稳定会话就无处安放卡片：宁可不显示，也不塞进别的会话。 */
     return null;
   }
-  const breakpointIdentifier = continuityBreakpointIdentifier(facts.missionIdentifier);
+  const interruptionRevision = interruptionRevisionOf(facts);
+  const breakpointIdentifier = continuityBreakpointIdentifier(
+    facts.missionIdentifier,
+    interruptionRevision,
+  );
   const isCancelled = facts.status === "cancelled";
   const blockedReason = isCancelled
     ? "任务已取消：取消不复活已结束的执行；如需继续请新建任务。"
@@ -132,6 +174,7 @@ export function deriveContinuationBreakpoint(
     breakpointIdentifier,
     conversationIdentifier,
     missionIdentifier: facts.missionIdentifier,
+    interruptionRevision,
     projectIdentifier: facts.projectIdentifier,
     taskShortName: shortTaskName(facts.prompt),
     interruptionReason: isCancelled ? "mission-cancelled" : "mission-blocked",
@@ -147,8 +190,8 @@ export function deriveContinuationBreakpoint(
         : "需人工核对未决事项后再决定",
     canResume: blockedReason === null,
     blockedReason,
-    recordedAtIso: facts.createdAtIso,
-    updatedAtIso: facts.createdAtIso,
+    recordedAtIso: interruptionRevision,
+    updatedAtIso: interruptionRevision,
     lastRequestIdentifier: null,
   };
 }
@@ -191,7 +234,7 @@ export class ContinuationBreakpointStore {
         typeof parsed.status !== "string" ||
         typeof parsed.revision !== "number"
       ) {
-        /** 损坏/异体记录按"没有覆盖"处理，并**显式**让调用方知道来源是派生值。 */
+        /** 损坏/异体记录按"没有覆盖"处理（派生值仍可用）。 */
         return null;
       }
       return parsed as ContinuationOverlayRecord;
@@ -200,12 +243,32 @@ export class ContinuationBreakpointStore {
     }
   }
 
+  /** 列出某会话的全部覆盖记录（历史中断轮次留档的依据）。 */
+  async listForConversation(
+    conversationIdentifier: string,
+  ): Promise<ContinuationOverlayRecord[]> {
+    let fileNames: string[];
+    try {
+      fileNames = await fs.readdir(this.directory);
+    } catch {
+      return [];
+    }
+    const records: ContinuationOverlayRecord[] = [];
+    for (const fileName of fileNames.filter((name) => name.endsWith(".json"))) {
+      const record = await this.read(fileName.slice(0, -".json".length));
+      if (record === null) continue;
+      if (record.conversationIdentifier !== conversationIdentifier) continue;
+      records.push(record);
+    }
+    return records;
+  }
+
   async write(record: ContinuationOverlayRecord): Promise<void> {
     await writeAtomicJson(this.filePath(record.breakpointIdentifier), record, {
       beforeCommit: async () => {
         /**
          * 乐观并发：提交前复核既有 revision 未超过本记录。
-         * 两个标签页同时点"恢复任务"时，后来者会在这里失败而不是覆盖。
+         * 两个界面同时点"恢复任务"时，后来者会在这里失败而不是覆盖。
          */
         const existing = await this.read(record.breakpointIdentifier);
         if (existing !== null && existing.revision > record.revision) {
@@ -248,7 +311,7 @@ export interface ContinuationControllerOptions {
     missionIdentifier: string,
   ) => Promise<ContinuationMissionFacts | null>;
   readonly hasTrustedCheckpoint: (missionIdentifier: string) => Promise<boolean>;
-  /** 真正执行恢复（由装配层注入 `MainController.resumeMission` 等既有门禁）。 */
+  /** 真正执行恢复（由装配层注入既有恢复门禁）。 */
   readonly resumeMission: (missionIdentifier: string) => Promise<void>;
 }
 
@@ -267,8 +330,7 @@ export class ContinuationController {
   private async buildView(
     facts: ContinuationMissionFacts,
   ): Promise<ContinuationBreakpointView | null> {
-    const hasTrustedCheckpoint = facts.hasTrustedCheckpoint;
-    const derived = deriveContinuationBreakpoint({ ...facts, hasTrustedCheckpoint });
+    const derived = deriveContinuationBreakpoint(facts);
     if (derived === null) return null;
     const overlay = await this.options.store.read(derived.breakpointIdentifier);
     if (overlay === null) return derived;
@@ -279,7 +341,6 @@ export class ContinuationController {
       revision: overlay.revision,
       updatedAtIso: overlay.updatedAtIso,
       lastRequestIdentifier: overlay.lastRequestIdentifier,
-      /** 终态直接沿用派生原因；请求中/已恢复不重复说明。 */
       nextStep:
         status === "resumed"
           ? "已派发恢复（不代表任务已完成），详情见运行历史"
@@ -289,11 +350,47 @@ export class ContinuationController {
               ? "已取消续接请求"
               : derived.nextStep,
       canResume: derived.canResume && status === "open",
-      blockedReason: derived.canResume ? null : derived.blockedReason,
     };
   }
 
-  /** 某会话当前的断点卡（含终态，用于"留档"）。 */
+  /** 由覆盖记录还原一张历史卡（该轮已不是当前中断轮次）。 */
+  private historicalView(
+    record: ContinuationOverlayRecord,
+  ): ContinuationBreakpointView {
+    const isOpen = record.status === "open";
+    return {
+      breakpointIdentifier: record.breakpointIdentifier,
+      conversationIdentifier: record.conversationIdentifier,
+      missionIdentifier: record.missionIdentifier,
+      interruptionRevision: record.interruptionRevision,
+      projectIdentifier: record.projectIdentifier,
+      taskShortName: record.taskShortName,
+      interruptionReason: record.interruptionReason,
+      status: record.status,
+      revision: record.revision,
+      lastCheckpointIdentifier: null,
+      nextStep: isOpen
+        ? "该轮中断已被后续中断取代（留档）"
+        : record.status === "resumed"
+          ? "该轮恢复已派发（留档）"
+          : record.status === "cancelled"
+            ? "该轮续接请求已取消（留档）"
+            : record.status === "superseded"
+              ? "该轮中断已被后续中断取代（留档）"
+              : "该轮续接请求已登记（留档）",
+      canResume: false,
+      blockedReason: isOpen ? "已被后续中断取代" : null,
+      recordedAtIso: record.recordedAtIso,
+      updatedAtIso: record.updatedAtIso,
+      lastRequestIdentifier: record.lastRequestIdentifier,
+    };
+  }
+
+  /**
+   * 某会话当前的断点卡（含历史轮次与终态，用于"留档"）。
+   *
+   * 排序：按中断轮次（时刻）升序 —— 与对话时间线一致。
+   */
   async listForConversation(
     conversationIdentifier: string,
   ): Promise<ContinuationBreakpointView[]> {
@@ -301,38 +398,54 @@ export class ContinuationController {
       conversationIdentifier,
     );
     const views: ContinuationBreakpointView[] = [];
+    const currentIdentifiers = new Set<string>();
+
     for (const missionIdentifier of missionIdentifiers) {
       const facts = await this.options.readMission(missionIdentifier);
       if (facts === null) continue;
       if (facts.conversationIdentifier !== conversationIdentifier) continue;
-      const view = await this.buildView({
-        ...facts,
-        hasTrustedCheckpoint: await this.options.hasTrustedCheckpoint(missionIdentifier),
-      });
-      if (view !== null) views.push(view);
+      const view = await this.buildView(facts);
+      if (view === null) continue;
+      currentIdentifiers.add(view.breakpointIdentifier);
+      views.push(view);
     }
+
+    /**
+     * 历史轮次：覆盖层里有、但不是当前中断轮次的记录 ⇒ 只读留档，
+     * **永不**标成可恢复（否则会把用户恢复到过期状态）。
+     */
+    for (const record of await this.options.store.listForConversation(
+      conversationIdentifier,
+    )) {
+      if (currentIdentifiers.has(record.breakpointIdentifier)) continue;
+      views.push(this.historicalView(record));
+    }
+
     views.sort((left, right) =>
-      left.recordedAtIso === right.recordedAtIso
+      left.interruptionRevision === right.interruptionRevision
         ? left.breakpointIdentifier.localeCompare(right.breakpointIdentifier)
-        : left.recordedAtIso.localeCompare(right.recordedAtIso),
+        : left.interruptionRevision.localeCompare(right.interruptionRevision),
     );
     return views;
   }
 
-  /** 单张断点卡（按标识，供重连后按原 ID 校验）。 */
+  /** 单张断点卡（按标识；供重连后按原 ID 校验）。 */
   async read(
     breakpointIdentifier: string,
     missionIdentifier: string,
   ): Promise<ContinuationBreakpointView | null> {
-    if (continuityBreakpointIdentifier(missionIdentifier) !== breakpointIdentifier) {
-      return null;
-    }
     const facts = await this.options.readMission(missionIdentifier);
     if (facts === null) return null;
-    return this.buildView({
+    const view = await this.buildView({
       ...facts,
       hasTrustedCheckpoint: await this.options.hasTrustedCheckpoint(missionIdentifier),
     });
+    if (view !== null && view.breakpointIdentifier === breakpointIdentifier) return view;
+    const overlay = await this.options.store.read(breakpointIdentifier);
+    if (overlay !== null && overlay.missionIdentifier === missionIdentifier) {
+      return this.historicalView(overlay);
+    }
+    return null;
   }
 
   async requestContinuation(input: {
@@ -374,15 +487,24 @@ export class ContinuationController {
         breakpoint: view,
       };
     }
-    const requestedRevision = view.revision + 1;
-    const requestedAtIso = this.options.store.nowIso();
-    await this.options.store.write({
+    const overlayBase: Omit<ContinuationOverlayRecord, "status" | "revision" | "updatedAtIso" | "lastOutcome" | "lastOutcomeDetail"> = {
       schemaVersion: 1,
       breakpointIdentifier: view.breakpointIdentifier,
+      conversationIdentifier: view.conversationIdentifier,
+      missionIdentifier: view.missionIdentifier,
+      interruptionRevision: view.interruptionRevision,
+      taskShortName: view.taskShortName,
+      interruptionReason: view.interruptionReason,
+      projectIdentifier: view.projectIdentifier,
+      recordedAtIso: view.recordedAtIso,
+      lastRequestIdentifier: input.requestIdentifier,
+    };
+    const requestedRevision = view.revision + 1;
+    await this.options.store.write({
+      ...overlayBase,
       status: "requested",
       revision: requestedRevision,
-      updatedAtIso: requestedAtIso,
-      lastRequestIdentifier: input.requestIdentifier,
+      updatedAtIso: this.options.store.nowIso(),
       lastOutcome: null,
       lastOutcomeDetail: null,
     });
@@ -395,37 +517,31 @@ export class ContinuationController {
        */
       const detail = error instanceof Error ? error.message : String(error);
       await this.options.store.write({
-        schemaVersion: 1,
-        breakpointIdentifier: view.breakpointIdentifier,
+        ...overlayBase,
         status: "open",
         revision: requestedRevision + 1,
         updatedAtIso: this.options.store.nowIso(),
-        lastRequestIdentifier: input.requestIdentifier,
         lastOutcome: "blocked",
         lastOutcomeDetail: detail,
       });
-      const updated = await this.read(view.breakpointIdentifier, input.missionIdentifier);
       return {
         outcome: "blocked",
         reason: detail,
-        breakpoint: updated,
+        breakpoint: await this.read(view.breakpointIdentifier, input.missionIdentifier),
       };
     }
     await this.options.store.write({
-      schemaVersion: 1,
-      breakpointIdentifier: view.breakpointIdentifier,
+      ...overlayBase,
       status: "resumed",
       revision: requestedRevision + 1,
       updatedAtIso: this.options.store.nowIso(),
-      lastRequestIdentifier: input.requestIdentifier,
       lastOutcome: "resumed",
       lastOutcomeDetail: "恢复已派发给执行端（不代表任务已完成）。",
     });
-    const updated = await this.read(view.breakpointIdentifier, input.missionIdentifier);
     return {
       outcome: "resumed",
       reason: "恢复已派发给执行端（不代表任务完成）。",
-      breakpoint: updated,
+      breakpoint: await this.read(view.breakpointIdentifier, input.missionIdentifier),
     };
   }
 }

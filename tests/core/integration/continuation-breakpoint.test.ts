@@ -2,6 +2,7 @@
  * RESUME-02（2026-11-07，用户裁决版）：断点卡与显式续接。
  *
  * 语义：断点由**真实中断**派生（不是设置开关）；不点一直保留；终态留档。
+ * 同一 mission 的**多次中断**各有独立卡片（最新可操作，旧的留档且不可恢复）。
  */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,6 +17,7 @@ import {
   ContinuationBreakpointStore,
   continuityBreakpointIdentifier,
   deriveContinuationBreakpoint,
+  interruptionRevisionOf,
   type ContinuationMissionFacts,
 } from "../../../packages/core/src/orchestration/continuation-breakpoint.js";
 
@@ -37,6 +39,7 @@ function facts(overrides: Partial<ContinuationMissionFacts> = {}): ContinuationM
     prompt: "实现登录页的错误提示",
     status: "blocked",
     createdAtIso: "2026-11-07T01:00:00.000Z",
+    statusUpdatedAtIso: "2026-11-07T01:00:00.000Z",
     hasTrustedCheckpoint: true,
     ...overrides,
   };
@@ -50,7 +53,9 @@ describe("断点派生", () => {
     expect(blocked?.status).toBe("open");
     expect(blocked?.canResume).toBe(true);
     expect(blocked?.taskShortName).toBe("实现登录页的错误提示");
-    expect(blocked?.breakpointIdentifier).toBe(continuityBreakpointIdentifier("mission-1"));
+    expect(blocked?.breakpointIdentifier).toBe(
+      continuityBreakpointIdentifier("mission-1", "2026-11-07T01:00:00.000Z"),
+    );
   });
 
   it("无稳定会话不生成卡片；无检查点不可恢复；取消不可恢复", () => {
@@ -69,24 +74,36 @@ describe("断点派生", () => {
     expect(view?.taskShortName.endsWith("…")).toBe(true);
     expect(view?.taskShortName.length).toBeLessThanOrEqual(41);
   });
+
+  it("同一 mission 不同中断时刻 ⇒ 不同断点标识；无变更时刻退回创建时刻", () => {
+    const first = continuityBreakpointIdentifier("mission-1", "2026-11-07T01:00:00.000Z");
+    const second = continuityBreakpointIdentifier("mission-1", "2026-11-07T02:00:00.000Z");
+    expect(first).not.toBe(second);
+    expect(
+      interruptionRevisionOf({ createdAtIso: "2026-11-07T01:00:00.000Z", statusUpdatedAtIso: null }),
+    ).toBe("2026-11-07T01:00:00.000Z");
+    expect(
+      interruptionRevisionOf({
+        createdAtIso: "2026-11-07T01:00:00.000Z",
+        statusUpdatedAtIso: "2026-11-07T02:00:00.000Z",
+      }),
+    ).toBe("2026-11-07T02:00:00.000Z");
+  });
 });
 
 describe("断点存储与续接控制器", () => {
   async function createController(
     resumeMission: (missionIdentifier: string) => Promise<void> = async () => {},
+    missionFacts: ContinuationMissionFacts = facts(),
   ) {
     const directory = await mkdtemp(path.join(tmpdir(), "astarray-breakpoint-"));
     directories.push(directory);
     const store = new ContinuationBreakpointStore({ baseDirectory: directory });
     const controller = new ContinuationController({
       store,
-      readConversationMissions: async () => ["mission-1", "mission-2"],
+      readConversationMissions: async () => [missionFacts.missionIdentifier],
       readMission: async (missionIdentifier) =>
-        missionIdentifier === "mission-1"
-          ? facts()
-          : missionIdentifier === "mission-2"
-            ? facts({ missionIdentifier: "mission-2", status: "done" })
-            : null,
+        missionIdentifier === missionFacts.missionIdentifier ? missionFacts : null,
       hasTrustedCheckpoint: async () => true,
       resumeMission,
     });
@@ -164,9 +181,8 @@ describe("断点存储与续接控制器", () => {
       expectedRevision: view!.revision,
       requestIdentifier: "req-restart",
     });
-    const restartedStore = new ContinuationBreakpointStore({ baseDirectory: directory });
     const restarted = new ContinuationController({
-      store: restartedStore,
+      store: new ContinuationBreakpointStore({ baseDirectory: directory }),
       readConversationMissions: async () => ["mission-1"],
       readMission: async () => facts(),
       hasTrustedCheckpoint: async () => true,
@@ -180,23 +196,67 @@ describe("断点存储与续接控制器", () => {
 
   it("不可恢复的断点：请求被拒且不调用恢复", async () => {
     const resumeMission = vi.fn(async () => {});
-    const noCheckpoint = new ContinuationController({
-      store: new ContinuationBreakpointStore({
-        baseDirectory: await mkdtemp(path.join(tmpdir(), "astarray-breakpoint2-")),
-      }),
-      readConversationMissions: async () => ["mission-cancelled"],
-      readMission: async () => facts({ missionIdentifier: "mission-cancelled", status: "cancelled" }),
-      hasTrustedCheckpoint: async () => true,
-      resumeMission,
-    });
-    const views = await noCheckpoint.listForConversation("conversation-1");
-    const result = await noCheckpoint.requestContinuation({
+    const { controller } = await createController(resumeMission, facts({ status: "cancelled" }));
+    const views = await controller.listForConversation("conversation-1");
+    expect(views).toHaveLength(1);
+    const result = await controller.requestContinuation({
       breakpointIdentifier: views[0]!.breakpointIdentifier,
-      missionIdentifier: "mission-cancelled",
+      missionIdentifier: "mission-1",
       expectedRevision: views[0]!.revision,
       requestIdentifier: "req-cancelled",
     });
     expect(result.outcome).toBe("not-resumable");
     expect(resumeMission).not.toHaveBeenCalled();
+  });
+
+  it("同一 mission 多次中断：两张独立卡；旧轮次不可恢复且留档", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "astarray-breakpoint-multi-"));
+    directories.push(directory);
+    const store = new ContinuationBreakpointStore({ baseDirectory: directory });
+
+    /** 第一轮中断：用户点了恢复。 */
+    const firstFacts = facts({ statusUpdatedAtIso: "2026-11-07T01:00:00.000Z" });
+    const firstController = new ContinuationController({
+      store,
+      readConversationMissions: async () => ["mission-1"],
+      readMission: async () => firstFacts,
+      hasTrustedCheckpoint: async () => true,
+      resumeMission: async () => {},
+    });
+    const [firstView] = await firstController.listForConversation("conversation-1");
+    const firstResult = await firstController.requestContinuation({
+      breakpointIdentifier: firstView!.breakpointIdentifier,
+      missionIdentifier: "mission-1",
+      expectedRevision: firstView!.revision,
+      requestIdentifier: "req-round-1",
+    });
+    expect(firstResult.outcome).toBe("resumed");
+
+    /** 同一 mission 再次中断（更晚的时刻）⇒ 新卡可操作，旧卡留档。 */
+    const secondFacts = facts({ statusUpdatedAtIso: "2026-11-07T02:00:00.000Z" });
+    const secondController = new ContinuationController({
+      store,
+      readConversationMissions: async () => ["mission-1"],
+      readMission: async () => secondFacts,
+      hasTrustedCheckpoint: async () => true,
+      resumeMission: async () => {},
+    });
+    const views = await secondController.listForConversation("conversation-1");
+    expect(views).toHaveLength(2);
+    expect(views[0]?.interruptionRevision).toBe("2026-11-07T01:00:00.000Z");
+    expect(views[0]?.status).toBe("resumed");
+    expect(views[0]?.canResume).toBe(false);
+    expect(views[1]?.interruptionRevision).toBe("2026-11-07T02:00:00.000Z");
+    expect(views[1]?.status).toBe("open");
+    expect(views[1]?.canResume).toBe(true);
+
+    /** 点旧卡 ⇒ 拒绝（不恢复到过期状态）。 */
+    const staleClick = await secondController.requestContinuation({
+      breakpointIdentifier: views[0]!.breakpointIdentifier,
+      missionIdentifier: "mission-1",
+      expectedRevision: views[0]!.revision,
+      requestIdentifier: "req-round-old",
+    });
+    expect(staleClick.outcome).toBe("not-resumable");
   });
 });
