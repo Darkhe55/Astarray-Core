@@ -15,6 +15,13 @@ import {
 } from "../tools/tool-help-recall-controller.js";
 import type { ToolPublicDocumentation } from "../tools/tool-documentation-recall.js";
 import {
+  ContinuationController,
+  type ContinuationBreakpointStore,
+  type ContinuationBreakpointView,
+  type ContinuationRequestResult,
+} from "./continuation-breakpoint.js";
+import type { RecoveryCheckpointStore } from "./recovery-checkpoint-store.js";
+import {
   CustomPermissionProfileController,
   type CreateCustomProfileInput,
 } from "../tools/custom-permission-profile-controller.js";
@@ -676,6 +683,13 @@ export interface MainControllerOptions {
    * 用于两套记账对照（`inspectTaskLedgerAlignment`），不改变任何状态。
    */
   taskSequenceStatusController?: TaskSequenceStatusController | null;
+  /**
+   * RESUME-02（2026-11-07）：断点覆盖层存储（用户操作产生的状态）。
+   * 缺省 ⇒ 断点查询返回空数组（不伪造断点）。
+   */
+  continuationBreakpointStore?: ContinuationBreakpointStore | null;
+  /** RESUME-02：恢复检查点存储（判定“是否有可信检查点”）。缺省 ⇒ 一律视为无。 */
+  recoveryCheckpointStore?: RecoveryCheckpointStore | null;
   /** R133：图变更通知（可选；用于目标联动：标记需重新规划并暂停）。 */
   onMissionGraphChanged?: (
     missionId: string,
@@ -1058,6 +1072,93 @@ export class MainController {
           assignedAgentByTaskIdentifier.get(node.taskId) ?? null,
       })),
     };
+  }
+
+  /**
+   * RESUME-02（2026-11-07，用户裁决版）：**按会话查询断点**。
+   *
+   * 断点由已持久化的 mission 摘要**派生**（崩溃场景也能重建），只把用户操作状态
+   * 放进覆盖层。没有装配 ⇒ 返回空数组（不伪造断点）。
+   */
+  async queryContinuationBreakpoints(
+    conversationIdentifier: string,
+  ): Promise<ContinuationBreakpointView[]> {
+    const store = this.options.continuationBreakpointStore;
+    const checkpointStore = this.options.recoveryCheckpointStore;
+    if (store === null || store === undefined) return [];
+    const missionIdentifiers = await this.options.missionManager.listMissionIds();
+    const controller = this.buildContinuationController(store, checkpointStore, missionIdentifiers);
+    return controller.listForConversation(conversationIdentifier);
+  }
+
+  /**
+   * RESUME-02：**显式续接**（用户点按钮的唯一入口）。
+   *
+   * 幂等键、revision、可恢复性、既有恢复门禁全部复用；恢复被拒时如实返回原因。
+   */
+  async requestContinuation(input: {
+    readonly breakpointIdentifier: string;
+    readonly missionIdentifier: string;
+    readonly expectedRevision: number;
+    readonly requestIdentifier: string;
+  }): Promise<ContinuationRequestResult> {
+    const store = this.options.continuationBreakpointStore;
+    if (store === null || store === undefined) {
+      throw new DomainError("invalid-task-chain", "断点续接未装配：拒绝处理请求。");
+    }
+    const missionIdentifiers = await this.options.missionManager.listMissionIds();
+    const controller = this.buildContinuationController(
+      store,
+      this.options.recoveryCheckpointStore,
+      missionIdentifiers,
+    );
+    return controller.requestContinuation(input);
+  }
+
+  private buildContinuationController(
+    store: ContinuationBreakpointStore,
+    checkpointStore: RecoveryCheckpointStore | null | undefined,
+    missionIdentifiers: readonly string[],
+  ): ContinuationController {
+    const knownMissionIdentifiers = new Set(missionIdentifiers);
+    return new ContinuationController({
+      store,
+      readConversationMissions: async (conversationIdentifier) => {
+        const matches: string[] = [];
+        for (const missionIdentifier of missionIdentifiers) {
+          const summary = await this.options.missionManager
+            .readSummary(missionIdentifier)
+            .catch(() => null);
+          if (summary?.conversationIdentifier === conversationIdentifier) {
+            matches.push(missionIdentifier);
+          }
+        }
+        return matches;
+      },
+      readMission: async (missionIdentifier) => {
+        if (!knownMissionIdentifiers.has(missionIdentifier)) return null;
+        const summary = await this.options.missionManager
+          .readSummary(missionIdentifier)
+          .catch(() => null);
+        if (summary === null) return null;
+        return {
+          missionIdentifier: summary.missionId,
+          conversationIdentifier: summary.conversationIdentifier ?? null,
+          projectIdentifier: summary.projectIdentifier ?? null,
+          prompt: summary.prompt,
+          status: summary.status,
+          createdAtIso: summary.createdAtIso,
+          hasTrustedCheckpoint: false,
+        };
+      },
+      hasTrustedCheckpoint: async (missionIdentifier) =>
+        checkpointStore === null || checkpointStore === undefined
+          ? false
+          : checkpointStore.hasTrustedCheckpointForMission(missionIdentifier),
+      resumeMission: async (missionIdentifier) => {
+        await this.resumeMission(missionIdentifier);
+      },
+    });
   }
 
   getMissionTaskSequence(missionId: string): {

@@ -247,6 +247,7 @@ import {
   buildWritingProcessInstanceIdentifier,
 } from "../orchestration/recovery-checkpoint-recorder.js";
 import { RecoveryCheckpointStore } from "../orchestration/recovery-checkpoint-store.js";
+import { ContinuationBreakpointStore } from "../orchestration/continuation-breakpoint.js";
 import { LocalContextGraphStore } from "../orchestration/local-context-graph-store.js";
 import {
   createContextPromptProvider,
@@ -2836,6 +2837,10 @@ export async function createApplicationRuntime(
   const recoveryCheckpointStore = new RecoveryCheckpointStore({
     baseDirectory: stateDirectory,
   });
+  /** RESUME-02（2026-11-07）：断点覆盖层（只保存用户操作产生的状态）。 */
+  const continuationBreakpointStore = new ContinuationBreakpointStore({
+    baseDirectory: stateDirectory,
+  });
   const recoveryCheckpointRecorderByKey = new Map<string, RecoveryCheckpointRecorder>();
   /**
    * **跨记录器共享写队列**（2026-10-07 真实回归修复）：同一 store 被多个记录器共用
@@ -3472,6 +3477,8 @@ export async function createApplicationRuntime(
     taskSequenceManageController: sequenceManageController,
     /** 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面（两套记账对照用）。 */
     taskSequenceStatusController: sequenceStatusController,
+    continuationBreakpointStore,
+    recoveryCheckpointStore,
     /** R124：发布时自动登记整 mission 映射。 */
     /** R133：图变更 ⇒ 目标联动（标记需重新规划 + 暂停 + 落盘）。 */
     onMissionGraphChanged: (missionIdentifier, event) => {

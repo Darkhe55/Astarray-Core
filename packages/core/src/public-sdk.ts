@@ -17,6 +17,10 @@ import { parseStartupRecoveryPolicy } from "./orchestration/startup-recovery-pol
 import type { StartupRecoveryBootReport } from "./orchestration/startup-recovery-report.js";
 import type { ToolHelpResponseV1 } from "./tools/tool-help-recall-controller.js";
 import type {
+  ContinuationBreakpointView,
+  ContinuationRequestResult,
+} from "./orchestration/continuation-breakpoint.js";
+import type {
   DelegatedAgentCommunicationGrant,
   DelegatedMessageType,
   DelegationValidationContext,
@@ -3228,6 +3232,32 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }> {
     this.assertOpen();
     return this.runtime.controller.requestRuntimeTaskInsertion(payload);
+  }
+  /**
+   * RESUME-02（用户裁决版）：**按会话查询断点**。
+   *
+   * 断点由真实中断派生（不因刷新/重启丢失或重复）；终态保留用于留档。
+   */
+  async queryContinuationBreakpoints(
+    conversationIdentifier: string,
+  ): Promise<ContinuationBreakpointView[]> {
+    this.assertOpen();
+    return this.runtime.controller.queryContinuationBreakpoints(conversationIdentifier);
+  }
+
+  /**
+   * RESUME-02：**显式续接**（用户点击断点卡的唯一入口）。
+   *
+   * 幂等键 + revision 校验 + 既有恢复门禁；`resumed` 只表示已派发，不代表任务完成。
+   */
+  async requestContinuation(input: {
+    readonly breakpointIdentifier: string;
+    readonly missionIdentifier: string;
+    readonly expectedRevision: number;
+    readonly requestIdentifier: string;
+  }): Promise<ContinuationRequestResult> {
+    this.assertOpen();
+    return this.runtime.controller.requestContinuation(input);
   }
   async getCurrentPermissionProfileReference() {
     return this.runtime.controller.getCurrentPermissionProfileReference();
