@@ -8,6 +8,14 @@ import type { TaskChainDocument, TaskDependencyNode } from "./types.js";
 
 export class TaskGraph {
   private readonly nodesById = new Map<string, TaskDependencyNode>();
+  /**
+   * ALIGN-02-03（2026-11-08）：节点声明序（0 起）。
+   *
+   * 用于"同层稳定排序"：同优先级下**先声明先执行**，而不是字典序 ——
+   * 字典序会让 `a-xxx` 永远压过先声明的 `z-yyy`，与用户可见的任务顺序不符。
+   */
+  private readonly declarationOrderById = new Map<string, number>();
+  private nextDeclarationOrder = 0;
 
   constructor(nodes: TaskDependencyNode[]) {
     for (const node of nodes) {
@@ -18,6 +26,8 @@ export class TaskGraph {
         );
       }
       this.nodesById.set(node.id, { ...node, dependsOn: [...node.dependsOn] });
+      this.declarationOrderById.set(node.id, this.nextDeclarationOrder);
+      this.nextDeclarationOrder += 1;
     }
     this.validateDependencies();
     this.validateAcyclic();
@@ -42,6 +52,8 @@ export class TaskGraph {
       }
     }
     this.nodesById.set(node.id, { ...node, dependsOn: [...node.dependsOn] });
+    this.declarationOrderById.set(node.id, this.nextDeclarationOrder);
+    this.nextDeclarationOrder += 1;
     this.validateAcyclic();
   }
 
@@ -145,21 +157,82 @@ export class TaskGraph {
 
   /**
    * 可运行任务：pending 且全部依赖已 done，且自身未被领取。
-   * 按任务 ID 字典序返回，保证调度确定性。
+   *
+   * 排序见 `findRunnableTaskIds` 内注释：有效优先级 → 声明序 → 任务标识。
    */
   findRunnableTaskIds(): string[] {
-    return this.getTaskIds()
-      .filter((taskId) => {
-        const node = this.nodesById.get(taskId);
-        if (node === undefined || node.status !== "pending") {
-          return false;
-        }
-        return node.dependsOn.every(
-          (dependencyId) =>
-            this.nodesById.get(dependencyId)?.status === "done",
+    const runnableTaskIds = this.getTaskIds().filter((taskId) => {
+      const node = this.nodesById.get(taskId);
+      if (node === undefined || node.status !== "pending") {
+        return false;
+      }
+      return node.dependsOn.every(
+        (dependencyId) =>
+          this.nodesById.get(dependencyId)?.status === "done",
+      );
+    });
+    /**
+     * ALIGN-02-03（2026-11-08）：**有效优先级 + 同层稳定排序**。
+     *
+     * 旧实现是纯字典序 `sort()`：tier 完全不参与 ⇒ 用户层任务可能排在 Agent
+     * 派生任务之后。现在：
+     *   1. 有效优先级 = min(自身 tier, 所有可达后继的 tier)（紧急后继先满足）；
+     *   2. 同层按**声明序**（先声明先执行）；
+     *   3. 最后用 taskId 决平 —— 保证同一输入永远同一顺序。
+     *
+     * 准入条件不变：只有依赖全部 done 的 pending 才可运行；置顶/提权/声明序
+     * 都在此集合**内部**排序，绝不让未就绪任务进入结果。
+     */
+    const effectivePriorityTierById = this.computeEffectivePriorityTiers();
+    return runnableTaskIds.sort((left, right) => {
+      const leftTier = effectivePriorityTierById.get(left) ?? 0;
+      const rightTier = effectivePriorityTierById.get(right) ?? 0;
+      if (leftTier !== rightTier) return leftTier - rightTier;
+      const leftOrder = this.declarationOrderById.get(left) ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = this.declarationOrderById.get(right) ?? Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      return left.localeCompare(right);
+    });
+  }
+
+  /**
+   * ALIGN-02-03：有效优先级 = `min(自身 tier, 所有可达后继的 tier)`。
+   *
+   * 语义：一个"闸门"任务即使自身是低优先级，只要它挡着紧急后继，就应先跑。
+   * 记忆化 DFS；环由构造期校验排除，这里额外用占位值防自旋（防御性）。
+   */
+  computeEffectivePriorityTiers(): Map<string, number> {
+    const successorIdentifiersById = new Map<string, string[]>();
+    for (const node of this.nodesById.values()) {
+      for (const dependencyIdentifier of node.dependsOn) {
+        const successors = successorIdentifiersById.get(dependencyIdentifier) ?? [];
+        successors.push(node.id);
+        successorIdentifiersById.set(dependencyIdentifier, successors);
+      }
+    }
+    const resolved = new Map<string, number>();
+    const effectivePriorityTierOf = (taskIdentifier: string): number => {
+      const cached = resolved.get(taskIdentifier);
+      if (cached !== undefined) return cached;
+      const node = this.nodesById.get(taskIdentifier);
+      if (node === undefined) return Number.MAX_SAFE_INTEGER;
+      /** 先占位，避免异常图导致无限递归（缺省 tier 按 0 = 用户层）。 */
+      const declaredPriorityTier = node.priorityTier ?? 0;
+      resolved.set(taskIdentifier, declaredPriorityTier);
+      let effectivePriorityTier = declaredPriorityTier;
+      for (const successorIdentifier of successorIdentifiersById.get(taskIdentifier) ?? []) {
+        effectivePriorityTier = Math.min(
+          effectivePriorityTier,
+          effectivePriorityTierOf(successorIdentifier),
         );
-      })
-      .sort();
+      }
+      resolved.set(taskIdentifier, effectivePriorityTier);
+      return effectivePriorityTier;
+    };
+    for (const taskIdentifier of this.nodesById.keys()) {
+      effectivePriorityTierOf(taskIdentifier);
+    }
+    return resolved;
   }
 
   isMissionComplete(): boolean {
