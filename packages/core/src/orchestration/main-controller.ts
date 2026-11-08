@@ -3864,6 +3864,121 @@ export class MainController {
   }
 
   /**
+   * ALIGN-01-04（2026-11-08）：**用户直投产品入口**（认证用户显式路由到具体次级）。
+   *
+   * 纪律：
+   * - **认证用户标识与来源由本地注入**，调用方传入的 `authenticatedUserId` 一律被覆盖，
+   *   模型无法通过参数伪造用户来源（伪造会被改成真实认证用户，或直接拒绝）；
+   * - 目标次级必须在注册目录中**真实存在**（不按昵称猜收件人）；
+   * - 目标序列必须已发布（不存在 ⇒ 如实失败，不静默建序列）；
+   * - 本方法不调用任何模型，主 Agent 不被重复规划。
+   */
+  async dispatchDirectTask(input: {
+    readonly targetSecondaryAgentInstanceId: string;
+    readonly scopeDescription: string;
+    readonly originalUserInstruction: string;
+    readonly acceptanceCriteria: string;
+    readonly anchor: { predecessorTaskIds: readonly string[]; successorTaskIds: readonly string[] };
+    /**
+     * 显式附件引用哈希（`sha256:<hex>`）。ADR-0025 要求直投**只带显式附件引用**，
+     * 不复制主 Agent 完整会话；没有真实哈希时**拒绝投递**，不用占位哈希凑 schema。
+     */
+    readonly attachedContextReferenceHashes: readonly string[];
+    readonly expectedSequenceRevision: number;
+    readonly forceDispatchConfirmationText?: string | null;
+    readonly eligibilityCharacteristics?: {
+      readonly requiresDesignDiscussion: boolean;
+      readonly modifiesArchitectureOrPublicContract: boolean;
+      readonly hasUnresolvedHighRiskRuling: boolean;
+      readonly requiresCrossProjectCoordination: boolean;
+    };
+  }): Promise<{
+    readonly outcome: "dispatched" | "returned-to-main-agent";
+    readonly targetSequenceId: string | null;
+    readonly reason: string | null;
+  }> {
+    const authenticatedUserId = this.options.authenticatedUserId?.trim();
+    if (authenticatedUserId === undefined || authenticatedUserId === "") {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "缺少认证用户身份：拒绝直投（不按匿名身份投递用户任务）。",
+      );
+    }
+    const facade = this.options.t08cRoutingFacade;
+    if (facade === null || facade === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "四层路由控制面未装配：拒绝直投。",
+      );
+    }
+    const sequenceId = `sequence-${input.targetSecondaryAgentInstanceId}`;
+    const statusController = this.options.taskSequenceStatusController;
+    if (statusController === null || statusController === undefined) {
+      throw new DomainError(
+        "invalid-task-chain",
+        "序列状态控制面未装配：拒绝直投。",
+      );
+    }
+    const snapshot = await statusController.getSnapshot({
+      ownerAgentInstanceId: input.targetSecondaryAgentInstanceId,
+      sequenceId,
+      viewer: { sourceKind: "user", actorId: authenticatedUserId },
+    });
+    const result = await facade.directDispatchController.dispatchDirectTask({
+      envelope: {
+        schemaVersion: 1,
+        envelopeId: `envelope-${randomUUID()}`,
+        /** 强制使用本地认证身份：调用方传入的同名字段不会被采纳。 */
+        authenticatedUserId,
+        targetSecondaryAgentInstanceId: input.targetSecondaryAgentInstanceId,
+        scopeDescription: input.scopeDescription,
+        originalUserInstruction: input.originalUserInstruction,
+        priorityTier: 0,
+        anchor: {
+          predecessorTaskIds: [...input.anchor.predecessorTaskIds],
+          successorTaskIds: [...input.anchor.successorTaskIds],
+        },
+        acceptanceCriteria: input.acceptanceCriteria,
+        /** 附件引用原样透传；调用方没有真实哈希时 schema 会拒绝（不编造占位）。 */
+        attachedContextReferenceHashes: [...input.attachedContextReferenceHashes],
+        createdAtIso: new Date().toISOString(),
+        revision: 1,
+      },
+      userRouteDecision:
+        input.forceDispatchConfirmationText === undefined ||
+        input.forceDispatchConfirmationText === null ||
+        input.forceDispatchConfirmationText.trim() === ""
+          ? { kind: "follow-policy-suggestion" }
+          : {
+              kind: "force-dispatch",
+              confirmationText: input.forceDispatchConfirmationText,
+            },
+      expectedSequenceRevision:
+        input.expectedSequenceRevision > 0
+          ? input.expectedSequenceRevision
+          : snapshot.revision,
+      eligibilityCharacteristics: input.eligibilityCharacteristics ?? {
+        requiresDesignDiscussion: false,
+        modifiesArchitectureOrPublicContract: false,
+        hasUnresolvedHighRiskRuling: false,
+        requiresCrossProjectCoordination: false,
+      },
+    });
+    if (result.outcome === "dispatched") {
+      return {
+        outcome: "dispatched",
+        targetSequenceId: result.targetSequenceId,
+        reason: null,
+      };
+    }
+    return {
+      outcome: "returned-to-main-agent",
+      targetSequenceId: null,
+      reason: result.reason,
+    };
+  }
+
+  /**
    * 向次级调度发送裁决指令（Assist）。
    *
    * 修复（2026-10-01）：调度器实例运行在**本进程**（`activeOrchestrators`），而

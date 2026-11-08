@@ -68,6 +68,109 @@ const eligibleCharacteristics = {
 };
 
 describe("直投产品入口（ALIGN-01-04）", () => {
+  async function seedSequence(application: Awaited<ReturnType<typeof createRuntime>>) {
+    application.controller.registerAgent({
+      agentInstanceId: "secondary-agent-1",
+      agentRole: "secondary",
+      missionId: "mission-cli",
+      owningSecondaryAgentInstanceId: null,
+      boundTaskBundleId: "bundle-cli",
+    });
+    await application.taskSequenceManageController.publishOrInsertTask({
+      ownerAgentInstanceId: "secondary-agent-1",
+      actor: { sourceKind: "user", actorId: "user-1" },
+      sequenceId: "sequence-secondary-agent-1",
+      task: {
+        taskId: "seed-task-1",
+        title: "占位任务（建立序列）",
+        priorityTier: 0,
+        externalReference: null,
+      },
+      anchor: { predecessorTaskIds: [], successorTaskIds: [] },
+    });
+  }
+
+  it("产品入口 dispatchDirectTask：认证身份由本地注入并成功投递", async () => {
+    const application = await createRuntime();
+    await seedSequence(application);
+    const dispatched = await application.controller.dispatchDirectTask({
+      targetSecondaryAgentInstanceId: "secondary-agent-1",
+      scopeDescription: "改一处说明文字",
+      originalUserInstruction: "把 README 标题改成 Astarray",
+      acceptanceCriteria: "README 标题为 Astarray",
+      anchor: { predecessorTaskIds: ["seed-task-1"], successorTaskIds: [] },
+      attachedContextReferenceHashes: ["sha256:" + "2".repeat(64)],
+      expectedSequenceRevision: 0,
+    });
+    expect(dispatched.outcome).toBe("dispatched");
+    expect(dispatched.targetSequenceId).toBe("sequence-secondary-agent-1");
+
+    const snapshot = await application.taskSequenceStatusController.getSnapshot({
+      ownerAgentInstanceId: "secondary-agent-1",
+      sequenceId: "sequence-secondary-agent-1",
+      viewer: { sourceKind: "user", actorId: "user-1" },
+    });
+    const inserted = snapshot.nodes.find((node) => node.title.includes("README 标题"));
+    expect(inserted?.sourceKind).toBe("user");
+    expect(inserted?.priorityTier).toBe(0);
+  });
+
+  it("产品入口：缺少认证用户 ⇒ 拒绝（不按匿名身份投递用户任务）", async () => {
+    const anonymousDirectory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "astarray-direct-anon-"),
+    );
+    const anonymousRuntime = await createApplicationRuntime({
+      mode: "assist",
+      stateDirectory: anonymousDirectory,
+      concurrency: 1,
+      failureThreshold: 1,
+      maxLoopIterations: 2,
+      runtimeKind: "mock",
+      useFeedbackProcess: false,
+      /** 显式声明"无身份"：不回退到宿主用户（fail-closed 语义）。 */
+      authenticatedUserId: null,
+      streamOutput: () => {},
+    });
+    try {
+      await expect(
+        anonymousRuntime.controller.dispatchDirectTask({
+          targetSecondaryAgentInstanceId: "secondary-agent-1",
+          scopeDescription: "改一处说明文字",
+          originalUserInstruction: "改标题",
+          acceptanceCriteria: "已改",
+          anchor: { predecessorTaskIds: [], successorTaskIds: [] },
+          attachedContextReferenceHashes: ["sha256:" + "2".repeat(64)],
+          expectedSequenceRevision: 0,
+        }),
+      ).rejects.toThrow(/缺少认证用户身份/u);
+    } finally {
+      await anonymousRuntime.shutdown().catch(() => undefined);
+      await fs.rm(anonymousDirectory, { recursive: true, force: true, maxRetries: 5 });
+    }
+  });
+
+  it("产品入口：目标序列不存在 ⇒ 如实失败（不静默建序列）", async () => {
+    const application = await createRuntime();
+    application.controller.registerAgent({
+      agentInstanceId: "secondary-agent-1",
+      agentRole: "secondary",
+      missionId: "mission-cli",
+      owningSecondaryAgentInstanceId: null,
+      boundTaskBundleId: "bundle-cli",
+    });
+    await expect(
+      application.controller.dispatchDirectTask({
+        targetSecondaryAgentInstanceId: "secondary-agent-1",
+        scopeDescription: "改一处说明文字",
+        originalUserInstruction: "改标题",
+        acceptanceCriteria: "已改",
+        anchor: { predecessorTaskIds: [], successorTaskIds: [] },
+        attachedContextReferenceHashes: ["sha256:" + "2".repeat(64)],
+        expectedSequenceRevision: 0,
+      }),
+    ).rejects.toThrow(/序列不存在/u);
+  });
+
   it("认证用户 + 已登记次级 + 序列已发布 ⇒ dispatched", async () => {
     const application = await createRuntime();
     /** 先让目标次级在注册表里存在（直投要求具体个体存在）。 */
@@ -203,3 +306,4 @@ describe("直投产品入口（ALIGN-01-04）", () => {
     ).rejects.toThrow();
   });
 });
+

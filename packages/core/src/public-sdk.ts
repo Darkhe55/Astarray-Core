@@ -3259,6 +3259,38 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.runtime.controller.requestContinuation(input);
   }
+  /**
+   * ALIGN-01-04（2026-11-08）：**用户直投**（认证用户显式路由到具体次级）。
+   *
+   * 认证身份由本地注入；`outcome` 如实区分 dispatched / returned-to-main-agent。
+   */
+  async dispatchDirectTask(input: {
+    readonly targetSecondaryAgentInstanceId: string;
+    readonly scopeDescription: string;
+    readonly originalUserInstruction: string;
+    readonly acceptanceCriteria: string;
+    readonly anchor: {
+      readonly predecessorTaskIds: readonly string[];
+      readonly successorTaskIds: readonly string[];
+    };
+    /** 显式附件引用哈希（`sha256:<hex>`）；无真实附件时不得用占位值凑数。 */
+    readonly attachedContextReferenceHashes: readonly string[];
+    readonly expectedSequenceRevision: number;
+    readonly forceDispatchConfirmationText?: string | null;
+    readonly eligibilityCharacteristics?: {
+      readonly requiresDesignDiscussion: boolean;
+      readonly modifiesArchitectureOrPublicContract: boolean;
+      readonly hasUnresolvedHighRiskRuling: boolean;
+      readonly requiresCrossProjectCoordination: boolean;
+    };
+  }): Promise<{
+    readonly outcome: "dispatched" | "returned-to-main-agent";
+    readonly targetSequenceId: string | null;
+    readonly reason: string | null;
+  }> {
+    this.assertOpen();
+    return this.runtime.controller.dispatchDirectTask(input);
+  }
   async getCurrentPermissionProfileReference() {
     return this.runtime.controller.getCurrentPermissionProfileReference();
   }
