@@ -83,28 +83,37 @@ export interface SchedulingWakeReport {
 }
 
 /**
- * ALIGN-02-05（2026-11-05）：把**真实编排器的按 taskId 派发入口**包装成 mission 端口。
+ * ALIGN-02-05（2026-11-08 返修）：把**真实编排器的按 taskId 派发入口**包装成 mission 端口。
  *
  * 说明（不夸大能力）：
  * - 编排器的 `dispatchTaskByTaskIdentifier` 语义是"**优先派发**"（下一轮优先启动），
  *   不是"立即开始执行"；因此这里只把 accepted 映射为 true，不伪造"已运行"。
- * - 原子性由编排器自身校验（任务必须 pending、依赖已满足；重复调用幂等），
- *   故不额外实现 claim；失败由调用方按"未接受"处理。
+ * - **必须同时提供领取与释放**：只给 `dispatchChain` 会让循环里的
+ *   "领取失败 ⇒ 跳过 / 派发被拒 ⇒ 释放" 在生产上**永不发生**（此前正是如此），
+ *   任务会一直停在 pending，也没有 double-claim 保护。
+ * - 领取/释放由调用方用权威序列实现（revision 乐观并发）；这里只做透传，
+ *   不自行实现第二套状态机。
  */
-export function createMissionDispatchPorts(dispatcher: {
+export function createMissionDispatchPorts(input: {
   dispatchTaskByTaskIdentifier(taskId: string): {
     readonly outcome: "accepted" | "refused";
   };
+  /** 原子领取：返回 false 表示没领到（已被领取/状态不符/竞态）。 */
+  claimTask?: (taskId: string) => Promise<boolean>;
+  /** 释放领取：派发失败时把任务放回可执行集合。 */
+  releaseTask?: (taskId: string, reason: string) => Promise<void>;
 }): MissionDispatchPorts {
   return {
     dispatchChain: async (chain) => {
       let accepted = false;
       for (const taskId of chain.taskIds) {
-        const decision = dispatcher.dispatchTaskByTaskIdentifier(taskId);
+        const decision = input.dispatchTaskByTaskIdentifier(taskId);
         if (decision.outcome === "accepted") accepted = true;
       }
       return accepted;
     },
+    ...(input.claimTask === undefined ? {} : { claimTask: input.claimTask }),
+    ...(input.releaseTask === undefined ? {} : { releaseTask: input.releaseTask }),
   };
 }
 

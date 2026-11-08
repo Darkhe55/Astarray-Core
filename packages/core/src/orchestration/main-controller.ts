@@ -1716,6 +1716,18 @@ export class MainController {
       createMissionDispatchPorts({
         dispatchTaskByTaskIdentifier: (taskId) =>
           orchestrator.dispatchTaskByTaskIdentifier(taskId),
+        /**
+         * ALIGN-02-05（2026-11-08 返修）：**生产上真的领取与释放**。
+         *
+         * 此前只给了 `dispatchChain`，于是循环里的"领取失败 ⇒ 跳过 /
+         * 派发被拒 ⇒ 释放"在生产上永不发生，序列任务会一直停在 pending。
+         * 这里用权威序列做原子领取（revision 乐观并发）；未建立序列映射的
+         * mission **不领取**（返回 true 表示"无需领取"，保持旧行为不阻塞）。
+         */
+        claimTask: async (taskId) => this.claimSequenceTaskForMission(missionId, taskId),
+        releaseTask: async (taskId, reason) => {
+          await this.releaseSequenceTaskClaimForMission(missionId, taskId, reason);
+        },
       }),
     );
     void dispatchLoop
@@ -1736,6 +1748,106 @@ export class MainController {
             (error instanceof Error ? error.message : String(error)),
         );
       });
+  }
+
+  /**
+   * ALIGN-02-05（2026-11-08）：**派发前原子领取序列任务**。
+   *
+   * - 未建立序列映射 ⇒ 返回 `true`（"无需领取"，不放行会平白阻塞旧路径）；
+   * - 已建立映射 ⇒ 用 `claimTask`（revision 乐观并发）领取，领不到返回 `false`
+   *   ⇒ 循环跳过该任务，**不会重复派发**；
+   * - 领取后把映射 revision 同步为新值（否则后续插入会被误判 stale）。
+   */
+  private async claimSequenceTaskForMission(
+    missionId: string,
+    taskId: string,
+  ): Promise<boolean> {
+    const manageController = this.options.taskSequenceManageController;
+    const mapping = this.missionTaskSequences.get(missionId);
+    if (manageController === null || manageController === undefined) return true;
+    if (mapping === undefined) return true;
+    const isOriginalTask = taskId === mapping.taskIdentifier;
+    /**
+     * 只有**原始用户任务**在序列里有节点；mission 链的其他节点没有序列条目
+     * ⇒ 领取它们会被判 `false` 并永久跳过（会丢任务）。因此只领取原始任务。
+     */
+    if (!isOriginalTask) return true;
+    const claimed = await manageController.claimTask({
+      ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
+      sequenceId: mapping.taskSequenceIdentifier,
+      taskId,
+    });
+    if (claimed) {
+      await this.syncMissionSequenceRevision(missionId).catch(() => undefined);
+    }
+    return claimed;
+  }
+
+  /**
+   * ALIGN-02-05：**释放领取**（派发失败时把序列任务放回 pending）。
+   *
+   * 只在原始用户任务上生效；失败只写诊断，不掩盖原始派发失败原因。
+   */
+  private async releaseSequenceTaskClaimForMission(
+    missionId: string,
+    taskId: string,
+    reason: string,
+  ): Promise<void> {
+    const manageController = this.options.taskSequenceManageController;
+    const mapping = this.missionTaskSequences.get(missionId);
+    if (
+      manageController === null ||
+      manageController === undefined ||
+      mapping === undefined ||
+      taskId !== mapping.taskIdentifier
+    ) {
+      return;
+    }
+    try {
+      const released = await manageController.releaseClaim({
+        ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
+        sequenceId: mapping.taskSequenceIdentifier,
+        taskId,
+      });
+      if (!released) {
+        this.options.streamOutput(
+          missionId,
+          "[序列同步] 释放领取未生效（任务可能已被收口）：" + reason,
+        );
+      }
+      await this.syncMissionSequenceRevision(missionId).catch(() => undefined);
+    } catch (error) {
+      this.options.streamOutput(
+        missionId,
+        "[序列同步] 释放领取失败：" +
+          (error instanceof Error ? error.message : String(error)) +
+          "（原因：" +
+          reason +
+          "）",
+      );
+    }
+  }
+
+  /** ALIGN-02-05：把映射里的 sequenceRevision 同步为权威序列当前 revision。 */
+  private async syncMissionSequenceRevision(missionId: string): Promise<void> {
+    const statusController = this.options.taskSequenceStatusController;
+    const mapping = this.missionTaskSequences.get(missionId);
+    if (statusController === null || statusController === undefined) return;
+    if (mapping === undefined) return;
+    const authenticatedUserId = this.options.authenticatedUserId?.trim();
+    const viewer =
+      authenticatedUserId !== undefined && authenticatedUserId !== ""
+        ? { sourceKind: "user" as const, actorId: authenticatedUserId }
+        : {
+            sourceKind: "agent" as const,
+            actorId: mapping.ownerAgentInstanceIdentifier,
+          };
+    const snapshot = await statusController.getSnapshot({
+      ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
+      sequenceId: mapping.taskSequenceIdentifier,
+      viewer,
+    });
+    mapping.sequenceRevision = snapshot.revision;
   }
 
   /**
@@ -4959,7 +5071,16 @@ export class MainController {
   private async registerMissionArtifacts(missionId: string): Promise<void> {
     const store = this.options.artifactRecordStore;
     if (store === undefined) return;
-    const status = await this.options.missionManager.getMissionStatus(missionId);
+    /**
+     * 产物登记是**尾声辅助动作**（调用方以 `void` 发起）。mission 目录可能已在此刻
+     * 被清理（终态收口/测试拆除并发）⇒ 读取会抛 `mission-not-found`。
+     * 这里必须**容忍缺失**：否则 `void` 出去的 Promise 会产生未处理的拒绝
+     * （实测会让整轮门禁报错，即使任务本身已经正常收口）。
+     */
+    const status = await this.options.missionManager
+      .getMissionStatus(missionId)
+      .catch(() => null);
+    if (status === null) return;
     const projectIdentifier = this.missionProjectIdentifiers.get(missionId) ?? "workspace";
     for (const task of status.taskChain?.tasks ?? []) {
       if (typeof task.resultLocation !== "string" || task.resultLocation.trim() === "") continue;
