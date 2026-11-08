@@ -333,3 +333,37 @@ tier 0 先于 tier 1（字典序相反）、同层先声明先执行、
 **仍未做（如实）**：任务包（bundle）单元选择仍由 `selectNextTaskGroup` 提供，
 调度器按任务而非包派发；`maximumUnitCount` 预算未进入 `scheduleRound`。
 本检查点标 **implemented-unverified**（未经真实 mission 端到端观察）。
+
+### 05 收口（2026-11-08）：生产上真的领取与释放
+
+**发现的真实缺陷**：`createMissionDispatchPorts` 只包装了 `dispatchTaskByTaskIdentifier`，
+**没有提供** `claimTask` / `releaseTask`。于是调度循环里那段"领取失败 ⇒ 跳过 /
+派发被拒 ⇒ 释放"的代码**只在测试里被人工注入过**，生产路径上从不发生：
+
+- 序列里的原始用户任务会停在 `pending`，没有任何"领取 → 失败 → 释放 → 再领取"闭环；
+- `claimTask` 的 double-claim 保护在生产里也从未被调用。
+
+**修复**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 端口工厂扩展 | `secondary-continuous-dispatch-loop.ts` `createMissionDispatchPorts` | 接受并透传 `claimTask` / `releaseTask`（缺省不伪造 `true`） |
+| 生产装配 | `main-controller.ts` `registerMissionDispatchConsumer` | 注入真实领取/释放 |
+| 只领取原始任务 | `claimSequenceTaskForMission` | mission 链的其他节点没有序列条目，领取它们会永久跳过（会丢任务）⇒ 只领取 `mapping.taskIdentifier` |
+| revision 同步 | `syncMissionSequenceRevision` | 领取/释放后同步映射 revision，避免后续插入被误判 `stale-revision` |
+| 释放失败可见 | `releaseSequenceTaskClaimForMission` | 只写诊断，不掩盖原始派发失败原因 |
+
+**顺带修复的真实缺陷**：`registerMissionArtifacts` 在 mission 目录已被清理时会抛
+`mission-not-found`，而调用方是 `void` ⇒ **未处理的 Promise 拒绝**，实测让整轮门禁报错
+（即使任务本身正常收口）。现改为容忍缺失直接返回。
+
+**证据**：
+- `dispatch-claim-production` 3/3：端口透传、领取真的把序列任务置 running、
+  派发被拒后回到 pending 且占用回落、重复领取只成功一次；
+- `dispatch-claim-real-mission` 2/2：真实 mission 跑完后序列原始任务不再是 `pending`；
+  无序列映射的 mission 行为不变。
+公开全量 **629 files / 4318 tests** 通过。
+
+**仍未做（如实）**：租约过期接管（`takeOverExpiredLease`）与本闭环的联动未验证；
+"领取 → 执行者崩溃 → 租约过期 → 另一进程接管"没有端到端实测。
+本检查点标 **implemented-unverified**。
