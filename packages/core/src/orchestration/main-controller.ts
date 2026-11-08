@@ -1519,6 +1519,15 @@ export class MainController {
      * 别的进程仍持活动租约 ⇒ 拒绝接管（不抢正在跑的 mission）。
      */
     await this.prepareResumeLease(missionId);
+    /**
+     * ALIGN-02-05（2026-11-08）：**核对崩溃遗留的领取**。
+     *
+     * 崩溃的进程可能在持有序列任务（`running`）时死掉；`claimTask` 只接受
+     * `pending`，于是新进程永远领不到该任务、派发循环每轮都以"领取失败"跳过
+     * ⇒ 任务被静默搁死。这里在**已成功接管租约之后**（顺序很关键：接管前
+     * 别的进程仍可能在跑，释放会把它的在途任务打回 pending）受控释放。
+     */
+    await this.reconcileStaleSequenceClaim(missionId);
     const resumeWorkWindowDecision = await this.options.workWindowGateDecisionProvider?.({
       missionId,
       projectIdentifier: this.missionProjectIdentifiers.get(missionId) ?? null,
@@ -2989,6 +2998,44 @@ export class MainController {
         purpose: "run",
         claimantDescription: "main-controller-resume",
       });
+    }
+  }
+
+  /**
+   * ALIGN-02-05（2026-11-08）：**核对崩溃遗留的序列领取**。
+   *
+   * 只在**恢复路径**（已接管租约）调用：把该 mission 的原始序列任务从
+   * `running` 释放回 `pending`，否则 `claimTask` 永远拒绝、任务被搁死。
+   *
+   * 纪律：
+   * - 没有序列映射 ⇒ 什么都不做（旧路径不受影响）；
+   * - 未释放成功（任务已被收口/不是 running）⇒ 只写诊断，不改状态；
+   * - `done`/`blocked` 等终态**不会**被打回 pending（`releaseClaim` 本身拒绝）。
+   */
+  private async reconcileStaleSequenceClaim(missionId: string): Promise<void> {
+    const manageController = this.options.taskSequenceManageController;
+    const mapping = this.missionTaskSequences.get(missionId);
+    if (manageController === null || manageController === undefined) return;
+    if (mapping === undefined) return;
+    try {
+      const released = await manageController.releaseClaim({
+        ownerAgentInstanceId: mapping.ownerAgentInstanceIdentifier,
+        sequenceId: mapping.taskSequenceIdentifier,
+        taskId: mapping.taskIdentifier,
+      });
+      if (released) {
+        this.options.streamOutput(
+          missionId,
+          "[恢复] 已核对并释放崩溃遗留的领取：" + mapping.taskIdentifier + " → pending",
+        );
+      }
+      await this.syncMissionSequenceRevision(missionId).catch(() => undefined);
+    } catch (error) {
+      this.options.streamOutput(
+        missionId,
+        "[恢复] 核对遗留领取失败：" +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
   }
 
