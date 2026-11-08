@@ -108,7 +108,10 @@ import {
 import { RegisteredAgentDirectory } from "../orchestration/registered-agent-directory.js";
 import type { ProjectReconnaissanceController } from "../orchestration/project-reconnaissance-controller.js";
 import { StandaloneWorkflowRunner } from "../orchestration/standalone-workflow-runner.js";
-import type { TaskSequenceManageController } from "../orchestration/task-sequence-controllers.js";
+import type {
+  TaskSequenceManageController,
+  TaskSequenceStatusController,
+} from "../orchestration/task-sequence-controllers.js";
 import { MainAgentReportArchiveIngestor } from "../orchestration/main-agent-report-archive.js";
 import { ConversationTaskInsertionController } from "../orchestration/conversation-task-insertion-controller.js";
 import { UnboundedAgentInstanceRegistry } from "../orchestration/unbounded-agent-registry.js";
@@ -271,6 +274,8 @@ export interface ApplicationRuntime {
   reconnaissanceController: ProjectReconnaissanceController;
   /** T08A：任务序列管理面（发布序列/插入任务/状态流转的本地控制面入口）。 */
   taskSequenceManageController: TaskSequenceManageController;
+  /** ALIGN-02-03：只读序列状态控制面（选择/快照；不派发）。 */
+  taskSequenceStatusController: TaskSequenceStatusController;
   /** ALIGN-02-05：持续调度循环（诊断/测试可见；生产由编排层驱动）。 */
   secondaryDispatchLoop: SecondaryContinuousDispatchLoop;
   /** 启动自动恢复 Phase 1：只读扫描（不恢复）。 */
@@ -4395,6 +4400,8 @@ export async function createApplicationRuntime(
     registeredAgentDirectory,
     reconnaissanceController,
     taskSequenceManageController: sequenceManageController,
+    /** ALIGN-02-03：只读序列状态控制面（选择/快照对照；不派发）。 */
+    taskSequenceStatusController: sequenceStatusController,
     secondaryDispatchLoop,
     standaloneWorkflowRunner,
     readMissionResultSummaries,
