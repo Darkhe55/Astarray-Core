@@ -307,3 +307,29 @@ mission 已 done（组关闭）→ 插入返回 `deferred-to-sequence`；任务�
 "读 revision → insert" 会被抢先 ⇒ `stale-revision` 直接把用户请求打回。
 修复：推迟登记遇 `stale-revision` **有界重试 3 次**（20ms 间隔），仍失败才如实报错；
 测试先等 revision 稳定再发起请求。公开全量 **611 files / 4233 tests** 通过。
+
+### 03 收口（2026-11-08）：调度器真正按有效优先级 + 声明序
+
+**发现的真实缺陷**：`TaskGraph.findRunnableTaskIds()` 用裸字典序 `sort()` ——
+`priorityTier` 完全不参与、同层顺序是 `a-` 压过先声明的 `z-`。这与卡内
+"用户层最高、同层稳定排序"直接冲突，且 `ready-task-group-selection.ts` 里
+已实现的有效优先级**从未被调度器消费**（两套排序口径）。
+
+**修复**（`packages/core/src/core/task-graph.ts`）：
+
+| 要点 | 实现 |
+|---|---|
+| 有效优先级 | `computeEffectivePriorityTiers()`：`min(自身 tier, 所有可达后继 tier)`，记忆化 DFS，占位防自旋 |
+| 同层稳定 | 新增 `declarationOrderById`：按**声明位置**（构造与追加时递增），不是字典序 |
+| 确定性 | 最终以 `taskId.localeCompare` 决平 —— 同输入永远同顺序 |
+| 准入不变 | 仍只取"pending 且依赖全 done"；置顶/提权/声明序只在集合**内部**排序 |
+
+**证据**：`tests/core/unit/dag-scheduler-ready-order.test.ts` 5/5：
+tier 0 先于 tier 1（字典序相反）、同层先声明先执行、
+紧急后继把闸门任务提权（未就绪后继不启动）、
+未满足依赖永不被绕过（先满足依赖，完成后才启动后继）、重复构造顺序一致。
+公开全量 **625 files / 4303 tests** 通过。
+
+**仍未做（如实）**：任务包（bundle）单元选择仍由 `selectNextTaskGroup` 提供，
+调度器按任务而非包派发；`maximumUnitCount` 预算未进入 `scheduleRound`。
+本检查点标 **implemented-unverified**（未经真实 mission 端到端观察）。
