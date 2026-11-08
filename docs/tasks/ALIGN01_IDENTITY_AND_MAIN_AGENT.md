@@ -226,3 +226,22 @@ CLI 实测：`direct-dispatch --help` 正常、未知目标输出 `astarray: 序
 **仍未做（如实）**：TUI/GUI 内的直投交互入口（本轮只补 CLI/SDK）；直投任务的产品级端到端
 （投递 → 次级实际执行 → 回执）未实测；跨项目直投拒绝仅在控制器层校验，"项目"字段尚未进入信封。
 本检查点标 **implemented-unverified**。
+
+## 06 收口（2026-11-08）：真实 mission 终态 → 索引 → 读回
+
+**此前缺口**（卡内如实记录）：所有报告索引证据都是**合成调用**
+（直接 `ingestTertiaryTerminalReport` 手填数据），从未用真实 mission 跑通终态写入路径。
+
+**本轮补齐**（`tests/core/integration/report-index-real-mission.test.ts` 2/2）：
+
+| 断言 | 结果 |
+|---|---|
+| 真实 mission 跑到终态 ⇒ 索引非空 | 通过（assist + mock runtime，最多 30s 等终态，再给终态写入 5s 落盘窗口） |
+| 索引条目带 mission、来源个体、`sha256:<hex>` 内容哈希 | 通过 |
+| `selectRelevantReports` 按需读回，且来源与索引一致 | 通过 |
+| `tokenBudgetTokens = 0` ⇒ 返回空（预算优先，不静默超发） | 通过 |
+| 未登记来源写入 ⇒ `报告来源认证失败` 且索引保持为空 | 通过 |
+
+**仍未做（如实）**：三级任务包级报告（属 ALIGN-03）、提醒推送、保留策略（索引文件目前无上限/清理）、
+UI 展示、token 预算仍是 `JSON 长度/4` 粗估。本检查点标 **implemented-unverified**（自动化已过，
+未做人工/真实模型验收）。
