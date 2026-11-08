@@ -199,3 +199,30 @@ ALIGN-04 尚未消费；**没有在真实旧状态目录上跑过**；run-histor
 - 证据：`tests/core/integration/align01-03-proposal-success.test.ts`、
   `align01-03-persisted-derivation.test.ts`；公开全量 601 files / 4200 tests 通过。
 - 本卡 01-04（直投消费）与 01-06 仍为部分交付，整卡不判通过。
+
+## 04 收口（2026-11-08）：直投产品入口接通
+
+**此前结论**："`executeDirectDispatchCommand` 未注册、SDK 无导出 ⇒ 没有任何产品入口能调用它"。
+本轮逐条补齐，并把旧的缺陷一并修正：
+
+| 层 | 位置 | 变化 |
+|---|---|---|
+| 核心入口 | `main-controller.ts` `dispatchDirectTask` | **认证身份由本地注入**，调用方自带的 `authenticatedUserId` 不被采纳；目标序列必须已发布（不存在 ⇒ `序列不存在`，不静默建序列） |
+| 附件 | 同文件 | 不再用全零占位哈希凑 schema：`attachedContextReferenceHashes` 由调用方给出，无真实哈希 ⇒ schema 拒绝 |
+| revision | 同文件 | `expectedSequenceRevision <= 0` 时取**真实快照** revision（旧 CLI 硬编码 1） |
+| SDK | `public-sdk.ts` | `dispatchDirectTask` 加入 `PublicApplicationService` 与 facade |
+| CLI | `cli.tsx` | 注册 `direct-dispatch`（`--target/--scope/--instruction/--acceptance/--anchor/--context-hash/--force/--json`）与 `agent-tree`（此前两者都只有实现、没有注册） |
+| 错误呈现 | `cli/commands.ts` | 被拒时输出人话并置非零退出码（此前抛裸栈、退出码丢失） |
+| 只读视图 | `application-runtime.ts` | 暴露 `taskSequenceStatusController`（测试与诊断可读序列，不派发） |
+
+**验证**：`direct-dispatch-production` 8/8：
+产品入口成功投递（插入节点 `sourceKind=user`、`priorityTier=0`）、
+缺认证身份被拒、伪造用户来源被拒、目标次级不存在被拒、
+不符合资格且未强制 ⇒ 无损回主 Agent、序列不存在 ⇒ 如实失败；
+CLI 实测：`direct-dispatch --help` 正常、未知目标输出 `astarray: 序列不存在: …` 且 exit 1；
+`agent-tree --json` 输出四层视图。
+公开全量 **626 files / 4311 tests** 通过。
+
+**仍未做（如实）**：TUI/GUI 内的直投交互入口（本轮只补 CLI/SDK）；直投任务的产品级端到端
+（投递 → 次级实际执行 → 回执）未实测；跨项目直投拒绝仅在控制器层校验，"项目"字段尚未进入信封。
+本检查点标 **implemented-unverified**。
