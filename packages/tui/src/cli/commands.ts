@@ -2171,61 +2171,57 @@ export interface DirectDispatchCommandOptions {
   acceptanceCriteria: string;
   /** 用户显式确认（force-dispatch 时必填确认文本）。 */
   forceDispatchConfirmation: string | null;
+  /** 插入锚点：新任务排在它之后（缺省 null ⇒ 追加到序列末尾）。 */
+  anchorTaskIdentifier?: string | null;
+  /** 显式附件引用哈希（`sha256:<hex>`）；空数组 ⇒ 无显式附件（信封 schema 会拒绝）。 */
+  attachedContextReferenceHashes?: string[];
 }
 
 export async function executeDirectDispatchCommand(
   options: DirectDispatchCommandOptions,
 ): Promise<number> {
   const bootstrap = await loadSessionInfra(options.stateDirectory);
-  const facade = bootstrap.controller.getT08cRoutingFacade();
-  if (facade === null) {
-    throw new Error("四层路由控制面未装配");
-  }
-  const result = await facade.directDispatchController.dispatchDirectTask({
-    envelope: {
-      schemaVersion: 1,
-      envelopeId: `envelope-${Date.now()}`,
-      authenticatedUserId: requireHostUserId(),
+  try {
+    /**
+     * ALIGN-01-04（2026-11-08）：改走**产品入口** `dispatchDirectTask`。
+     *
+     * 旧实现直接构造控制器，因此：① 需要自己填占位附件哈希；② 期望 revision 硬编码 1；
+     * ③ 不检查序列是否存在。产品入口把这些交给核心：认证身份由本地注入、revision 取
+     * 真实快照、序列不存在就如实失败。
+     */
+    const result = await bootstrap.controller.dispatchDirectTask({
       targetSecondaryAgentInstanceId: options.targetSecondaryAgentInstanceId,
       scopeDescription: options.scopeDescription,
       originalUserInstruction: options.originalUserInstruction,
-      priorityTier: 0,
-      anchor: { predecessorTaskIds: [], successorTaskIds: [] },
       acceptanceCriteria: options.acceptanceCriteria,
-      attachedContextReferenceHashes: [`sha256:${"0".repeat(64)}`],
-      createdAtIso: new Date().toISOString(),
-      revision: 1,
-    },
-    userRouteDecision:
-      options.forceDispatchConfirmation !== null
-        ? {
-            kind: "force-dispatch",
-            confirmationText: options.forceDispatchConfirmation,
-          }
-        : { kind: "follow-policy-suggestion" },
-    expectedSequenceRevision: 1,
-    eligibilityCharacteristics: {
-      requiresDesignDiscussion: false,
-      modifiesArchitectureOrPublicContract: false,
-      hasUnresolvedHighRiskRuling: false,
-      requiresCrossProjectCoordination: false,
-    },
-  });
-  await bootstrap.shutdown();
-  if (options.isJsonOutput) {
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-  } else {
-    if (result.outcome === "dispatched") {
+      anchor: {
+        predecessorTaskIds:
+          options.anchorTaskIdentifier === null ||
+          options.anchorTaskIdentifier === undefined
+            ? []
+            : [options.anchorTaskIdentifier],
+        successorTaskIds: [],
+      },
+      attachedContextReferenceHashes: options.attachedContextReferenceHashes ?? [],
+      expectedSequenceRevision: 0,
+      forceDispatchConfirmationText: options.forceDispatchConfirmation,
+    });
+    if (options.isJsonOutput) {
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+    } else if (result.outcome === "dispatched") {
       process.stdout.write(
-        `dispatched → ${result.targetSequenceId}（结果将由主 Agent 解释反馈）\n`,
+        `dispatched → ${result.targetSequenceId ?? "（未知序列）"}（结果将由主 Agent 解释反馈）\n`,
       );
     } else {
-      process.stdout.write(
-        `returned-to-main-agent: ${result.reason}\n`,
-      );
+      process.stdout.write(`returned-to-main-agent: ${result.reason ?? "不符合直投资格"}\n`);
     }
+    return EXIT_CODES.SUCCESS;
+  } catch (error) {
+    /** 直投被拒（序列不存在/次级不存在/资格不符）必须给人话 + 非零退出码。 */
+    return failWith(error as Error);
+  } finally {
+    await bootstrap.shutdown();
   }
-  return EXIT_CODES.SUCCESS;
 }
 
 /** T08C-07：四层 Agent 状态视图（主 Agent 对话目标提示清晰；只读）。 */

@@ -141,6 +141,8 @@ import {
   executeToolPackageRecoverCommand,
   executeToolPackageStatusCommand,
   executeUsageOverviewCommand,
+  executeDirectDispatchCommand,
+  executeAgentTreeCommand,
 } from "./cli/commands.js";
 
 import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
@@ -344,6 +346,11 @@ program
 /**
  * USAGE-01-03：用量最小概览（只读；由已落盘账目复算；不虚报官方余额，不泄漏他人明细）。
  */
+/** commander 可重复选项收集器（返回累积值，不丢弃前面的）。 */
+function collectValues(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
 const usageCommand = program.command("usage").description("用量概览（只读；由已落盘账目复算）");
 usageCommand
   .command("overview")
@@ -1362,6 +1369,65 @@ goalModeCommand
       goalIdentifier: options.goal,
       taskGroupIdentifier: options.group,
       note: options.note,
+    });
+  });
+
+/**
+ * ALIGN-01-04（2026-11-08）：**直投**（认证用户显式路由到具体次级）。
+ *
+ * 纪律：
+ * - 身份由本地宿主解析，**不接受**命令行自报用户；
+ * - 目标次级与目标序列必须真实存在；不存在就如实失败（不建序列、不猜收件人）；
+ * - 不调用主 Agent 模型，因此不是"另一次规划"。
+ */
+program
+  .command("direct-dispatch")
+  .description("把小型明确任务直投给具体次级 Agent（用户显式路由；不调用主 Agent 规划）")
+  .requiredOption("--target <agent-instance-id>", "目标次级 Agent 个体标识")
+  .requiredOption("--scope <text>", "任务范围描述（有界，不改架构/公共契约）")
+  .requiredOption("--instruction <text>", "用户原始任务指令（原文保留）")
+  .requiredOption("--acceptance <text>", "可核对的验收标准")
+  .option("--anchor <task-id>", "插入锚点：新任务排在它之后")
+  .option("--context-hash <sha256:hex>", "显式附件引用哈希（可重复）", collectValues, [])
+  .option(
+    "--force <text>",
+    "不符合直投资格时仍强制投递，需给出确认文本（缺省则不强制）",
+  )
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      target: string;
+      scope: string;
+      instruction: string;
+      acceptance: string;
+      anchor?: string;
+      contextHash?: string[];
+      force?: string;
+      json?: boolean;
+    }) => {
+      process.exitCode = await executeDirectDispatchCommand({
+        stateDirectory: defaultStateDirectory(),
+        isJsonOutput: options.json === true,
+        targetSecondaryAgentInstanceId: options.target,
+        scopeDescription: options.scope,
+        originalUserInstruction: options.instruction,
+        acceptanceCriteria: options.acceptance,
+        forceDispatchConfirmation: options.force ?? null,
+        anchorTaskIdentifier: options.anchor ?? null,
+        attachedContextReferenceHashes: options.contextHash ?? [],
+      });
+    },
+  );
+
+/** T08C-07（2026-11-08）：四层 Agent 只读视图（此前只有命令实现、无注册）。 */
+program
+  .command("agent-tree")
+  .description("只读查看四层 Agent 结构与路由通道（主 Agent 为唯一对话对象）")
+  .option("--json", "JSON 输出")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await executeAgentTreeCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
     });
   });
 

@@ -85,7 +85,12 @@ describe("mission 任务序列只读查询", () => {
       const outcome = await runtime.controller.requestRuntimeTaskInsertion({
         missionIdentifier: missionId,
         requestIdentifier: "insert-1",
-        expectedGroupRevision: sequence?.revision ?? 0,
+        /**
+         * 用插入前**重新读取**的当前 revision：任务收口会推进序列 revision，
+         * 上面读到的快照可能在收口完成前取到（并发下旧值会被正当拒绝）。
+         */
+        expectedGroupRevision:
+          (await runtime.controller.queryMissionTaskSequence(missionId))?.revision ?? 0,
         anchorTaskIdentifier: null,
         title: "补充任务",
         description: "运行中补充",
