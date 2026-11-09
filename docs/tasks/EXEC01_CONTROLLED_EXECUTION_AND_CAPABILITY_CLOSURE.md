@@ -454,3 +454,29 @@ init-sandbox --confirm-create-profile ⇒ exit 3「HRESULT=0x80070005」+ 指引
 
 **仍未做（如实）**：运行时/CLI **尚未调用**该工厂（装配仍是显式传 `sandboxExecutionBackend`）；
 Linux 的 bwrap 包装实现未写。
+
+## 02 运行时自动探测（2026-11-09）
+
+**缺口**：装配层仍无默认值 —— 产品入口无法"选择使用随包沙箱"。
+
+**新增选项**（`ApplicationRuntimeOptions`）：
+
+| 选项 | 缺省 | 说明 |
+|---|---|---|
+| `isSandboxBackendAutoDetected` | **false** | 探测会启动一次子进程，不能让每个测试 runtime 都付代价；产品入口显式开启 |
+| `sandboxApplicationRootPath` | `process.cwd()` | 定位随包辅助程序 |
+| `sandboxHelperExecutablePathOverride` | — | 高级部署/测试用 |
+
+**行为**：开启且组件存在 ⇒ 装配后端；找不到 ⇒ `null`；**两种情况 `start` 都拒绝**（不降级到宿主执行）。
+
+**顺带修掉一处真实缺陷**：辅助程序**无法启动**（文件不是可执行、权限不足）时，
+原先会把底层 `spawn EFTYPE` 原样抛给调用方 —— 上层既看不出原因、也读不出"该拒绝执行"。
+现在归为**不可用**并带出真实原因。
+
+**证据**（`exec01-02-runtime-autodetect` 3/3）：缺省不探测 ⇒ 拒绝原因为"未装配"；
+开启但无组件 ⇒ 仍拒绝；开启且组件存在（空文件）⇒ 装配后端、**探测后拒绝**，
+原因为"没有可用的隔离执行后端：辅助程序无法启动…"，且**未启动任何宿主进程**。
+
+公开全量 **656 files / 4484 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：CLI 尚未开启该开关；Linux bwrap 包装实现未写。
