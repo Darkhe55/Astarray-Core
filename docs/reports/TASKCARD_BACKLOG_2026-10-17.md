@@ -1629,3 +1629,24 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 1. `contextRecallControllerFactory` 实际**默认已装配**（卡内写"未装配"）；
 2. `createWorkWindowTransitionMonitor` 实际**已构造并 start**（卡内写"没有检测器"）；
 3. 审查者校验缺"隶属"一条已补（卡内原列在未做项）。
+
+### 11.G.6 2026-11-10 ALIGN-04 追加对账
+
+| 检查点 | 新增证据 | 状态 |
+|---|---|---|
+| 03 就绪分类与租约 | `align04-lease-takeover`（7）+ `align04-crash-resume-refusal`（4） | 两侧已跑通 |
+| 03 对账结论 | `align04-task-reconciliation-verdict`（7）+ 接入 `resumeMission` 拒绝分支 | **结论已记录**；**执行未做** |
+| 04 工作时段恢复 | `align04-work-window-resume`（7）；检测器本已存在 | 判定路径已跑 |
+| 05 胶囊回访 | `align04-context-recall-refusal`（2）+ `align04-context-recall-injection`（5） | 拒绝路径 + **注入面已落地**；自动触发未接 |
+
+**本轮新增的三处卡内陈述更正**（均为"卡旧、码新"）：
+
+1. `pauseKind` 是**调用方声明**而非存储推导 ⇒ 改判为"无存储实体，暂不可做"；
+2. 序列领取对账**已存在**（`reconcileStaleSequenceClaim`）⇒ "没有对账动作"收窄为任务级三类；
+3. `hasResumedSinceWake` 不持久化**不构成功能缺口**（一次性由队列移除保证）。
+
+**ALIGN-04 剩余可施工项（未阻塞）**：
+
+- 已产出 ⇒ 确认回执的**受控动作**（需先定义"产物有效"的判据）；
+- 启动恢复回填映射对崩溃 mission 的覆盖验证；
+- 回访的**自动触发**（需产品定义触发时机与预算）。
