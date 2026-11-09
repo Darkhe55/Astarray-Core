@@ -323,3 +323,26 @@
 
 **仍未验证**：启动恢复回填映射是否对"崩溃的 mission"**总能**发生（依赖恢复扫描覆盖范围），
 未跑对应用例 —— 这是下一步该补的证据。
+
+### 03 任务级对账结论已落地（2026-11-10 追加）
+
+**缺口**："不会把 running/blocked/已产出任务放回 pending 或**记录对账结论**"。
+上一轮已把表述收窄到任务级三类；本轮补上"**记录对账结论**"这一半。
+
+**交付**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 结论判定 | `orchestration/task-reconciliation-verdict.ts` | 每个未完成任务 → `none` / `resumable` / `requires-side-effect-review` / `requires-decision` / `requires-output-acknowledgement` |
+| 与就绪分类同口径 | 同上 | 判定顺序与 `projectMissionResumeReadiness` 一致（running > blocked > 已产出 > pending），避免两处口径分叉 |
+| 接入 | `main-controller.ts` `resumeMission` 拒绝分支 | 逐个 `streamOutput("[对账] …")`，**只写诊断、不改任务状态** |
+| 为什么只记录不改状态 | — | 把 running 打回 pending 可能让副作用**重复发生**，必须由人/上层决定 |
+
+**证据**（`align04-task-reconciliation-verdict` 7/7）：四类各自结论；running **不得**当作可重跑；
+已产出未回执要求先确认（带产物路径）；空 `resultLocation` 不误判；阻塞判定两侧；
+每条结论原因非空。
+
+公开全量 **672 files / 4575 passed + 3 skipped**。
+
+**仍未做（如实）**：**对账的"执行"仍未做** —— 没有把任何任务真的放回 pending 或标记 done；
+"已产出 ⇒ 确认回执"缺一个受控动作；启动恢复回填映射对崩溃 mission 是否总能发生仍未验证。

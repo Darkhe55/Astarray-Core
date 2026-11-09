@@ -157,6 +157,7 @@ import type { TaskInsertionProposal } from "./conversation-task-insertion-contro
 import { createMissionDispatchPorts } from "./secondary-continuous-dispatch-loop.js";
 import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dispatch-loop.js";
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
+import { projectTaskReconciliationVerdicts } from "./task-reconciliation-verdict.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
 import type { CrossAgentContextAttachmentController } from "./cross-agent-attachment-controller.js";
 import type { DirectDispatchController } from "./direct-dispatch-controller.js";
@@ -1509,6 +1510,22 @@ export class MainController {
      */
     const resumeReadiness = this.projectMissionResumeReadiness(missionStatus.taskChain);
     if (!resumeReadiness.isAutoResumable) {
+      /**
+       * ALIGN-04-03（2026-11-10）：**记录对账结论**（只写诊断，不改任务状态）。
+       *
+       * 打回 pending 可能让副作用重复发生，必须由人/上层决定；这里只把
+       * "每个未完成任务该做什么"落到可读诊断里，供恢复前查看。
+       */
+      const reconciliationVerdicts = projectTaskReconciliationVerdicts(
+        missionStatus.taskChain,
+      );
+      for (const verdict of reconciliationVerdicts) {
+        if (verdict.action === "none" || verdict.action === "resumable") continue;
+        this.options.streamOutput(
+          missionId,
+          `[对账] ${verdict.taskIdentifier}: ${verdict.action} —— ${verdict.reason}`,
+        );
+      }
       throw new DomainError(
         "mission-locked",
         `不自动恢复（需先对账/裁决）: ${resumeReadiness.blockedReasons.join("；")}`,
