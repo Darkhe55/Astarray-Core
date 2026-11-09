@@ -417,3 +417,32 @@ Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/�
 **未做（如实）**：解析器**尚未接入派发路径**（`DagScheduler.allocateAgentId` / Worker 登记仍未写
 `owningSecondaryAgentInstanceId`）；任务完成时的**自动任命与裁决**未接；`handleUserMessage`
 尚未要求/确定责任次级（从主 Agent 进入时"先确定承接次级"的路由未实现）。
+
+### 01/04 接线前发现：**当前 mission 的"次级"就是调度器本身**（2026-11-10）
+
+**核对**（`main-controller.ts:4038` `resolveSecondaryAgentInstanceIdentifier`）：
+
+```ts
+const agentInstanceId =
+  this.options.secondaryAgentInstanceIdFactory?.(missionId) ?? `scheduler:${missionId}`;
+```
+
+⇒ 未注入工厂时，mission 的"次级主体"是 **`scheduler:<missionId>`** —— 一个**伪个体**，
+而且正是用户裁决里明确否定的那种"把调度器当上级"。
+
+**因此不能**直接把 `resolveSecondaryAgentInstanceIdentifier()` 的返回值写进
+`responsibleSecondaryAgentInstanceId`：那会把"调度器"持久化成责任次级，**违反裁决**。
+
+**正确的迁移顺序**（下一步）：
+
+1. 为每个 assist mission 创建/指派一个**真实的次级 Agent 个体**（`agentRole: "secondary"`，
+   登记进 `RegisteredAgentDirectory`），由它承接并派发；
+2. `scheduler:<missionId>` 仅保留为**派发来源标签**（反馈路由等既有用途），**不再充当上级**；
+3. 再把真实次级写入 `responsibleSecondaryAgentInstanceId`；
+4. 然后才把 `resolveWorkerDirectSuperior` 接进派发（未绑定即阻断）。
+
+**风险提示**：`scheduler:` 在 `main-controller`(7 处)、`mission-orchestrator`(5 处)、
+`worker-agent`、`public-sdk` 等都有引用，属**跨模块迁移**，必须分批做并每批跑权威门禁；
+一次性改默认身份字符串会同时动摇反馈路由与报告认证。
+
+**本轮不改代码**：接线前提不成立，改了就是"把调度器写成上级"。
