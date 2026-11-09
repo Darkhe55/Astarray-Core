@@ -398,3 +398,38 @@ AppContainer 不可建 ⇒ 不可用且原因带出 `0x80070005`；不可用时 
 **仍未做（如实）**：本机实测该后端 `probeCapability()` 报**不可用**（AppContainer 档案建不了）
 ⇒ 受控执行在产品里仍是"拒绝执行"状态，直到安装期初始化落地。协议测试用注入进程，
 **不声称隔离**（隔离证据见 `EXEC01_02_B1_REVISED_2026-11-09.md`）。
+
+## 02 安装期一次性初始化（2026-11-09）
+
+按裁决做成**唯一提权入口**，客户端整体不提权：
+
+```powershell
+sandbox-helper.exe init-sandbox --confirm-create-profile [--profile <name>]
+```
+
+| 约束（裁决原文） | 落点 |
+|---|---|
+| 明确用户确认 | 无 `--confirm-create-profile` ⇒ **退出码 2**，明确说明原因与"仅安装期一次" |
+| 每用户档案 | 只对**当前用户**建（`CreateAppContainerProfile` 即 per-user per-app） |
+| 运行期非管理员 | 建完立刻验证 `Derive...`（运行期只走这条，**派生失败即初始化白做**，退出码 4） |
+| 不得整体提权 | 该子命令是唯一需要提权的入口；`run`/`probe` 不需要 |
+
+**实测两条拒绝路径**（真实二进制）：
+
+```
+init-sandbox                         ⇒ exit 2「拒绝执行：创建沙箱档案需要显式确认」
+init-sandbox --confirm-create-profile ⇒ exit 3「HRESULT=0x80070005」+ 指引
+```
+
+**证据**（`exec01-02-sandbox-init` 3/3，辅助程序未构建时**跳过**而非伪造通过）：
+无确认 ⇒ 拒绝且不出现 `profile-created`；有确认但无权限 ⇒ 非 0 且不声称成功
+（已提权环境则要求 `profile-created` + `derive-ok`）；`probe` 报不可用时退出码必须非 0。
+
+**顺带修掉一处未处理拒绝**：任务轮询用 `promise.finally(...)` 且只 `void` 掉派生 Promise，
+原 Promise 拒绝时会产生未处理拒绝（实测：mission 被取消后轮询报"任务不存在"，
+整轮 4478 全绿却 exit 1）。改为显式 `catch` 后结算。
+
+公开全量 **654 files / 4478 passed + 3 skipped，exit 0**。
+
+**仍未验证（如实）**：**提权后建档案是否真的成功** —— 本会话无交互式提权，`init-sandbox` 的
+成功分支只写了断言，未取得真实成功记录。
