@@ -696,11 +696,38 @@ export interface CrossProjectImportResult {
  * 真实 I/O 必须可注入（可测替换、可审计、可换成受控边界实现），
  * 且"是否真的读/写"必须由调用方提供的端口行为决定，而不是由本服务**自称**。
  */
+/**
+ * PROJECT-01（2026-11-09）：单次操作的**范围上下文**。
+ *
+ * 由服务在**已完成绑定校验之后**传入：`allowedProjectRootPaths` 是本次操作
+ * 已证实的来源/目标项目根。端口据此放行"工作区根之外的合法项目根"，
+ * 从而修复"两个项目根互为兄弟目录时合法授权被判 path-escape-attempt"。
+ *
+ * 为什么安全：这些根不是模型输入，而是服务用来证明
+ * `绝对路径 === 项目根 + 声明相对路径` 的那对参数；绑定校验已经拒绝了逃逸。
+ */
+export interface CrossProjectResourceIoScopeContext {
+  readonly allowedProjectRootPaths?: readonly string[];
+}
+
 export interface CrossProjectResourceIoPort {
-  readTextFile(absolutePath: string): Promise<string>;
-  writeTextFile(absolutePath: string, content: string): Promise<void>;
-  ensureDirectory(absoluteDirectoryPath: string): Promise<void>;
-  fileExists(absolutePath: string): Promise<boolean>;
+  readTextFile(
+    absolutePath: string,
+    scopeContext?: CrossProjectResourceIoScopeContext,
+  ): Promise<string>;
+  writeTextFile(
+    absolutePath: string,
+    content: string,
+    scopeContext?: CrossProjectResourceIoScopeContext,
+  ): Promise<void>;
+  ensureDirectory(
+    absoluteDirectoryPath: string,
+    scopeContext?: CrossProjectResourceIoScopeContext,
+  ): Promise<void>;
+  fileExists(
+    absolutePath: string,
+    scopeContext?: CrossProjectResourceIoScopeContext,
+  ): Promise<boolean>;
 }
 
 /**
@@ -893,15 +920,26 @@ export class CrossProjectTransferService {
     if (!binding.isAllowed) {
       return denied("resource-out-of-scope", binding.detail);
     }
+    /**
+     * PROJECT-01（2026-11-09）：把**已证实的来源项目根**作为本次读取的允许根。
+     *
+     * 绑定校验刚刚证明了"绝对路径 === 项目根 + 声明相对路径"且未逃逸，
+     * 因此该根可以安全地作为"工作区之外也允许"的范围。
+     */
+    const readScopeContext: CrossProjectResourceIoScopeContext = {
+      ...(input.sourceProjectRootPath === undefined
+        ? {}
+        : { allowedProjectRootPaths: [input.sourceProjectRootPath] }),
+    };
 
-    if (!(await resourceIo.fileExists(binding.resolvedAbsolutePath))) {
+    if (!(await resourceIo.fileExists(binding.resolvedAbsolutePath, readScopeContext))) {
       return denied("resource-not-found", "资源不存在：" + input.resourcePath);
     }
 
     let content: string;
     let sourceContentHashBefore: string;
     try {
-      content = await resourceIo.readTextFile(binding.resolvedAbsolutePath);
+      content = await resourceIo.readTextFile(binding.resolvedAbsolutePath, readScopeContext);
       sourceContentHashBefore = CrossProjectTransferService.sha256Text(content);
     } catch (error) {
       return denied("resource-read-failed", "资源读取失败：" + (error as Error).message);
@@ -924,7 +962,7 @@ export class CrossProjectTransferService {
     // 读后再取一次来源哈希：与读取前相等 ⇒ 来源零写入的可核对证据。
     let sourceContentHashAfter: string;
     try {
-      const sourceTextAfterRead = await resourceIo.readTextFile(binding.resolvedAbsolutePath);
+      const sourceTextAfterRead = await resourceIo.readTextFile(binding.resolvedAbsolutePath, readScopeContext);
       sourceContentHashAfter = CrossProjectTransferService.sha256Text(sourceTextAfterRead);
     } catch (error) {
       return denied(
@@ -1077,6 +1115,12 @@ export class CrossProjectTransferService {
       await releaseClaim();
       return refusal("resource-out-of-scope", sourceBinding.detail);
     }
+    /** PROJECT-01：来源侧只允许来源项目根（绑定校验已证未逃逸）。 */
+    const sourceScopeContext: CrossProjectResourceIoScopeContext = {
+      ...(input.sourceProjectRootPath === undefined
+        ? {}
+        : { allowedProjectRootPaths: [input.sourceProjectRootPath] }),
+    };
     const targetBinding = await this.authorizeAccessTarget({
       projectRootPath: input.targetProjectRootPath,
       relativeResourcePath: input.targetResourcePath,
@@ -1094,6 +1138,20 @@ export class CrossProjectTransferService {
       await releaseClaim();
       return refusal("resource-out-of-scope", targetBinding.detail);
     }
+    /**
+     * PROJECT-01（2026-11-09）：来源与目标两个项目根都已由绑定校验证实，
+     * 一并作为本次写入的允许根（兄弟目录布局下缺一不可）。
+     */
+    const transferScopeContext: CrossProjectResourceIoScopeContext = {
+      allowedProjectRootPaths: [
+        ...(input.sourceProjectRootPath === undefined
+          ? []
+          : [input.sourceProjectRootPath]),
+        ...(input.targetProjectRootPath === undefined
+          ? []
+          : [input.targetProjectRootPath]),
+      ],
+    };
 
     const resourceIo = this.options.resourceIo;
     if (
@@ -1109,14 +1167,14 @@ export class CrossProjectTransferService {
     }
 
     // 真实读取来源（并取前后哈希 ⇒ 来源零写入的可核对证据）
-    if (!(await resourceIo.fileExists(sourceBinding.resolvedAbsolutePath))) {
+    if (!(await resourceIo.fileExists(sourceBinding.resolvedAbsolutePath, sourceScopeContext))) {
       await releaseClaim();
       return refusal("resource-not-found", "来源资源不存在：" + input.sourceResourcePath);
     }
     let sourceContent: string;
     let sourceContentHashBefore: string;
     try {
-      sourceContent = await resourceIo.readTextFile(sourceBinding.resolvedAbsolutePath);
+      sourceContent = await resourceIo.readTextFile(sourceBinding.resolvedAbsolutePath, sourceScopeContext);
       sourceContentHashBefore = CrossProjectTransferService.sha256Text(sourceContent);
     } catch (error) {
       await releaseClaim();
@@ -1139,7 +1197,7 @@ export class CrossProjectTransferService {
     // 真实写出目标副本之前：**目标已存在时必须先查人工改动**（拒绝陈旧覆盖）。
     // 目标不存在 ⇒ 无需询问守卫（避免无谓 I/O）。
     try {
-      if (await resourceIo.fileExists(targetBinding.resolvedAbsolutePath)) {
+      if (await resourceIo.fileExists(targetBinding.resolvedAbsolutePath, transferScopeContext)) {
         const guard = this.options.humanEditGuard;
         if (guard === undefined) {
           await releaseClaim();
@@ -1181,8 +1239,8 @@ export class CrossProjectTransferService {
 
     // 真实写出目标副本（先建父目录，再写内容）
     try {
-      await resourceIo.ensureDirectory(path.dirname(targetBinding.resolvedAbsolutePath));
-      await resourceIo.writeTextFile(targetBinding.resolvedAbsolutePath, sourceContent);
+      await resourceIo.ensureDirectory(path.dirname(targetBinding.resolvedAbsolutePath), transferScopeContext);
+      await resourceIo.writeTextFile(targetBinding.resolvedAbsolutePath, sourceContent, transferScopeContext);
     } catch (error) {
       await releaseClaim();
       return {
@@ -1192,7 +1250,7 @@ export class CrossProjectTransferService {
     }
 
     // 写出后复核目标确实存在：回执成立必须以文件成立为前提。
-    if (!(await resourceIo.fileExists(targetBinding.resolvedAbsolutePath))) {
+    if (!(await resourceIo.fileExists(targetBinding.resolvedAbsolutePath, transferScopeContext))) {
       await releaseClaim();
       return {
         ...refusal("target-write-failed", "写入后复核目标不存在：不落定回执"),
@@ -1203,7 +1261,7 @@ export class CrossProjectTransferService {
     let sourceContentHashAfter: string;
     try {
       sourceContentHashAfter = CrossProjectTransferService.sha256Text(
-        await resourceIo.readTextFile(sourceBinding.resolvedAbsolutePath),
+        await resourceIo.readTextFile(sourceBinding.resolvedAbsolutePath, sourceScopeContext),
       );
     } catch (error) {
       await releaseClaim();

@@ -2858,6 +2858,31 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           protectedStoragePolicy: new ProtectedStoragePolicy({
             stateDirectoryPath: options.stateDirectory,
           }),
+          /**
+           * PROJECT-01（2026-11-09）：**把授权范围里的真实路径并入允许根**。
+           *
+           * 受控端口此前只认单一工作区根，而跨项目借阅的真实布局常是
+           * "两个项目根互为兄弟目录" ⇒ 合法授权也被判 `path-escape-attempt`（实测复现）。
+           * 这里从**已生效的授权记录**里取 `resourceScope.realPaths` 作为额外允许根：
+           * 只放行认证用户明确授权过的对象，模型无法扩大该集合。
+           */
+          additionalAllowedRootsProvider: async () => {
+            const store = new CrossProjectAuthorizationStore({
+              baseDirectory: options.stateDirectory,
+            });
+            const authorizations = await store.listAuthorizations();
+            const allowedRoots = new Set<string>();
+            for (const authorization of authorizations) {
+              /** 只采信**生效中**的授权：已撤销的不再提供允许根。 */
+              if (authorization.state !== "active") continue;
+              for (const realPath of authorization.resourceScope.realPaths) {
+                if (typeof realPath === "string" && realPath.trim() !== "") {
+                  allowedRoots.add(realPath);
+                }
+              }
+            }
+            return [...allowedRoots];
+          },
         }),
       /**
        * PROJECT-01-03（2026-10-31）：**人工改动守卫默认装配**。
@@ -6758,7 +6783,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     // 声明的内容哈希取自**来源实际内容**：入口不猜哈希，避免把别的版本当本次许可内容。
     let declaredContentHash = "";
     try {
-      const sourceText = await this.crossProjectResourceIo.readTextFile(input.absoluteSourcePath);
+      /**
+       * PROJECT-01（2026-11-09）：读取声明哈希时**同样要带来源项目根**。
+       * 缺它时兄弟目录布局下这次读取会被判逃逸 ⇒ 哈希为空 ⇒ 导入必然
+       * `content-hash-mismatch`（实测踩到）。
+       */
+      const sourceText = await this.crossProjectResourceIo.readTextFile(
+        input.absoluteSourcePath,
+        input.sourceProjectRootPath === undefined
+          ? undefined
+          : { allowedProjectRootPaths: [input.sourceProjectRootPath] },
+      );
       declaredContentHash = createHash("sha256").update(sourceText, "utf8").digest("hex");
     } catch {
       // 来源不可读 ⇒ 保持空哈希：后续会因 "contentHash 与来源实际不一致" 被如实拒绝。

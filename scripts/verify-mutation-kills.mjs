@@ -3119,9 +3119,20 @@ export const MUTATIONS = [
   {
     mutationIdentifier: "project01-controlled-port-skips-workspace-boundary",
     targetFile: "packages/core/src/tools/controlled-cross-project-resource-io.ts",
-    find: `    const resolvedWithinWorkspace =
-      await this.workspaceBoundary.resolveWithinWorkspace(absolutePath);`,
-    replace: `    const resolvedWithinWorkspace = absolutePath;`,
+    /**
+     * PROJECT-01（2026-11-09）：锚点随"额外允许根"改动同步更新。
+     *
+     * 现在越界时会先尝试额外允许根（跨项目兄弟目录），因此变异体改为
+     * **跳过工作区边界判定**（直接采用绝对路径）—— 语义仍是"跳过边界"，
+     * 且仍会被三条越界反例杀死。
+     */
+    find: `    let resolvedWithinWorkspace: string;
+    try {
+      resolvedWithinWorkspace =
+        await this.workspaceBoundary.resolveWithinWorkspace(absolutePath);`,
+    replace: `    let resolvedWithinWorkspace: string = absolutePath;
+    try {
+      resolvedWithinWorkspace = absolutePath;`,
     testFiles: [
       "tests/core/integration/project01-controlled-resource-io-port.test.ts",
     ],

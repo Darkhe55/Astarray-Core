@@ -122,11 +122,17 @@ async function runMissionWithProcessExecution(input: {
 
 describe("EXEC-01-04 生产接线", () => {
   it("assist：调用 processExecution 走到权限询问（证明工具真的可达）", async () => {
-    const { streamedJoined } = await runMissionWithProcessExecution({ mode: "assist" });
-    /** 不是"未注册"，而是**走到了权限裁决**。 */
-    expect(streamedJoined).not.toContain("tool-not-found");
-    expect(streamedJoined).toContain("processExecution");
-    expect(streamedJoined).toMatch(/需要权限调用 processExecution/u);
+    const { streamedJoined, inputTranscript } = await runMissionWithProcessExecution({
+      mode: "assist",
+    });
+    /**
+     * 询问文本可能经流式输出，也可能只出现在**工具结果回填**里（`permission-ask-pending`）；
+     * 只断言其中一条通道会在满载时翻红（实测踩到两次）。这里对两者取并集。
+     */
+    const observed = streamedJoined + "\n" + inputTranscript;
+    expect(observed).not.toContain("tool-not-found");
+    expect(observed).toContain("processExecution");
+    expect(observed).toMatch(/permission-ask-pending|需要权限调用 processExecution/u);
   }, 90_000);
 
   it("devolve：放行后如实报未装配沙箱后端，不降级宿主执行", async () => {
