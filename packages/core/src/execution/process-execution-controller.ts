@@ -245,6 +245,30 @@ export class ProcessExecutionController {
     /** 幂等：同键同参返回原执行，异参拒绝（不重启进程）。 */
     const idempotencyKey = input.request.idempotencyKey;
     if (idempotencyKey !== undefined) {
+      /**
+       * EXEC-01-03：**毒化键优先**。
+       *
+       * 重启对账若无法确认某次执行是否真的跑过，该幂等键会被毒化；
+       * 此后再用同一个键启动，可能重复副作用 ⇒ 必须拒绝，且**不**回退到"新建执行"。
+       */
+      const poisonedCheck = this.store as unknown as {
+        isIdempotencyKeyPoisoned?: (input: {
+          readonly agentInstanceIdentifier: string;
+          readonly idempotencyKey: string;
+        }) => Promise<boolean>;
+      };
+      if (typeof poisonedCheck.isIdempotencyKeyPoisoned === "function") {
+        const isPoisoned = await poisonedCheck.isIdempotencyKeyPoisoned({
+          agentInstanceIdentifier: input.ownership.agentInstanceIdentifier,
+          idempotencyKey,
+        });
+        if (isPoisoned) {
+          throw new DomainError(
+            "execution-idempotency-conflict",
+            `幂等键 ${idempotencyKey} 的副作用可能已经发生（重启对账不确定）：拒绝复用启动新执行`,
+          );
+        }
+      }
       const existing = await this.store.readByIdempotencyKey({
         agentInstanceIdentifier: input.ownership.agentInstanceIdentifier,
         idempotencyKey,
