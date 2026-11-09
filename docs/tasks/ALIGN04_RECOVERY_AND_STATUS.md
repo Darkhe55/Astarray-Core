@@ -278,3 +278,25 @@
 
 **仍未做（如实）**：ALIGN-04-03 的**对账动作**（把 running/blocked/已产出任务放回 pending）
 与 ALIGN-04-05 的**提示词注入回访**——两者都是真实可做的编码项，留待余量充足时施工。
+
+### 05 回访内容注入装配（2026-11-10 追加）
+
+**缺口（本卡记录）**："**未注入提示词装配**（组装上下文时不会自动回访，只能由上层显式调用）"。
+
+**本轮交付（注入面）**：`assembleContextPrompt` 新增可选输入 `recalledContextBlocks`：
+
+| 约束 | 实现 |
+|---|---|
+| 缺省不注入 | 未传 ⇒ **不出现该区块**，`injectedRecalledContextNodeIdentifiers` 为空（旧行为不变） |
+| **必须带来源** | 每块需 `contextNodeIdentifier` + `sourceRevision`；标识或正文为空的块**一律不注入** |
+| **显式边界声明** | 注入时写明"仅为所列节点的关闭摘要，**不是完整历史**，也不含其他节点内容" |
+| 可追溯 | 返回 `injectedRecalledContextNodeIdentifiers` 列出实际注入的节点 |
+
+**证据**（`align04-context-recall-injection` 5/5）：缺省不注入；注入带节点与 revision；
+边界声明存在；无标识/无正文不注入；多块逐个记录。
+
+公开全量 **671 files / 4568 passed + 3 skipped**。
+
+**仍未做（如实）**：**自动触发未接线** —— 装配时**不会自己去回访**，仍需上层显式把
+`recallClosedContext` 的结果传进来。本轮只把**注入面**做出来并钉住契约，
+"自动回访"需要先定义触发时机（每次装配？仅上下文被裁剪时？）与预算约束，属产品决策。

@@ -61,6 +61,18 @@ export interface AssembleContextPromptInput {
   activeFrontier: ContextPromptActiveFrontier | null;
   /** 上游插入任务时声明的上下文包（可选；缺省不注入该区块）。 */
   contextPacks?: ReadonlyArray<ContextPack>;
+  /**
+   * ALIGN-04-05（2026-11-10）：**按节点回访的已关闭上下文**（可选）。
+   *
+   * 由 `recallClosedContext` 的结果转换而来；**缺省不注入该区块**（旧行为不变）。
+   * 每个块必须带节点标识与来源 revision —— 没有来源的文本一律不注入，
+   * 避免"看起来像历史但无法追溯"的内容进入提示词。
+   */
+  recalledContextBlocks?: ReadonlyArray<{
+    readonly contextNodeIdentifier: string;
+    readonly sourceRevision: number;
+    readonly text: string;
+  }>;
 }
 
 export interface AssembledContextPrompt {
@@ -76,6 +88,8 @@ export interface AssembledContextPrompt {
   unsatisfiedNecessaryConditionIdentifiers: string[];
   /** 实际注入的上下文包标识（原子包整包注入）。 */
   injectedContextPackIdentifiers?: string[];
+  /** ALIGN-04-05：实际注入的回访节点标识（缺省区块不注入 ⇒ 空数组）。 */
+  injectedRecalledContextNodeIdentifiers?: string[];
 }
 
 export function assembleContextPrompt(
@@ -149,6 +163,28 @@ export function assembleContextPrompt(
     );
   }
 
+  /**
+   * ALIGN-04-05（2026-11-10）：**按节点回访区块**。
+   *
+   * 只接受**带来源**的块（节点标识 + revision）；没有来源的文本不注入，
+   * 且明确标注"这是该节点的已关闭摘要，不是完整历史"，防止被当成全局记忆。
+   */
+  const injectedRecalledContextNodeIdentifiers: string[] = [];
+  const recalledBlocks = input.recalledContextBlocks ?? [];
+  const usableRecalledBlocks = recalledBlocks.filter(
+    (block) => block.contextNodeIdentifier.trim() !== "" && block.text.trim() !== "",
+  );
+  if (usableRecalledBlocks.length > 0) {
+    lines.push("", "[按节点回访的已关闭上下文]");
+    lines.push("（以下仅为所列节点的关闭摘要，不是完整历史，也不含其他节点内容。）");
+    for (const block of usableRecalledBlocks) {
+      lines.push(
+        `- 节点 ${block.contextNodeIdentifier}（revision ${block.sourceRevision}）: ${block.text.trim()}`,
+      );
+      injectedRecalledContextNodeIdentifiers.push(block.contextNodeIdentifier);
+    }
+  }
+
   const promptText = lines.join("\n");
   return {
     promptText,
@@ -163,6 +199,7 @@ export function assembleContextPrompt(
     excludedClosedNodeCount: input.activeFrontier?.excludedClosedNodeCount ?? 0,
     unsatisfiedNecessaryConditionIdentifiers,
     injectedContextPackIdentifiers: renderedPacks.injectedPackIdentifiers.slice(),
+    injectedRecalledContextNodeIdentifiers,
   };
 }
 
