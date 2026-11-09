@@ -543,3 +543,25 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 
 **仍未做（如实）**：资源上限（内存/进程数）在 Linux 后端尚未施加（该 bwrap 构建无 `--rlimit-*`，
 需 `prlimit`/cgroup）；裸机 Linux 复测未做。
+
+## 02 资源上限真正生效（2026-11-09）
+
+**缺口**：上限**按环境登记**了，但端口只带"流存储预算" ⇒ 两个后端都拿不到内存/进程数上限
+⇒ 登记的限额对真实执行**完全不生效**。
+
+**修复**：
+
+| 层 | 改动 |
+|---|---|
+| 端口 | `SandboxExecutionBackend.start` 新增 `resourceLimits`（内存字节 + 进程数） |
+| 控制器 | 从**环境登记表**读取后传入（后端不得自选"给多少"） |
+| Windows 辅助程序 | 传 `--max-memory-mb` / `--max-processes`（参数一直存在，但**从没人传过**） |
+| Linux | 前缀 `prlimit --as=… --nproc=… --`（该 bwrap 构建无 `--rlimit-*`） |
+
+**证据**：`exec01-02-bubblewrap-backend` 9/9（新增 prlimit 前缀与退化值两条）；
+`exec01-02-sandbox-helper-backend` 6/6；其余执行用例 26/26 全通过。
+
+公开全量 **658 files / 4494 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：`prlimit` 的实际拦截效果在 Linux 上**未实测**（WSL 里只验证过 `ulimit -v`
+能挡住超额分配）；裸机复测未做。
