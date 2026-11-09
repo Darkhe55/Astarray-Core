@@ -43,6 +43,22 @@ export const PROCESS_EXECUTION_STATUSES = [
 ] as const;
 export type ProcessExecutionStatus = (typeof PROCESS_EXECUTION_STATUSES)[number];
 
+/**
+ * EXEC-01-03：**终止原因分类**。
+ *
+ * 为什么需要独立字段：`cancelled` 同时覆盖"调用方取消"与"权限被撤销"，
+ * 只靠 `failureReason` 的自由文本无法可靠区分，也无法据此决定是否允许重试。
+ * `null` = 尚未终止（或旧记录没有该字段）。
+ */
+export const PROCESS_EXECUTION_TERMINATION_KINDS = [
+  "caller-cancelled",
+  "timed-out",
+  "authorization-revoked",
+  "backend-failed",
+] as const;
+export type ProcessExecutionTerminationKind =
+  (typeof PROCESS_EXECUTION_TERMINATION_KINDS)[number];
+
 export interface ExecutionResourcePolicy {
   readonly maximumCpuMilliseconds: number;
   readonly maximumMemoryBytes: number;

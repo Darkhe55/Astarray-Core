@@ -15,6 +15,7 @@ import type {
   ProcessExecutionOwnership,
   ProcessExecutionStartRequest,
   ProcessExecutionStatus,
+  ProcessExecutionTerminationKind,
 } from "./execution-contract.js";
 import {
   buildProcessExecutionIdentity,
@@ -86,6 +87,11 @@ export interface ProcessExecutionRecord {
   backendExecutionHandle: string | null;
   exitCode: number | null;
   failureReason: string | null;
+  /**
+   * 终止原因分类（EXEC-01-03）。旧记录没有该字段 ⇒ 读回时按 `null` 处理，
+   * **不猜测**它是取消还是失败。
+   */
+  terminationKind?: ProcessExecutionTerminationKind | null;
   readonly queuedAtIso: string;
   startedAtIso: string | null;
   finishedAtIso: string | null;
@@ -165,6 +171,8 @@ export interface ProcessExecutionStatusResult {
   readonly queuedAtIso: string;
   readonly startedAtIso: string | null;
   readonly finishedAtIso: string | null;
+  /** EXEC-01-03：终止原因分类（`null` = 尚未终止，或旧记录未记录）。 */
+  readonly terminationKind: ProcessExecutionTerminationKind | null;
 }
 
 export interface ProcessExecutionOutputResult {
@@ -383,6 +391,7 @@ export class ProcessExecutionController {
       queuedAtIso: refreshed.queuedAtIso,
       startedAtIso: refreshed.startedAtIso,
       finishedAtIso: refreshed.finishedAtIso,
+      terminationKind: refreshed.terminationKind ?? null,
     };
   }
 
@@ -453,6 +462,13 @@ export class ProcessExecutionController {
     readonly requestingAgentInstanceIdentifier: string;
     readonly executionId: string;
     readonly reason: string;
+    /**
+     * 终止原因分类（缺省 `caller-cancelled`）。
+     *
+     * 权限撤销必须与调用方取消**分开**：前者不允许自动重试，后者允许。
+     * 调用方自述不足以为证，因此该值只由受信控制面传入。
+     */
+    readonly terminationKind?: ProcessExecutionTerminationKind;
   }): Promise<ProcessExecutionStatusResult> {
     const record = await this.requireAccessibleRecord(input);
     if (this.sandboxBackend === null || record.backendExecutionHandle === null) {
@@ -470,6 +486,7 @@ export class ProcessExecutionController {
       status: snapshot.status,
       exitCode: snapshot.exitCode,
       failureReason: snapshot.failureReason ?? input.reason,
+      terminationKind: input.terminationKind ?? "caller-cancelled",
       finishedAtIso: this.nowIso(),
     };
     await this.store.write(cancelledRecord);
@@ -482,6 +499,7 @@ export class ProcessExecutionController {
       queuedAtIso: cancelledRecord.queuedAtIso,
       startedAtIso: cancelledRecord.startedAtIso,
       finishedAtIso: cancelledRecord.finishedAtIso,
+      terminationKind: cancelledRecord.terminationKind ?? null,
     };
   }
 
@@ -579,6 +597,17 @@ export class ProcessExecutionController {
       status: snapshot.status,
       exitCode: snapshot.exitCode,
       failureReason: snapshot.failureReason,
+      /**
+       * EXEC-01-03：终止原因**由后端状态推导**，不由调用方自述。
+       * 只有 `timed-out` / `failed` 能从状态本身确定；`cancelled` 需要区分
+       * "调用方取消"与"权限撤销"，因此**不在**这里推断（由 cancel 路径显式设置）。
+       */
+      terminationKind:
+        snapshot.status === "timed-out"
+          ? "timed-out"
+          : snapshot.status === "failed"
+            ? "backend-failed"
+            : (record.terminationKind ?? null),
       finishedAtIso: isTerminal ? (record.finishedAtIso ?? this.nowIso()) : null,
     };
     await this.store.write(updated);

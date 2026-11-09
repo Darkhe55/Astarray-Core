@@ -1683,6 +1683,7 @@ export type PublicAstarrayEvent = (
       status: string;
       exitCode: number | null;
       failureReason: string | null;
+      terminationKind: string | null;
     }
 ) & {
   /** 权威状态 revision（任务链 revision；会话事件用会话内单调计数）。 */
@@ -6341,6 +6342,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     queuedAtIso: string;
     startedAtIso: string | null;
     finishedAtIso: string | null;
+    /** EXEC-01-03：终止原因分类（`null` = 尚未终止）。 */
+    terminationKind: string | null;
   }> {
     this.assertOpen();
     this.requireSession(input.sessionId);
@@ -6361,6 +6364,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         status: status.status,
         exitCode: status.exitCode,
         failureReason: status.failureReason,
+        terminationKind: status.terminationKind,
       });
       return {
         executionId: status.executionId,
@@ -6371,6 +6375,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         queuedAtIso: status.queuedAtIso,
         startedAtIso: status.startedAtIso,
         finishedAtIso: status.finishedAtIso,
+        terminationKind: status.terminationKind,
       };
     } catch (error) {
       throw this.toProcessExecutionPublicError(error);
@@ -6436,6 +6441,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         status: status.status,
         exitCode: status.exitCode,
         failureReason: status.failureReason,
+        terminationKind: status.terminationKind,
       });
       return {
         executionId: status.executionId,
@@ -6459,6 +6465,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     status: string;
     exitCode: number | null;
     failureReason: string | null;
+    terminationKind: string | null;
   }): void {
     const previousStatus = this.lastEmittedExecutionStatuses.get(input.executionId);
     if (previousStatus === input.status) return;
@@ -6470,6 +6477,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       exitCode: input.exitCode,
       failureReason:
         input.failureReason === null ? null : redactSensitiveText(input.failureReason),
+      terminationKind: input.terminationKind,
       revision: this.nextSessionEventRevision(input.sessionId),
       idempotencyId: this.nextEventIdempotencyId(),
     });
