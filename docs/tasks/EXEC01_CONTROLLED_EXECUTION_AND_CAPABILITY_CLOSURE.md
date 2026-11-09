@@ -433,3 +433,24 @@ init-sandbox --confirm-create-profile ⇒ exit 3「HRESULT=0x80070005」+ 指引
 
 **仍未验证（如实）**：**提权后建档案是否真的成功** —— 本会话无交互式提权，`init-sandbox` 的
 成功分支只写了断言，未取得真实成功记录。
+
+## 02 平台后端装配（2026-11-09）
+
+**缺口**：辅助程序后端已存在，但**没有代码决定"要不要用它"** ⇒ 装配层仍无默认值。
+
+**新增** `packages/core/src/execution/platform-sandbox-backend.ts`：
+
+| 函数 | 语义 |
+|---|---|
+| `resolveSandboxHelperExecutablePath` | 显式覆盖 > 随包位置（`native/sandbox-helper/sandbox-helper.exe`）；不存在 ⇒ `null` |
+| `createPlatformSandboxExecutionBackend` | 路径为 `null` ⇒ 返回 `null`（**不造一个"凑合能用"的后端**） |
+
+非 Windows 返回 `null`：Linux 需要的是 bwrap 包装（另一实现），**不冒充**已有。
+
+**证据**（`exec01-02-platform-backend` 3/3）：无辅助程序 ⇒ `null` 且不构造后端；
+覆盖指向不存在的文件 ⇒ `null`；覆盖指向真实文件 ⇒ 解析成功并构造后端。
+
+公开全量 **655 files / 4481 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：运行时/CLI **尚未调用**该工厂（装配仍是显式传 `sandboxExecutionBackend`）；
+Linux 的 bwrap 包装实现未写。
