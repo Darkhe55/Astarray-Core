@@ -4810,7 +4810,17 @@ export class MainController {
               } catch {
                 // 报告索引是辅助观测；失败不覆盖已确认的终态
               }
-            })();
+            })().catch((error: unknown) => {
+              /**
+               * 完成门禁是**旁路观测**：mission 目录已被清理（测试收尾、或用户删除）时
+               * `getMissionStatus` 会抛 `mission-not-found`。
+               *
+               * 这个 IIFE 是 fire-and-forget，未捕获的拒绝会变成**未处理拒绝**，
+               * 把整轮门禁的退出码打成非 0（实测：4506 条全绿仍 exit 1）。
+               * 这里显式吞掉：门禁失败不应反过来影响已确认的终态。
+               */
+              void error;
+            });
             return;
           }
           this.options.missionRuntimeRegistry?.release(missionId);
