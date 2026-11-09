@@ -8,6 +8,7 @@
  * - 首版非交互（stdin 关闭）、有限时长、网络禁止。
  */
 import { DomainError } from "../core/errors.js";
+import { redactSensitiveText } from "../orchestration/diagnostic-event-store.js";
 import type {
   ExecutionEnvironmentRegistry,
   ProcessExecutionIdentity,
@@ -173,6 +174,12 @@ export interface ProcessExecutionOutputResult {
   readonly nextCursorBytes: number;
   readonly isTruncated: boolean;
   readonly isStreamStorageLimitReached: boolean;
+  /**
+   * 本次读取是否发生了敏感内容替换（`false` = 未发现，不是"没有扫描"）。
+   *
+   * 只报事实，不报"发现了什么"：把命中的凭据类型回传给调用方等于二次泄漏。
+   */
+  readonly isSensitiveContentRedacted: boolean;
 }
 
 export class ProcessExecutionController {
@@ -421,13 +428,24 @@ export class ProcessExecutionController {
       fromCursorBytes: input.fromCursorBytes,
       maximumBytes,
     });
+    /**
+     * EXEC-01-03：**返回前的敏感扫描门禁**。
+     *
+     * 为什么放在控制器而不是各自调用方：工具路径与 SDK 路径都会读输出，
+     * 只在其中一处脱敏就等于另一处照原样外泄（实测过同类问题：运行历史
+     * 曾"先落盘再在展示层遮挡"）。这里统一在**离开控制器之前**扫描并替换，
+     * 同时如实回报"是否发生了替换"，供诊断区分"没有敏感内容"与"已遮挡"。
+     */
+    const redactedText = redactSensitiveText(chunk.text);
+    const isSensitiveContentRedacted = redactedText !== chunk.text;
     return {
       executionId: record.identity.executionId,
       stream: input.stream,
-      text: chunk.text,
+      text: redactedText,
       nextCursorBytes: chunk.nextCursorBytes,
       isTruncated: chunk.isTruncated,
       isStreamStorageLimitReached: chunk.isTruncated,
+      isSensitiveContentRedacted,
     };
   }
 
