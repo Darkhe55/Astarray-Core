@@ -11,6 +11,7 @@
  *   因此 `probeCapability()` 必须报**不可用**，`start()` 一律拒绝 —— 不静默降级到宿主执行。
  */
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 
 import { DomainError } from "../core/errors.js";
 import type {
@@ -54,6 +55,17 @@ interface ExecutionEntry {
 }
 
 const DEFAULT_PROBE_CACHE_MILLISECONDS = 60_000;
+
+/**
+ * 由**项目标识**派生稳定档案名（**纯函数**）。
+ *
+ * 名字要满足 AppContainer 的字符集要求（`[-_. A-Za-z0-9]+`）且不超过 64 字符，
+ * 因此用哈希前缀而不是项目名本身（项目名可能含中文/空格）。
+ */
+export function buildProjectProfileName(prefix: string, projectIdentifier: string): string {
+  const digest = createHash("sha256").update(projectIdentifier, "utf8").digest("hex").slice(0, 12);
+  return (prefix + "-" + digest).slice(0, 64);
+}
 
 export class SandboxHelperBackend implements SandboxExecutionBackend {
   private readonly options: SandboxHelperBackendOptions;
@@ -107,7 +119,11 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
   }
 
   async start(input: {
-    readonly identity: { readonly executionId: string };
+    readonly identity: {
+      readonly executionId: string;
+      /** 项目归属：用于派生**每项目**档案名（避免跨项目共用一个 SID）。 */
+      readonly projectIdentifier: string;
+    };
     readonly executableEntryPoint: string;
     readonly arguments: readonly string[];
     readonly workingDirectory: string;
@@ -133,10 +149,19 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
     this.executionSequence += 1;
     const backendExecutionHandle =
       "helper-" + input.identity.executionId + "-" + String(this.executionSequence);
-    const profileName =
-      (this.options.profileNamePrefix ?? "astarray-exec") +
-      "-" +
-      String(this.executionSequence);
+    /**
+     * 档案名**按项目**派生（稳定），不是按执行序号。
+     *
+     * 为什么必须这样（用户裁决 2026-11-09）：
+     *  - 档案是 **per-user per-app**，运行期建档案需要提权 ⇒ 不能每次执行换一个名字；
+     *  - 若两个项目共用同一个 SID，又各自把项目目录授权给该 SID，
+     *    则项目 A 可以读项目 B 的目录 —— 这正是要禁止的**跨项目互读**。
+     * 因此每个项目一个稳定档案名 ⇒ 每个项目一个独立 SID。
+     */
+    const profileName = buildProjectProfileName(
+      this.options.profileNamePrefix ?? "astarray-exec",
+      input.identity.projectIdentifier,
+    );
     /**
      * 把**环境登记表**的上限传给辅助程序（它用 Job Object 施加）。
      *

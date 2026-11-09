@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildProjectProfileName,
   interpretProbeOutput,
   SandboxHelperBackend,
   type SandboxHelperProcess,
@@ -101,7 +102,7 @@ describe("EXEC-01-02 沙箱辅助程序后端", () => {
     });
     await expect(
       backend.start({
-        identity: { executionId: "exec-1" },
+        identity: { executionId: "exec-1", projectIdentifier: "project-a" },
         executableEntryPoint: "node",
         arguments: ["-e", "1"],
         workingDirectory: "docs",
@@ -126,7 +127,7 @@ describe("EXEC-01-02 沙箱辅助程序后端", () => {
       spawnHelper: fake.spawnHelper,
     });
     const started = await backend.start({
-      identity: { executionId: "exec-2" },
+      identity: { executionId: "exec-2", projectIdentifier: "project-a" },
       executableEntryPoint: "node",
       arguments: ["-e", "console.log(1)"],
       workingDirectory: "docs",
@@ -148,6 +149,42 @@ describe("EXEC-01-02 沙箱辅助程序后端", () => {
     expect(status.status).toBe("succeeded");
   }, 30_000);
 
+  it("**不同项目**派生不同档案名（不得共用一个 SID 造成跨项目互读）", () => {
+    const projectAProfile = buildProjectProfileName("astarray-exec", "project-a");
+    const projectBProfile = buildProjectProfileName("astarray-exec", "project-b");
+    expect(projectAProfile).not.toBe(projectBProfile);
+    /** 同一项目必须**稳定**（否则运行期又要重新建档案 ⇒ 又要提权）。 */
+    expect(buildProjectProfileName("astarray-exec", "project-a")).toBe(projectAProfile);
+    /** 满足 AppContainer 字符集与长度约束。 */
+    expect(projectAProfile).toMatch(/^[-_.A-Za-z0-9]+$/u);
+    expect(projectAProfile.length).toBeLessThanOrEqual(64);
+  });
+
+  it("启动时把**项目档案名**传给辅助程序（不是每次执行换名）", async () => {
+    const fake = buildFakeHelper({ probeOutput: FULL_SUCCESS_PROBE, runOutput: "", exitCode: 0 });
+    const backend = new SandboxHelperBackend({
+      helperExecutablePath: "sandbox-helper",
+      spawnHelper: fake.spawnHelper,
+    });
+    const started = await backend.start({
+      identity: { executionId: "exec-p", projectIdentifier: "project-a" },
+      executableEntryPoint: "node",
+      arguments: [],
+      workingDirectory: "docs",
+      timeoutMilliseconds: 1_000,
+      streamStorageLimitBytes: 1_024,
+      resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
+    });
+    expect(started.backendExecutionHandle).toContain("exec-p");
+    const runInvocation = fake.invocations.find((invocation) => invocation.includes("run"));
+    expect(runInvocation).toBeDefined();
+    const profileIndex = runInvocation?.indexOf("--profile") ?? -1;
+    expect(profileIndex).toBeGreaterThanOrEqual(0);
+    expect(runInvocation?.[profileIndex + 1]).toBe(
+      buildProjectProfileName("astarray-exec", "project-a"),
+    );
+  });
+
   it("取消 ⇒ 终止辅助程序并如实回报 cancelled", async () => {
     const fake = buildFakeHelper({
       probeOutput: FULL_SUCCESS_PROBE,
@@ -160,7 +197,7 @@ describe("EXEC-01-02 沙箱辅助程序后端", () => {
       spawnHelper: fake.spawnHelper,
     });
     const started = await backend.start({
-      identity: { executionId: "exec-3" },
+      identity: { executionId: "exec-3", projectIdentifier: "project-a" },
       executableEntryPoint: "node",
       arguments: [],
       workingDirectory: "docs",
