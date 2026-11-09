@@ -559,3 +559,35 @@ fail-closed 语义**此前已正确实现**（由上一轮的 `CrossProjectTarge
   `verify:instruction-entry-package` exit 0（**17/17**）。
 - **仍未完成**：真实多项目大样本压力验收（卡内 04 点名的"多项目压力"）；
   人工能分辨副本与原件的人类体验结论 ⇒ **不主张整卡通过**。
+## 兄弟目录布局收口（2026-11-09，`75c3aa97`）
+
+**真实缺陷（本轮修复）**：受控跨项目端口只认**单一**工作区根
+（`new WorkspaceBoundary(workspaceRootPath ?? cwd)`），而真实跨项目布局是
+"两个项目根互为兄弟目录"。此时来源/目标项目根都在工作区根之外
+⇒ **合法授权也会被判 `path-escape-attempt`**。
+
+既有压力用例之所以没暴露它：它把 `workspaceRootPath` 设成三个项目根的**父目录**
+⇒ "跨项目"其实仍在同一根内。
+
+**修复**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 端口接受本次操作已证实的项目根 | `tools/controlled-cross-project-resource-io.ts` | `CrossProjectResourceIoScopeContext.allowedProjectRootPaths`；工作区越界时再看这些根，都不满足才拒绝 |
+| 服务传入已证实的根 | `orchestration/cross-project-authorization-store.ts` | 只读传来源根；导入传来源 + 目标根。两者都已由绑定校验证实"绝对路径 === 根 + 声明相对路径"且未逃逸 |
+| 分隔符归一 | 同上 | Windows `realpath` 用反斜杠，原先按 `/` 前缀比对**恒不成立**（实测踩到） |
+| SDK 声明哈希带来源根 | `public-sdk.ts` | 原来算 `declaredContentHash` 时不带根 ⇒ 兄弟布局下读取被判逃逸 ⇒ 哈希为空 ⇒ 导入必然 `content-hash-mismatch` |
+
+**证据**（`tests/core/integration/project01-sibling-roots.test.ts` 3/3，真实兄弟布局）：
+
+- `base/project-a` 是工作区根，`base/project-b` 是兄弟 ⇒ 合法授权**可读**（修复前 `path-escape-attempt`）；
+- 未获授权覆盖的兄弟路径仍被拒绝（允许根不是"整个磁盘"）；
+- 导入副本到兄弟目标目录可用（来源与目标根都要放行）。
+
+**变异锚点同步**：`project01-controlled-port-skips-workspace-boundary` 的 `find` 随代码形状更新，
+`node scripts/verify-mutation-kills.mjs` 全量 **313/313 被拦下**（证明"跳过边界"仍会被三条越界反例杀死）。
+
+公开全量 **644 files / 4432 tests** 通过。
+
+**仍未做（如实）**：`additionalAllowedRootsProvider`（按生效授权取 `resourceScope.realPaths`）已装配，
+但**没有应用级正反例**；CLI 侧仍用裸 `fs` 端口（与 SDK 安全语义不同）未统一。
