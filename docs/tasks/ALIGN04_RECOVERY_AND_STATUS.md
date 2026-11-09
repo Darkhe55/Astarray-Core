@@ -373,3 +373,19 @@
 `tests/core/integration/reliability-r4-ledger-concurrency.test.ts`，隔离运行 4/4 通过）。
 这与本卡历史修复过的"fire-and-forget 未处理拒绝"是同一类，**需单独修**（catch 分支里的
 `handleWorkerOutcome` 自身再次 reject 时无人接住）。
+
+### 03 产物校验已接入拒绝分支（2026-11-10 追加，替换上文"未接线"）
+
+`resumeMission` 的拒绝分支现在对 `requires-output-acknowledgement` 的任务**实际校验产物**，
+并在 `[对账]` 诊断后附 `（产物校验：present|missing|empty|outside-project-root）`。
+
+| 要点 | 实现 |
+|---|---|
+| 项目根来源 | `resolveProjectRootPathForMission`：`missionProjectIdentifiers` → `registeredProjectRoots` |
+| **拿不到根** | 返回 `null` ⇒ **跳过校验**，不猜、也不下"已产出"结论 |
+| 只读 | 只 `stat`，**不改任务状态** |
+
+**验证**：`align04-output-artifact-check`(7) + `align04-crash-resume-refusal`(4) + `align04-lease-takeover`(7)
+定向通过；**权威门禁** `npx vitest run --maxWorkers=1` ⇒ **673 files / 4582 passed + 3 skipped / exit 0**。
+
+（第 52 轮曾因未处理拒绝回退此接线；该拒绝已在 `ad8db73e` 修掉，本轮重接并通过串行门禁。）

@@ -158,6 +158,7 @@ import { createMissionDispatchPorts } from "./secondary-continuous-dispatch-loop
 import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dispatch-loop.js";
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
 import { projectTaskReconciliationVerdicts } from "./task-reconciliation-verdict.js";
+import { checkOutputArtifact } from "./output-artifact-check.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
 import type { CrossAgentContextAttachmentController } from "./cross-agent-attachment-controller.js";
 import type { DirectDispatchController } from "./direct-dispatch-controller.js";
@@ -1519,11 +1520,32 @@ export class MainController {
       const reconciliationVerdicts = projectTaskReconciliationVerdicts(
         missionStatus.taskChain,
       );
+      const projectRootPath = this.resolveProjectRootPathForMission(missionId);
       for (const verdict of reconciliationVerdicts) {
         if (verdict.action === "none" || verdict.action === "resumable") continue;
+        let artifactNote = "";
+        /**
+         * ALIGN-04-03（2026-11-10）：**有路径 ≠ 有产物**。
+         * 只有项目根可得时才校验；拿不到根就不猜，也不下"已产出"结论。
+         */
+        if (
+          verdict.action === "requires-output-acknowledgement" &&
+          projectRootPath !== null
+        ) {
+          const producedTask = missionStatus.taskChain.tasks.find(
+            (task) => task.id === verdict.taskIdentifier,
+          );
+          if (producedTask?.resultLocation != null) {
+            const artifactCheck = await checkOutputArtifact({
+              projectRootPath,
+              resultLocation: producedTask.resultLocation,
+            });
+            artifactNote = `（产物校验：${artifactCheck.kind}）`;
+          }
+        }
         this.options.streamOutput(
           missionId,
-          `[对账] ${verdict.taskIdentifier}: ${verdict.action} —— ${verdict.reason}`,
+          `[对账] ${verdict.taskIdentifier}: ${verdict.action} —— ${verdict.reason}${artifactNote}`,
         );
       }
       throw new DomainError(
@@ -2907,6 +2929,22 @@ export class MainController {
       missionIdentifier: missionId,
       ...this.projectMissionResumeReadiness(missionStatus.taskChain),
     };
+  }
+
+  /**
+   * ALIGN-04-03（2026-11-10）：解析该 mission 的项目根（拿不到 ⇒ `null`，**不猜**）。
+   *
+   * 产物校验必须限定在项目根内；没有根就无法判断越界，因此返回 `null` 并跳过校验。
+   */
+  private resolveProjectRootPathForMission(missionId: string): string | null {
+    const projectIdentifier = this.missionProjectIdentifiers.get(missionId);
+    if (projectIdentifier === undefined) {
+      return null;
+    }
+    const root = this.options.registeredProjectRoots?.find(
+      (candidate) => candidate.projectIdentifier === projectIdentifier,
+    );
+    return root === undefined ? null : root.rootPath;
   }
 
   /** ALIGN-04-03：判定"能不能自动恢复"，并分类列出原因（纯函数式，只读输入）。 */
