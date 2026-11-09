@@ -209,3 +209,28 @@
 
 **仍未做（如实）**：**成功路径未跑**（需要真实关闭胶囊 + `nodeIndexProvider`/`fullFragmentProvider`）；
 **提示词装配仍未注入回访**（组装上下文时不会自动回访，只能上层显式调用）—— 这是本检查点的主缺口。
+
+### 04 工作时段恢复：判定路径已跑 + 一处旧陈述更正（2026-11-09 追加）
+
+**缺口（本卡记录）**："未跑任何一条判定路径"；"没有时段变化检测器"。
+
+**更正旧陈述（如实）**：`createWorkWindowTransitionMonitor` **已构造并 `start()`**
+（`application-runtime.ts:2758/2799`）——"没有检测器"是 2026-10-28 的旧状态，**已过期**。
+
+**本轮**：为 `evaluateWorkWindowResume` 补 7 条判定用例：
+
+| 场景 | 期望 |
+|---|---|
+| rest→working 且有待恢复业务 | `resume-once` |
+| **手动取消** | `suppressed-by-manual-cancel`（唤醒**不得**复活） |
+| 仍在休息 | `no-new-business-calls`（不发模型请求） |
+| 无待恢复业务 | `nothing-pending` |
+| **本次唤醒已恢复过** | `already-resumed`（不跑两遍） |
+| 状态未变化（抖动） | `nothing-pending` |
+| 每条判定 | 原因**非空** |
+
+公开全量 **670 files / 4563 passed + 3 skipped**（首次运行有 1 条既有 `g3-high-rigor-evidence`
+用例满载翻红，隔离 3/3 通过后重跑绿）。
+
+**仍未做（如实）**：`hasResumedSinceWake` **未持久化**（由调用方维护，进程重启即丢）；
+`pauseKind` 无权威标记（不由暂停原因存储推导）。
