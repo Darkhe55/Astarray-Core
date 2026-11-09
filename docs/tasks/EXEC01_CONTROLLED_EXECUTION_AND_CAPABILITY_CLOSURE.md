@@ -372,3 +372,29 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 
 **仍未做（如实）**：权限撤销时**自动终止该主体的在跑执行**尚未接线（目前只提供分类入口）；
 队列取消语义、临时目录清理与备份删除分离仍未做。
+
+## 02 辅助程序后端接线（2026-11-09）
+
+**缺口**：辅助程序能编能跑，但**没有任何生产代码与它对话** ⇒ 控制器依旧无可注入的后端。
+
+**新增** `packages/core/src/execution/sandbox-helper-backend.ts`（`SandboxHelperBackend`）：
+
+| 能力 | 实现 |
+|---|---|
+| 探测 | 跑辅助程序 `probe`，把输出翻译成能力画像（**只认明确成功标记**） |
+| 启动 | 能力可用才 `run`；否则抛 `execution-backend-unsupported`（**不降级到宿主执行**） |
+| 状态/输出 | 后台收集 stdout/stderr，按**字节游标**读取 |
+| 取消 | 终止辅助程序（Windows 整树 `taskkill /T /F`） |
+
+**关键纪律落在代码里**：探测缺任一成功标记（`appcontainer-created` + `appcontainer-deleted hresult=0`
++ `job-created`）即判**不可用** —— "看起来像成功"不算成功。
+
+**证据**（`exec01-02-sandbox-helper-backend` 6/6）：完整成功 ⇒ 可用；缺标记 ⇒ 不可用；
+AppContainer 不可建 ⇒ 不可用且原因带出 `0x80070005`；不可用时 `start` **拒绝且只发生一次 probe**；
+可用时走 `run` 协议、输出可游标读取、退出码落为 `succeeded`；取消如实回报 `cancelled`。
+
+公开全量 **653 files / 4475 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：本机实测该后端 `probeCapability()` 报**不可用**（AppContainer 档案建不了）
+⇒ 受控执行在产品里仍是"拒绝执行"状态，直到安装期初始化落地。协议测试用注入进程，
+**不声称隔离**（隔离证据见 `EXEC01_02_B1_REVISED_2026-11-09.md`）。
