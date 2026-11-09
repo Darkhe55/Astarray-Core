@@ -234,3 +234,23 @@
 
 **仍未做（如实）**：`hasResumedSinceWake` **未持久化**（由调用方维护，进程重启即丢）；
 `pauseKind` 无权威标记（不由暂停原因存储推导）。
+
+### 04 `hasResumedSinceWake` 未持久化 —— 核对结论：**不是功能缺口**（2026-11-10）
+
+卡内记录："`hasResumedSinceWake` 由调用方维护、未持久化"。
+
+**核对**（`application-runtime.ts:2788` + `work-window-deferred-mission-store.ts:238`）：
+
+- 唤醒回调里 `hasResumedSinceWake` **恒为 `false`**（硬编码）；
+- 但"最多恢复一次"由**队列移除**保证：`resumeDeferredWorkWindowMissions` 在
+  `didResume === true` **或** `decision === "already-running"` 时
+  `store.remove(missionIdentifier)` —— 恢复过的 mission 不会再出现在下一次唤醒的列表里。
+
+**结论**：对**延迟队列这条路径**，"恢复两次"的防护**已经成立**（靠移除而非靠标志位）。
+标志位不持久化只影响"同一进程内多次调用 `handleWorkWindowResume` 且不走队列"的场景，
+那是控制面直接调用，语义上应由调用方决定。
+
+**因此本轮不改代码**：把 `hasResumedSinceWake` 持久化会引入"何时重置"的新语义
+（按唤醒周期？按进程启动？），在没有产品定义前加进去只会制造一处难以解释的状态。
+
+**仍未做（如实）**：`pauseKind` 无权威标记（不由暂停原因存储推导）—— 这条是真的缺口，未核对完。
