@@ -30,6 +30,15 @@ export interface TertiaryLifecycleHooksFactoryInput {
   readonly individualMemoryStore: AgentIndividualMemoryStore;
   /** 移交文件目录（通常是 `<stateDirectory>/agent-handoffs`）。 */
   readonly handoffDirectoryPath: string;
+  /**
+   * 读取该个体占用的 Git 工作区/分支（**只读**）。
+   *
+   * 缺省不装配 ⇒ 报告 `no-git-allocation`（与"没有分配"同文本，但这是**未检查**；
+   * 装配后才是真实结论）。
+   */
+  readonly readGitAllocation?: (
+    agentInstanceId: string,
+  ) => Promise<{ readonly workerBranchName: string } | null>;
   /** 本次移交**显式选定**的附件哈希（空数组 = 不带附件）。 */
   readonly selectedAttachmentHashes?: readonly string[];
   /** 可选：权限租约撤销端口（返回结果字符串）。 */
@@ -129,10 +138,28 @@ export function buildTertiaryLifecycleHooks(
      * Git 资源：有端口就用端口的结果（端口必须区分"远端已推送"与"本地保全待同步"）；
      * 没端口就如实报"无本地分配"，**不**声明推送成功。
      */
-    handleGitResources: async (agentInstanceId) =>
-      input.handleGitResources === undefined
-        ? "no-git-allocation"
-        : input.handleGitResources(agentInstanceId),
+    handleGitResources: async (agentInstanceId) => {
+      if (input.handleGitResources !== undefined) {
+        return input.handleGitResources(agentInstanceId);
+      }
+      /**
+       * ALIGN-03-07（2026-11-09）：**如实报告真实 Git 资源状态**。
+       *
+       * 此前恒返回 `no-git-allocation` —— 即使该个体真的占了工作区/分支，
+       * 报告也会说"没有"，等于把"未检查"伪装成"没有"。
+       *
+       * 这里只**报告**，不**释放**：删除工作区/分支是破坏性操作，需要单独的决定，
+       * 不属于"关闭个体"的默认副作用。
+       */
+      if (input.readGitAllocation === undefined) {
+        return "no-git-allocation";
+      }
+      const allocation = await input.readGitAllocation(agentInstanceId);
+      if (allocation === null) {
+        return "no-git-allocation";
+      }
+      return `git-allocation-retained:${allocation.workerBranchName}`;
+    },
 
     /** 进程内 Worker：没有独立进程可杀。 */
     terminateProcess: async () => "in-process-worker",

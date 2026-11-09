@@ -1275,6 +1275,22 @@ export async function createApplicationRuntime(
     buildTertiaryLifecycleHooks({
       individualMemoryStore: agentIndividualMemoryStore,
       handoffDirectoryPath: path.join(stateDirectory, "agent-handoffs"),
+      /**
+       * ALIGN-03-07（2026-11-09）：把"该个体是否真的占了 Git 资源"接进来。
+       *
+       * 只读：从 `worker:<mission>:<task>` 形态取出 taskId 再查分配记录；
+       * 形态不匹配 ⇒ 返回 null（不猜，报 `no-git-allocation`）。
+       */
+      readGitAllocation: async (agentInstanceId: string) => {
+        const taskId = agentInstanceId.startsWith("worker:")
+          ? agentInstanceId.split(":").at(-1)
+          : undefined;
+        if (taskId === undefined || taskId === "") return null;
+        const allocation = await new GitWorktreeAllocator({ baseDirectory: stateDirectory })
+          .readAllocation(taskId)
+          .catch(() => null);
+        return allocation === null ? null : { workerBranchName: allocation.workerBranchName };
+      },
     }),
     { phaseStore: tertiaryLifecyclePhaseStore },
   );
