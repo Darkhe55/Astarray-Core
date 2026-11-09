@@ -48,3 +48,4 @@ AGENTS.md
 # EXEC-01-02：沙箱辅助程序构建产物（源码入库，二进制不入库）
 native/sandbox-helper/sandbox-helper.exe
 native/sandbox-helper/target/
+native/sandbox-helper/sandbox-helper.pdb
