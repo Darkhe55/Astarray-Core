@@ -591,3 +591,31 @@ fail-closed 语义**此前已正确实现**（由上一轮的 `CrossProjectTarge
 
 **仍未做（如实）**：`additionalAllowedRootsProvider`（按生效授权取 `resourceScope.realPaths`）已装配，
 但**没有应用级正反例**；CLI 侧仍用裸 `fs` 端口（与 SDK 安全语义不同）未统一。
+
+## CLI 受控端口收口（2026-11-09，`18c09de4`）
+
+**用户裁决**：Agent 操作及模型可影响路径的读取/写入必须经过权限、真实路径、敏感信息、备份与版本冲突检查；
+配置/日志/恢复账本等内部存储保留专用可信接口，**不机械替换全部 fs**。
+
+**真实缺陷**：CLI 自带 `buildLocalResourceIoPort()`（裸 `fs` + 仅受保护存储判定，注释自述"不引入核心包依赖"）
+⇒ "拿到绝对路径就能读写"，**没有真实路径与工作区边界检查**，与 SDK 侧安全语义不一致。
+
+**修复**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 两个跨项目命令改用受控端口 | `packages/tui/src/cli/commands.ts` | `cross-project read` 与 `cross-project import-copy` 都换成 `ControlledCrossProjectResourceIo`（工作区边界 + 受保护存储，先判后读） |
+| 合法兄弟根仍可用 | 同上 | 项目根由服务按本次操作**已证实**的来源/目标根注入（`scopeContext`），不靠放宽边界 |
+| 删除旁路 | 同上 | 移除裸 `fs` 端口实现（不再存在"只要绝对路径就能读写"的入口） |
+| 不做机械替换 | 同上 | 设置/日志/恢复账本等内部存储仍用各自专用接口 |
+
+**CLI 入口级反例**（`tests/tui/unit/cross-project-cli-controlled-port.test.ts` 3/3）：
+
+- 合法路径（项目根内）照常可读 ⇒ exit 0（证明受控端口不是"一律拒绝"）；
+- 声明 `docs/spec.md` 却实传项目根之外的绝对路径 ⇒ **非 0 拒绝**；
+- 声明 `../outside-secret.md` ⇒ 非 0 拒绝，且项目外文件内容保持不变（既未读走也未改写）。
+
+公开全量 **648 files / 4452 tests** 通过。
+
+**仍未做（如实）**：CLI 其余文件操作（如工具包安装、导出）仍走各自的专用实现，未逐一收口；
+"版本冲突检查"在 CLI 跨项目路径上由既有 `expectedTargetContentHash` 守卫承担，未新增机制。
