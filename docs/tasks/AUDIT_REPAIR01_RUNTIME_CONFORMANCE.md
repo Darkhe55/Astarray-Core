@@ -340,7 +340,7 @@ worker 使用的 profile 引用在装配时固定，不读当前选择。本用�
 - 同一 worker 端口上：第一次 `readFile` 成功读到正文；**运行期间**切到空白自定义组（`project.read` 回退 deny）；
   第二次 `readFile` 被 `tool-permission-denied` 拒绝且未读到正文；
 - **对照组**：不切换权限组时第二次同样成功 ⇒ 差异确实来自收紧，而不是环境偶然；
-- 先断言"切换对控制器可见"（`getCurrentPermissionProfileRefurence().kind === "custom"`），再归因到执行前重读。
+- 先断言"切换对控制器可见"（`getCurrentPermissionProfileReference().kind === "custom"`），再归因到执行前重读。
 
 公开全量 **647 files / 4449 tests** 通过。
 
