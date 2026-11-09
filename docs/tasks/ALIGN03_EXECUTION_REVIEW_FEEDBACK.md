@@ -317,3 +317,32 @@ Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/�
 ② 任务完成时按同一所属次级自动任命审查者并等待裁决。
 
 **因此 01 记为"等待同一产品决策"**，不重复计为两个独立阻塞。
+
+### 02 信包白名单/六项校验/权限求交已跑（2026-11-10 追加）
+
+**缺口（本卡记录）**："未跑求交/禁止字段/六项缺失任何一条路径"。
+
+**本轮**：`align03-task-bundle-envelope` **10 条**：
+
+| 用例 | 期望 |
+|---|---|
+| 合法信包 | 构造成功，六项齐备 |
+| **五个禁止字段**（`toolDescriptors`/`availableTools`/`toolLibrary`/`fullDocumentation`/`toolSchemas`） | 逐一拒绝（不静默忽略） |
+| 未知字段 | 拒绝（白名单外不静默忽略） |
+| **权限求交** | 超出上级进 `deniedToolNames`，不进 `allowedToolNames` |
+| 求交为空 | 拒绝（不发空权限信包） |
+| **必需项**缺失（五项） | 逐一拒绝 |
+| `selectedAttachments` 缺省 | **允许**，默认空数组 |
+| 附件缺 `contentHash` | 拒绝 |
+| 非对象信包 | 拒绝 |
+| `intersectToolPermissionCeiling` | 去重并保留顺序 |
+
+**一处实测更正**：卡内写"六项校验"，但 `selectedAttachments` 实际是**唯一可选**项
+（缺省空数组，不拒绝）。已在用例中明确钉住，避免以后按"六项都必需"去改坏它。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **674/675 files、4595 passed**，
+唯一失败是既有的 `public-sdk` 类抖动家族新增一员 `obs01-diag-production-collection`（隔离 5/5 通过），
+与本次改动无关。
+
+**仍未做（如实）**：**执行侧仍不消费信包**（orchestrator/worker 派发仍用原工具端口与提示词）；
+`createTaskBundle` 仍无生产调用方；`deniedToolNames` 只上报不升级。
