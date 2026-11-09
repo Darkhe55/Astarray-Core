@@ -5,6 +5,7 @@
 
 import { sanitizeLogLine } from "../../../core/src/infra/log-line-safety.js";
 import { redactSensitiveText } from "../../../core/src/orchestration/diagnostic-event-store.js";
+import { sanitizeRunHistoryDisplayText } from "../../../core/src/orchestration/run-history-view.js";
 
 export const EXIT_CODES = {
   SUCCESS: 0,
@@ -36,7 +37,15 @@ export function logToStderr(message: string): void {
  * 脱敏 + 换行转义 + 有界截断。
  */
 export function writeDiagnosticText(text: string): void {
-  const redactedMessage = redactSensitiveText(text);
+  /**
+   * 顺序：**去 ANSI → 脱敏 → 换行转义 + 截断**。
+   *
+   * 为什么要去 ANSI（SEC-02 通道 14 剩余项）：子进程 stderr 与工具输出可能带
+   * 颜色/光标/清屏序列，直接写终端会**覆盖已显示的报错**（攻击者可让"失败"
+   * 看起来像"成功"），落到日志文件则是不可读噪声。
+   */
+  const withoutAnsi = sanitizeRunHistoryDisplayText(text);
+  const redactedMessage = redactSensitiveText(withoutAnsi);
   const sanitized = sanitizeLogLine(redactedMessage);
   process.stderr.write(`${sanitized.text}\n`);
 }

@@ -54,6 +54,15 @@ describe("SEC-02 CLI 诊断输出漏斗", () => {
     expect(written.length).toBeLessThan(2_200);
   });
 
+  it("ANSI 转义被剥离 ⇒ 不能覆盖已显示的报错", () => {
+    /** 清屏 + 光标回原点：可让"失败"看起来像"成功"。 */
+    const written = captureStderr(() => {
+      logToStderr("\u001B[2J\u001B[H全部通过");
+    });
+    expect(written).not.toContain("\u001B");
+    expect(written).toContain("全部通过");
+  });
+
   it("普通文本保持可读（不误伤）", () => {
     const written = captureStderr(() => {
       logToStderr("跨项目只读失败: 授权已过期");
