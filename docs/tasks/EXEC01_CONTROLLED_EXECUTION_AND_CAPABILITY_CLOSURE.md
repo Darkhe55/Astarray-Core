@@ -565,3 +565,19 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 
 **仍未做（如实）**：`prlimit` 的实际拦截效果在 Linux 上**未实测**（WSL 里只验证过 `ulimit -v`
 能挡住超额分配）；裸机复测未做。
+
+## 02 探测跑"真实命令形态"（2026-11-09）
+
+**教训来源**：上一轮加 `--nproc` 后 bwrap **完全起不来**，但探测**没带前缀** ⇒ 探测判可用、
+真实执行全失败。这是"探测与实际不一致"的典型缺口。
+
+**修复**：探测命令改为与 `start` **同形**：`prlimit --as=<512MB> -- bwrap --unshare-all … /bin/true`。
+前缀本身坏掉 ⇒ 探测直接判不可用。
+
+**证据**（`exec01-02-bubblewrap-backend` 11/11，新增 1 条）：捕获探测实际参数 ⇒
+首项为 `prlimit`、含 `--as=`、且含 `--unshare-all`（证明前缀与 bwrap 参数同时在探测里）。
+
+公开全量 **658 files / 4496 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：探测里的地址空间上限用固定 512MB（只验证"前缀不弄挂 bwrap"，
+不验证每个环境的具体限额）；裸机 Linux 复测未做。
