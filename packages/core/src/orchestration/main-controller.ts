@@ -5130,9 +5130,18 @@ export class MainController {
        * 因此这里只保留身份字符串，不登记为"次级"、也不往报告索引里写
        * "下级报告" —— 否则就是把主 Agent 自己的调度记成了下级的汇报。
        */
-      secondaryAgentInstanceId:
-        this.options.secondaryAgentInstanceIdFactory?.(missionId) ??
-        `scheduler:${missionId}`,
+      /**
+       * ALIGN-03（2026-11-10，用户归属裁决）：devolve 同样**先确定承接次级**再派发。
+       *
+       * 裁决原文："若用户任务从主 Agent 进入，必须先确定承接次级，再派发 Worker；
+       * 不能因缺少次级身份而退回 main。" 这里用 mission 级真实次级个体，
+       * 而不是 `scheduler:<missionId>` 这个派发来源标签。
+       * （devolve 仍**不产生下级报告**，报告语义不变。）
+       */
+      secondaryAgentInstanceId: this.ensureResponsibleSecondaryAgentInstance(
+        missionId,
+      ),
+      isWorkerOwnershipEnforced: true,
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
       /** ALIGN-03-03：完成收据门禁（缺省关；开启后 success 无收据不判 done）。 */

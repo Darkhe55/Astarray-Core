@@ -575,3 +575,21 @@ const agentInstanceId =
 1. **默认关闭** ⇒ 生产里仍不自动任命（需要真实审查 Worker 才能开启，否则任务会卡住）；
 2. **裁决（verdict）仍未自动产生** —— 只做到"任命"，没有审查者执行与结论；
 3. devolve 路径未迁移；跨项目拒绝缺装配级用例。
+
+### 01/04 迁移第 6 步：**devolve 路径也迁移**（2026-11-10）
+
+此前 devolve 构造编排器时仍用 `scheduler:<missionId>` 作次级身份、且未强制归属。
+
+**改动**（`main-controller.ts` devolve 装配处）：
+- `secondaryAgentInstanceId` 改为 `ensureResponsibleSecondaryAgentInstance(missionId)`（真实次级个体）；
+- 加 `isWorkerOwnershipEnforced: true`。
+
+**依据**：裁决原文"若用户任务从主 Agent 进入，必须先确定承接次级，再派发 Worker；
+不能因缺少次级身份而退回 main"。devolve 由主 Agent 直接调度，正是这一条的场景。
+**报告语义不变**：devolve 仍不产生"下级报告"。
+
+**证据**：`tests/core/integration` 全量 **1117 passed**；权威门禁
+`npx vitest run --maxWorkers=1` ⇒ **680 files / 4614 passed + 3 skipped / exit 0**。
+
+**仍未做（如实）**：裁决（verdict）闭环未做——只任命、无审查者执行与结论；
+跨项目拒绝缺装配级用例。
