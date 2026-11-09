@@ -19,14 +19,17 @@ import type { AgentRuntime } from "../../../packages/core/src/core/types.js";
 vi.setConfig({ testTimeout: 90_000 });
 
 let stateDirectory: string;
+let projectRootPath: string;
 
 beforeEach(async () => {
   stateDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-auto-review-"));
+  projectRootPath = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-auto-review-project-"));
 });
 
 afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 150));
   await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
+  await fs.rm(projectRootPath, { recursive: true, force: true, maxRetries: 10 });
 });
 
 function buildRuntimeStub(): AgentRuntime {
@@ -102,6 +105,62 @@ describe("ALIGN-03-01 自动独立任命", () => {
     expect(contributorIds).not.toContain(reviewer?.agentInstanceId);
   }, 90_000);
 
+  it("**裁决落盘**：无产物 ⇒ rejected（不伪造 accepted）", async () => {
+    const captured: string[] = [];
+    const runtime = await createApplicationRuntime({
+      mode: "assist",
+      stateDirectory,
+      concurrency: 1,
+      failureThreshold: 1,
+      maxLoopIterations: 3,
+      useFeedbackProcess: false,
+      authenticatedUserId: "user-1",
+      mainAgentInstanceId: "main-agent-1",
+      streamOutput: (_missionId: string | null, text: string) => { captured.push(text); },
+      workerRuntimeFactory: () => buildRuntimeStub(),
+      isIndependentReviewAutoAppointmentEnabled: true,
+      /** 让 `project-alpha` 成为**已登记**的项目根，产物校验才有根可依。 */
+      projectIdentifier: "project-alpha",
+      workspaceRootPath: projectRootPath,
+    });
+    try {
+      const missionIdentifier = await runtime.controller.handleUserMessage("裁决落盘测试", {
+        projectIdentifier: "project-alpha",
+      });
+      const deadlineMilliseconds = Date.now() + 60_000;
+      while (Date.now() < deadlineMilliseconds) {
+        const status = (await runtime.controller.queryMissionStatus(missionIdentifier))?.summary
+          ?.status;
+        if (status === "done" || status === "blocked" || status === "cancelled") break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const verdictDirectoryPath = path.join(stateDirectory, "completion-verdicts");
+      const fileNames = await fs.readdir(verdictDirectoryPath).catch(() => [] as string[]);
+      expect(fileNames.length, `输出=${captured.join(" | ")}`).toBeGreaterThan(0);
+      const readAllJsonFiles = async (directoryPath: string): Promise<string[]> => {
+        const entries = await fs.readdir(directoryPath, { withFileTypes: true });
+        const collected: string[] = [];
+        for (const entry of entries) {
+          const entryPath = path.join(directoryPath, entry.name);
+          if (entry.isDirectory()) {
+            collected.push(...(await readAllJsonFiles(entryPath)));
+            continue;
+          }
+          if (entry.name.endsWith(".json")) {
+            collected.push(await fs.readFile(entryPath, "utf8"));
+          }
+        }
+        return collected;
+      };
+      const contents = await readAllJsonFiles(verdictDirectoryPath);
+      const joined = contents.join("\n");
+      /** 没有产物 ⇒ 结论必须是 rejected，**不得**因为任务报成功就自动 accepted。 */
+      expect(joined).toContain("rejected");
+      expect(joined).not.toContain("\"accepted\"");
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 90_000);
   it("未开启 ⇒ 不出现审查者（行为不变）", async () => {
     const result = await runMission({});
     expect(result.reviewerEntries).toEqual([]);

@@ -619,3 +619,33 @@ const agentInstanceId =
 **权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **681 files / 4620 passed + 3 skipped / exit 0**。
 
 **仍未接线**：该产出器**尚未**接进自动任命回调（下一步：任命后立即产结论并 `recordAcceptanceVerdict`）。
+
+### 01 裁决闭环**已接通**（2026-11-10）
+
+任命后立即产结论并落盘：`onTaskCompletedForIndependentReview` →
+`produceArtifactBackedVerdict` → `recordAcceptanceVerdict`。
+
+**三个身份必须互不相同**（这是接线过程中被门禁连续拒绝两次才理清的）：
+
+| 角色 | 谁 |
+|---|---|
+| 实现者 | 派发出的 Worker |
+| 测试者 | **责任次级** |
+| 验收者 | `reviewer:<mission>:<task>`（三级，挂同一责任次级） |
+
+踩坑记录：
+1. 测试者 = 实现者 ⇒ 拒绝（"作者自验被拒"）；
+2. 测试者 = 验收者 ⇒ 拒绝（"测试者不能签发自己的验收结论"）；
+3. `rework` 结论**证据为空** ⇒ 拒绝（空证据被当"只有自报"）⇒ 改为 `check:artifact-<kind>:<path>` 这类**检查结果**证据。
+
+**证据**（装配级 3/3）：
+- 开启 ⇒ 出现 `reviewer:*`，`owningSecondaryAgentInstanceId === secondary:<missionId>`，非贡献者；
+- **无产物 ⇒ 裁决落盘为 `rejected`，且文件里不出现 `"accepted"`**（不因"任务报成功"就自动通过）；
+- 关闭 ⇒ 无审查者。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **681 files / 4621 passed + 3 skipped / exit 0**。
+
+**仍未做（如实）**：
+1. **默认关闭**（`isIndependentReviewAutoAppointmentEnabled`），生产里尚不启用；
+2. 验收只依据**产物存在性**，不判内容正确性；
+3. 跨项目拒绝缺装配级用例。

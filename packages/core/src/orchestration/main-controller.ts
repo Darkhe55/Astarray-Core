@@ -159,6 +159,7 @@ import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dis
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
 import { projectTaskReconciliationVerdicts } from "./task-reconciliation-verdict.js";
 import { checkOutputArtifact } from "./output-artifact-check.js";
+import { produceArtifactBackedVerdict } from "./artifact-backed-verdict.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
 import type { CrossAgentContextAttachmentController } from "./cross-agent-attachment-controller.js";
 import type { DirectDispatchController } from "./direct-dispatch-controller.js";
@@ -4772,7 +4773,7 @@ export class MainController {
        */
       ...(this.options.isIndependentReviewAutoAppointmentEnabled === true
         ? {
-            onTaskCompletedForIndependentReview: (input: {
+            onTaskCompletedForIndependentReview: async (input: {
               readonly missionId: string;
               readonly taskId: string;
               readonly contributorAgentInstanceId: string;
@@ -4795,8 +4796,9 @@ export class MainController {
                   registeredAtIso: new Date().toISOString(),
                 });
               }
+              const appointmentIdentifier = `appointment:${input.missionId}:${input.taskId}`;
               this.appointExecutionAndReview({
-                appointmentIdentifier: `appointment:${input.missionId}:${input.taskId}`,
+                appointmentIdentifier,
                 missionIdentifier: input.missionId,
                 taskIdentifier: input.taskId,
                 taskRevision: 1,
@@ -4804,9 +4806,47 @@ export class MainController {
                 appointingSecondaryAgentInstanceIdentifier:
                   input.responsibleSecondaryAgentInstanceId,
                 implementationAgentInstanceIdentifier: input.contributorAgentInstanceId,
-                testingAgentInstanceIdentifier: input.contributorAgentInstanceId,
+                /**
+                 * 三个身份必须**互不相同**：实现者（Worker）、测试者（责任次级）、
+                 * 验收者（审查者）。测试者等于实现者会被"作者自验"拒绝，
+                 * 等于验收者会被"测试者不能签发自己的验收结论"拒绝。
+                 */
+                testingAgentInstanceIdentifier:
+                  input.responsibleSecondaryAgentInstanceId,
                 acceptanceAgentInstanceIdentifier: reviewerAgentInstanceId,
                 allowsSharedTestAndAcceptance: true,
+              });
+              /**
+               * ALIGN-03-01（2026-11-10）：任命后**立即产出并记录结论**。
+               *
+               * 只依据可复核产物（`artifact:` 证据），执行者无法用自报伪造；
+               * 无项目根 ⇒ 不产结论（不猜路径、不假装已裁决）。
+               */
+              const projectRootPath = this.resolveProjectRootPathForMission(input.missionId);
+              if (projectRootPath === null) {
+                return;
+              }
+              const taskChain = await this.options.taskStore.readTaskChain(input.missionId);
+              const task = taskChain?.tasks.find(
+                (candidate) => candidate.id === input.taskId,
+              );
+              const producedVerdict = await produceArtifactBackedVerdict({
+                projectRootPath,
+                taskIdentifier: input.taskId,
+                taskRevision: 1,
+                resultLocation: task?.resultLocation ?? null,
+              });
+              await this.recordAcceptanceVerdict({
+                appointmentIdentifier,
+                verdict: {
+                  acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
+                  boundTaskIdentifier: input.taskId,
+                  boundTaskRevision: 1,
+                  boundCommitHash: null,
+                  verdict: producedVerdict.verdict,
+                  evidenceReferences: [...producedVerdict.evidenceReferences],
+                  reason: producedVerdict.reason,
+                },
               });
             },
           }

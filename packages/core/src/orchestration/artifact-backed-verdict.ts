@@ -42,7 +42,8 @@ export async function produceArtifactBackedVerdict(
     return {
       verdict: "rework",
       reason: "任务未登记产物路径：没有可复核的产出，不能判定为完成。",
-      evidenceReferences: [],
+      /** 证据是**检查结果**（不是执行者自报），否则门禁会拒绝"只有自报"的结论。 */
+      evidenceReferences: ["check:result-location-unregistered"],
     };
   }
   const artifactCheck = await checkOutputArtifact({
@@ -57,7 +58,7 @@ export async function produceArtifactBackedVerdict(
         artifactCheck.kind +
         "）：" +
         ("detail" in artifactCheck ? artifactCheck.detail : resultLocation),
-      evidenceReferences: [],
+      evidenceReferences: [`check:artifact-${artifactCheck.kind}:${resultLocation}`],
     };
   }
   return {

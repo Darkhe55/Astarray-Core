@@ -471,7 +471,7 @@ export interface MissionOrchestratorOptions {
     readonly taskId: string;
     readonly contributorAgentInstanceId: string;
     readonly responsibleSecondaryAgentInstanceId: string;
-  }) => void;
+  }) => void | Promise<void>;
   registerTertiaryAgentInstance?: (input: {
     readonly agentInstanceId: string;
     readonly missionId: string;
@@ -1433,7 +1433,7 @@ export class MissionOrchestrator {
           const responsibleSecondary = this.options.secondaryAgentInstanceId ?? null;
           if (responsibleSecondary !== null) {
             try {
-              this.options.onTaskCompletedForIndependentReview?.({
+              await this.options.onTaskCompletedForIndependentReview?.({
                 missionId: this.options.missionId,
                 taskId: action.taskId,
                 contributorAgentInstanceId: agentInstanceId,

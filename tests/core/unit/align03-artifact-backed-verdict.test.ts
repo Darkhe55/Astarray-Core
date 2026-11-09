@@ -51,7 +51,8 @@ describe("ALIGN-03-01 产物证据验收结论", () => {
     });
     expect(verdict.verdict).toBe("rework");
     expect(verdict.reason).toContain("不可确认");
-    expect(verdict.evidenceReferences).toEqual([]);
+    /** 证据必须是**检查结果**，不是空数组（空证据会被门禁当"只有自报"拒绝）。 */
+    expect(verdict.evidenceReferences[0]).toBe("check:artifact-missing:docs/missing.md");
   }, 30_000);
 
   it("空产物 ⇒ rework（有文件不等于有产出）", async () => {
