@@ -19,6 +19,17 @@ export type ScheduleAction =
 export interface DagSchedulerOptions {
   concurrency: number;
   taskStore: TaskStorePort;
+  /**
+   * ALIGN-03-07（2026-11-09）：任务终态后关闭该三级个体（**可选**）。
+   *
+   * 缺省不装配 ⇒ 收口仍不发生（不得假装已关闭）。装配方必须是
+   * `TertiaryAgentLifecycleController.shutdown` 的受控包装。
+   */
+  closeAgentInstance?: (input: {
+    readonly agentInstanceId: string;
+    readonly taskId: string;
+    readonly outcome: "done" | "failed";
+  }) => Promise<void>;
   /** 为新领取的任务分配 Worker（Agent）实例 ID。 */
   allocateAgentId: (taskId: string) => string;
   /** R133：图变更通知（可选；失败不阻断）。 */
@@ -49,6 +60,8 @@ export interface DagSchedulerOptions {
 
 export class DagScheduler {
   private readonly claimedTaskIds = new Set<string>();
+  /** ALIGN-03-07：已领取任务的个体标识（终态关闭用）。 */
+  private readonly claimedTaskAgentIds = new Map<string, string>();
   /**
    * R126（2026-11-01）：**按 taskId 优先派发**。
    *
@@ -140,6 +153,8 @@ export class DagScheduler {
       this.claimedTaskIds.add(taskId);
       this.graph.markRunning(taskId);
       this.graph.assignAgent(taskId, assignedAgentId);
+      /** ALIGN-03-07：记下**本次实际分配**的个体，供终态关闭使用（不再二次分配）。 */
+      this.claimedTaskAgentIds.set(taskId, assignedAgentId);
       this.preferredDispatchTaskIds.delete(taskId);
       actions.push({ action: "start-task", taskId, assignedAgentId });
     }
@@ -160,6 +175,8 @@ export class DagScheduler {
       return;
     }
     this.claimedTaskIds.delete(taskId);
+    const assignedAgentInstanceId = this.claimedTaskAgentIds.get(taskId) ?? null;
+    this.claimedTaskAgentIds.delete(taskId);
     if (outcome === "done") {
       this.graph.markDone(taskId, resultLocation);
     } else {
@@ -167,6 +184,30 @@ export class DagScheduler {
       this.graph.propagateFailureToDownstream(taskId);
     }
     await this.persistChain();
+    /**
+     * ALIGN-03-07（2026-11-09）：任务终态后**关闭该三级个体**。
+     *
+     * 此前 `TertiaryAgentLifecycleController.shutdown()` 在生产里**没有调用方**
+     * ⇒ 收口"看起来成功"，实际没存档案、没写移交。
+     *
+     * 顺序要求：**先 `persistChain()`（档案/任务链已落盘）再关闭**，
+     * 否则会出现"已关闭但结果未持久化"。关闭失败**不得**反转任务终态，
+     * 但要如实记入日志字段（不静默）。
+     */
+    /**
+     * **不要**在这里再调 `allocateAgentId`：它是**有状态的一次性分配**
+     * （实测：二次调用会让后续任务的个体编号整体后移，打破既有调度顺序）。
+     * 关闭用的是任务**已实际分配**的那个个体。
+     */
+    if (assignedAgentInstanceId !== null) {
+      await this.options
+        .closeAgentInstance?.({
+          agentInstanceId: assignedAgentInstanceId,
+          taskId,
+          outcome,
+        })
+        .catch(() => undefined);
+    }
   }
 
   /** Worker 报告无法继续（如模糊/等待人工）：任务回 pending，释放锁。 */
