@@ -69,7 +69,12 @@ async function seed(): Promise<void> {
       eventIdentifier: "e3",
       kind: "tool-call",
       recordedAtIso: "2026-10-18T00:00:06.000Z",
-      payloadJson: JSON.stringify({ outputText: "y".repeat(9_000) }),
+      /**
+       * HISTORY-01（2026-11-09）：写入前脱敏会把"超长单词"当凭据处理，
+       * 因此这里改用**带空格的**长文本构造"详情过长"场景（仍 > 截断阈值），
+       * 不弱化断言，只避免把测试夹具写成密钥形态。
+       */
+      payloadJson: JSON.stringify({ outputText: "长文本 ".repeat(3_000) }),
     },
   });
 }

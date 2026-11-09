@@ -17,6 +17,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { selectCredentialMaskingRules } from "../tools/credential-detector-registry.js";
+
 export type DiagnosticEventClassification =
   | "deterministic-fact"
   | "suspected-cause"
@@ -60,7 +62,18 @@ const DIAGNOSTIC_FILE_NAME = "events.jsonl";
  * 只做**文本级**替换，不改动错误码与结构；宁可多脱敏，不可漏泄。
  */
 export function redactSensitiveText(text: string): string {
-  return text
+  /**
+   * HISTORY-01（2026-11-09）：**先走单一凭据目录**（`credential-detector-registry`）。
+   *
+   * 此前这里自带一份正则副本，只覆盖 Bearer/api_key/sk- ⇒ GitHub(`ghp_`)、
+   * AWS(`AKIA`)、Slack 等前缀**完全漏脱敏**（实测：`ghp_…` 原样落盘）。
+   * 目录是唯一来源，这里只消费它的掩码规则，避免两套口径再次漂移。
+   */
+  let redactedText = text;
+  for (const maskingRule of selectCredentialMaskingRules()) {
+    redactedText = redactedText.replace(maskingRule.pattern, maskingRule.replacement);
+  }
+  return redactedText
     .replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, "$1[REDACTED]")
     .replace(/(api[_-]?key\s*[=:]\s*)[A-Za-z0-9._-]+/gi, "$1[REDACTED]")
     .replace(/\bsk-[A-Za-z0-9._-]{8,}/g, "[REDACTED]")

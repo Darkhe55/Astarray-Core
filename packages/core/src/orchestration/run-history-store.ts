@@ -13,6 +13,8 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { redactSensitiveText } from "./diagnostic-event-store.js";
+
 import { writeAtomicJson } from "../infra/atomic-json.js";
 
 /** 事件种类（覆盖卡内 §2 要求的最小集合）。 */
@@ -129,6 +131,18 @@ export class RunHistoryStore {
     readonly missionIdentifier: string;
     readonly event: RunHistoryEvent;
   }): Promise<RunHistoryAppendOutcome> {
+    /**
+     * HISTORY-01（2026-11-09，卡内 §3）：**写入前脱敏**。
+     *
+     * 此前工具输出/失败原因**原样落盘**，脱敏只发生在展示层 —— 也就是
+     * "先保存再在 UI 遮挡"，与卡内"不得只靠展示层遮挡"直接冲突：
+     * 密钥会先进入历史文件，任何读文件的人（含后续导出）都能拿到。
+     * 这里在**唯一写入漏斗**上统一脱敏，覆盖工具输出、失败原因、模型说明与控制事件。
+     */
+    const redactedEvent: RunHistoryEvent = {
+      ...input.event,
+      payloadJson: redactSensitiveText(input.event.payloadJson),
+    };
     const current = await this.read(input.missionIdentifier);
 
     if (current.kind === "invalid") {
@@ -173,12 +187,12 @@ export class RunHistoryStore {
       segments.push({
         segmentRevision: segments.length + 1,
         startedAtIso: input.event.recordedAtIso,
-        events: [input.event],
+        events: [redactedEvent],
       });
     } else {
       const lastSegment = segments[segments.length - 1];
       if (lastSegment === undefined) throw new Error("不可能状态：段列表为空");
-      lastSegment.events.push(input.event);
+      lastSegment.events.push(redactedEvent);
     }
 
     const nextDocument: RunHistoryDocument = {
@@ -203,14 +217,19 @@ export class RunHistoryStore {
     readonly outputText: string;
     readonly recordedAtIso?: string;
   }): Promise<RunHistoryAppendOutcome> {
-    const contentDigest = createHash("sha256").update(input.outputText).digest("hex");
+    /** HISTORY-01 §3：去重摘要也基于**脱敏后**文本，保证摘要与落盘内容一致。 */
+    const redactedOutputText = redactSensitiveText(input.outputText);
+    const contentDigest = createHash("sha256").update(redactedOutputText).digest("hex");
     return this.appendEvent({
       missionIdentifier: input.missionIdentifier,
       event: {
         eventIdentifier: "tool-call:" + input.toolName + ":" + contentDigest,
         kind: "tool-call",
         recordedAtIso: input.recordedAtIso ?? new Date().toISOString(),
-        payloadJson: JSON.stringify({ toolName: input.toolName, outputText: input.outputText }),
+        payloadJson: JSON.stringify({
+          toolName: input.toolName,
+          outputText: redactedOutputText,
+        }),
       },
     });
   }
@@ -222,7 +241,9 @@ export class RunHistoryStore {
     readonly failureReason: string;
     readonly recordedAtIso?: string;
   }): Promise<RunHistoryAppendOutcome> {
-    const reasonDigest = createHash("sha256").update(input.failureReason).digest("hex");
+    /** HISTORY-01 §3：失败原因同样先脱敏（它常带出命令与凭据片段）。 */
+    const redactedFailureReason = redactSensitiveText(input.failureReason);
+    const reasonDigest = createHash("sha256").update(redactedFailureReason).digest("hex");
     return this.appendEvent({
       missionIdentifier: input.missionIdentifier,
       event: {
@@ -231,7 +252,7 @@ export class RunHistoryStore {
         recordedAtIso: input.recordedAtIso ?? new Date().toISOString(),
         payloadJson: JSON.stringify({
           toolName: input.toolName,
-          failureReason: input.failureReason,
+          failureReason: redactedFailureReason,
         }),
       },
     });

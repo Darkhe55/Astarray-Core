@@ -31,7 +31,12 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 6 });
+  /**
+   * 收尾前短暂等待：任务终态后仍有后台写入（mission 摘要/报告索引）在飞，
+   * 立刻删目录会让 `writeAtomicJson` 的 rename 撞上 ENOENT（实测未处理拒绝）。
+   */
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
 });
 
 interface ToolResultMessage {
