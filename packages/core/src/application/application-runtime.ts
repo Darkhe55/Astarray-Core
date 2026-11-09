@@ -97,6 +97,7 @@ import {
   type ProcessExecutionOwnership,
 } from "../execution/execution-contract.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
+import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
 import { PermissionProfileStore } from "../tools/permission-profile-store.js";
 import type { PermissionProfileReference } from "../tools/permission-profile-store.js";
@@ -310,6 +311,15 @@ export interface ApplicationRuntime {
   globalContextBudgetStore: GlobalContextBudgetStore;
   scopedSettingsStore: ScopedSettingsStore;
   agentModelBindingStore: AgentModelBindingStore;
+  /**
+   * EXEC-01-04：受控进程执行控制面（查询/读取/取消）。
+   *
+   * 暴露给 SDK 的是**受控接口**，不是后端本身：所有调用仍走归属校验与
+   * 状态机，SDK 无法绕过它们直接接触沙箱。
+   */
+  processExecutionController: ProcessExecutionController;
+  /** 环境登记表（登记方为认证控制面；SDK 只读不到写入入口）。 */
+  executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
   missionRuntimeRegistry: MissionRuntimeRegistry;
   artifactRecordStore: ArtifactRecordStore;
   projectWorkWindowStore: ProjectWorkWindowStore;
@@ -660,6 +670,13 @@ export interface ApplicationRuntimeOptions {
     agentInstanceId: string | null;
   }) => Promise<MissionRuntimeLease | null>;
   mode: "ponder" | "assist" | "devolve";
+  /**
+   * EXEC-01-04：受控执行后端（缺省 `null` ⇒ 一律 `execution-backend-unsupported`）。
+   *
+   * 注入点存在是为了让测试与将来的真实沙箱用**同一装配路径**，
+   * 而不是各自绕开控制器。
+   */
+  sandboxExecutionBackend?: SandboxExecutionBackend | null;
   stateDirectory: string;
   concurrency: number;
   failureThreshold: number;
@@ -1079,10 +1096,17 @@ export async function createApplicationRuntime(
    * - 执行记录落盘（可跨重启对账），毒化幂等键同样持久化。
    */
   const executionEnvironmentRegistry = new ExecutionEnvironmentRegistry();
+  /**
+   * EXEC-01-04 / 用户裁决（2026-11-09）：后端可由装配注入（测试与将来的真实沙箱共用）。
+   *
+   * 缺省仍是 `null` —— **不降级到宿主执行**；注入只改变"用什么隔离"，
+   * 不改变"没有隔离就拒绝执行"的语义。
+   */
+  const sandboxExecutionBackend = options.sandboxExecutionBackend ?? null;
   const processExecutionController = new ProcessExecutionController({
     environmentRegistry: executionEnvironmentRegistry,
     store: new FileSystemProcessExecutionStore({ stateDirectory }),
-    sandboxBackend: null,
+    sandboxBackend: sandboxExecutionBackend,
   });
   const permissionCatalog = new PermissionCapabilityCatalog();
   const permissionProfileStore = new PermissionProfileStore({
@@ -4473,6 +4497,8 @@ export async function createApplicationRuntime(
     scanStartupRecovery,
     runStartupRecovery,
     readStartupRecoveryReport,
+    processExecutionController,
+    executionEnvironmentRegistry,
     startupRecoveryReportStore,
     startupRecoveryPolicyStore,
     controller,

@@ -11,6 +11,7 @@ import { promises as fs } from "node:fs";
 import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
 import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
+import { redactSensitiveText } from "./orchestration/diagnostic-event-store.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
 import type { StartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
 import { parseStartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
@@ -6307,6 +6308,122 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     });
     this.startTaskMonitor(input.taskIdentifier);
     return this.toTaskResult(input.taskIdentifier, record);
+  }
+
+  /**
+   * EXEC-01-04：查询一次受控执行的**状态**。
+   *
+   * 只暴露状态视图，不暴露后端句柄；归属校验在控制器内完成，
+   * SDK 调用方必须是该执行的**同一主体**（或经明确授权的上级）。
+   */
+  async queryProcessExecution(input: {
+    sessionId: string;
+    executionId: string;
+  }): Promise<{
+    executionId: string;
+    status: string;
+    exitCode: number | null;
+    failureReason: string | null;
+    environmentIdentifier: string;
+    queuedAtIso: string;
+    startedAtIso: string | null;
+    finishedAtIso: string | null;
+  }> {
+    this.assertOpen();
+    this.requireSession(input.sessionId);
+    try {
+      const status = await this.runtime.processExecutionController.readStatus({
+        requestingAgentInstanceIdentifier: this.runtime.mainAgentInstanceId,
+        executionId: input.executionId,
+      });
+      return {
+        executionId: status.executionId,
+        status: status.status,
+        exitCode: status.exitCode,
+        failureReason: status.failureReason,
+        environmentIdentifier: status.environmentIdentifier,
+        queuedAtIso: status.queuedAtIso,
+        startedAtIso: status.startedAtIso,
+        finishedAtIso: status.finishedAtIso,
+      };
+    } catch (error) {
+      throw this.toProcessExecutionPublicError(error);
+    }
+  }
+
+  /**
+   * EXEC-01-04：按**字节游标**读取受控执行的输出。
+   *
+   * 返回前统一脱敏（与运行历史同一凭据目录）：模型/命令输出可能带出密钥，
+   * 不得让 SDK 调用方拿到原文。
+   */
+  async readProcessExecutionOutput(input: {
+    sessionId: string;
+    executionId: string;
+    stream: "stdout" | "stderr";
+    fromCursorBytes: number;
+    maximumBytes?: number;
+  }): Promise<{
+    stream: "stdout" | "stderr";
+    outputText: string;
+    nextCursorBytes: number;
+    isTruncated: boolean;
+  }> {
+    this.assertOpen();
+    this.requireSession(input.sessionId);
+    try {
+      const output = await this.runtime.processExecutionController.readOutput({
+        requestingAgentInstanceIdentifier: this.runtime.mainAgentInstanceId,
+        executionId: input.executionId,
+        stream: input.stream,
+        fromCursorBytes: input.fromCursorBytes,
+        ...(input.maximumBytes === undefined ? {} : { maximumBytes: input.maximumBytes }),
+      });
+      return {
+        stream: output.stream,
+        outputText: redactSensitiveText(output.text),
+        nextCursorBytes: output.nextCursorBytes,
+        isTruncated: output.isTruncated,
+      };
+    } catch (error) {
+      throw this.toProcessExecutionPublicError(error);
+    }
+  }
+
+  /** EXEC-01-04：取消一次受控执行（必须真的停住，不只是标记状态）。 */
+  async cancelProcessExecution(input: {
+    sessionId: string;
+    executionId: string;
+    reason: string;
+  }): Promise<{ executionId: string; status: string; failureReason: string | null }> {
+    this.assertOpen();
+    this.requireSession(input.sessionId);
+    try {
+      const status = await this.runtime.processExecutionController.cancel({
+        requestingAgentInstanceIdentifier: this.runtime.mainAgentInstanceId,
+        executionId: input.executionId,
+        reason: input.reason,
+      });
+      return {
+        executionId: status.executionId,
+        status: status.status,
+        failureReason: status.failureReason,
+      };
+    } catch (error) {
+      throw this.toProcessExecutionPublicError(error);
+    }
+  }
+
+  /** 把执行控制面的领域错误映射成公开错误（不泄漏内部细节）。 */
+  private toProcessExecutionPublicError(error: unknown): PublicApplicationError {
+    if (error instanceof PublicApplicationError) return error;
+    if (error instanceof DomainError) {
+      return new PublicApplicationError(error.errorCode, error.message);
+    }
+    return new PublicApplicationError(
+      "execution-query-failed",
+      "执行查询失败: " + (error as Error).message,
+    );
   }
 
   /** 查询任务：以本地权威 mission 状态为准（非字符串占位）。 */
