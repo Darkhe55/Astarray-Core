@@ -35,6 +35,16 @@ import type { ReadSuppressionLedger } from "./read-suppression-ledger.js";
 import type { EvidenceSearchAgentPort } from "./evidence-search-agent-port.js";
 import type { EvidenceQueryGuard } from "./evidence-search-agent-port.js";
 import type { EvidenceBundleBuilder } from "./evidence-bundle-builder.js";
+import type {
+  ProcessExecutionController,
+  ProcessExecutionOutputResult,
+  ProcessExecutionStatusResult,
+} from "../execution/process-execution-controller.js";
+import {
+  parseProcessExecutionQueryRequest,
+  parseProcessExecutionStartRequest,
+  type ProcessExecutionOwnership,
+} from "../execution/execution-contract.js";
 
 export interface BuiltinToolExecutionContext {
   workspaceBoundary: WorkspaceBoundary;
@@ -99,6 +109,19 @@ export interface BuiltinToolExecutionContext {
   evidenceBundleBuilder?: EvidenceBundleBuilder | null;
   /** T06D：当前主张（证据包聚合键）。 */
   factVerificationClaimIdentifier?: string | null;
+  /**
+   * EXEC-01-01（2026-11-09）：受控进程执行控制器。
+   *
+   * 未装配 ⇒ `processExecution` 一律返回 `execution-backend-unsupported`；
+   * **不**降级到宿主进程执行。
+   */
+  processExecutionController?: ProcessExecutionController | null;
+  /**
+   * EXEC-01-01：本次执行的归属（project/mission/task/attempt/授权 revision）。
+   *
+   * 由 harness 注入，**不接受**模型自报；缺失时拒绝 `start`。
+   */
+  processExecutionOwnership?: ProcessExecutionOwnership | null;
 }
 
 export const BUILTIN_TOOL_DESCRIPTORS: ToolDescriptor[] = [
@@ -284,6 +307,42 @@ export const BUILTIN_TOOL_DESCRIPTORS: ToolDescriptor[] = [
       },
     },
   },
+  {
+    name: "processExecution",
+    summary:
+      "受控进程执行族（start/status/readOutput/cancel；非交互、有限时长、无网络、仅沙箱环境内已登记可执行标识）",
+    category: "restricted",
+    mutationKind: "create-only",
+    backupPolicy: "not-required",
+    authorizationPolicy: "standard",
+    supportedTaskTypes: ["code", "data"],
+    /**
+     * EXEC-01-01：`start` 会产生进程副作用，因此整工具**不声明幂等**
+     * （幂等由控制器按 `idempotencyKey` + 请求指纹判定）。
+     */
+    isIdempotent: false,
+    inputSchema: {
+      type: "object",
+      required: ["action"],
+      properties: {
+        action: {
+          type: "string",
+          enum: ["start", "status", "readOutput", "cancel"],
+        },
+        environmentIdentifier: { type: "string" },
+        executableIdentifier: { type: "string" },
+        arguments: { type: "array", items: { type: "string" } },
+        workingDirectory: { type: "string" },
+        timeoutMilliseconds: { type: "number" },
+        idempotencyKey: { type: "string" },
+        executionId: { type: "string" },
+        stream: { type: "string", enum: ["stdout", "stderr"] },
+        fromCursorBytes: { type: "number" },
+        maximumBytes: { type: "number" },
+        reason: { type: "string" },
+      },
+    },
+  },
 ];
 
 export async function executeBuiltinTool(
@@ -321,16 +380,26 @@ export async function executeBuiltinTool(
       );
     }
     /**
-     * 交给具体工具执行，但先**去掉 action 字段**：具体实现不认识它，
-     * 且留着会被"未知参数拒绝"校验（正确）拦下 —— 那会让统一入口永远不可用。
+     * EXEC-01-01（2026-11-09）：**族名 === 实现名** 的族（`processExecution`）。
+     *
+     * 卡内要求"不建立多个近义工具"，因此该族的四个 action 共用一个实现名。
+     * 这种情况**不能**按下面的路径递归（同名同参 ⇒ 无限递归），也不能删掉
+     * `action`（实现需要它来分派）。正确做法：直接落到本函数的 switch，
+     * 由 `processExecution` 分支按 action 分派。
      */
-    const remainingArguments = JSON.parse(argumentsJson) as Record<string, unknown>;
-    delete remainingArguments["action"];
-    return executeBuiltinTool(
-      resolvedUnifiedEntry.concreteToolName,
-      JSON.stringify(remainingArguments),
-      executionContext,
-    );
+    if (resolvedUnifiedEntry.concreteToolName !== toolName) {
+      /**
+       * 交给具体工具执行，但先**去掉 action 字段**：具体实现不认识它，
+       * 且留着会被"未知参数拒绝"校验（正确）拦下 —— 那会让统一入口永远不可用。
+       */
+      const remainingArguments = JSON.parse(argumentsJson) as Record<string, unknown>;
+      delete remainingArguments["action"];
+      return executeBuiltinTool(
+        resolvedUnifiedEntry.concreteToolName,
+        JSON.stringify(remainingArguments),
+        executionContext,
+      );
+    }
   }
   const args = JSON.parse(argumentsJson) as Record<string, unknown>;
   switch (toolName) {
@@ -757,9 +826,147 @@ export async function executeBuiltinTool(
     case "factVerification": {
       return await executeFactVerification(args, executionContext);
     }
+    case "processExecution": {
+      return await executeProcessExecution(args, executionContext);
+    }
     default:
       throw new Error(`未知内置工具: ${toolName}`);
   }
+}
+
+/**
+ * EXEC-01-01（2026-11-09）：`processExecution` 族的执行分派。
+ *
+ * 纪律：
+ * - **逐 action** 校验参数（未知字段拒绝），校验先于任何执行；
+ * - 未装配控制器 ⇒ 精确 `execution-backend-unsupported`，不降级到宿主执行；
+ * - `start` 必须由 harness 注入归属（模型不能自报 project/mission/attempt）；
+ * - 输出是结构化摘要，不含真实可执行入口、宿主路径或未扫描的原始输出。
+ */
+async function executeProcessExecution(
+  args: Record<string, unknown>,
+  executionContext: BuiltinToolExecutionContext,
+): Promise<{
+  outputText: string;
+  isSideEffectFree: boolean;
+  producedArtifacts?: Array<{
+    path: string;
+    artifactType: string;
+    displayName: string;
+  }>;
+}> {
+  const rawAction = args["action"];
+  if (
+    rawAction !== "start" &&
+    rawAction !== "status" &&
+    rawAction !== "readOutput" &&
+    rawAction !== "cancel"
+  ) {
+    throw new Error("processExecution 参数 action 必须为 start/status/readOutput/cancel");
+  }
+  const actionArgumentsOutcome = validateToolActionArguments({
+    toolNameOrAlias: "processExecution",
+    action: rawAction,
+    argumentsJson: JSON.stringify(args),
+  });
+  if (!actionArgumentsOutcome.isValid) {
+    throw new Error(
+      "processExecution 参数非法：" + String(actionArgumentsOutcome.reason),
+    );
+  }
+  const controller = executionContext.processExecutionController ?? null;
+  if (controller === null) {
+    throw new Error(
+      "processExecution 不可用：未装配沙箱执行后端（拒绝降级到宿主进程执行）",
+    );
+  }
+  const requestingAgentInstanceIdentifier = executionContext.requestingAgentInstanceId;
+  if (requestingAgentInstanceIdentifier === "") {
+    throw new Error("processExecution 不可用：缺少调用主体标识");
+  }
+
+  if (rawAction === "start") {
+    const ownership = executionContext.processExecutionOwnership ?? null;
+    if (ownership === null) {
+      throw new Error(
+        "processExecution 不可用：缺少执行归属（project/mission/task/attempt 由 harness 注入，不接受模型自报）",
+      );
+    }
+    if (ownership.agentInstanceIdentifier !== requestingAgentInstanceIdentifier) {
+      throw new Error("processExecution 归属与调用主体不一致：拒绝执行");
+    }
+    const request = parseProcessExecutionStartRequest(args);
+    const started = await controller.start({ ownership, request });
+    return {
+      outputText: JSON.stringify({
+        executionId: started.executionId,
+        status: started.status,
+        isReusedByIdempotencyKey: started.isReusedByIdempotencyKey,
+      }),
+      /** `start` 会产生进程副作用：不得声明为无副作用。 */
+      isSideEffectFree: false,
+    };
+  }
+
+  if (rawAction === "status") {
+    const query = parseProcessExecutionQueryRequest("status", args);
+    const status = await controller.readStatus({
+      requestingAgentInstanceIdentifier,
+      executionId: query.executionId,
+    });
+    return {
+      outputText: JSON.stringify(status satisfies ProcessExecutionStatusResult),
+      isSideEffectFree: true,
+    };
+  }
+
+  if (rawAction === "readOutput") {
+    const query = parseProcessExecutionQueryRequest("readOutput", args);
+    const stream = args["stream"];
+    if (stream !== "stdout" && stream !== "stderr") {
+      throw new Error("processExecution 的 readOutput 必须指定 stream=stdout|stderr");
+    }
+    const rawCursor = args["fromCursorBytes"];
+    if (
+      rawCursor !== undefined &&
+      (typeof rawCursor !== "number" || !Number.isInteger(rawCursor) || rawCursor < 0)
+    ) {
+      throw new Error("fromCursorBytes 必须是非负整数字节游标");
+    }
+    const rawMaximum = args["maximumBytes"];
+    if (
+      rawMaximum !== undefined &&
+      (typeof rawMaximum !== "number" || !Number.isInteger(rawMaximum) || rawMaximum <= 0)
+    ) {
+      throw new Error("maximumBytes 必须是正整数字节数");
+    }
+    const output = await controller.readOutput({
+      requestingAgentInstanceIdentifier,
+      executionId: query.executionId,
+      stream,
+      fromCursorBytes: rawCursor ?? 0,
+      ...(rawMaximum === undefined ? {} : { maximumBytes: rawMaximum }),
+    });
+    return {
+      outputText: JSON.stringify(output satisfies ProcessExecutionOutputResult),
+      isSideEffectFree: true,
+    };
+  }
+
+  const query = parseProcessExecutionQueryRequest("cancel", args);
+  const rawReason = args["reason"];
+  if (rawReason !== undefined && typeof rawReason !== "string") {
+    throw new Error("cancel 的 reason 必须是字符串");
+  }
+  const cancelled = await controller.cancel({
+    requestingAgentInstanceIdentifier,
+    executionId: query.executionId,
+    reason: rawReason ?? "用户取消",
+  });
+  return {
+    outputText: JSON.stringify(cancelled satisfies ProcessExecutionStatusResult),
+    isSideEffectFree: false,
+  };
 }
 
 async function executeBackupVaultAction(

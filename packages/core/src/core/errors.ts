@@ -129,6 +129,24 @@ export type DomainErrorCode =
    * （节点数/标识/依赖环/验收要求/未注册工具/越权字段）。
    */
   | "task-decomposition-invalid"
+  /**
+   * EXEC-01（2026-11-09）：受控进程执行的稳定错误码。
+   *
+   * 语义刻意分开，避免把"没装后端"伪装成"参数不对"：
+   * - `execution-environment-invalid`：认证控制面登记内容不合格（缺资源额度/范围/允许网络等）；
+   * - `execution-environment-not-found`：模型给了未登记的环境标识（不得临时创建）；
+   * - `execution-request-invalid`：模型参数越界（宿主命令字符串、绝对路径、未知字段）；
+   * - `execution-backend-unsupported`：当前平台没有可用的隔离后端（精确 unsupported，不伪装成功）；
+   * - `execution-not-found` / `execution-not-authorized`：执行不存在 / 不属于本主体且未获上级授权；
+   * - `execution-idempotency-conflict`：同一幂等键换了参数（拒绝复用，不重启进程）。
+   */
+  | "execution-environment-invalid"
+  | "execution-environment-not-found"
+  | "execution-request-invalid"
+  | "execution-backend-unsupported"
+  | "execution-not-found"
+  | "execution-not-authorized"
+  | "execution-idempotency-conflict"
   | "unknown";
 
 export class DomainError extends Error {

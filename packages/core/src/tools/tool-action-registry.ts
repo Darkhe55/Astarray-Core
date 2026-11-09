@@ -155,10 +155,93 @@ export const PROJECT_FILE_WRITE_FAMILY: ToolCapabilityFamily = {
   ],
 };
 
+/**
+ * EXEC-01-01（2026-11-09）：**受控进程执行族**（模型只看到这一个工具名）。
+ *
+ * 卡内明确要求"不建立多个近义工具"：因此四个 action 共用同一个实现工具名
+ * `processExecution`（族名 = 实现名），由实现内部按 action 分派。
+ *
+ * 逐 action 判定（不得整体伪装只读）：
+ *  - `start`：**不是只读**，会产生进程副作用，非幂等（幂等键在控制器层处理）；
+ *  - `status` / `readOutput`：只读；
+ *  - `cancel`：改变执行状态，非只读、非幂等。
+ */
+export const PROCESS_EXECUTION_FAMILY_NAME = "processExecution";
+
+export const PROCESS_EXECUTION_FAMILY: ToolCapabilityFamily = {
+  familyName: PROCESS_EXECUTION_FAMILY_NAME,
+  actions: [
+    {
+      action: "start",
+      aliases: [],
+      isReadOnly: false,
+      mutationKind: "create-only",
+      requiresPreMutationBackup: false,
+      isIdempotent: false,
+      requiredParameters: [
+        "environmentIdentifier",
+        "executableIdentifier",
+        "arguments",
+        "workingDirectory",
+      ],
+      implementationToolName: PROCESS_EXECUTION_FAMILY_NAME,
+      allowedParameters: [
+        "action",
+        "environmentIdentifier",
+        "executableIdentifier",
+        "arguments",
+        "workingDirectory",
+        "timeoutMilliseconds",
+        "idempotencyKey",
+      ],
+    },
+    {
+      action: "status",
+      aliases: [],
+      isReadOnly: true,
+      mutationKind: "none",
+      requiresPreMutationBackup: false,
+      isIdempotent: true,
+      requiredParameters: ["executionId"],
+      implementationToolName: PROCESS_EXECUTION_FAMILY_NAME,
+      allowedParameters: ["action", "executionId"],
+    },
+    {
+      action: "readOutput",
+      aliases: [],
+      isReadOnly: true,
+      mutationKind: "none",
+      requiresPreMutationBackup: false,
+      isIdempotent: true,
+      requiredParameters: ["executionId"],
+      implementationToolName: PROCESS_EXECUTION_FAMILY_NAME,
+      allowedParameters: [
+        "action",
+        "executionId",
+        "stream",
+        "fromCursorBytes",
+        "maximumBytes",
+      ],
+    },
+    {
+      action: "cancel",
+      aliases: [],
+      isReadOnly: false,
+      mutationKind: "overwrite",
+      requiresPreMutationBackup: false,
+      isIdempotent: false,
+      requiredParameters: ["executionId"],
+      implementationToolName: PROCESS_EXECUTION_FAMILY_NAME,
+      allowedParameters: ["action", "executionId", "reason"],
+    },
+  ],
+};
+
 /** 全部已登记的能力族（当前只登记纵向样本；新增族必须逐 action 判副作用）。 */
 export const REGISTERED_TOOL_CAPABILITY_FAMILIES: ToolCapabilityFamily[] = [
   PROJECT_FILE_READ_FAMILY,
   PROJECT_FILE_WRITE_FAMILY,
+  PROCESS_EXECUTION_FAMILY,
 ];
 
 export interface ResolvedToolAction {

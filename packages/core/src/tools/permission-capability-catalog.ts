@@ -11,7 +11,14 @@
  */
 import type { PermissionResult, ToolDescriptor } from "../core/types.js";
 
-export const PERMISSION_CATALOG_VERSION = 1;
+/**
+ * EXEC-01-01（2026-11-09）：版本 1 → 2。
+ *
+ * 新增 `process.read` / `process.control` 两项能力并登记 `processExecution` 的
+ * 逐 action 映射 —— 目录内容变了，版本必须跟着变，否则"profile 快照"会
+ * 声称与目录一致而实际缺少新能力。
+ */
+export const PERMISSION_CATALOG_VERSION = 2;
 
 export type PermissionDecision = PermissionResult;
 
@@ -84,6 +91,14 @@ const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
   { capabilityId: "task.manage", displayName: "任务管理", description: "创建、插入、改序、取消任务", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["task"], riskSummary: "中" },
   { capabilityId: "memory.read-selected", displayName: "记忆选择性读取", description: "读取明确选择的 Agent 存档条目", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["memory"], riskSummary: "中" },
   { capabilityId: "memory.write", displayName: "记忆写入", description: "写入任务记忆与工作存档", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["memory"], riskSummary: "中" },
+  /**
+   * EXEC-01-01（2026-11-09）：受控进程执行的逐 action 权限。
+   *
+   * `process.read` / `process.control` 与既有的 `process.execute-sandboxed`
+   * 刻意分开：只读查询输出不该要求"执行"授权，取消也不该等同起新进程。
+   */
+  { capabilityId: "process.read", displayName: "执行查询", description: "查询受控执行的运行状态与输出（只读）", devolveDefault: "allow", assistDefault: "allow", applicableResources: ["sandbox"], riskSummary: "低" },
+  { capabilityId: "process.control", displayName: "执行控制", description: "取消受控执行", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["sandbox"], riskSummary: "中" },
 ];
 
 /** 内置工具 → 权限映射（注册校验与执行裁决用）。 */
@@ -103,11 +118,42 @@ const DEFAULT_TOOL_CAPABILITY_MAPPINGS: Record<string, string[]> = {
   searchProjectText: ["project.read"],
   gitReadonlyView: ["git.read"],
   factVerification: ["network.read"],
+  /**
+   * EXEC-01-01：整工具映射（**兜底**，保留既有整工具授权模式）。
+   *
+   * 实际裁决优先用下面的逐 action 映射；这里只在该 action 未登记时生效，
+   * 且取最严的 `process.execute-sandboxed`，避免"未登记 action 反而更宽松"。
+   */
+  processExecution: ["process.execute-sandboxed"],
+};
+
+/**
+ * EXEC-01-01（2026-11-09）：**逐 action 权限映射**。
+ *
+ * 为什么必须分开：`processExecution` 的四个 action 副作用完全不同 ——
+ * `start` 起进程（沙箱执行），`status`/`readOutput` 只读，`cancel` 改变执行状态。
+ * 若共用一组权限，要么只读查询被迫走"沙箱执行"的高风险授权，要么 start
+ * 被降级成只读 —— 两者都是错误的产品语义。
+ */
+const DEFAULT_TOOL_ACTION_CAPABILITY_MAPPINGS: Record<string, Record<string, string[]>> = {
+  processExecution: {
+    start: ["process.execute-sandboxed"],
+    status: ["process.read"],
+    readOutput: ["process.read"],
+    cancel: ["process.control"],
+  },
 };
 
 export class PermissionCapabilityCatalog {
   private readonly capabilitiesById = new Map<string, PermissionCapability>();
   private readonly toolMappings = new Map<string, string[]>();
+  /**
+   * EXEC-01-01（2026-11-09）：逐 action 权限映射。
+   *
+   * 同一个统一入口工具的不同 action 副作用不同，不能共享一组权限；
+   * 未登记的 action 回退整工具映射（保留既有整工具授权模式）。
+   */
+  private readonly actionMappings = new Map<string, Record<string, string[]>>();
 
   constructor() {
     for (const definition of CAPABILITY_DEFINITIONS) {
@@ -122,6 +168,11 @@ export class PermissionCapabilityCatalog {
     }
     for (const [toolName, capabilityIds] of Object.entries(DEFAULT_TOOL_CAPABILITY_MAPPINGS)) {
       this.toolMappings.set(toolName, capabilityIds);
+    }
+    for (const [toolName, actionMapping] of Object.entries(
+      DEFAULT_TOOL_ACTION_CAPABILITY_MAPPINGS,
+    )) {
+      this.actionMappings.set(toolName, actionMapping);
     }
   }
 
@@ -153,12 +204,18 @@ export class PermissionCapabilityCatalog {
   /**
    * 按 profile 决定裁决工具（最严格结果）：
    * 任一 deny → deny；否则任一 ask → ask；全部 allow → allow。
+   *
+   * EXEC-01-01（2026-11-09）：支持**逐 action** 覆盖。同一个统一入口工具的
+   * 不同 action 副作用不同（`processExecution` 的 start 会起进程，status 只读），
+   * 因此不能让它们共享同一组权限。给了 `action` 且该 action 有专门映射时，
+   * 用专门映射；否则回退到整工具映射（保留既有整工具授权模式）。
    */
   evaluateToolPermission(input: {
     toolName: string;
     capabilityDecisions: Record<string, PermissionDecision>;
+    action?: string | null;
   }): PermissionDecision {
-    const capabilityIds = this.getToolCapabilityIds(input.toolName);
+    const capabilityIds = this.getCapabilityIdsForCall(input.toolName, input.action);
     if (capabilityIds.length === 0) {
       return "deny"; // 未映射工具拒绝执行
     }
@@ -174,6 +231,28 @@ export class PermissionCapabilityCatalog {
     }
     return hasAsk ? "ask" : "allow";
   }
+
+  /**
+   * 本次调用的权限能力集合：action 有专门映射则用它，否则回退整工具映射。
+   *
+   * 注意：回退**不**是"放宽"——整工具映射仍然生效；只有显式登记了逐 action
+   * 映射的工具才会被更精确地裁决。
+   */
+  getCapabilityIdsForCall(toolName: string, action?: string | null): string[] {
+    if (typeof action === "string" && action !== "") {
+      const actionMapping = this.actionMappings.get(toolName)?.[action];
+      if (actionMapping !== undefined) {
+        return actionMapping;
+      }
+    }
+    return this.getToolCapabilityIds(toolName);
+  }
+
+  /** 该工具是否登记了逐 action 映射（诊断用；不参与放行）。 */
+  hasActionMapping(toolName: string, action: string): boolean {
+    return this.actionMappings.get(toolName)?.[action] !== undefined;
+  }
+
 
   /** 工具注册校验：未映射拒绝（由 ToolRegistry 调用）。 */
   assertToolMapped(descriptor: ToolDescriptor): void {

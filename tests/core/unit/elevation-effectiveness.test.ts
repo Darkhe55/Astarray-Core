@@ -22,6 +22,8 @@ import {
 } from "../../../packages/core/src/tools/session-permission-elevation.js";
 import { CurrentPermissionConfigurationExporter } from "../../../packages/core/src/tools/session-shutdown-and-export.js";
 
+const CURRENT_CATALOG_VERSION = new PermissionCapabilityCatalog().getCatalogVersion();
+
 let temporaryDirectory: string;
 let clockMilliseconds: number;
 
@@ -51,7 +53,8 @@ function makeElevationInput(overrides: Record<string, unknown> = {}) {
     resourceScope: "workspace",
     baseProfileReference: { kind: "builtin", profileId: "assist" },
     baseProfileRevision: 1,
-    catalogVersion: 1,
+    /** 目录版本取自目录实例（写死会在目录新增能力后误判提升失效）。 */
+    catalogVersion: CURRENT_CATALOG_VERSION,
     originalDecision: "ask",
     elevatedDecision: "allow",
     expiresAtIso: null,

@@ -127,6 +127,21 @@ const READ_ONLY_OPERATION_KINDS: ReadonlySet<OperationKind> = new Set([
   "project-file-read",
 ]);
 
+/**
+ * EXEC-01-01（2026-11-09）：**没有项目路径目标**的操作类型。
+ *
+ * 范围门禁的职责是解析"这次操作触及哪个项目/哪个路径"；`process-query`
+ * 与 `process-control` 的目标是执行 ID 而非路径，因此这里显式豁免，
+ * 而不是让它们落进"目标路径无法解析 ⇒ S4-unknown ⇒ 拒绝"。
+ *
+ * 豁免**不等于放行**：这两个 action 仍分别受权限引擎
+ * （`process.read` / `process.control`）与执行归属校验约束。
+ */
+const SCOPE_EXEMPT_OPERATION_KINDS: ReadonlySet<OperationKind> = new Set([
+  "process-query",
+  "process-control",
+]);
+
 export class ScopeAuthorizationGate {
   /**
    * 用于判定"预留"与"授权"是否落在**同一个 gate 实例**上。
@@ -751,6 +766,31 @@ export function describeToolOperation(
     case "factVerification":
     case "taskSequenceStatus":
       return null;
+    /**
+     * EXEC-01-01（2026-11-09）：受控进程执行族。
+     *
+     * 逐 action 映射（不能整体映射成 `process-execution`）：
+     * - `start` 会真正起进程，必须带 `workingDirectory` 走范围解析（项目内 → S1）；
+     * - `status`/`readOutput` 目标是执行 ID，登记为 `process-query`（无路径目标，范围豁免）；
+     * - `cancel` 同样无路径目标，登记为 `process-control`。
+     *
+     * 缺 action 或 action 非法时按**最严**处理：当作 `process-execution` 且无目标路径
+     * ⇒ S4-unknown ⇒ 拒绝（不因"参数不全"而放宽）。
+     */
+    case "processExecution": {
+      const action = parsedArguments["action"];
+      if (action === "status" || action === "readOutput") {
+        return { operationKind: "process-query", targetPath: null };
+      }
+      if (action === "cancel") {
+        return { operationKind: "process-control", targetPath: null };
+      }
+      const workingDirectory = parsedArguments["workingDirectory"];
+      return {
+        operationKind: "process-execution",
+        targetPath: typeof workingDirectory === "string" ? workingDirectory : null,
+      };
+    }
     default:
       // GOV-02c：未显式映射的工具不进入范围门禁；未注册/禁用工具会由注册表层
       // fail-closed 拒绝（tool-not-found），不会因此放行。
@@ -792,6 +832,13 @@ export class ScopeGatedToolPort implements ToolPort {
      * 此处只是不再占用"单次授权/重放保护"语义。
      */
     if (READ_ONLY_OPERATION_KINDS.has(operation.operationKind)) {
+      return this.innerToolPort.execute(toolName, argumentsJson, callId, cancellationSignal);
+    }
+    /**
+     * EXEC-01-01：没有项目路径目标的执行查询/控制同样不占用预留表
+     * （它们的目标是执行 ID，不产生项目文件副作用）。
+     */
+    if (SCOPE_EXEMPT_OPERATION_KINDS.has(operation.operationKind)) {
       return this.innerToolPort.execute(toolName, argumentsJson, callId, cancellationSignal);
     }
     // 执行前**原子预留**（未获授权绝不触达内层工具）。

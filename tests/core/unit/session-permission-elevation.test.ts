@@ -30,6 +30,13 @@ import { PermissionCapabilityCatalog } from "../../../packages/core/src/tools/pe
 import { PermissionProfileStore } from "../../../packages/core/src/tools/permission-profile-store.js";
 import type { PermissionProfileDocument } from "../../../packages/core/src/tools/permission-profile-store.js";
 
+/**
+ * 目录版本取自**当前目录实例**：本文件多处构造提升记录，写死版本会在
+ * 目录新增能力（EXEC-01 新增 process.read/process.control）后让"提升生效"
+ * 的断言失败 —— 那是测试脆弱，不是产品缺陷。
+ */
+const CURRENT_CATALOG_VERSION = new PermissionCapabilityCatalog().getCatalogVersion();
+
 let temporaryDirectory: string;
 
 beforeEach(async () => {
@@ -147,7 +154,11 @@ describe("SessionPermissionElevation", () => {
       resourceScope: "workspace",
       baseProfileReference: { kind: "builtin", profileId: "assist" },
       baseProfileRevision: 1,
-      catalogVersion: 1,
+      /**
+       * 目录版本必须取自目录本身，不能写死：目录新增能力时版本会递增，
+       * 写死会让"提升生效"的断言在版本升级后失败（而真实语义是对的）。
+       */
+      catalogVersion: CURRENT_CATALOG_VERSION,
       originalDecision: "deny",
       elevatedDecision: "allow",
       expiresAtIso: null,

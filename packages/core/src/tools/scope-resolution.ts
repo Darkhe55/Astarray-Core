@@ -18,6 +18,16 @@ export const OPERATION_KINDS = [
   "dependency-install",
   "external-software-control",
   "process-execution",
+  /**
+   * EXEC-01-01（2026-11-09）：受控进程执行的**查询**与**控制**。
+   *
+   * 这两类操作没有项目文件目标（目标是执行 ID，不是路径），因此不参与
+   * 范围门禁的路径解析；授权由权限引擎（`process.read` / `process.control`）
+   * 与执行归属校验负责。把它们登记为独立操作类型，是为了**显式说明**
+   * "不因无路径而变成未知范围"，而不是让它们悄悄落进 default 分支。
+   */
+  "process-query",
+  "process-control",
   "remote-publish",
   "backup-deletion",
   "unknown",
