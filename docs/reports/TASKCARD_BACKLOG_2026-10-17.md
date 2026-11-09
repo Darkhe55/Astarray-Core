@@ -1886,3 +1886,26 @@ DomainError: mission 租约文件损坏，拒绝读取/覆盖: …/mission-lease
 
 **顺带保留**：`public-sdk.test.ts` 的断言消息现在会带上实际 `status` 与条目数 —— 下次失败可直接定位，
 不必再靠"重跑直到绿"。
+
+### 11.G.7 2026-11-10 ALIGN-03 归属裁决落地对账
+
+用户已裁定"调度器不是上级、Worker 唯一直属上级是 mission 责任次级、禁止默认绑主 Agent、
+缺失即阻断、四级挂三级、恢复保持原绑定"。据此已完成：
+
+| 项 | 证据 |
+|---|---|
+| 责任次级持久化 | `align03-responsible-secondary`（装配级，断言非 `scheduler:`、非主 Agent） |
+| Worker 登记真实上级 | 同上 + `listAgentEntries()`（所有三级项上级 = `secondary:<missionId>`） |
+| 未绑定 ⇒ 阻断 | `align03-ownership-blocking`（4 条，含 `scheduler:` 标签拒绝） |
+| 自动任命 | `align03-auto-review-appointment`（开启 ⇒ 出现非贡献者审查者） |
+| **裁决落盘** | 同上（**无产物 ⇒ rejected，不出现 accepted**） |
+| 产物证据结论 | `align03-artifact-backed-verdict`（6 条） |
+
+**ALIGN-03-01/04 状态**：链路已通（任命 + 裁决 + 归属），**默认关闭**
+（`isIndependentReviewAutoAppointmentEnabled`），故仍为 implemented-unverified。
+
+**剩余阻塞（需用户决策）**：是否默认启用"产物存在性验收"作为完成门槛；
+若不够，需要先实现真实审查 Worker（模型审查）。
+
+**公开库整体状态**：台账 §11 各卡均为 implemented-unverified；剩余项为平台条件
+（干净设备、Linux/macOS 证据）或需用户决策（UAC 验证、审查默认开启）。
