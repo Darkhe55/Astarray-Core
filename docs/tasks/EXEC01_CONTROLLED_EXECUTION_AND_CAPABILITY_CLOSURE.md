@@ -480,3 +480,23 @@ Linux 的 bwrap 包装实现未写。
 公开全量 **656 files / 4484 passed + 3 skipped，exit 0**。
 
 **仍未做（如实）**：CLI 尚未开启该开关；Linux bwrap 包装实现未写。
+
+## 02 CLI 入口开启探测（2026-11-09）
+
+**缺口**：运行时只在被要求时探测，而**没有任何入口要求** ⇒ 产品里受控执行永远报"未装配"，
+测试却全绿（典型"组件存在但产品不可达"）。
+
+**改动**（`packages/tui/src/cli/bootstrap.ts`）：`isSandboxBackendAutoDetected: true` +
+`resolveApplicationRootPath()`。
+
+**过程中修掉一处真实缺陷**：应用根按**固定层数**推断（`..`,`..`）——源码运行时在
+`packages/tui/src/cli`、构建产物在 `dist/cli`，两者到包根层数不同 ⇒ 源码下指错目录
+⇒ 后端恒为 `null`，表现成"未装配"，**看起来像没接线**。改为**向上查找** `native/sandbox-helper`
+目录（最多 6 层），两种布局都能定位。
+
+**证据**（`exec01-02-cli-bootstrap-autodetect` 1/1）：引导后的运行时拒绝原因**不含"未装配"**，
+而是"没有可用的隔离执行后端…" ⇒ 证明探测真的接上了（本机探测结果为不可用，符合预期）。
+
+公开全量 **657 files / 4485 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：Linux bwrap 包装实现未写；提权后建档案的成功分支仍未验证。
