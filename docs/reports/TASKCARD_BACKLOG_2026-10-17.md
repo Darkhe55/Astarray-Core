@@ -1836,3 +1836,22 @@ AssertionError: 第 4 次提交未被接受: expected 'queued' to be 'accepted'
 
 **若将来复现，第一条检查**：`submitTask` 内部对 mission 登记（写 `projectIdentifier`）
 是否 `await`；以及 `queryMissionHistory` 是否应支持"读己之写"（读内存快照兜底）。
+
+#### 11.H.8 11.H.7 的"读己之写"假设被推翻（2026-11-10）
+
+**核对**：
+
+- `submitTask` **await** `controller.handleUserMessage(...)`（`public-sdk.ts:6337`）；
+- `MissionManager.createMission` 在返回前 **await** 写入 `summary.json`，且**同一处**写入
+  `projectIdentifier`（`mission-manager.ts:145-186`）；
+- `queryMissionHistory` 读的正是这份 `summary.json`（`mission-history-reader.ts:177`）。
+
+⇒ 提交返回时摘要已落盘，**不存在"提交后异步写摘要"的读己之写竞态**。11.H.7 的假设作废。
+
+**新的、更贴合证据的假设**：`submitTask` 在**指令窗口已满**时会**提前返回 `queued`**，
+**根本不创建 mission**（`public-sdk.ts:6329-6333` 早返回）。此时：
+① `status` 不是 `accepted`；② 历史里没有该 mission ⇒ `mission?.projectIdentifier` 为 `undefined`。
+两种断言失败都与观测到的 1/70 吻合。
+
+**待验证**：全新 `stateDirectory` 下首次提交为何会撞上"窗口已满"——需先捕获失败时的
+`status` 实际值（在断言消息里带上），而不是继续读代码猜测。
