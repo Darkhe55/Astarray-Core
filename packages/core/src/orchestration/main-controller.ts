@@ -4751,6 +4751,39 @@ export class MainController {
       workArchiveStore: this.options.workArchiveStore ?? null,
       /** ALIGN-03（2026-11-10）：编排层的"次级身份"用**真实责任次级**，不再是 scheduler 标签。 */
       secondaryAgentInstanceId: this.ensureResponsibleSecondaryAgentInstance(missionId),
+      /** ALIGN-03：主 Agent 标识（仅用于拒绝把它当上级）。 */
+      ...(this.options.mainAgentInstanceId === undefined
+        ? {}
+        : { mainAgentInstanceId: this.options.mainAgentInstanceId }),
+      /** ALIGN-03：assist 路径**强制**归属（解析不到上级即阻断派发）。 */
+      isWorkerOwnershipEnforced: true,
+      /**
+       * ALIGN-03：把派发出的三级 Worker 登记进目录，并写入**真实直属上级**。
+       * 未装配目录 ⇒ 不登记（行为不变，不假装已绑定）。
+       */
+      ...(this.options.registeredAgentDirectory === null ||
+      this.options.registeredAgentDirectory === undefined
+        ? {}
+        : {
+            registerTertiaryAgentInstance: (input: {
+              readonly agentInstanceId: string;
+              readonly missionId: string;
+              readonly taskId: string;
+              readonly owningSecondaryAgentInstanceId: string;
+            }) => {
+              const directory = this.options.registeredAgentDirectory;
+              if (directory === null || directory === undefined) return;
+              if (directory.hasAgent(input.agentInstanceId)) return;
+              directory.registerAgent({
+                agentInstanceId: input.agentInstanceId,
+                agentRole: "tertiary",
+                missionId: input.missionId,
+                owningSecondaryAgentInstanceId: input.owningSecondaryAgentInstanceId,
+                boundTaskBundleId: input.taskId,
+                registeredAtIso: new Date().toISOString(),
+              });
+            },
+          }),
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
       /** ALIGN-03-03：完成收据门禁（缺省关；开启后 success 无收据不判 done）。 */

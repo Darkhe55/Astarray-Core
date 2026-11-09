@@ -44,6 +44,16 @@ export class RegisteredAgentDirectory {
     return this.entriesByAgentId.has(agentInstanceId);
   }
 
+  /**
+   * ALIGN-03（2026-11-10）：**只读列出全部登记项**（副本）。
+   *
+   * 用途：验收"派发出的 Worker 是否都带了真实直属上级"。
+   * 只读、不改变任何状态；返回副本避免外部改动内部表。
+   */
+  listAgentEntries(): RegisteredAgentEntry[] {
+    return [...this.entriesByAgentId.values()].map((entry) => ({ ...entry }));
+  }
+
   /** 读取登记项（只读副本；未知返回 null）。 */
   getAgentEntry(agentInstanceId: string): RegisteredAgentEntry | null {
     const entry = this.entriesByAgentId.get(agentInstanceId);

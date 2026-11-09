@@ -506,3 +506,30 @@ const agentInstanceId =
 **结论**：**当前没有可用的产物能证明"编排层身份已切换"**。要证明它，必须让 Worker
 **登记进目录并带上 `owningSecondaryAgentInstanceId`** —— 那正是下一步的实现内容，
 证明与实现合并做，而不是先造一个观测点。
+
+### 01/04 迁移第 3 步：Worker 派发**登记直属上级**（2026-11-10）
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 派发前解析 | `mission-orchestrator.ts` 派发处 | `resolveWorkerDirectSuperior` 取 `secondaryAgentInstanceId`（现为真实次级） |
+| 登记 | 同上 → `registerTertiaryAgentInstance` | 写 `agentRole: "tertiary"` + `owningSecondaryAgentInstanceId` + `boundTaskBundleId = taskId` |
+| 阻断 | 同上 | 解析失败且**强制开启**时：`onUserEscalation` 报告并**不派发**该任务 |
+| 只读观测 | `registered-agent-directory.ts` `listAgentEntries()` | 供验收"所有三级 Worker 都带真实上级" |
+
+**强制开关**：`isWorkerOwnershipEnforced`（缺省 false）。assist 路径已开启；
+**devolve 路径未开启**（它仍是 `scheduler:<missionId>`，迁移未做）。
+
+**为什么必须做成开关**：第一次接线时**无条件阻断**，直接让 26 条既有用例翻红
+（`lesson01-dispatch-wiring` / `lesson01-receive-review-wiring` 等直接构造编排器、
+没有次级身份的路径全部不再派发）。这不是测试挑剔，而是"尚未迁移的装配路径"确实没有上级。
+
+**证据**（`align03-responsible-secondary`，装配级）：真实 mission 跑完后，
+目录里**所有** `agentRole === "tertiary"` 的登记项，其
+`owningSecondaryAgentInstanceId === secondary:<missionId>`，且**不以 `scheduler:` 开头**、
+**不等于主 Agent**。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **678 files / 4608 passed + 3 skipped / exit 0**。
+
+**未做（如实）**：devolve 路径未迁移（仍 scheduler 标签、未强制）；"未绑定 ⇒ 阻断"只有代码路径，
+**没有专门用例**（合成 mission 总能拿到责任次级，构造不出阻断场景）；
+自动任命审查者 + 裁决仍未接。

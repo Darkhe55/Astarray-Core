@@ -59,6 +59,7 @@ import type { GuidanceScopeTarget } from "../runtime-guidance/runtime-guidance.j
 import { LocalRigorPolicyEngine } from "../tools/local-rigor-policy-engine.js";
 import type { ContextNodeLifecyclePort } from "./worker-agent.js";
 import type { AgentWorkArchiveStore } from "./work-archive-store.js";
+import { resolveWorkerDirectSuperior } from "./worker-ownership.js";
 import { DomainError } from "../core/errors.js";
 import { shouldRetryCompletionProtocolFailure } from "./completion-protocol-retry.js";
 import type { MissionLeaseStore } from "../infra/mission-lease-store.js";
@@ -444,6 +445,27 @@ export interface MissionOrchestratorOptions {
    * 未提供时回退 scheduler:<missionId>（仅用于无 Git 装配的旧路径）。
    */
   secondaryAgentInstanceId?: string;
+  /** ALIGN-03（2026-11-10）：主 Agent 标识，**仅用于拒绝**把它当作 Worker 的上级。 */
+  mainAgentInstanceId?: string;
+  /**
+   * ALIGN-03（2026-11-10）：Worker 登记回调（写 `owningSecondaryAgentInstanceId`）。
+   *
+   * 缺省不登记 ⇒ 行为不变；装配后每个派发的三级 Worker 都会带上真实直属上级。
+   */
+  /**
+   * ALIGN-03（2026-11-10）：是否**强制**归属（缺省 false）。
+   *
+   * 开启后，解析不到直属上级 ⇒ **阻断派发**；
+   * 关闭时保持旧行为（照常派发、不登记），用于尚未迁移的装配路径
+   * （例如 devolve 与直接构造编排器的用例）。
+   */
+  isWorkerOwnershipEnforced?: boolean;
+  registerTertiaryAgentInstance?: (input: {
+    readonly agentInstanceId: string;
+    readonly missionId: string;
+    readonly taskId: string;
+    readonly owningSecondaryAgentInstanceId: string;
+  }) => void;
   /** T05B → T08：Git 集成装配（可选；缺省时编排行为与旧版一致）。 */
   gitIntegration?: GitIntegrationOrchestrationOptions | null;
   /**
@@ -1215,6 +1237,33 @@ export class MissionOrchestrator {
      * 注意：**发布者登记在 `buildWorkerAgent` 内部完成**（不变量放在那里，
      * 任何经该方法构造的 Worker 都带发布者信箱，调用点无法漏掉）。
      */
+    /**
+     * ALIGN-03-01/04（2026-11-10，用户归属裁决）：**派发前先确定直属上级**。
+     *
+     * 缺失/失效/不匹配 ⇒ **不派发该任务并报告**（不猜身份、不退回主 Agent）。
+     */
+    const ownership = resolveWorkerDirectSuperior({
+      missionResponsibleSecondaryAgentInstanceId:
+        this.options.secondaryAgentInstanceId ?? null,
+      derivedFromTertiaryAgentInstanceId: null,
+      mainAgentInstanceId: this.options.mainAgentInstanceId ?? null,
+      missionProjectIdentifier: null,
+    });
+    if (ownership.kind === "blocked") {
+      if (this.options.isWorkerOwnershipEnforced === true) {
+        this.options.onUserEscalation(
+          `任务 ${task.id} 未派发：${ownership.detail}（${ownership.reasonCode}）`,
+        );
+        return;
+      }
+    } else {
+      this.options.registerTertiaryAgentInstance?.({
+        agentInstanceId,
+        missionId,
+        taskId: task.id,
+        owningSecondaryAgentInstanceId: ownership.superiorAgentInstanceId,
+      });
+    }
     const worker = this.buildWorkerAgent({
       agentInstanceId,
       missionId,

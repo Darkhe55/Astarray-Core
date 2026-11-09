@@ -40,6 +40,7 @@ function buildRuntimeStub(): AgentRuntime {
 
 describe("ALIGN-03 责任次级", () => {
   it("mission 摘要持久化**真实次级个体**，且不是 scheduler 标签", async () => {
+    const capturedOutput: string[] = [];
     const runtime = await createApplicationRuntime({
       mode: "assist",
       stateDirectory,
@@ -49,7 +50,7 @@ describe("ALIGN-03 责任次级", () => {
       useFeedbackProcess: false,
       authenticatedUserId: "user-1",
       mainAgentInstanceId: "main-agent-1",
-      streamOutput: () => {},
+      streamOutput: (_missionId: string | null, text: string) => { capturedOutput.push(text); },
       workerRuntimeFactory: () => buildRuntimeStub(),
     });
     try {
@@ -57,6 +58,27 @@ describe("ALIGN-03 责任次级", () => {
         projectIdentifier: "project-alpha",
       });
 
+
+      /** 等 mission 到终态：Worker 领取后才会有 assignedAgentId。 */
+      const deadlineMilliseconds = Date.now() + 60_000;
+      while (Date.now() < deadlineMilliseconds) {
+        const status = (await runtime.controller.queryMissionStatus(missionIdentifier))?.summary
+          ?.status;
+        if (status === "done" || status === "blocked" || status === "cancelled") break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      /** 派发出的三级 Worker 必须都登记，且直属上级是**真实次级**。 */
+      const tertiaryEntries = runtime.registeredAgentDirectory
+        .listAgentEntries()
+        .filter((entry) => entry.agentRole === "tertiary");
+      expect(tertiaryEntries.length, "没有任何三级 Worker 被登记").toBeGreaterThan(0);
+      for (const entry of tertiaryEntries) {
+        expect(entry.owningSecondaryAgentInstanceId).toBe(`secondary:${missionIdentifier}`);
+        expect(String(entry.owningSecondaryAgentInstanceId).startsWith("scheduler:")).toBe(
+          false,
+        );
+        expect(entry.owningSecondaryAgentInstanceId).not.toBe("main-agent-1");
+      }
 
       const summaryPath = path.join(
         stateDirectory,
