@@ -143,3 +143,29 @@
 3. `SecondaryContinuousDispatchLoop` 是第二套调度器，从未被生产调用。
 
 **验证状态**：文档交付；未编写/未运行测试。
+
+### 03 租约语义：幂等重入与过期接管已跑（2026-11-09 追加）
+
+**缺口（本卡记录）**："未跑'崩溃 running ⇒ 拒绝恢复''过期租约 ⇒ 接管成功'任何一条"。
+
+**本轮**：为 `MissionLeaseStore` 补 7 条测试，覆盖租约侧三条语义：
+
+| 用例 | 期望 |
+|---|---|
+| 首次获取 | `acquired` |
+| **同进程重入** | `acquired-reentrant`（**不是** `locked-active`；恢复不再把自己挡在门外） |
+| 别的进程持活跃租约 | `locked-active`（不得抢占） |
+| **过期租约 + tryAcquire** | `locked-stale`（提示需接管，而非直接抢占） |
+| **过期租约 + revision 正确** | 接管成功，属主变为新进程 |
+| revision 不匹配 | 拒绝（`revision`） |
+| **未过期**租约 | 禁止接管（`mission-locked`） |
+
+**测试构造要点（如实记录）**：租约到期时间由**存储的** `leaseTtlMilliseconds` 与
+`nowMilliseconds` 决定，**不是** claim 字段 —— 初版我把 `renewsUntilIso` 放进 claim，
+结果租约永不过期，三条用例假红。改用可控时钟后通过。
+
+公开全量 **667 files / 4550 passed + 3 skipped**。
+
+**仍未做（如实）**：**"崩溃 running ⇒ 拒绝恢复"的应用级用例仍未跑**（需构造 mission 处于 running
+且进程消失的场景）；对账动作（把 running/blocked/已产出任务放回 pending）仍未实现；
+"属主进程已死但未过期"的探测未做。
