@@ -90,6 +90,23 @@ describe("EXEC-01-02 bubblewrap 探测与拒绝", () => {
     expect(capability.backendIdentifier).toBe("bubblewrap");
   });
 
+  it("探测命令**带上真实前缀**（前缀坏掉必须被探测发现）", async () => {
+    const capturedCommands: string[][] = [];
+    const backend = new BubblewrapSandboxBackend({
+      spawnProcess: (input) => {
+        capturedCommands.push([...input.arguments]);
+        return buildFakeProcess({ exitCode: 0 });
+      },
+    });
+    await backend.probeCapability();
+    expect(capturedCommands).toHaveLength(1);
+    const probeArguments = capturedCommands[0] ?? [];
+    /** 探测必须跑"真实命令形态"：prlimit 前缀 + bwrap 参数。 */
+    expect(probeArguments[0]).toBe("prlimit");
+    expect(probeArguments.join(" ")).toContain("--as=");
+    expect(probeArguments).toContain("--unshare-all");
+  });
+
   it("探测失败 ⇒ 判定不可用，且**不**据版本号放行", async () => {
     const backend = new BubblewrapSandboxBackend({
       spawnProcess: () => buildFakeProcess({ exitCode: 1, output: "bwrap: No permissions" }),

@@ -35,6 +35,8 @@ export interface BubblewrapBackendOptions {
 
 const DEFAULT_READ_ONLY_BINDS = ["/usr", "/bin", "/lib", "/lib64"] as const;
 const DEFAULT_PROBE_CACHE_MILLISECONDS = 60_000;
+/** 探测用的地址空间上限（足够宽，只验证"前缀不会把 bwrap 弄挂"）。 */
+const PROBE_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024;
 
 /**
  * 构造 bwrap 参数（**纯函数**，可离线验证）。
@@ -138,7 +140,15 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
     let probeOutput = "";
     let isProbeOk = false;
     try {
+      /**
+       * 探测命令必须**带上真正会用的前缀**。
+       *
+       * 教训（2026-11-09）：`--nproc` 会让 bwrap 完全起不来，而当时的探测没有前缀，
+       * 于是"探测通过、真实执行全失败"。现在探测跑的就是真实命令形态，
+       * 前缀本身坏掉会被探测直接判为不可用。
+       */
       const probeProcess = this.spawnProcess([
+        ...buildResourceLimitPrefix({ maximumMemoryBytes: PROBE_ADDRESS_SPACE_BYTES }),
         "--unshare-all",
         "--die-with-parent",
         "--ro-bind",
