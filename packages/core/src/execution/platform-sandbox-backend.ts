@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 import type { SandboxExecutionBackend } from "./process-execution-controller.js";
+import { BubblewrapSandboxBackend } from "./bubblewrap-sandbox-backend.js";
 import { SandboxHelperBackend } from "./sandbox-helper-backend.js";
 
 export interface PlatformSandboxBackendInput {
@@ -33,7 +34,10 @@ export function resolveSandboxHelperExecutablePath(
       : null;
   }
   if (process.platform !== "win32") {
-    /** 非 Windows 的辅助程序尚未交付（Linux 走 bwrap 包装，属另一实现）。 */
+    /**
+     * Linux 走 bubblewrap（另一实现，不需要随包辅助程序）；其余平台暂无可交付实现。
+     * 这里返回 `null` 表示"没有辅助程序路径"，由调用方按平台另择后端。
+     */
     return null;
   }
   const candidatePath = path.join(
@@ -54,6 +58,10 @@ export function resolveSandboxHelperExecutablePath(
 export function createPlatformSandboxExecutionBackend(
   input: PlatformSandboxBackendInput,
 ): SandboxExecutionBackend | null {
+  /** Linux：bubblewrap（不需要随包二进制；`bwrap` 由系统/发行版提供）。 */
+  if (process.platform === "linux") {
+    return new BubblewrapSandboxBackend();
+  }
   const helperExecutablePath = resolveSandboxHelperExecutablePath(input);
   if (helperExecutablePath === null) {
     return null;
