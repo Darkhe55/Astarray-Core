@@ -1369,6 +1369,13 @@ export class MissionOrchestrator {
       } catch (error) {
         // 运行时/工具异常必须收敛为任务失败，不得变成未处理拒绝（T07D-R2-02）。
         this.inFlightTaskIds.delete(action.taskId);
+        /**
+         * ALIGN-04-03（2026-11-10）：**兜底本身也可能失败**。
+         *
+         * 实测（全量满载）：临时目录被清理后 `finishTask` → `persistChain` 抛 `ENOENT`，
+         * 这个拒绝从兜底调用逃出 `workerPromise`（无人 await）⇒ 变成未处理拒绝，
+         * 全量**测试全通过却 exit=1**。兜底失败只能记账，**不得**再抛出去。
+         */
         await this.handleWorkerOutcome(action.taskId, {
           outcome: "failure",
           toolName: null,
@@ -1379,8 +1386,17 @@ export class MissionOrchestrator {
           ...(error instanceof DomainError
             ? { failureCode: error.errorCode }
             : {}),
-        }, agentInstanceId);
-        await this.maybeFinishGoalTaskGroup("interrupted");
+        }, agentInstanceId).catch((fallbackError: unknown) => {
+          /** 只记账：观测端口自己也会吞错，这里不引入新的失败面。 */
+          void this.reportMissionDiagnosticEvent({
+            component: "worker-outcome-fallback",
+            error: fallbackError,
+            errorCode: null,
+            fallbackErrorCode: "task-failure-containment-failed",
+            stage: "dispatch",
+          });
+        });
+        await this.maybeFinishGoalTaskGroup("interrupted").catch(() => undefined);
       }
     })();
     this.inFlightWorkerPromises.add(workerPromise);
