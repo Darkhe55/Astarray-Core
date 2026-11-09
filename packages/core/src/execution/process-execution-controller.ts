@@ -68,6 +68,16 @@ export interface SandboxExecutionBackend {
     readonly workingDirectory: string;
     readonly timeoutMilliseconds: number;
     readonly streamStorageLimitBytes: number;
+    /**
+     * 环境登记的资源上限（EXEC-01-02，2026-11-09）。
+     *
+     * 为什么由控制器传入而不是后端自选：上限来自**环境登记表**（认证控制面登记），
+     * 后端不得自行决定"给多少"，否则登记的限额形同虚设。
+     */
+    readonly resourceLimits: {
+      readonly maximumMemoryBytes: number;
+      readonly maximumProcessCount: number;
+    };
   }): Promise<SandboxStartOutcome>;
   readStatus(backendExecutionHandle: string): Promise<SandboxExecutionSnapshot>;
   readOutputStream(input: {
@@ -361,6 +371,11 @@ export class ProcessExecutionController {
       workingDirectory: input.request.workingDirectory,
       timeoutMilliseconds,
       streamStorageLimitBytes: PROCESS_EXECUTION_DEFAULT_STREAM_STORAGE_LIMIT_BYTES,
+      /** 上限取自**环境登记表**（不是后端自选），保证登记的限额真的生效。 */
+      resourceLimits: {
+        maximumMemoryBytes: environmentEntry.policy.resourcePolicy.maximumMemoryBytes,
+        maximumProcessCount: environmentEntry.policy.resourcePolicy.maximumProcessCount,
+      },
     });
     const runningRecord: ProcessExecutionRecord = {
       ...record,

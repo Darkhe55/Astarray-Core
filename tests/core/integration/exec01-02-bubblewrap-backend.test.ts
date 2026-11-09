@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BubblewrapSandboxBackend,
   buildBubblewrapArguments,
+  buildResourceLimitPrefix,
 } from "../../../packages/core/src/execution/bubblewrap-sandbox-backend.js";
 import type { SandboxHelperProcess } from "../../../packages/core/src/execution/sandbox-helper-backend.js";
 
@@ -49,6 +50,23 @@ describe("EXEC-01-02 bubblewrap 参数构造", () => {
     const separatorIndex = bwrapArguments.indexOf("--");
     expect(separatorIndex).toBeGreaterThan(0);
     expect(bwrapArguments[separatorIndex + 1]).toBe("node");
+  });
+
+  it("资源上限以 prlimit 前缀施加（该 bwrap 构建无 --rlimit-*）", () => {
+    const prefix = buildResourceLimitPrefix({
+      maximumMemoryBytes: 268435456,
+      maximumProcessCount: 8,
+    });
+    expect(prefix).toEqual(["prlimit", "--as=268435456", "--nproc=8", "--"]);
+  });
+
+  it("上限为 0 或负数 ⇒ 收敛为 1（不产生非法参数）", () => {
+    const prefix = buildResourceLimitPrefix({
+      maximumMemoryBytes: 0,
+      maximumProcessCount: -3,
+    });
+    expect(prefix).toContain("--as=1");
+    expect(prefix).toContain("--nproc=1");
   });
 
   it("自定义 bind 列表生效（不写死 /usr 等）", () => {
@@ -95,6 +113,7 @@ describe("EXEC-01-02 bubblewrap 探测与拒绝", () => {
         workingDirectory: "/work",
         timeoutMilliseconds: 1_000,
         streamStorageLimitBytes: 1_024,
+        resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
       }),
     ).rejects.toThrow(/不可用/u);
   });
@@ -133,6 +152,7 @@ describe("EXEC-01-02 bubblewrap 探测与拒绝", () => {
       workingDirectory: "/work",
       timeoutMilliseconds: 80,
       streamStorageLimitBytes: 1_024,
+      resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
     });
     await new Promise((resolve) => setTimeout(resolve, 250));
     /** 关键：**进程真的被终止**，而不只是状态变成超时。 */
@@ -159,6 +179,7 @@ describe("EXEC-01-02 bubblewrap 探测与拒绝", () => {
       workingDirectory: "/work",
       timeoutMilliseconds: 5_000,
       streamStorageLimitBytes: 1_024,
+      resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
     });
     await new Promise((resolve) => setTimeout(resolve, 50));
     const status = await backend.readStatus(started.backendExecutionHandle);

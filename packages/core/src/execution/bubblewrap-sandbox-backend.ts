@@ -50,6 +50,11 @@ export function buildBubblewrapArguments(input: {
   readonly executableEntryPoint: string;
   readonly arguments: readonly string[];
   readonly readOnlyBindPaths?: readonly string[];
+  /** 资源上限（缺省不施加）。 */
+  readonly resourceLimits?: {
+    readonly maximumMemoryBytes: number;
+    readonly maximumProcessCount: number;
+  };
 }): string[] {
   const readOnlyBindPaths = input.readOnlyBindPaths ?? DEFAULT_READ_ONLY_BINDS;
   const bwrapArguments: string[] = ["--unshare-all", "--die-with-parent"];
@@ -71,6 +76,25 @@ export function buildBubblewrapArguments(input: {
     ...input.arguments,
   );
   return bwrapArguments;
+}
+
+/**
+ * 把资源上限包成 `prlimit` 前缀（**纯函数**）。
+ *
+ * 为什么用 `prlimit` 而不是 bwrap 的 `--rlimit-*`：WSL 实测该 bwrap 构建
+ * **没有** `--rlimit-*` 选项（`Unknown option --rlimit-as`），而 `prlimit`
+ * 是 util-linux 的标准组件，语义等价（对**新进程**施加 `RLIMIT_AS` / `RLIMIT_NPROC`）。
+ */
+export function buildResourceLimitPrefix(input: {
+  readonly maximumMemoryBytes: number;
+  readonly maximumProcessCount: number;
+}): string[] {
+  return [
+    "prlimit",
+    "--as=" + String(Math.max(1, Math.floor(input.maximumMemoryBytes))),
+    "--nproc=" + String(Math.max(1, Math.floor(input.maximumProcessCount))),
+    "--",
+  ];
 }
 
 interface BubblewrapExecutionEntry {
@@ -160,6 +184,10 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
     readonly workingDirectory: string;
     readonly timeoutMilliseconds: number;
     readonly streamStorageLimitBytes: number;
+    readonly resourceLimits: {
+      readonly maximumMemoryBytes: number;
+      readonly maximumProcessCount: number;
+    };
   }): Promise<SandboxStartOutcome> {
     const capability = await this.probeCapability();
     if (!capability.isAvailable) {
@@ -171,8 +199,14 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
     this.executionSequence += 1;
     const backendExecutionHandle =
       "bwrap-" + input.identity.executionId + "-" + String(this.executionSequence);
-    const process = this.spawnProcess(
-      buildBubblewrapArguments({
+    /**
+     * 命令形态：`prlimit --as=… --nproc=… -- bwrap …`。
+     *
+     * 上限来自环境登记表（经控制器传入），后端不自行决定"给多少"。
+     */
+    const process = this.spawnProcess([
+      ...buildResourceLimitPrefix(input.resourceLimits),
+      ...buildBubblewrapArguments({
         workingDirectory: input.workingDirectory,
         executableEntryPoint: input.executableEntryPoint,
         arguments: input.arguments,
@@ -180,7 +214,7 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
           ? {}
           : { readOnlyBindPaths: this.options.readOnlyBindPaths }),
       }),
-    );
+    ]);
     const entry: BubblewrapExecutionEntry = {
       process,
       stdoutChunks: [],

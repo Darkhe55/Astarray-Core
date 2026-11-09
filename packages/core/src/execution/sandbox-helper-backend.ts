@@ -113,6 +113,10 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
     readonly workingDirectory: string;
     readonly timeoutMilliseconds: number;
     readonly streamStorageLimitBytes: number;
+    readonly resourceLimits: {
+      readonly maximumMemoryBytes: number;
+      readonly maximumProcessCount: number;
+    };
   }): Promise<SandboxStartOutcome> {
     /**
      * 能力不足 ⇒ **拒绝启动**（`execution-backend-unsupported`）。
@@ -133,12 +137,25 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
       (this.options.profileNamePrefix ?? "astarray-exec") +
       "-" +
       String(this.executionSequence);
+    /**
+     * 把**环境登记表**的上限传给辅助程序（它用 Job Object 施加）。
+     *
+     * 此前这两项从未传过 ⇒ 登记的限额对真实执行不生效（辅助程序有参数，但没人给）。
+     */
+    const maximumMemoryMegabytes = Math.max(
+      1,
+      Math.floor(input.resourceLimits.maximumMemoryBytes / (1024 * 1024)),
+    );
     const helperProcess = this.startHelper([
       "run",
       "--profile",
       profileName,
       "--timeout-ms",
       String(input.timeoutMilliseconds),
+      "--max-memory-mb",
+      String(maximumMemoryMegabytes),
+      "--max-processes",
+      String(Math.max(1, Math.floor(input.resourceLimits.maximumProcessCount))),
       "--",
       input.executableEntryPoint,
       ...input.arguments,

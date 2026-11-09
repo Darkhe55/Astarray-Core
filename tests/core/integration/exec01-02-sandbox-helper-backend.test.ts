@@ -107,6 +107,7 @@ describe("EXEC-01-02 沙箱辅助程序后端", () => {
         workingDirectory: "docs",
         timeoutMilliseconds: 1_000,
         streamStorageLimitBytes: 1_024,
+        resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
       }),
     ).rejects.toThrow(/execution-backend-unsupported|不可用/u);
     /** 只发生了一次 probe，没有真的去 `run`（拒绝发生在启动之前）。 */
@@ -131,6 +132,7 @@ describe("EXEC-01-02 沙箱辅助程序后端", () => {
       workingDirectory: "docs",
       timeoutMilliseconds: 5_000,
       streamStorageLimitBytes: 1_024,
+      resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
     });
     expect(fake.invocations.some((invocation) => invocation.includes("run"))).toBe(true);
     /** 等待输出收集与退出码落定（后端在后台收集）。 */
@@ -164,6 +166,7 @@ describe("EXEC-01-02 沙箱辅助程序后端", () => {
       workingDirectory: "docs",
       timeoutMilliseconds: 5_000,
       streamStorageLimitBytes: 1_024,
+      resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
     });
     const cancelled = await backend.cancel(started.backendExecutionHandle, "用户取消");
     expect(cancelled.status).toBe("cancelled");
