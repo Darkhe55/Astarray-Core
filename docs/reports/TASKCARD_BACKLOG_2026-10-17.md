@@ -1596,3 +1596,36 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 **不构成开箱即用证据**（用户明确）：成功分支断言、SID 派生可用、拒绝路径测试、参数/协议测试。
 
 验证方案：`docs/reports/EXEC01_02_UAC_INIT_VERIFICATION_PLAN_2026-11-09.md`（**待用户确认后执行**）。
+
+### 11.G.5 2026-11-10 ALIGN-03 / ALIGN-04 增量对账
+
+> 口径同 §11.G：只登记**实际改过或实际跑过**的项；未验证的一律 implemented-unverified。
+
+#### ALIGN-03（下级执行与审查闭环）
+
+| 检查点 | 本轮后状态 | 证据 |
+|---|---|---|
+| 04 审查者独立 | **存在性 + 隶属 + 非自审**三项齐备且已接生产 | `align03-review-evidence`（19 条）+ `agentDirectory` 已传入协调器 |
+| 05 证据绑定 | 通过/拒绝路径已跑 | `align03-review-evidence`（11 条，含"过期证据"核心反例） |
+| 06 反馈补送 | 指数退避 + `deferredCount` 可观测 | `align03-outbox-backoff`（4 条） |
+| 07 三级收口 | 关闭钩子接生产 + 移交可读回 + Git 资源**如实报告** | `align03-tertiary-close-wiring`（装配级）+ `align03-handoff-read`（6 条）+ `align03-task-terminal-close`（4 条） |
+
+**仍阻塞**：审查者**隶属校验**对"调度器派发的 Worker"恒不触发——这些 Worker 没有"所属次级"，
+需产品决策（main agent / 发起次级 / 引入 mission owner）。
+
+#### ALIGN-04（恢复与状态）
+
+| 检查点 | 本轮后状态 | 证据 |
+|---|---|---|
+| 03 就绪分类与租约 | 分类两侧**均已跑通** | `align04-lease-takeover`（7 条）+ `align04-crash-resume-refusal`（4 条） |
+| 04 工作时段恢复 | 判定路径已跑；检测器**本已存在**（卡内旧陈述已更正） | `align04-work-window-resume`（7 条） |
+| 05 胶囊回访 | 入口拒绝路径已跑；**成功路径与提示词注入未做** | `align04-context-recall-refusal`（2 条） |
+
+**仍缺（如实）**：对账动作（把 running/blocked/已产出任务放回 pending）未实现；
+`hasResumedSinceWake` 未持久化；`pauseKind` 无权威标记；回访未注入提示词装配。
+
+#### 本轮附带更正的三处**过期卡内陈述**
+
+1. `contextRecallControllerFactory` 实际**默认已装配**（卡内写"未装配"）；
+2. `createWorkWindowTransitionMonitor` 实际**已构造并 start**（卡内写"没有检测器"）；
+3. 审查者校验缺"隶属"一条已补（卡内原列在未做项）。
