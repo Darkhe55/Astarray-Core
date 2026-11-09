@@ -1091,9 +1091,29 @@ export async function executeCrossProjectReadCommand(
     const protectedStoragePolicy = new ProtectedStoragePolicy({
       stateDirectoryPath: options.stateDirectory,
     });
+    /**
+     * PROJECT-01 / 用户裁决（2026-11-09）：**CLI 业务文件操作走受控端口**。
+     *
+     * 此前用 `buildLocalResourceIoPort()`（裸 fs + 仅受保护存储判定）⇒
+     * "拿到绝对路径就能读写"，缺少真实路径与工作区边界检查，与 SDK 侧安全语义不一致。
+     * 现改用 `ControlledCrossProjectResourceIo`：越界路径在**触达磁盘之前**被拒绝；
+     * 项目根由服务按本次操作已证实的来源/目标根注入（`scopeContext`）。
+     * 配置/日志/恢复账本等内部存储仍走各自专用接口，不做机械替换。
+     */
+    const { ControlledCrossProjectResourceIo } = await import(
+      "../../../core/src/tools/controlled-cross-project-resource-io.js"
+    );
+    const { WorkspaceBoundary } = await import(
+      "../../../core/src/tools/workspace-boundary.js"
+    );
     const service = new CrossProjectTransferService({
       store,
-      resourceIo: buildLocalResourceIoPort(),
+      resourceIo: new ControlledCrossProjectResourceIo({
+        workspaceBoundary: new WorkspaceBoundary(
+          options.sourceProjectRootPath ?? process.cwd(),
+        ),
+        protectedStoragePolicy,
+      }),
       isForbiddenAccessTarget: (canonicalAccessTargetPath: string) =>
         protectedStoragePolicy.isProtectedStorageAccessTarget(canonicalAccessTargetPath),
     });
@@ -1172,9 +1192,24 @@ export async function executeCrossProjectImportCopyCommand(
     const protectedStoragePolicyForImport = new ProtectedStoragePolicy({
       stateDirectoryPath: options.stateDirectory,
     });
+    /**
+     * PROJECT-01 / 用户裁决（2026-11-09）：**导入同样走受控端口**。
+     * 来源与目标项目根由服务按本次操作已证实的两个根注入；越界在触达磁盘前拒绝。
+     */
+    const { ControlledCrossProjectResourceIo } = await import(
+      "../../../core/src/tools/controlled-cross-project-resource-io.js"
+    );
+    const { WorkspaceBoundary } = await import(
+      "../../../core/src/tools/workspace-boundary.js"
+    );
     const service = new CrossProjectTransferService({
       store,
-      resourceIo: buildLocalResourceIoPort(),
+      resourceIo: new ControlledCrossProjectResourceIo({
+        workspaceBoundary: new WorkspaceBoundary(
+          options.sourceProjectRootPath ?? process.cwd(),
+        ),
+        protectedStoragePolicy: protectedStoragePolicyForImport,
+      }),
       isForbiddenAccessTarget: (canonicalAccessTargetPath: string) =>
         protectedStoragePolicyForImport.isProtectedStorageAccessTarget(
           canonicalAccessTargetPath,
@@ -1252,37 +1287,7 @@ export async function executeCrossProjectImportCopyCommand(
   }
 }
 
-/** 本地文件系统资源 I/O 端口（CLI 入口专用；不引入核心包依赖）。 */
-function buildLocalResourceIoPort(): {
-  readTextFile(absolutePath: string): Promise<string>;
-  writeTextFile(absolutePath: string, content: string): Promise<void>;
-  ensureDirectory(absoluteDirectoryPath: string): Promise<void>;
-  fileExists(absolutePath: string): Promise<boolean>;
-} {
-  return {
-    readTextFile: async (absolutePath) => {
-      const { promises: fsPromises } = await import("node:fs");
-      return fsPromises.readFile(absolutePath, "utf8");
-    },
-    writeTextFile: async (absolutePath, content) => {
-      const { promises: fsPromises } = await import("node:fs");
-      await fsPromises.writeFile(absolutePath, content, "utf8");
-    },
-    ensureDirectory: async (absoluteDirectoryPath) => {
-      const { promises: fsPromises } = await import("node:fs");
-      await fsPromises.mkdir(absoluteDirectoryPath, { recursive: true });
-    },
-    fileExists: async (absolutePath) => {
-      const { promises: fsPromises } = await import("node:fs");
-      try {
-        await fsPromises.stat(absolutePath);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-  };
-}
+
 
 async function readFileOrNull(absolutePath: string): Promise<string | null> {
   const { promises: fsPromises } = await import("node:fs");
