@@ -81,6 +81,15 @@ function buildScriptedRuntime(input: {
   } as AgentRuntime;
 }
 
+async function listContractFiles(): Promise<string[]> {
+  try {
+    const fileNames = await fs.readdir(path.join(stateDirectory, "goal-mode", "contracts"));
+    return fileNames.filter((fileName) => fileName.endsWith(".json"));
+  } catch {
+    return [];
+  }
+}
+
 async function listProposalFiles(): Promise<string[]> {
   try {
     const fileNames = await fs.readdir(path.join(stateDirectory, "goal-mode", "proposals"));
@@ -103,10 +112,12 @@ const validProposalArguments = JSON.stringify({
 });
 
 async function runMatrixCase(input: {
-  readonly mode: "assist" | "devolve";
+  readonly mode: "assist" | "devolve" | "ponder";
   readonly isGoalModeActivated: boolean;
   /** 传入则用分解显式限定工具子集（用于构造"未分配"）。 */
   readonly restrictedToolNames?: readonly string[];
+  /** `blank-custom`：切换到空白自定义权限组（`goal.propose` 回退 deny）。 */
+  readonly permissionProfileSource?: "blank-custom";
 }): Promise<{
   readonly toolResultText: string;
   readonly streamedText: string;
@@ -169,6 +180,27 @@ async function runMatrixCase(input: {
       });
       expect(activation.isActive).toBe(true);
     }
+    if (input.permissionProfileSource === "blank-custom") {
+      /**
+       * 用**项目级作用域覆盖**切到空白自定义组（`goal.propose` 回退 deny）。
+       *
+       * 为什么不用 `switchPermissionProfile`：实测它对 worker 的工具端口不生效
+       * （worker 用的 profile 引用在装配时固定，不读当前选择）—— 那是另一处缺口，
+       * 不在本用例范围内；作用域覆盖是 worker 真正消费的路径。
+       */
+      const created = await runtime.controller.createPermissionProfile({
+        displayName: "matrix-blank",
+        source: { kind: "blank" },
+      });
+      const currentScopedSettings = await runtime.scopedSettingsStore.read();
+      await runtime.scopedSettingsStore.updatePermission({
+        scope: "project",
+        identifier: "project-a",
+        expectedRevision: currentScopedSettings.revision,
+        permissionProfileId: created.permissionProfileId,
+        updatedByUserId: "user-1",
+      });
+    }
     const missionIdentifier = await runtime.controller.handleUserMessage("矩阵用例", {
       projectIdentifier: "project-a",
     });
@@ -215,6 +247,56 @@ describe("AUDIT-REPAIR-01 应用级矩阵", () => {
       await runtime.shutdown().catch(() => undefined);
     }
   }, 60_000);
+
+  it("已激活但未分配：目标模式激活不构成工具分配 ⇒ 拒绝且无提案文件", async () => {
+    /**
+     * 用户裁决（2026-11-09）：**目标模式激活不构成工具分配或授权**。
+     *
+     * 此前装配层在激活时把 `proposeGoal` 强行加进允许列表，于是"只授予 readFile"
+     * 的任务仍能成功提议目标（实测复现）。现在必须被本地子集拒绝，且不落盘。
+     */
+    const { toolResultText, proposalFiles } = await runMatrixCase({
+      mode: "devolve",
+      isGoalModeActivated: true,
+      restrictedToolNames: ["readFile"],
+    });
+    expect(toolResultText).toContain("不在本 Worker 授权子集内");
+    expect(proposalFiles).toEqual([]);
+    expect(await listContractFiles()).toEqual([]);
+  }, 90_000);
+
+  it("已分配但 deny：统一权限门禁拒绝，且无提案文件", async () => {
+    const { toolResultText, proposalFiles } = await runMatrixCase({
+      mode: "devolve",
+      isGoalModeActivated: true,
+      /** 空白自定义组：`goal.propose` 无显式决定 ⇒ 回退 deny。 */
+      permissionProfileSource: "blank-custom",
+    });
+    /** 权限引擎拒绝：工具未被放行到处理器（错误码 + 工具名，不含规则细节）。 */
+    expect(toolResultText).toContain("tool-permission-denied");
+    expect(toolResultText).toContain("proposeGoal");
+    expect(toolResultText).not.toContain("目标提案已创建");
+    expect(proposalFiles).toEqual([]);
+    expect(await listContractFiles()).toEqual([]);
+  }, 90_000);
+
+  it("已分配且合法授权：只保存待确认提案，不生成契约", async () => {
+    const { proposalFiles } = await runMatrixCase({
+      mode: "devolve",
+      isGoalModeActivated: true,
+    });
+    expect(proposalFiles.length).toBe(1);
+    /** "仅保存待确认提案"：提案存在，但**没有**契约文件。 */
+    expect(await listContractFiles()).toEqual([]);
+    const content = JSON.parse(
+      await fs.readFile(
+        path.join(stateDirectory, "goal-mode", "proposals", proposalFiles[0] as string),
+        "utf8",
+      ),
+    ) as { proposalIdentifier?: string; draft?: { objectiveText?: string } };
+    expect(typeof content.proposalIdentifier).toBe("string");
+    expect(content.draft?.objectiveText).toContain("只读视图");
+  }, 90_000);
 
   it("未分配：分解只授予 readFile 且目标模式未激活 ⇒ 子集拒绝，且不落盘", async () => {
     /**

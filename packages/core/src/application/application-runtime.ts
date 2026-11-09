@@ -4025,11 +4025,15 @@ export async function createApplicationRuntime(
        * 它与其它工具一样经过 ScopeGatedToolPort → PolicyWrapper：
        * 注册表存在性、允许列表、权限/询问、安装/工作时段门禁全部先生效；
        * 处理器只做「目标已激活 + mission 存在」校验并落提案。
+       *
+       * EXEC-01-05 收口（2026-11-09，用户裁决）：**目标模式激活不构成工具分配**。
+       *
+       * 此前激活时会 `effectiveAllowedToolNames.add(proposeGoal)`，等于让"激活"
+       * 越过任务工具子集 —— 实测一个只被授予 `readFile` 的任务仍能成功提议目标。
+       * 现改为：`proposeGoal` 必须由**任务子集**显式分配；未分配即在本地拒绝、
+       * 不落盘；已分配仍照常走权限裁决（deny 即拒绝）。绝不全局自动追加。
        */
       const effectiveAllowedToolNames = new Set(allowedToolNames);
-      if (isGoalModeActivated) {
-        effectiveAllowedToolNames.add(GOAL_PROPOSAL_TOOL_NAME);
-      }
       const goalProposalHandler = createGoalProposalToolHandler({
         isGoalModeActivated: () => isGoalModeActivated,
         missionIdentifier,
