@@ -1542,3 +1542,42 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 
 
 
+
+## 11.G 2026-11-09 增量对账（EXEC-01 与本次会话收口项）
+
+> 口径：只登记**本轮实际改过并跑过门禁**的项；未验证的一律标 implemented-unverified，
+> 平台受限的标平台阻塞。**不虚报 done。**
+
+### 11.G.1 EXEC-01（受控执行与能力闭合）
+
+| 检查点 | 状态 | 证据 |
+|---|---|---|
+| 01 执行契约 | implemented-unverified | `execution-contract.ts` + `exec01-execution-contract`（25） |
+| 02 自带沙箱与工具链 | **平台阻塞（部分）** | Windows Job Object 四项真实验证；Linux(WSL) bwrap 五项真实验证；AppContainer 档案需安装期提权，**提权后成功未验证** |
+| 02 辅助程序后端 | implemented-unverified | `sandbox-helper-backend.ts` + `exec01-02-sandbox-helper-backend`（6） |
+| 02 安装期初始化入口 | implemented-unverified | `init-sandbox` 两条拒绝路径实测；**成功分支未验证** |
+| 03 生命周期 | implemented-unverified | 持久化/游标/重启对账/输出敏感扫描/终止分类 |
+| 04 生产接线 | implemented-unverified | 内部命令异步化 + SDK 查询/读取/取消 + 脱敏状态事件 |
+| 05 开发闭环与分诊 | 部分 | 分诊报告 + 应用级 allow/deny 矩阵；真实闭环阻塞于 02 |
+| 06 验收 | **平台阻塞** | 需干净设备 |
+
+### 11.G.2 本次会话其他收口
+
+| 卡 | 本轮改动 | 状态 |
+|---|---|---|
+| AUDIT-REPAIR-01 | worker 每次执行前重解析权限；proposeGoal 受任务子集约束；包级验收在当前 HEAD 复验（`npm pack` prepack 通过） | implemented-unverified |
+| PROJECT-01 | 兄弟目录项目根集合；CLI 跨项目命令改用受控端口 | implemented-unverified |
+| HISTORY-01 | 写入前脱敏（唯一写漏斗）+ 凭据目录统一（补上 `ghp_` 等漏脱敏） | implemented-unverified |
+| OBS-01 | 存储占用可未知（`null` ≠ 0），10 MB 预算**真的能触发** | implemented-unverified |
+| SMART-01 | 窗口准入接线：满窗排队不启动、只补一条、取消不受阻 | implemented-unverified |
+| EXEC-01-03/04 附带 | 轮询派生 Promise 未处理拒绝修复；两处测试清理竞态修复（门禁退出码回到 0） | 已完成（测试卫生） |
+
+### 11.G.3 仍待用户决策 / 平台受限
+
+| 项 | 阻塞原因 |
+|---|---|
+| AppContainer 提权后建档案 | 需交互式提权；成功分支**未验证** |
+| 裸机 Linux（bwrap）复测 | 本机仅 WSL；WSL 内核 ≠ 裸机 |
+| macOS 沙箱 | 按用户裁决**不做** |
+| 弱隔离（不封网络）降级档 | 用户裁决**不批准**，已不实现 |
+| EXEC-01-06 干净设备验收 | 需干净设备 |
