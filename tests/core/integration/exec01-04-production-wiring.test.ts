@@ -95,12 +95,16 @@ async function runMissionWithProcessExecution(input: {
       { projectIdentifier: "project-a" },
     );
     /**
-     * 等到**第二轮**开始即足够：此时上一轮的工具结果已经产生并回填，
-     * 不必等 mission 终态（那会白等几十秒，也不增加证据）。
+     * 等"出现可判定的观测"：要么第二轮已开始（工具结果已回填），
+     * 要么权限询问文本已经流出，要么 mission 已终态。
+     *
+     * 不能只等第二轮：权限询问会**挂住**任务，不会产生第二轮；
+     * 而询问文本是异步流出的，只等终态会读到空串（实测门禁翻红过）。
      */
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
       if (recordedInputs.length >= 2) break;
+      if (streamedTexts.join("\n").includes("processExecution")) break;
       const status = (await runtime.controller.queryMissionStatus(missionIdentifier))
         ?.summary?.status ?? "";
       if (["done", "blocked", "cancelled", "failed"].includes(status)) break;
