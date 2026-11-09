@@ -76,12 +76,30 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
     ) {
       return this.cachedCapability;
     }
-    const probeProcess = this.startHelper(["probe"]);
+    /**
+     * 探测本身也可能失败（文件不是可执行、权限不足…）。
+     *
+     * 这类失败必须归为**不可用**，而不是把底层 `spawn` 错误原样抛给调用方 ——
+     * 否则上层拿到的是 "spawn EFTYPE" 这种既不解释原因、又看不出"该拒绝执行"的文本。
+     */
     let probeOutput = "";
-    for await (const chunk of probeProcess.standardOutput) {
-      probeOutput += chunk;
+    try {
+      const probeProcess = this.startHelper(["probe"]);
+      for await (const chunk of probeProcess.standardOutput) {
+        probeOutput += chunk;
+      }
+      await probeProcess.exited;
+    } catch (error) {
+      const capability: SandboxCapabilityProfile = {
+        isAvailable: false,
+        backendIdentifier: "sandbox-helper",
+        isolationPrimitiveDescription: "AppContainer + Job Object（辅助程序）",
+        reasonUnavailable: "辅助程序无法启动：" + (error as Error).message,
+      };
+      this.cachedCapability = capability;
+      this.cachedCapabilityAtMilliseconds = nowMilliseconds;
+      return capability;
     }
-    await probeProcess.exited;
     const capability = interpretProbeOutput(probeOutput);
     this.cachedCapability = capability;
     this.cachedCapabilityAtMilliseconds = nowMilliseconds;

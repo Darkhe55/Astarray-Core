@@ -96,6 +96,7 @@ import {
   ExecutionEnvironmentRegistry,
   type ProcessExecutionOwnership,
 } from "../execution/execution-contract.js";
+import { createPlatformSandboxExecutionBackend } from "../execution/platform-sandbox-backend.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -677,6 +678,17 @@ export interface ApplicationRuntimeOptions {
    * 而不是各自绕开控制器。
    */
   sandboxExecutionBackend?: SandboxExecutionBackend | null;
+  /**
+   * EXEC-01-02（2026-11-09）：**按平台自动探测**沙箱后端。
+   *
+   * 缺省 `false`：自动探测会启动一次子进程，不能让每个测试 runtime 都付这个代价。
+   * 产品入口（CLI）显式开启；探测不到组件时后端仍为 `null` ⇒ 一律拒绝执行。
+   */
+  isSandboxBackendAutoDetected?: boolean;
+  /** 自动探测时用于定位随包辅助程序的根目录（缺省 `process.cwd()`）。 */
+  sandboxApplicationRootPath?: string;
+  /** 自动探测时显式指定辅助程序路径（高级部署/测试用）。 */
+  sandboxHelperExecutablePathOverride?: string;
   stateDirectory: string;
   concurrency: number;
   failureThreshold: number;
@@ -1102,7 +1114,16 @@ export async function createApplicationRuntime(
    * 缺省仍是 `null` —— **不降级到宿主执行**；注入只改变"用什么隔离"，
    * 不改变"没有隔离就拒绝执行"的语义。
    */
-  const sandboxExecutionBackend = options.sandboxExecutionBackend ?? null;
+  const sandboxExecutionBackend =
+    options.sandboxExecutionBackend ??
+    (options.isSandboxBackendAutoDetected === true
+      ? createPlatformSandboxExecutionBackend({
+          applicationRootPath: options.sandboxApplicationRootPath ?? process.cwd(),
+          ...(options.sandboxHelperExecutablePathOverride === undefined
+            ? {}
+            : { helperExecutablePathOverride: options.sandboxHelperExecutablePathOverride }),
+        })
+      : null);
   const processExecutionController = new ProcessExecutionController({
     environmentRegistry: executionEnvironmentRegistry,
     store: new FileSystemProcessExecutionStore({ stateDirectory }),
