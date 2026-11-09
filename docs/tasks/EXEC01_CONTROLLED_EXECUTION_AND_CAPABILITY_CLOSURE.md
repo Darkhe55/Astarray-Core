@@ -343,3 +343,32 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 
 **仍未做（如实）**：取消/超时/权限撤销的**分类**仍共用同一终态口径；队列取消语义未做；
 临时目录清理与备份删除未分离。
+
+## 03 终止原因分类（2026-11-09）
+
+**缺口**：`cancelled` 同时覆盖"调用方取消"与"权限撤销"，只靠 `failureReason` 自由文本无法区分
+⇒ 下游无法据此决定"能不能重试"。
+
+**修复**：执行记录新增 `terminationKind`：
+
+| 取值 | 来源 |
+|---|---|
+| `caller-cancelled` | `cancel()` 缺省值 |
+| `authorization-revoked` | **仅受信控制面**可传入（调用方不能把自己的取消标成撤销） |
+| `timed-out` | 由后端状态推导 |
+| `backend-failed` | 由后端状态推导 |
+| `null` | 尚未终止，或**旧记录没有该字段**（不猜测） |
+
+`cancelled` **不**在后端状态推导里自动归类 —— 取消与撤销必须由显式来源区分。
+
+**证据**（`exec01-03-termination-kind` 5/5）：调用方取消 ⇒ `caller-cancelled`；
+显式撤销 ⇒ `authorization-revoked` 且**不退化为** `caller-cancelled`；后端超时 ⇒ `timed-out`；
+后端失败 ⇒ `backend-failed`；仍在运行 ⇒ `null`。
+
+状态视图、SDK 返回与 `execution-status` 事件都带上该字段。
+
+公开全量 **4465 passed + 3 skipped**（首次运行有 1 个既有用例 `public-sdk` 满载翻红，
+隔离复跑 10/10 通过后重跑全量绿 —— 属负载抖动，未改断言）。
+
+**仍未做（如实）**：权限撤销时**自动终止该主体的在跑执行**尚未接线（目前只提供分类入口）；
+队列取消语义、临时目录清理与备份删除分离仍未做。
