@@ -70,6 +70,23 @@ describe("ALIGN-03-07 生产装配接线", () => {
       );
       /** 至少一个个体被真正关闭（写入了 closedAtIso），而不是"看起来成功"。 */
       expect(contents.some((content) => content.includes("closed"))).toBe(true);
+
+      /**
+       * ALIGN-03-07：**接手侧可用** —— 关闭写出的移交文件必须能被读回。
+       *
+       * 只断言"文件存在"不够：读取要经过校验（版本/个体一致/不合并兄弟记忆）。
+       */
+      const closedAgentInstanceId = JSON.parse(
+        contents.find((content) => content.includes("closed")) ?? "{}",
+      ).agentInstanceId as string | undefined;
+      expect(typeof closedAgentInstanceId).toBe("string");
+      const handoff = await runtime.readTertiaryHandoff({
+        agentInstanceId: closedAgentInstanceId as string,
+      });
+      expect(handoff.kind).toBe("found");
+      if (handoff.kind !== "found") return;
+      expect(handoff.document.agentInstanceId).toBe(closedAgentInstanceId);
+      expect(handoff.document.doesMergeSiblingMemory).toBe(false);
     } finally {
       await runtime.shutdown().catch(() => undefined);
     }

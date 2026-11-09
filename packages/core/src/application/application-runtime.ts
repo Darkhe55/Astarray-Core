@@ -149,6 +149,8 @@ import {
 } from "../orchestration/tertiary-lifecycle.js";
 import { AgentIndividualMemoryStore } from "../orchestration/agent-individual-memory.js";
 import { buildTertiaryLifecycleHooks } from "../orchestration/tertiary-lifecycle-hooks.js";
+import { readLatestTertiaryHandoff } from "../orchestration/tertiary-handoff-store.js";
+import type { ReadTertiaryHandoffOutcome } from "../orchestration/tertiary-handoff-store.js";
 import { MissionRelationIndexStore } from "../orchestration/mission-relation-index.js";
 import { RecoveryCenterController } from "../orchestration/recovery-center-controller.js";
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
@@ -319,6 +321,14 @@ export interface ApplicationRuntime {
    * 状态机，SDK 无法绕过它们直接接触沙箱。
    */
   processExecutionController: ProcessExecutionController;
+  /**
+   * ALIGN-03-07（2026-11-09）：读取某三级个体**最新**的移交文件（收口的接手侧）。
+   *
+   * 此前移交只写不读 ⇒ 关闭后档案无人接手。
+   */
+  readTertiaryHandoff: (input: {
+    readonly agentInstanceId: string;
+  }) => Promise<ReadTertiaryHandoffOutcome>;
   /** 环境登记表（登记方为认证控制面；SDK 只读不到写入入口）。 */
   executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
   missionRuntimeRegistry: MissionRuntimeRegistry;
@@ -4519,6 +4529,11 @@ export async function createApplicationRuntime(
     runStartupRecovery,
     readStartupRecoveryReport,
     processExecutionController,
+    readTertiaryHandoff: (input: { readonly agentInstanceId: string }) =>
+      readLatestTertiaryHandoff({
+        handoffDirectoryPath: path.join(stateDirectory, "agent-handoffs"),
+        agentInstanceId: input.agentInstanceId,
+      }),
     executionEnvironmentRegistry,
     startupRecoveryReportStore,
     startupRecoveryPolicyStore,
