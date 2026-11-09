@@ -446,3 +446,23 @@ const agentInstanceId =
 一次性改默认身份字符串会同时动摇反馈路由与报告认证。
 
 **本轮不改代码**：接线前提不成立，改了就是"把调度器写成上级"。
+
+### 01/04 迁移第 1 步：mission 有了**真实责任次级**（2026-11-10）
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 真实次级个体 | `main-controller.ts` `ensureResponsibleSecondaryAgentInstance` | `secondary:<missionId>`，以 `agentRole: "secondary"` 登记进目录；幂等（同一 mission 复用同一 id） |
+| 持久化 | 同上 → `createMission({ responsibleSecondaryAgentInstanceId })` | 写入 `summary.json` |
+| **不动既有标签** | — | `scheduler:<missionId>` 保留原用途（派发来源/反馈路由），本轮**未替换**，避免动摇报告认证 |
+
+**证据**（`align03-responsible-secondary` 1/1，装配级）：
+真实 mission 跑起来后读 `summary.json` ⇒ `responsibleSecondaryAgentInstanceId === "secondary:<missionId>"`，
+并显式断言 **不以 `scheduler:` 开头**、**不等于主 Agent**。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **678 files / 4608 passed + 3 skipped / exit 0**。
+
+**未做（如实）**：
+1. 派发路径**尚未消费**该责任次级（`resolveWorkerDirectSuperior` 未接入，Worker 也未写
+   `owningSecondaryAgentInstanceId`）；
+2. 自动任命审查者 + 裁决未接（01 的正题）；
+3. `scheduler:` 与真实次级**并存**，尚未把前者从"上级"语义中彻底剥离。

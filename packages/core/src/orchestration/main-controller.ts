@@ -819,6 +819,9 @@ export class MainController {
   /** ALIGN-01-05：最近一次主 Agent 轮次的记账（只读给 UI；不含模型隐式状态）。 */
   private lastMainAgentTurnProgress: MainAgentTurnProgressRecord | null = null;
   /** ALIGN-02-01：mission → 权威任务序列/任务 投影映射。 */
+  /** ALIGN-03：mission → 责任次级个体（真实 Agent，不是 scheduler 标签）。 */
+  private readonly missionResponsibleSecondaryAgentIdentifiers = new Map<string, string>();
+
   private readonly missionTaskSequences = new Map<
     string,
     {
@@ -1304,6 +1307,15 @@ export class MainController {
      * 只对 **assist** 登记：devolve 由主 Agent 直接调度、没有下级偏序集，
      * 给它编一条"次级序列"就是把调度方式记错（等 ALIGN-02 统一后再迁移）。
      */
+    /**
+     * ALIGN-03-01/04（2026-11-10，用户归属裁决）：**先确定承接次级，再派发 Worker**。
+     *
+     * 注意：`scheduler:<missionId>` 是**派发来源标签**，不是 Agent、更不是上级。
+     * 这里为 mission 建立**真实的次级个体**（`agentRole: "secondary"`）作为责任次级，
+     * 并把它持久化进摘要；缺失时**不得**退回主 Agent。
+     */
+    const responsibleSecondaryAgentInstanceId =
+      this.ensureResponsibleSecondaryAgentInstance(missionId);
     const userTaskSequence =
       mode === "assist"
         ? await this.registerUserTaskInSequence({
@@ -1318,6 +1330,7 @@ export class MainController {
       mode,
       prompt: message,
       taskNodes,
+      responsibleSecondaryAgentInstanceId,
       ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
       ...(conversationIdentity === null
         ? {}
@@ -4029,6 +4042,38 @@ export class MainController {
       createdAtIso: new Date().toISOString(),
       contentHash: "",
     });
+  }
+
+  /**
+   * ALIGN-03-01/04（2026-11-10）：该 mission 的**责任次级**（真实 Agent 个体）。
+   *
+   * 与 `resolveSecondaryAgentInstanceIdentifier` 的区别：
+   * 后者在未注入工厂时返回 `scheduler:<missionId>`（**派发来源标签**，不是 Agent）；
+   * 本方法返回的是**登记过的次级个体**，可作为 Worker 的唯一直属上级。
+   */
+  private ensureResponsibleSecondaryAgentInstance(missionId: string): string {
+    const existing = this.missionResponsibleSecondaryAgentIdentifiers.get(missionId);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const agentInstanceId = `secondary:${missionId}`;
+    const directory = this.options.registeredAgentDirectory;
+    if (
+      directory !== null &&
+      directory !== undefined &&
+      !directory.hasAgent(agentInstanceId)
+    ) {
+      directory.registerAgent({
+        agentInstanceId,
+        agentRole: "secondary",
+        missionId,
+        owningSecondaryAgentInstanceId: null,
+        boundTaskBundleId: null,
+        registeredAtIso: new Date().toISOString(),
+      });
+    }
+    this.missionResponsibleSecondaryAgentIdentifiers.set(missionId, agentInstanceId);
+    return agentInstanceId;
   }
 
   /**
