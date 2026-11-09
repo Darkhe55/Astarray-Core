@@ -70,6 +70,12 @@ export interface GitIntegrationCoordinatorOptions {
    * —— 它拦的是"审的和合的不是同一份产物"（过期/不匹配证据）。
    */
   isReviewRequiredForMerge?: boolean;
+  /**
+   * ALIGN-03-04（2026-11-09）：已登记 Agent 目录（用于校验**审查者真实存在**）。
+   *
+   * 未装配 ⇒ 只保留"审查者 ≠ 贡献者"校验（不假装已校验存在性）。
+   */
+  agentDirectory?: { getAgentEntry(agentInstanceId: string): { agentInstanceId: string } | null };
 }
 
 export class GitIntegrationCoordinator {
@@ -178,6 +184,20 @@ export class GitIntegrationCoordinator {
         `贡献者不能担任自己的审查者（作者自审被拒）: ${reviewingAgentInstanceIdentifier}`,
       );
     }
+    /**
+     * ALIGN-03-04（2026-11-09）：**审查者必须是已登记个体**。
+     *
+     * 缺口（卡内记录）：只校验"审查者 ≠ 贡献者"，不校验"审查者是否真实存在"
+     * ⇒ 任意字符串都能当审查者（含拼写错误、已回收的个体）。
+     *
+     * 未装配登记目录 ⇒ 保持原行为（不假装已校验）。
+     */
+    assertReviewerIsRegistered({
+      reviewerAgentInstanceId: reviewingAgentInstanceIdentifier,
+      ...(this.options.agentDirectory === undefined
+        ? {}
+        : { agentDirectory: this.options.agentDirectory }),
+    });
     const verification = await this.options.verifier.verifyContribution({
       allocation,
       repositoryPath: input.repositoryPath,
@@ -547,5 +567,29 @@ export class GitIntegrationCoordinator {
       workingDirectoryPath: repositoryPath,
       timeoutMilliseconds: this.integrationTestTimeoutSeconds * 1000,
     });
+  }
+}
+
+/**
+ * ALIGN-03-04（2026-11-09）：审查者必须是**已登记个体**（纯判定，便于直接验证）。
+ *
+ * 未装配目录 ⇒ 不做存在性校验（保持原行为，**不假装已校验**）。
+ */
+export function assertReviewerIsRegistered(input: {
+  readonly reviewerAgentInstanceId: string | null;
+  readonly agentDirectory?: { getAgentEntry(agentInstanceId: string): unknown | null };
+}): void {
+  const reviewerAgentInstanceId = input.reviewerAgentInstanceId;
+  if (reviewerAgentInstanceId === null || reviewerAgentInstanceId === "") {
+    return;
+  }
+  if (input.agentDirectory === undefined) {
+    return;
+  }
+  if (input.agentDirectory.getAgentEntry(reviewerAgentInstanceId) === null) {
+    throw new DomainError(
+      "task-sequence-permission-denied",
+      `审查者未登记（不得作为审查结论来源）: ${reviewerAgentInstanceId}`,
+    );
   }
 }

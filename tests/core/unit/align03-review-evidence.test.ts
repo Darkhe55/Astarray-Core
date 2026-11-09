@@ -10,6 +10,7 @@ import {
   assertContributionReviewEvidence,
   evaluateContributionReviewEvidence,
 } from "../../../packages/core/src/orchestration/git-review-evidence.js";
+import { assertReviewerIsRegistered } from "../../../packages/core/src/orchestration/git-integration-coordinator.js";
 import type { GitContributionReviewRecord } from "../../../packages/core/src/core/types.js";
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -138,5 +139,45 @@ describe("ALIGN-03-05 审查证据绑定", () => {
         requiresReviewer: false,
       }),
     ).toThrow(/不一致/u);
+  });
+});
+
+describe("ALIGN-03-04 审查者登记校验", () => {
+  const directoryWith = (registeredAgentInstanceIds: readonly string[]) => ({
+    getAgentEntry: (agentInstanceId: string) =>
+      registeredAgentInstanceIds.includes(agentInstanceId) ? { agentInstanceId } : null,
+  });
+
+  it("审查者已登记 ⇒ 放行", () => {
+    expect(() =>
+      assertReviewerIsRegistered({
+        reviewerAgentInstanceId: "reviewer-1",
+        agentDirectory: directoryWith(["reviewer-1"]),
+      }),
+    ).not.toThrow();
+  });
+
+  it("审查者**未登记** ⇒ 拒绝（任意字符串不得当审查者）", () => {
+    expect(() =>
+      assertReviewerIsRegistered({
+        reviewerAgentInstanceId: "typo-reviewer",
+        agentDirectory: directoryWith(["reviewer-1"]),
+      }),
+    ).toThrow(/未登记/u);
+  });
+
+  it("未指定审查者 ⇒ 不校验（是否要求审查者由上游决定）", () => {
+    expect(() =>
+      assertReviewerIsRegistered({
+        reviewerAgentInstanceId: null,
+        agentDirectory: directoryWith([]),
+      }),
+    ).not.toThrow();
+  });
+
+  it("未装配目录 ⇒ 不做存在性校验（不假装已校验）", () => {
+    expect(() =>
+      assertReviewerIsRegistered({ reviewerAgentInstanceId: "whatever" }),
+    ).not.toThrow();
   });
 });

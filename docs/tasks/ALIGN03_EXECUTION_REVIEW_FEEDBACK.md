@@ -212,3 +212,22 @@ Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/�
 
 **仍未做（如实）**：审查者要求**默认关闭**（需产品决策）；只绑 commit、未绑序列 revision/证据哈希；
 未校验 `changedPaths` 与实际 diff 一致；与 `AcceptanceVerdictGate` 仍是两条独立证据链。
+
+### 04 审查者登记校验（2026-11-09 追加）
+
+**缺口（本卡记录）**：协调器只校验"审查者 ≠ 贡献者"，**不校验审查者是否真实存在**
+⇒ 任意字符串（含拼写错误、已回收个体）都能当审查结论来源。
+
+**交付**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 纯判定 | `git-integration-coordinator.ts` `assertReviewerIsRegistered` | 已装配登记目录时，审查者必须在目录中；未装配 ⇒ **不做**存在性校验（不假装已校验） |
+| 装配点 | 同文件 `options.agentDirectory` | 可选端口；缺省保持原行为 |
+
+**证据**（`align03-review-evidence` 15/15，新增 4 条）：已登记 ⇒ 放行；**未登记 ⇒ 拒绝**；
+未指定审查者 ⇒ 不校验；未装配目录 ⇒ 不校验（不假装）。
+
+**仍未做（如实）**：**隶属校验**（审查者是否属于同一/授权的次级）未做 ——
+`GitWorkerAllocation` 只有 `tertiaryAgentInstanceId`，没有 owning secondary，需先补数据；
+`agentDirectory` 也尚未从运行时装配进协调器（当前默认未传）。
