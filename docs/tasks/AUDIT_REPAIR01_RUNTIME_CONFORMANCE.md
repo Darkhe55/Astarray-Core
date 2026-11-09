@@ -314,3 +314,36 @@ bypass 条件）；`cache-metrics` 既有 17/17 已按新 API 更新。
 **顺带发现（未修，记录在案）**：`switchPermissionProfile` 对 **worker 工具端口不生效** ——
 worker 使用的 profile 引用在装配时固定，不读当前选择。本用例因此改用
 **项目级作用域覆盖**（worker 真正消费的路径）。该缺口属独立问题，未在本轮擅自改动。
+
+## worker 权限实时生效收口（2026-11-09，`9c2e57d9`）
+
+**用户裁决**：已有及新建 worker 在**每次工具实际执行前**读取当前有效权限与 revision；
+保留项目/会话覆盖优先级；权限收紧后排队调用重新鉴权；放宽仍需既有确认流程。
+
+**真实缺陷**：worker 工具端口在任务派发时构造一次，权限组引用被固定在构造时
+（`application-runtime.ts` 的 `effectivePermissionProfileReference`）⇒
+`switchPermissionProfile` 与项目/会话覆盖对**已在运行的 worker 无效**，
+切换权限组后 worker 仍按旧权限执行。
+
+**修复**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 每次执行前重解析 | `tools/policy-wrapper.ts` `resolveProfileReference()` | 新增 `resolveCurrentPermissionProfileReference`；给出解析器时以它为准，静态引用仅缺省回退 |
+| 解析失败不回退旧引用 | 同上 | 抛错/为空 ⇒ 视为未装配（不静默使用过期引用，避免收紧失效） |
+| 保持覆盖优先级 | `application-runtime.ts` | 每次重新计算：**会话覆盖 > 项目覆盖 > 当前选择**，与构造时同一逻辑 |
+| 放宽仍需确认 | 既有引擎行为 | `decide()` 每次读 profile 当前 revision；旧会话授权在 revision 变化后失效 |
+| 授予入口同样实时 | `policy-wrapper.ts` `grantConfigurableSessionAuthorization` | 也走解析器，避免"按旧引用授予" |
+
+**应用装配级反例**（`tests/core/integration/audit01-worker-permission-refresh.test.ts` 2/2）：
+
+- 同一 worker 端口上：第一次 `readFile` 成功读到正文；**运行期间**切到空白自定义组（`project.read` 回退 deny）；
+  第二次 `readFile` 被 `tool-permission-denied` 拒绝且未读到正文；
+- **对照组**：不切换权限组时第二次同样成功 ⇒ 差异确实来自收紧，而不是环境偶然；
+- 先断言"切换对控制器可见"（`getCurrentPermissionProfileRefurence().kind === "custom"`），再归因到执行前重读。
+
+公开全量 **647 files / 4449 tests** 通过。
+
+**本文件首版的一处测试自身缺陷（如实记录）**：`toolResultMessages` 是**累积**的，用 `flatMap`
+会把同一条结果重复计入，导致"第二次结果"其实还是第一次 —— 曾据此误判"收紧无效"。
+改为只取最后一条输入的 `toolResultMessages` 后，行为与断言一致。
