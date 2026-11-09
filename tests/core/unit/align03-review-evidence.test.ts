@@ -148,6 +148,7 @@ describe("ALIGN-03-04 审查者登记校验", () => {
       registeredAgentInstanceIds.includes(agentInstanceId) ? { agentInstanceId } : null,
   });
 
+
   it("审查者已登记 ⇒ 放行", () => {
     expect(() =>
       assertReviewerIsRegistered({
@@ -178,6 +179,63 @@ describe("ALIGN-03-04 审查者登记校验", () => {
   it("未装配目录 ⇒ 不做存在性校验（不假装已校验）", () => {
     expect(() =>
       assertReviewerIsRegistered({ reviewerAgentInstanceId: "whatever" }),
+    ).not.toThrow();
+  });
+});
+
+describe("ALIGN-03-04 审查者隶属校验", () => {
+  const directoryWithOwners = (owners: Readonly<Record<string, string | null>>) => ({
+    getAgentEntry: (agentInstanceId: string) =>
+      agentInstanceId in owners
+        ? { agentInstanceId, owningSecondaryAgentInstanceId: owners[agentInstanceId] ?? null }
+        : null,
+  });
+
+  it("审查者与贡献者同一所属次级 ⇒ 放行", () => {
+    expect(() =>
+      assertReviewerIsRegistered({
+        reviewerAgentInstanceId: "reviewer-1",
+        contributorAgentInstanceId: "worker-1",
+        agentDirectory: directoryWithOwners({
+          "reviewer-1": "secondary-A",
+          "worker-1": "secondary-A",
+        }),
+      }),
+    ).not.toThrow();
+  });
+
+  it("审查者属**别的**次级 ⇒ 拒绝（借别家次级的人签字）", () => {
+    expect(() =>
+      assertReviewerIsRegistered({
+        reviewerAgentInstanceId: "reviewer-1",
+        contributorAgentInstanceId: "worker-1",
+        agentDirectory: directoryWithOwners({
+          "reviewer-1": "secondary-B",
+          "worker-1": "secondary-A",
+        }),
+      }),
+    ).toThrow(/跨次级/u);
+  });
+
+  it("任一侧缺所属次级 ⇒ 不猜测（不拒绝、也不假装已校验）", () => {
+    expect(() =>
+      assertReviewerIsRegistered({
+        reviewerAgentInstanceId: "reviewer-1",
+        contributorAgentInstanceId: "worker-1",
+        agentDirectory: directoryWithOwners({
+          "reviewer-1": null,
+          "worker-1": "secondary-A",
+        }),
+      }),
+    ).not.toThrow();
+  });
+
+  it("未给贡献者 ⇒ 只做存在性校验", () => {
+    expect(() =>
+      assertReviewerIsRegistered({
+        reviewerAgentInstanceId: "reviewer-1",
+        agentDirectory: directoryWithOwners({ "reviewer-1": "secondary-B" }),
+      }),
     ).not.toThrow();
   });
 });

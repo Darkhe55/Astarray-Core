@@ -75,7 +75,12 @@ export interface GitIntegrationCoordinatorOptions {
    *
    * 未装配 ⇒ 只保留"审查者 ≠ 贡献者"校验（不假装已校验存在性）。
    */
-  agentDirectory?: { getAgentEntry(agentInstanceId: string): { agentInstanceId: string } | null };
+  agentDirectory?: {
+    getAgentEntry(agentInstanceId: string): {
+      readonly agentInstanceId: string;
+      readonly owningSecondaryAgentInstanceId?: string | null;
+    } | null;
+  };
 }
 
 export class GitIntegrationCoordinator {
@@ -194,6 +199,7 @@ export class GitIntegrationCoordinator {
      */
     assertReviewerIsRegistered({
       reviewerAgentInstanceId: reviewingAgentInstanceIdentifier,
+      contributorAgentInstanceId: allocation.tertiaryAgentInstanceId,
       ...(this.options.agentDirectory === undefined
         ? {}
         : { agentDirectory: this.options.agentDirectory }),
@@ -577,19 +583,51 @@ export class GitIntegrationCoordinator {
  */
 export function assertReviewerIsRegistered(input: {
   readonly reviewerAgentInstanceId: string | null;
-  readonly agentDirectory?: { getAgentEntry(agentInstanceId: string): unknown | null };
+  /** 贡献者（用于**隶属**校验：审查者必须与贡献者同一所属次级）。 */
+  readonly contributorAgentInstanceId?: string | null;
+  readonly agentDirectory?: {
+    getAgentEntry(agentInstanceId: string): {
+      readonly agentInstanceId: string;
+      readonly owningSecondaryAgentInstanceId?: string | null;
+    } | null;
+  };
 }): void {
   const reviewerAgentInstanceId = input.reviewerAgentInstanceId;
   if (reviewerAgentInstanceId === null || reviewerAgentInstanceId === "") {
     return;
   }
-  if (input.agentDirectory === undefined) {
+  const agentDirectory = input.agentDirectory;
+  if (agentDirectory === undefined) {
     return;
   }
-  if (input.agentDirectory.getAgentEntry(reviewerAgentInstanceId) === null) {
+  const reviewerEntry = agentDirectory.getAgentEntry(reviewerAgentInstanceId);
+  if (reviewerEntry === null) {
     throw new DomainError(
       "task-sequence-permission-denied",
       `审查者未登记（不得作为审查结论来源）: ${reviewerAgentInstanceId}`,
+    );
+  }
+  /**
+   * ALIGN-03-04（2026-11-09）：**隶属校验** —— 审查者必须与贡献者属于同一所属次级。
+   *
+   * 卡内缺口："任命不校验验收者的直属上级（可借别家次级的人签字）"。
+   * 只有**两侧都**能读出所属次级时才比较（缺数据不猜测、也不假装已校验）。
+   */
+  const contributorAgentInstanceId = input.contributorAgentInstanceId ?? null;
+  if (contributorAgentInstanceId === null) {
+    return;
+  }
+  const contributorEntry = agentDirectory.getAgentEntry(contributorAgentInstanceId);
+  const reviewerOwningSecondary = reviewerEntry.owningSecondaryAgentInstanceId ?? null;
+  const contributorOwningSecondary = contributorEntry?.owningSecondaryAgentInstanceId ?? null;
+  if (
+    reviewerOwningSecondary !== null &&
+    contributorOwningSecondary !== null &&
+    reviewerOwningSecondary !== contributorOwningSecondary
+  ) {
+    throw new DomainError(
+      "task-sequence-permission-denied",
+      `审查者不属于该贡献的所属次级（不得跨次级签字）：审查者属 ${reviewerOwningSecondary}，贡献者属 ${contributorOwningSecondary}`,
     );
   }
 }
