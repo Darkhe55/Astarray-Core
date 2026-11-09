@@ -124,13 +124,29 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
    * 幂等由子进程的 `idempotencyKey` 去重保证；这里只负责"再发一次"。
    * 单条失败不会中止其余条目的补送（各自保留，下次再试）。
    */
+  /**
+   * ALIGN-03-06（2026-11-09）：补送的**退避状态**（按文件名）。
+   *
+   * 为什么需要：此前每次心跳都重试全部积压条目 —— 子进程长期不可用时，
+   * 每个心跳都要走一遍 IPC 超时，可能长期占用通道（卡内点名的"无上限/无退避"）。
+   * 这里按失败次数做**指数退避**，并给出可观测的 `deferredCount`。
+   *
+   * 注意：**不设重试上限**——消息不能被静默丢弃，退避只降低尝试频率。
+   */
+  private readonly outboxRetryState = new Map<
+    string,
+    { attemptCount: number; nextAttemptAtMilliseconds: number }
+  >();
+
   async flushPendingOutbox(): Promise<{
     attemptedCount: number;
     resentCount: number;
     remainingCount: number;
+    /** 因退避而本轮未尝试的条数（可观测积压，不静默）。 */
+    deferredCount: number;
   }> {
     if (this.outboxDirectoryPath === null || this.isFlushingOutbox) {
-      return { attemptedCount: 0, resentCount: 0, remainingCount: 0 };
+      return { attemptedCount: 0, resentCount: 0, remainingCount: 0, deferredCount: 0 };
     }
     this.isFlushingOutbox = true;
     try {
@@ -139,12 +155,20 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
       try {
         entries = await fs.readdir(this.outboxDirectoryPath);
       } catch {
-        return { attemptedCount: 0, resentCount: 0, remainingCount: 0 };
+        return { attemptedCount: 0, resentCount: 0, remainingCount: 0, deferredCount: 0 };
       }
       let attemptedCount = 0;
       let resentCount = 0;
+      let deferredCount = 0;
+      const nowMilliseconds = Date.now();
       for (const entryName of entries) {
         if (!entryName.endsWith(".json")) {
+          continue;
+        }
+        const retryState = this.outboxRetryState.get(entryName);
+        if (retryState !== undefined && retryState.nextAttemptAtMilliseconds > nowMilliseconds) {
+          /** 仍在退避窗口内：本轮不尝试，但如实计数（积压可观测）。 */
+          deferredCount += 1;
           continue;
         }
         attemptedCount += 1;
@@ -166,9 +190,17 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
             requestId,
           );
           await fs.rm(filePath, { force: true }).catch(() => undefined);
+          this.outboxRetryState.delete(entryName);
           resentCount += 1;
         } catch {
-          // 保留文件，下一次补送继续
+          /** 失败：按次数指数退避（上限 60 秒），文件保留不删。 */
+          const previousAttemptCount = this.outboxRetryState.get(entryName)?.attemptCount ?? 0;
+          const nextAttemptCount = previousAttemptCount + 1;
+          const backoffMilliseconds = computeOutboxBackoffMilliseconds(nextAttemptCount);
+          this.outboxRetryState.set(entryName, {
+            attemptCount: nextAttemptCount,
+            nextAttemptAtMilliseconds: nowMilliseconds + backoffMilliseconds,
+          });
         }
       }
       let remainingCount = 0;
@@ -179,7 +211,7 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
       } catch {
         remainingCount = 0;
       }
-      return { attemptedCount, resentCount, remainingCount };
+      return { attemptedCount, resentCount, remainingCount, deferredCount };
     } finally {
       this.isFlushingOutbox = false;
     }
@@ -396,4 +428,15 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
       this.disconnected = true;
     }
   }
+}
+
+/**
+ * ALIGN-03-06（2026-11-09）：补送退避时长（**纯函数**，便于直接验证策略）。
+ *
+ * 1s、2s、4s … 上限 60s。**不设重试上限**：消息不得被静默丢弃，
+ * 退避只降低尝试频率（子进程长期不可用时不至于每个心跳都占满通道）。
+ */
+export function computeOutboxBackoffMilliseconds(attemptCount: number): number {
+  const safeAttemptCount = Math.max(1, Math.floor(attemptCount));
+  return Math.min(60_000, 1_000 * 2 ** Math.min(safeAttemptCount - 1, 6));
 }

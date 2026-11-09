@@ -167,3 +167,23 @@ reviewDecision/executedChecks`（本轮又加审查者），但 `finalizeIntegra
 Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/接手**未实现；未跑过任何一次真实收口。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+### 06 补送退避（2026-11-09 追加）
+
+**缺口（本卡 2026-10-28 记录）**：补送"**无上限/无退避**"——每次心跳重试全部积压条目，
+子进程长期不可用时每个心跳都要走一遍 IPC 超时，可能长期占用通道。
+
+**修复**（`packages/core/src/feedback-process/transport.ts`）：
+
+| 要点 | 实现 |
+|---|---|
+| 指数退避 | 失败后按次数等待 1s→2s→4s…（上限 60s），窗口内本轮不尝试 |
+| **不设重试上限** | 退避只降低频率；消息**不得被静默丢弃** |
+| 积压可观测 | `flushPendingOutbox()` 新增 `deferredCount`（因退避未尝试的条数），与既有 `remainingCount` 一并返回 |
+| 成功后清状态 | 发送成功即删除该文件的退避记录 |
+
+**证据**（`align03-outbox-backoff` 4/4）：指数序列 1/2/4/8s；饱和于 60s；
+饱和后**仍是有限等待**而非放弃；退化输入（0/负数）按第 1 次处理。
+
+**仍未做（如实）**：**未**验证"心跳触发退避"的端到端行为（需要可注入的子进程传输层，
+当前 `ForkFeedbackClient` 构造依赖真实 `ChildProcess`）；子进程崩溃恢复实测仍未做。
