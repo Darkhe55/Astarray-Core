@@ -24,7 +24,7 @@ import {
   TaskSequenceStatusController,
 } from "../../../core/src/orchestration/task-sequence-controllers.js";
 import { TaskStore } from "../../../core/src/infra/task-store.js";
-import { EXIT_CODES, printJson } from "./json-output.js";
+import { writeDiagnosticText, EXIT_CODES, printJson } from "./json-output.js";
 
 export interface TaskLedgerStatusCommandInput {
   readonly stateDirectory: string;
@@ -507,7 +507,7 @@ export async function executeTaskLedgerApplyWriteBackCommand(
     if (input.isJsonOutput) {
       printJson({ status: "index-missing", message });
     } else {
-      process.stderr.write(`${message}\n`);
+      writeDiagnosticText(message);
     }
     return EXIT_CODES.USAGE_ERROR;
   }
@@ -557,7 +557,7 @@ export async function executeTaskLedgerApplyWriteBackCommand(
     if (input.isJsonOutput) {
       printJson({ status: "stale-revision", message });
     } else {
-      process.stderr.write(`${message}\n`);
+      writeDiagnosticText(message);
     }
     return EXIT_CODES.FAILURE;
   }
@@ -619,7 +619,7 @@ export async function executeTaskLedgerBindTaskMapCommand(
     if (input.isJsonOutput) {
       printJson({ status: "index-missing", message });
     } else {
-      process.stderr.write(`${message}\n`);
+      writeDiagnosticText(message);
     }
     return EXIT_CODES.USAGE_ERROR;
   }
@@ -637,7 +637,7 @@ export async function executeTaskLedgerBindTaskMapCommand(
     if (input.isJsonOutput) {
       printJson({ status: "invalid-task-chain", message });
     } else {
-      process.stderr.write(`${message}\n`);
+      writeDiagnosticText(message);
     }
     return EXIT_CODES.USAGE_ERROR;
   }
@@ -658,7 +658,7 @@ export async function executeTaskLedgerBindTaskMapCommand(
     if (input.isJsonOutput) {
       printJson({ status: "invalid-task-chain", message });
     } else {
-      process.stderr.write(`${message}\n`);
+      writeDiagnosticText(message);
     }
     return EXIT_CODES.USAGE_ERROR;
   }

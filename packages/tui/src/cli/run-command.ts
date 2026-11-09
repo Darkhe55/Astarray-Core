@@ -11,7 +11,7 @@ import {
   prepareRunPerfCollection,
 } from "../../../core/src/public-sdk.js";
 import { runConfigSchema } from "../../../core/src/core/schemas.js";
-import { EXIT_CODES, failWith, logToStderr, printJson } from "./json-output.js";
+import { writeDiagnosticText, EXIT_CODES, failWith, logToStderr, printJson } from "./json-output.js";
 import {
   InteractivePermissionAskDecisionPort,
   buildPermissionAskFromEscalation,
@@ -516,8 +516,8 @@ const application = await AstarrayApplicationFacade.create({
       try {
         await runPerfCollector.stop();
       } catch (error) {
-        process.stderr.write(
-          `astarray: 采集收口失败（已忽略）：${error instanceof Error ? error.message : String(error)}\n`,
+        writeDiagnosticText(
+          `astarray: 采集收口失败（已忽略）：${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }

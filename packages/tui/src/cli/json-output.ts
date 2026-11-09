@@ -26,9 +26,19 @@ export function printJson(output: unknown): void {
  * 处理顺序：先脱敏（凭据），再安全化（换行注入 + 有界截断）。
  */
 export function logToStderr(message: string): void {
-  const redactedMessage = redactSensitiveText(message);
+  writeDiagnosticText(`astarray: ${message}`);
+}
+
+/**
+ * 诊断文本的**唯一写出点**（不加 `astarray:` 前缀，保持既有输出形态）。
+ *
+ * 供原先直接 `process.stderr.write` 的调用点使用：行为等价，但统一经过
+ * 脱敏 + 换行转义 + 有界截断。
+ */
+export function writeDiagnosticText(text: string): void {
+  const redactedMessage = redactSensitiveText(text);
   const sanitized = sanitizeLogLine(redactedMessage);
-  process.stderr.write(`astarray: ${sanitized.text}\n`);
+  process.stderr.write(`${sanitized.text}\n`);
 }
 
 export function failWith(

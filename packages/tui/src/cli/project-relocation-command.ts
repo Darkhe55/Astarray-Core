@@ -11,7 +11,7 @@ import {
   ProjectLocationRegistrationStore,
   ProjectRelocationController,
 } from "../../../core/src/public-sdk.js";
-import { EXIT_CODES, failWith, printJson } from "./json-output.js";
+import { writeDiagnosticText, EXIT_CODES, failWith, printJson } from "./json-output.js";
 import {
   applyProjectEntryRelocationChoice,
   buildProjectEntryRelocationPrompt,
@@ -315,8 +315,8 @@ export async function executeProjectEntryCommand(
 
   if (input.choice === "relocate" && input.confirmNewRoot !== undefined) {
     if (input.expectedLocationRevision === undefined) {
-      process.stderr.write(
-        "重定位需要显式 --expected-location-revision（用户确认时看到的 revision），不猜。\n",
+      writeDiagnosticText(
+        "重定位需要显式 --expected-location-revision（用户确认时看到的 revision），不猜。",
       );
       return 2;
     }

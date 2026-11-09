@@ -18,7 +18,7 @@ import { GoalMissionBindingStore } from "../../../core/src/orchestration/goal-mi
 import { GoalModeStateStore } from "../../../core/src/orchestration/goal-mode-store.js";
 import { GoalGateCache } from "../../../core/src/orchestration/goal-gate-cache.js";
 import { GoalDispatchVerdictJournal } from "../../../core/src/orchestration/goal-dispatch-verdict-journal.js";
-import { EXIT_CODES, printJson } from "./json-output.js";
+import { writeDiagnosticText, EXIT_CODES, printJson } from "./json-output.js";
 import { AstarrayApplicationFacade } from "../../../core/src/public-sdk.js";
 
 export interface GoalModeStatusCommandInput {
@@ -206,7 +206,7 @@ export async function executeGoalModeVerdictsCommand(
   if (input.exportPath !== undefined) {
     const exportPath = input.exportPath.trim();
     if (exportPath === "") {
-      process.stderr.write("astarray: --export 需要非空路径\n");
+      writeDiagnosticText("astarray: --export 需要非空路径");
       return EXIT_CODES.USAGE_ERROR;
     }
     try {
@@ -228,7 +228,7 @@ export async function executeGoalModeVerdictsCommand(
       const { writeFile } = await import("node:fs/promises");
       await writeFile(exportPath, jsonLines === "" ? "" : `${jsonLines}\n`, "utf8");
     } catch (error) {
-      process.stderr.write(`astarray: 导出判定记录失败: ${(error as Error).message}\n`);
+      writeDiagnosticText(`astarray: 导出判定记录失败: ${(error as Error).message}\n`.trimEnd());
       return EXIT_CODES.USAGE_ERROR;
     }
     if (input.isJsonOutput) {
@@ -298,7 +298,7 @@ export async function executeGoalModeProposeCommand(
   try {
     draft = JSON.parse(input.draftJson);
   } catch (error) {
-    process.stderr.write(`提案 JSON 无法解析: ${(error as Error).message}\n`);
+    writeDiagnosticText(`提案 JSON 无法解析: ${(error as Error).message}\n`.trimEnd());
     return EXIT_CODES.USAGE_ERROR;
   }
   const application = await AstarrayApplicationFacade.create({
@@ -345,7 +345,7 @@ export async function executeGoalModeConfirmCommand(
   input: GoalModeConfirmCommandInput,
 ): Promise<number> {
   if (input.isConfirmed !== true) {
-    process.stderr.write("拒绝确认：必须显式传 --yes（模型/脚本不得代替用户确认）。\n");
+    writeDiagnosticText("拒绝确认：必须显式传 --yes（模型/脚本不得代替用户确认）。");
     return EXIT_CODES.USAGE_ERROR;
   }
   const application = await AstarrayApplicationFacade.create({
@@ -361,7 +361,7 @@ export async function executeGoalModeConfirmCommand(
       requestedBy: "user",
     });
     if (!activation.isActive) {
-      process.stderr.write(`目标模式未激活: ${activation.reason}\n`);
+      writeDiagnosticText(`目标模式未激活: ${activation.reason}\n`.trimEnd());
       return EXIT_CODES.USAGE_ERROR;
     }
     const result = await application.confirmGoalContract({

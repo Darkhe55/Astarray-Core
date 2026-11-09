@@ -10,7 +10,7 @@ import path from "node:path";
 import { runConfigSchema } from "../../../core/src/core/schemas.js";
 import { resolveHostUserIdentifier } from "../../../core/src/core/host-user-context.js";
 import { bootstrapCli } from "./bootstrap.js";
-import { EXIT_CODES, failWith, logToStderr, printJson } from "./json-output.js";
+import { writeDiagnosticText, EXIT_CODES, failWith, logToStderr, printJson } from "./json-output.js";
 import { writeRuntimeDiagnosticsReport } from "./runtime-diagnostics-report.js";
 import {
   RuntimeSelectionError,
@@ -488,7 +488,7 @@ export interface ProfileCommandOptions {
 }
 
 function failWithCode(message: string, exitCode = 2): never {
-  process.stderr.write(`${message}\n`);
+  writeDiagnosticText(message);
   process.exitCode = exitCode;
   throw new Error(message);
 }
@@ -3445,7 +3445,7 @@ export async function executeRecoverResumeCommand(
           `${JSON.stringify({ missionIdentifier: options.missionIdentifier, error: message, status: "mission-locked" })}\n`,
         );
       } else {
-        process.stderr.write(`${message}\n`);
+        writeDiagnosticText(message);
       }
       return EXIT_CODES.FAILURE;
     }
@@ -3650,7 +3650,7 @@ export async function executeContextTransactionCommand(
     if (options.isJsonOutput) {
       process.stdout.write(`${JSON.stringify({ error: message })}\n`);
     } else {
-      process.stderr.write(`${message}\n`);
+      writeDiagnosticText(message);
     }
     return EXIT_CODES.FAILURE;
   }

@@ -10,7 +10,7 @@
 import { CollaborationInboxStore } from "../../../core/src/orchestration/collaboration-inbox-store.js";
 import { CollaborationInboxDeliveryService } from "../../../core/src/orchestration/collaboration-inbox-delivery.js";
 import { CollaborationOutboxTransport } from "../../../core/src/orchestration/collaboration-outbox-transport.js";
-import { EXIT_CODES, printJson } from "./json-output.js";
+import { writeDiagnosticText, EXIT_CODES, printJson } from "./json-output.js";
 
 /** `inbox deliver` 退出码：收件箱不可用（不存在/损坏/冲突）。 */
 const INBOX_UNAVAILABLE_EXIT_CODE = 2;
@@ -30,7 +30,7 @@ export async function executeInboxListCommand(input: InboxListCommandInput): Pro
   const outcome = await store.read(input.recipientAgentInstanceId);
 
   if (outcome.kind === "invalid") {
-    process.stderr.write("收件箱不可读（未静默当空）：" + outcome.reason + "\n");
+    writeDiagnosticText("收件箱不可读（未静默当空）：" + outcome.reason);
     return 2;
   }
   if (outcome.kind === "absent") {
@@ -109,8 +109,8 @@ export async function executeInboxDeliverCommand(
   input: InboxDeliverCommandInput,
 ): Promise<number> {
   if (input.transportName !== "file-outbox") {
-    process.stderr.write(
-      "不支持的传输实现 `" + input.transportName + "`：目前只支持 file-outbox（本地队列）。\n",
+    writeDiagnosticText(
+      "不支持的传输实现 `" + input.transportName + "`：目前只支持 file-outbox（本地队列）。",
     );
     return INBOX_UNAVAILABLE_EXIT_CODE;
   }

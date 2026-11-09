@@ -7,7 +7,7 @@
  * - 损坏 ⇒ 退出码 2 并给原因，不静默当空。
  */
 import { EventIncidentJournal } from "../../../core/src/orchestration/event-incident-journal.js";
-import { EXIT_CODES, printJson } from "./json-output.js";
+import { writeDiagnosticText, EXIT_CODES, printJson } from "./json-output.js";
 
 export interface EventStatusCommandInput {
   readonly stateDirectory: string;
@@ -21,7 +21,7 @@ export async function executeEventStatusCommand(
   const outcome = await journal.read();
 
   if (outcome.kind === "invalid") {
-    process.stderr.write("事故日志不可读（未静默当空）：" + outcome.reason + "\n");
+    writeDiagnosticText("事故日志不可读（未静默当空）：" + outcome.reason);
     return 2;
   }
   if (outcome.kind === "absent") {
