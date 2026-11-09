@@ -7887,6 +7887,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 }
 
+// EXEC-01-02（2026-11-09）：按平台装配沙箱后端（无组件 ⇒ null，不降级到宿主执行）。
+export {
+  createPlatformSandboxExecutionBackend,
+  resolveSandboxHelperExecutablePath,
+} from "./execution/platform-sandbox-backend.js";
+
 // RELOCATE-01（2026-10-18 第 19 轮）：冷启动重定位**只读**控制面（产品可达）。
 export { ProjectRelocationController } from "./orchestration/project-relocation-controller.js";
 export { ProjectLocationRegistrationStore } from "./orchestration/project-location-registration-store.js";
