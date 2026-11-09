@@ -1650,3 +1650,33 @@ pm run check 偶发红的真实缺陷：未处理的 promise 拒绝**。
 - 已产出 ⇒ 确认回执的**受控动作**（需先定义"产物有效"的判据）；
 - 启动恢复回填映射对崩溃 mission 的覆盖验证；
 - 回访的**自动触发**（需产品定义触发时机与预算）。
+
+### 11.H 公开全量门禁的系统性抖动（2026-11-10，**未修，需单独立项**）
+
+连续 4 次 `npm run check:low-parallel`，**每轮失败的用例都不同**，且**隔离运行全部通过**：
+
+| 轮次 | 失败用例 | 隔离结果 | 失败形态 |
+|---|---|---|---|
+| 1 | `reliability-r4-ledger-concurrency` | 4/4 通过 | 未处理拒绝（`Errors 1`，测试全通过但 exit=1） |
+| 2 | `e2e01-provider-write-probe` | 4/4 通过 | 断言失败 |
+| 3 | `g5-early-stop-resume` | 2/2 通过 | 断言失败 |
+| 4 | `history01-run-history-e2e` | 1/1 通过 | 断言失败 |
+
+**已修的一半**（`ad8db73e`）：`handleWorkerOutcome` 兜底自身 reject 时无人接住 ⇒ 未处理拒绝。
+修后 `Errors 1` 消失，但断言类抖动仍在。
+
+**已核对的线索**：这些用例都**启动后台编排**并在 `afterEach` 里**删除临时目录**：
+
+- `g5-early-stop-resume`：`fs.rm(stateDirectory, …, maxRetries: 5)`；
+- `e2e01-provider-write-probe`：`fs.rm(temporaryDirectory, …, maxRetries: 5)`；
+- `reliability-r4-ledger-concurrency`：`fs.rm(…, maxRetries: 10, retryDelay: 50)`；
+- `history01-run-history-e2e`：**不删**临时目录（注释明写"后台仍可能写盘，§14.3 教训"）。
+
+**假设**：后台任务在 `afterEach` 删目录后仍写盘 ⇒ 要么自己抛 ENOENT（未处理拒绝），
+要么影响同进程内**下一个**用例（共享的 provider 桩/时钟/临时根）。
+
+**为什么本轮不修**：需要统一决定"后台编排类用例何时可以删临时目录"（等 `shutdown()` 收口？
+一律不删？加就绪栅栏？），属**测试基础设施口径**，会影响数十个文件；
+在门禁本身不可信时仓促改测试，会把真实失败一起掩盖。
+
+**结论**：门禁当前**不可作为"全部通过"的证据**；任何"测试全绿"的声明必须附本轮实际退出码。
