@@ -390,3 +390,30 @@ Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/�
 
 **当前阻塞解除**：此前"Worker 所属次级是什么"未决，现已裁定为"mission 责任次级"，
 因此 01/04 不再等待产品决策，可施工。
+
+### 01/04 归属落地（第一步，2026-11-10）
+
+按用户归属裁决实现第一批：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 责任次级持久化 | `mission-manager.ts` | `MissionSummary.responsibleSecondaryAgentInstanceId`（可选）；`createMission` 有值才写，**缺省不写、不伪造主 Agent** |
+| 解析器 | `orchestration/worker-ownership.ts` `resolveWorkerDirectSuperior` | 纯函数；返回 `resolved`（含 `basis`）或 `blocked`（含 `reasonCode`） |
+| 四级规则 | 同上 | 有派生三级 ⇒ 上级**就是该三级**（`derived-from-tertiary`），不挂 mission 责任次级 |
+| 阻断原因码 | 同上 | `mission-responsible-secondary-unbound` / `responsible-secondary-is-main-agent` / `project-mismatch` / `derived-from-self` |
+
+**证据**（`align03-worker-ownership` 8/8）：
+
+- **唯一上级**：三级 ⇒ 责任次级（且不等于主 Agent）；
+- **未绑定 ⇒ 阻断**（不退回 main）；
+- 责任次级被写成主 Agent ⇒ 阻断；
+- **四级 ⇒ 挂派生它的三级**；
+- **跨项目拒绝**（派发目标 ≠ mission 项目 ⇒ `project-mismatch`），同项目放行；
+- **恢复一致性**：责任次级落盘后读回，两次解析结果完全相同（不因重启换人）；
+- 未提供责任次级 ⇒ 摘要里**无**该字段（不伪造）。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **677 files / 4607 passed + 3 skipped / exit 0**。
+
+**未做（如实）**：解析器**尚未接入派发路径**（`DagScheduler.allocateAgentId` / Worker 登记仍未写
+`owningSecondaryAgentInstanceId`）；任务完成时的**自动任命与裁决**未接；`handleUserMessage`
+尚未要求/确定责任次级（从主 Agent 进入时"先确定承接次级"的路由未实现）。

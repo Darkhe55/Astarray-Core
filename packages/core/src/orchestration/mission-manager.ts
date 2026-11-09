@@ -48,6 +48,14 @@ export interface MissionSummary {
   /** ALIGN-02-01：序列里承载本次用户原始任务的任务标识（`task-<missionId>`）。 */
   originalTaskIdentifier?: string;
   /**
+   * ALIGN-03-01/04（2026-11-10，用户归属裁决）：该 mission 的**责任次级**个体标识。
+   *
+   * 调度器直接派发的三级 Worker，**唯一直属上级**就是它；**禁止**默认绑主 Agent。
+   * 旧摘要没有该字段 ⇒ 读取方必须当作「**未绑定**」（阻断派发并报告），
+   * **不得**用主 Agent 或 missionId 顶替。
+   */
+  responsibleSecondaryAgentInstanceId?: string;
+  /**
    * ALIGN-02-02（2026-10-28）：本次执行的任务分解来源。
    *
    * - `model`：候选分解通过本地校验；
@@ -98,6 +106,13 @@ export interface CreateMissionInput {
   taskSequenceIdentifier?: string;
   /** ALIGN-02-01：序列中承载用户原始任务的任务标识（可选）。 */
   originalTaskIdentifier?: string;
+  /**
+   * ALIGN-03（2026-11-10）：该 mission 的**责任次级**个体标识（可选）。
+   *
+   * 缺省 ⇒ 摘要里不写 ⇒ 读取方按"**未绑定**"处理并阻断派发；
+   * **不得**在缺省时退回主 Agent。
+   */
+  responsibleSecondaryAgentInstanceId?: string;
   /** ALIGN-02-02：任务分解来源（可选；缺省 ⇒ 摘要不写，读取方按未知处理）。 */
   /**
    * RESUME-02（2026-11-07）：**最近一次状态变更时间**（毫秒精度）。
@@ -182,6 +197,14 @@ export class MissionManager {
       ...(typeof input.taskPlanningFallbackReason === "string" &&
       input.taskPlanningFallbackReason.trim().length > 0
         ? { taskPlanningFallbackReason: input.taskPlanningFallbackReason.trim() }
+        : {}),
+      /** ALIGN-03：责任次级如实落盘（缺省不写，读取方按"未绑定"处理）。 */
+      ...(typeof input.responsibleSecondaryAgentInstanceId === "string" &&
+      input.responsibleSecondaryAgentInstanceId.trim().length > 0
+        ? {
+            responsibleSecondaryAgentInstanceId:
+              input.responsibleSecondaryAgentInstanceId.trim(),
+          }
         : {}),
     };
     await this.summaryWriteMutex.runExclusive(() =>
