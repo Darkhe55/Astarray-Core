@@ -533,3 +533,24 @@ const agentInstanceId =
 **未做（如实）**：devolve 路径未迁移（仍 scheduler 标签、未强制）；"未绑定 ⇒ 阻断"只有代码路径，
 **没有专门用例**（合成 mission 总能拿到责任次级，构造不出阻断场景）；
 自动任命审查者 + 裁决仍未接。
+
+### 01/04 迁移第 4 步：**未绑定 ⇒ 阻断派发**已有用例（2026-11-10）
+
+新增 `align03-ownership-blocking`（4 条）：
+
+| 场景 | 期望 |
+|---|---|
+| 强制开启 + **无责任次级** | **不构造 Worker**，报告 `mission-responsible-secondary-unbound` |
+| 强制关闭 + 无责任次级 | 照常派发（未迁移路径行为不变），不报告 |
+| 强制开启 + 责任次级是 `scheduler:<missionId>` | **阻断**（新增原因码 `responsible-secondary-is-scheduler-label`） |
+| 有真实责任次级 | 照常派发 |
+
+**顺带补齐解析器**：`resolveWorkerDirectSuperior` 现在**显式拒绝** `scheduler:` 前缀
+——调度器只是执行机制，不是 Agent，不能充当上级（裁决第 1 条）。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **679 files / 4612 passed + 3 skipped / exit 0**。
+
+**仍未做（如实）**：
+1. devolve 路径未迁移（仍 `scheduler:`、未强制）；
+2. **自动任命审查者 + 裁决仍未接**（01 的正题：任务完成时按同一上级任命并等待裁决）；
+3. 跨项目拒绝只在纯函数层有断言，**装配级没有**。

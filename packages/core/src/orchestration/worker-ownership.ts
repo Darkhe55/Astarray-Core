@@ -29,6 +29,8 @@ export type WorkerDirectSuperiorResolution =
 export type WorkerOwnershipBlockReason =
   | "mission-responsible-secondary-unbound"
   | "responsible-secondary-is-main-agent"
+  /** 责任次级是 `scheduler:<missionId>` 这类**派发来源标签**：调度器不是 Agent，不能当上级。 */
+  | "responsible-secondary-is-scheduler-label"
   | "project-mismatch"
   | "derived-from-self";
 
@@ -84,6 +86,16 @@ export function resolveWorkerDirectSuperior(
       reasonCode: "mission-responsible-secondary-unbound",
       detail:
         "该 mission 未绑定责任次级：拒绝派发（不得退回主 Agent，也不猜测身份）。",
+    };
+  }
+  if (responsibleSecondary.startsWith("scheduler:")) {
+    return {
+      kind: "blocked",
+      reasonCode: "responsible-secondary-is-scheduler-label",
+      detail:
+        "责任次级是调度器标签（" +
+        responsibleSecondary +
+        "）：调度器只是执行机制，不是 Agent，不能充当上级。",
     };
   }
   if (
