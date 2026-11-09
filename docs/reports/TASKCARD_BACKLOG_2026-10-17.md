@@ -1794,3 +1794,25 @@ AssertionError: 第 4 次提交未被接受: expected 'queued' to be 'accepted'
 **下一步（未做）**：在 `smart01-instruction-window-admission` 用例集里补一条
 "3 条已准入 + 1 条新提交 ⇒ queued；其中一条完成后 ⇒ 新提交被准入"，
 若"完成后仍 queued" ⇒ 确认为泄漏缺陷。
+
+#### 11.H.6 "指令窗口泄漏"假设已被推翻（2026-11-10）
+
+**原假设**（11.H.5）：已准入未完成的任务永久占用窗口额度 ⇒ 泄漏。
+
+**核对**：`InstructionWindowStore.submitReceipt` **确实释放槽位并回填队列**：
+
+| 结果码 | 含义 |
+|---|---|
+| `released-with-backfill` | 释放槽位并从队列回填 |
+| `released-no-backfill` | 释放槽位；队列为空 |
+
+且 `instruction-window-persistence-branches` 已有用例钉住"默认容量 3、第 4 条排队"。
+
+⇒ **窗口本身没有泄漏**。第 4 次 `queued` 是**设计行为**：SDK 用例里 3 条指令
+既未完成也未发回执，槽位当然不释放。
+
+**`public-sdk.test.ts` 的 1/70 抖动仍未被解释**。当前最可能方向（未验证）：
+`submitTask` 与 `createSession` 之间存在竞态（例如窗口加载与准入的先后），
+而不是容量或泄漏问题。
+
+**口径**：11.H.5 里"可能是真实缺陷"的表述**作废**，以免后续按错误方向改产品代码。
