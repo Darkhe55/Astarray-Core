@@ -87,14 +87,19 @@ export function buildBubblewrapArguments(input: {
  */
 export function buildResourceLimitPrefix(input: {
   readonly maximumMemoryBytes: number;
-  readonly maximumProcessCount: number;
 }): string[] {
-  return [
-    "prlimit",
-    "--as=" + String(Math.max(1, Math.floor(input.maximumMemoryBytes))),
-    "--nproc=" + String(Math.max(1, Math.floor(input.maximumProcessCount))),
-    "--",
-  ];
+  /**
+   * **只用 `--as`**（地址空间）。
+   *
+   * 实测（WSL，2026-11-09）：加 `--nproc=8` 会让 bwrap **完全起不来**
+   * —— `bwrap: Creating new namespace failed: Resource temporarily unavailable`。
+   * 原因是 `RLIMIT_NPROC` 按**用户**计数而不是按进程树：系统里该用户已有进程数
+   * 超过 8，于是连创建命名空间所需的一次 fork 都失败。
+   *
+   * 因此 Linux 侧**不**用 rlimit 限制进程数（需要 cgroup 的 pids 控制器）；
+   * 进程数上限在 Windows 由 Job Object 承担，Linux 侧属**未实现**。
+   */
+  return ["prlimit", "--as=" + String(Math.max(1, Math.floor(input.maximumMemoryBytes))), "--"];
 }
 
 interface BubblewrapExecutionEntry {
@@ -205,7 +210,9 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
      * 上限来自环境登记表（经控制器传入），后端不自行决定"给多少"。
      */
     const process = this.spawnProcess([
-      ...buildResourceLimitPrefix(input.resourceLimits),
+      ...buildResourceLimitPrefix({
+        maximumMemoryBytes: input.resourceLimits.maximumMemoryBytes,
+      }),
       ...buildBubblewrapArguments({
         workingDirectory: input.workingDirectory,
         executableEntryPoint: input.executableEntryPoint,

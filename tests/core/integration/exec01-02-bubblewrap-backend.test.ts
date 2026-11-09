@@ -52,21 +52,19 @@ describe("EXEC-01-02 bubblewrap 参数构造", () => {
     expect(bwrapArguments[separatorIndex + 1]).toBe("node");
   });
 
-  it("资源上限以 prlimit 前缀施加（该 bwrap 构建无 --rlimit-*）", () => {
-    const prefix = buildResourceLimitPrefix({
-      maximumMemoryBytes: 268435456,
-      maximumProcessCount: 8,
-    });
-    expect(prefix).toEqual(["prlimit", "--as=268435456", "--nproc=8", "--"]);
+  it("内存上限以 prlimit --as 施加（该 bwrap 构建无 --rlimit-*）", () => {
+    const prefix = buildResourceLimitPrefix({ maximumMemoryBytes: 268435456 });
+    expect(prefix).toEqual(["prlimit", "--as=268435456", "--"]);
+  });
+
+  it("**不得**使用 --nproc：RLIMIT_NPROC 按用户计数，会让 bwrap 起不来", () => {
+    const prefix = buildResourceLimitPrefix({ maximumMemoryBytes: 268435456 });
+    expect(prefix.join(" ")).not.toContain("--nproc");
   });
 
   it("上限为 0 或负数 ⇒ 收敛为 1（不产生非法参数）", () => {
-    const prefix = buildResourceLimitPrefix({
-      maximumMemoryBytes: 0,
-      maximumProcessCount: -3,
-    });
+    const prefix = buildResourceLimitPrefix({ maximumMemoryBytes: 0 });
     expect(prefix).toContain("--as=1");
-    expect(prefix).toContain("--nproc=1");
   });
 
   it("自定义 bind 列表生效（不写死 /usr 等）", () => {
