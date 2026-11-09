@@ -182,3 +182,33 @@
 
 
 
+
+## 写入前脱敏收口（2026-11-09，`f9af1ae3`）
+
+**真实缺陷**：工具输出与失败原因**原样落盘**，脱敏只发生在展示层
+（`run-history-view.ts` 的 `sanitizeRunHistoryDisplayText`）—— 即"先保存再在 UI 遮挡"，
+与卡内 §3 直接冲突：密钥会先进入历史文件，任何读文件的人（含后续导出）都能拿到。
+
+**修复**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 唯一写入漏斗脱敏 | `run-history-store.ts` `appendEvent` | 写入前对 `payloadJson` 脱敏，覆盖工具调用/失败/模型说明/控制事件 |
+| 摘要与内容一致 | 同文件 `recordToolCall`、`recordToolFailure` | 去重摘要基于**脱敏后**文本计算，避免"摘要按原文、内容按脱敏"的口径分裂 |
+| 单一凭据目录 | `diagnostic-event-store.ts` `redactSensitiveText` | 改为消费 `credential-detector-registry` 的掩码规则 + 保留既有模式 |
+
+**顺带修掉的真实漏脱敏**：`redactSensitiveText` 原先自带一份正则副本，只覆盖
+Bearer / api_key / sk- ⇒ GitHub `ghp_…`、AWS `AKIA…`、Slack 等前缀**完全漏脱敏**
+（实测 `ghp_…` 原样落盘）。现由凭据目录统一提供规则。
+
+**证据**（`tests/core/integration/history01-write-redaction.test.ts` 5/5）：
+
+- 工具输出里的 `sk-…` 与失败原因里的 `ghp_…` 在**磁盘原文**中均不得出现，替换为 `[REDACTED]`；
+- 普通文本不受影响（不误伤）；
+- 直接 `appendEvent` 的载荷同样被脱敏（不只 `record*` 入口）；
+- 脱敏后仍可正常读回（结构未破坏）。
+
+公开全量 **646 files / 4447 tests** 通过。
+
+**仍未做（如实）**：`resume-boundary` / 控制事件 / 协作事件的**写入方**仍未接（采集面缺口）；
+大输出旁置分块、显示设置持久化、虚拟列表仍未做；人工体验（§7.8）属外部条件。
