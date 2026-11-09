@@ -329,6 +329,29 @@ fn main() {
 /// 能力探测：**只证明原语可用**，不等于隔离已验证（隔离验证见 `run` 的反例）。
 fn run_probe() {
     let profile_name = format!("astarray-probe-{}", std::process::id());
+    /**
+     * 诊断顺序：先证明**派生**可用（不写任何东西），再试**创建**。
+     *
+     * 这样能区分两种完全不同的失败：
+     *  - 派生也失败 ⇒ 整个 AppContainer API 面被令牌限制；
+     *  - 只有创建失败 ⇒ 是"建档案"这一步的权限/环境问题。
+     */
+    {
+        let derived_name = format!("astarray-nonexistent-{}", std::process::id());
+        let mut derived_sid: *mut c_void = ptr::null_mut();
+        let derive_result = unsafe {
+            DeriveAppContainerSidFromAppContainerName(
+                wide(&derived_name).as_ptr(),
+                &mut derived_sid,
+            )
+        };
+        println!(
+            "derive-nonexistent hresult=0x{:08X} lastError={} sid-null={}",
+            derive_result as u32,
+            unsafe { GetLastError() },
+            derived_sid.is_null()
+        );
+    }
     match ensure_app_container(&profile_name) {
         Ok(sid) => {
             println!("appcontainer-created sid-present={}", !sid.is_null());
