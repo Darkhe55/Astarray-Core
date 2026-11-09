@@ -1855,3 +1855,34 @@ AssertionError: 第 4 次提交未被接受: expected 'queued' to be 'accepted'
 
 **待验证**：全新 `stateDirectory` 下首次提交为何会撞上"窗口已满"——需先捕获失败时的
 `status` 实际值（在断言消息里带上），而不是继续读代码猜测。
+
+#### 11.H.9 **1/70 抖动已定位并修复**（2026-11-10）
+
+**捕获手段**：在断言消息里带上实际值（`实际 status=…` / `未找到 mission 或字段缺失：entries=…`），
+单文件连跑 40 次 —— 第 24 次命中，拿到完整栈：
+
+```
+DomainError: mission 租约文件损坏，拒绝读取/覆盖: …/mission-lease.json
+  MissionLeaseStore.readLeaseInternal:177  →  readLeaseSummary:283
+  → public-sdk.ts:3911 isMissionActivelyRunning
+  → mission-history-reader.ts:258  →  queryMissionHistory
+```
+
+**根因**：租约文件采用原子写（temp→rename）。`queryMissionHistory` 在枚举 mission 时
+经端口读取该 mission 的租约；若恰好落在写窗口内，解析失败 ⇒ `journal-corrupted` 抛出
+⇒ **整页历史查询失败**（`public-sdk.test.ts` 因此偶发翻红）。
+
+**修复**（`packages/core/src/gui/mission-history-reader.ts`）：
+运行态观测包 try/catch，失败 ⇒ `isActivelyRunning = false`。
+语义依据是既有规则「**无法确认在运行 ⇒ 不显示为运行中**」，不是新发明的兜底。
+
+**证据**：
+- 新增 `history01-lease-observation-resilience` 3 条：端口抛错 ⇒ 查询成功且
+  `runtimeState = interrupted-needs-reconciliation`；端口 true ⇒ 仍显示 running（不误伤）；
+  端口 false ⇒ 既有行为不变。
+- 修复前该用例**红**，修复后绿。
+- `public-sdk.test.ts` 连跑 **40 次 0 失败**（修复前约 1/20~1/70）。
+- **权威门禁** `npx vitest run --maxWorkers=1` ⇒ **676 files / 4599 passed + 3 skipped / exit 0**。
+
+**顺带保留**：`public-sdk.test.ts` 的断言消息现在会带上实际 `status` 与条目数 —— 下次失败可直接定位，
+不必再靠"重跑直到绿"。

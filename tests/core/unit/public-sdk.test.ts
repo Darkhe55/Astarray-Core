@@ -170,12 +170,15 @@ describe("AstarrayApplicationFacade（Public SDK）", () => {
       prompt: "归属到项目 A",
       projectIdentifier: "project-alpha",
     });
-    expect(accepted.status).toBe("accepted");
+    expect(accepted.status, `实际 status=${accepted.status}`).toBe("accepted");
     const history = await facade.queryMissionHistory();
     const mission = history.entries.find(
       (entry) => entry.missionIdentifier === accepted.missionIdentifier,
     );
-    expect(mission?.projectIdentifier).toBe("project-alpha");
+    expect(
+      mission?.projectIdentifier,
+      `未找到 mission 或字段缺失：entries=${history.entries.length}`,
+    ).toBe("project-alpha");
     await facade.shutdown();
   });
   it("SDK 版本与公共 DTO 不携带凭据/内部字段", async () => {

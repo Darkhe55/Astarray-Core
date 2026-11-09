@@ -254,8 +254,23 @@ async function readMissionHistoryEntry(input: {
    * - 且必须由 `isMissionActivelyRunning` 确认 —— 否则一律
    *   `interrupted-needs-reconciliation`（重启后不得显示为运行中）。
    */
-  const isActivelyRunning =
-    recordedStatus === "running" && (await input.isMissionActivelyRunning(input.missionIdentifier));
+  /**
+   * HISTORY-01（2026-11-10）：**运行态观测失败不得让历史查询整体失败**。
+   *
+   * 实测缺陷（约 1/70）：租约文件在原子写（temp→rename）窗口内可能不可解析，
+   * `MissionLeaseStore` 抛 `journal-corrupted`，经此端口冒泡 ⇒ 整页历史查询失败。
+   *
+   * 语义：历史是**只读观测**。"无法确认在运行"必须等价于"不显示为运行中"
+   * （既有规则：重启后不得显示为运行中），而不是把观测面拖崩。
+   */
+  let isActivelyRunning = false;
+  if (recordedStatus === "running") {
+    try {
+      isActivelyRunning = await input.isMissionActivelyRunning(input.missionIdentifier);
+    } catch {
+      isActivelyRunning = false;
+    }
+  }
 
   let runtimeState: MissionRuntimeState;
   if (recordedStatus === "running") {
