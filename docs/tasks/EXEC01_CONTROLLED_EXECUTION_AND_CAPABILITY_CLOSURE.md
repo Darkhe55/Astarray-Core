@@ -275,3 +275,31 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 
 **仍未验证**：Linux（bubblewrap）、macOS（App Sandbox）—— 本机无对应环境。
 辅助程序尚未接入 `ProcessExecutionController` 的 `SandboxExecutionBackend` 端口。
+
+## 04 公开 SDK 执行面（2026-11-09，`d840b386`）
+
+**缺口**：控制器已有 `readStatus` / `readOutput` / `cancel`，但**没有任何公开入口**调用
+⇒ 外部只能看任务状态，看不到受控执行输出，也无法取消。
+
+**新增（`public-sdk.ts`）**：
+
+| 方法 | 说明 |
+|---|---|
+| `queryProcessExecution` | 返回**状态视图**（状态/退出码/失败原因/环境/时间戳），**不含后端句柄** |
+| `readProcessExecutionOutput` | 按**字节游标**读取，**返回前脱敏**（与运行历史同一凭据目录） |
+| `cancelProcessExecution` | 取消并回传结果状态；取消后仍可查询 |
+
+**装配**：`ApplicationRuntimeOptions.sandboxExecutionBackend`（缺省 `null` ⇒ 一律
+`execution-backend-unsupported`，**不降级到宿主执行**）；运行时暴露
+`processExecutionController` 与 `executionEnvironmentRegistry`。
+
+**证据**（`tests/core/integration/exec01-04-sdk-execution-surface.test.ts` 3/3）：
+
+- 输出含 `sk-…` ⇒ 返回 `[REDACTED]`，原文不出现，游标前进；
+- 取消后 `queryProcessExecution` 为 `cancelled`，序列化结果不含 `handle-`；
+- 未知执行 ⇒ 公开错误（不泄漏内部细节）。
+
+公开全量 **4455 passed + 3 skipped**（第三次运行；前两次各 1 个**不同**的既有用例在满载下翻红，
+隔离与三文件联合运行均通过，判定为负载抖动，未改断言）。
+
+**仍未做（如实）**：CLI `run` 路径尚未消费同一套执行事件；执行事件的**对外脱敏事件流**未做。
