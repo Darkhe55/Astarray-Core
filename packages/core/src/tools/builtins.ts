@@ -1429,7 +1429,8 @@ const MAX_SEARCH_FILES = 500;
 const MAX_SEARCH_RESULTS = 100;
 const MAX_SEARCH_FILE_BYTES = 512 * 1024;
 
-async function searchProjectText(
+/** 导出以便直接验证"跳过 ≠ 未找到"的口径（SEC-02 通道 3）。 */
+export async function searchProjectText(
   workspaceRootPath: string,
   pattern: string,
   localEngine: LocalToolPolicyEngine,
@@ -1445,6 +1446,8 @@ async function searchProjectText(
   ]);
   const results: string[] = [];
   let fileCount = 0;
+  /** SEC-02 通道 3：被跳过的文件数（用于区分"未完成"与"未找到"）。 */
+  let skippedFileCount = 0;
 
   const visit = async (directoryPath: string): Promise<void> => {
     if (results.length >= MAX_SEARCH_RESULTS || fileCount >= MAX_SEARCH_FILES) {
@@ -1491,15 +1494,18 @@ async function searchProjectText(
         fsModule.stat(resolvedPath),
       );
       if (fileStat.size > MAX_SEARCH_FILE_BYTES) {
+        skippedFileCount += 1;
         continue;
       }
       let content: string;
       try {
         content = await readFile(resolvedPath, "utf8");
       } catch {
+        skippedFileCount += 1;
         continue;
       }
       if (content.includes("\u0000")) {
+        skippedFileCount += 1;
         continue; // 二进制文件
       }
       /**
@@ -1540,9 +1546,32 @@ async function searchProjectText(
   };
 
   await visit(workspaceRootPath);
-  return results.length === 0
-    ? "（未找到匹配）"
-    : results.join("\n");
+  /**
+   * SEC-02 通道 3（2026-11-09）：**跳过 ≠ 未找到**。
+   *
+   * 旧实现把"文件过大/不可读/二进制"三种跳过直接 `continue` 且不计数，
+   * 于是一个全是二进制文件的目录会返回"（未找到匹配）" —— 把**未完成**
+   * 当成**确定没有**，正是卡内禁止的口径。
+   */
+  if (results.length === 0) {
+    if (skippedFileCount > 0) {
+      return (
+        "（未完成：本次检索跳过了 " +
+        String(skippedFileCount) +
+        " 个文件（过大/不可读/二进制），不能据此判定不存在）"
+      );
+    }
+    return "（未找到匹配）";
+  }
+  if (skippedFileCount > 0) {
+    return (
+      results.join("\n") +
+      "\n（注意：另有 " +
+      String(skippedFileCount) +
+      " 个文件被跳过，结果可能不完整）"
+    );
+  }
+  return results.join("\n");
 }
 
 
