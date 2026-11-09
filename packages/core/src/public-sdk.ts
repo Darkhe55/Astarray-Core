@@ -7509,9 +7509,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 
   private trackPoll(promise: Promise<void>): void {
     this.inFlightPolls.add(promise);
-    void promise.finally(() => {
-      this.inFlightPolls.delete(promise);
-    });
+    /**
+     * SMART-01 修正（2026-11-09）：**不得让轮询的派生 Promise 变成未处理拒绝**。
+     *
+     * `promise.finally(...)` 会返回一个**新** Promise，原 Promise 拒绝时新 Promise 同样拒绝，
+     * 而它只被 `void` 掉 ⇒ 未处理拒绝（实测：mission 被取消后轮询报"任务不存在"，
+     * 整轮门禁 4478 全绿却 exit 1）。这里显式吞掉失败：轮询失败不该影响任何调用方。
+     */
+    void promise
+      .catch(() => undefined)
+      .then(() => {
+        this.inFlightPolls.delete(promise);
+      });
   }
 
   private isTerminalStatus(status: PublicTaskStatus): boolean {

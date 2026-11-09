@@ -318,6 +318,7 @@ fn main() {
     let command = arguments.first().map(String::as_str).unwrap_or("probe");
     match command {
         "probe" => run_probe(),
+        "init-sandbox" => run_init_sandbox(&arguments[1..]),
         "run" => run_sandboxed(&arguments[1..]),
         other => {
             eprintln!("未知子命令: {other}");
@@ -376,6 +377,77 @@ fn run_probe() {
         Err(message) => {
             println!("job-unavailable {message}");
             std::process::exit(1);
+        }
+    }
+}
+
+/// 安装期**一次性**初始化：为**当前用户**创建 AppContainer 档案。
+///
+/// 用户裁决（2026-11-09）的约束逐条落在这里：
+///  - **明确确认**：没有 `--confirm-create-profile` 一律拒绝（不静默建档案）；
+///  - **每用户档案**：只给当前用户建（`CreateAppContainerProfile` 语义即 per-user per-app）；
+///  - **客户端整体不提权**：本子命令是唯一需要提权的入口，运行期只用 `Derive...`。
+fn run_init_sandbox(arguments: &[String]) {
+    let mut profile_name = String::from("astarray-exec");
+    let mut has_confirmation = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--confirm-create-profile" => {
+                has_confirmation = true;
+                index += 1;
+            }
+            "--profile" => {
+                profile_name = arguments.get(index + 1).cloned().unwrap_or(profile_name);
+                index += 2;
+            }
+            other => {
+                eprintln!("未知参数: {other}");
+                std::process::exit(2);
+            }
+        }
+    }
+    if !has_confirmation {
+        eprintln!(
+            "拒绝执行：创建沙箱档案需要显式确认。请加 --confirm-create-profile 重试。"
+        );
+        eprintln!("说明：本步骤只需在安装期执行一次，运行期不需要管理员权限。");
+        std::process::exit(2);
+    }
+    match ensure_app_container(&profile_name) {
+        Ok(sid) => {
+            if sid.is_null() {
+                eprintln!("创建档案返回了空 SID：视为失败（不声称成功）");
+                std::process::exit(3);
+            }
+            /**
+             * 创建后立刻验证**派生**可用 —— 运行期只走派生路径，
+             * 因此"派生失败"等于初始化白做。
+             */
+            let mut derived: *mut c_void = ptr::null_mut();
+            let derive_result = unsafe {
+                DeriveAppContainerSidFromAppContainerName(
+                    wide(&profile_name).as_ptr(),
+                    &mut derived,
+                )
+            };
+            if derive_result < 0 || derived.is_null() {
+                eprintln!(
+                    "档案已创建，但派生 SID 失败：HRESULT=0x{:08X}",
+                    derive_result as u32
+                );
+                std::process::exit(4);
+            }
+            println!("profile-created name={profile_name}");
+            println!("derive-ok");
+        }
+        Err(message) => {
+            eprintln!("{message}");
+            eprintln!(
+                "提示：若报 HRESULT=0x80070005，说明当前进程没有创建档案的权限；\
+                 请以管理员身份**仅**运行本初始化步骤，运行期仍以标准用户运行。"
+            );
+            std::process::exit(3);
         }
     }
 }
