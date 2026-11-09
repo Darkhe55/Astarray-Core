@@ -4616,6 +4616,20 @@ export class MainController {
       missionId,
       initialChain,
       taskStore: this.options.taskStore,
+      /** ALIGN-03-07：任务终态后关闭该三级个体（真实收口；未装配则不调用）。 */
+      ...(this.options.tertiaryLifecycleController == null
+        ? {}
+        : {
+            closeTertiaryAgentInstance: async (closeInput: {
+              readonly agentInstanceId: string;
+              readonly taskId: string;
+              readonly outcome: "done" | "failed";
+            }) => {
+              await this.options.tertiaryLifecycleController?.shutdown({
+                agentInstanceId: closeInput.agentInstanceId,
+              });
+            },
+          }),
       ...(this.options.graphChangeJournal == null
         ? {}
         : { graphChangeJournal: this.options.graphChangeJournal }),
@@ -4891,6 +4905,20 @@ export class MainController {
       missionId,
       initialChain,
       taskStore: this.options.taskStore,
+      /** ALIGN-03-07：任务终态后关闭该三级个体（真实收口；未装配则不调用）。 */
+      ...(this.options.tertiaryLifecycleController == null
+        ? {}
+        : {
+            closeTertiaryAgentInstance: async (closeInput: {
+              readonly agentInstanceId: string;
+              readonly taskId: string;
+              readonly outcome: "done" | "failed";
+            }) => {
+              await this.options.tertiaryLifecycleController?.shutdown({
+                agentInstanceId: closeInput.agentInstanceId,
+              });
+            },
+          }),
       ...(this.options.graphChangeJournal == null
         ? {}
         : { graphChangeJournal: this.options.graphChangeJournal }),

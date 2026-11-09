@@ -226,6 +226,14 @@ export interface MissionOrchestratorOptions {
       } | null;
     }): Promise<void>;
   };
+  /**
+   * ALIGN-03-07（2026-11-09）：任务终态后关闭该三级个体（透传给 `DagScheduler`）。
+   */
+  closeTertiaryAgentInstance?: (input: {
+    readonly agentInstanceId: string;
+    readonly taskId: string;
+    readonly outcome: "done" | "failed";
+  }) => Promise<void>;
   onGraphChanged?: (event: {
     readonly changeKind: "inject" | "remove" | "revise" | "rewire";
     readonly taskIdentifier: string;
@@ -524,6 +532,13 @@ export class MissionOrchestrator {
       ...(options.onGraphChanged === undefined
         ? {}
         : { onGraphChanged: options.onGraphChanged }),
+      /**
+       * ALIGN-03-07（2026-11-09）：把三级收口钩子透传到调度层。
+       * 缺省不传 ⇒ 调度层不调用（不假装已关闭）。
+       */
+      ...(options.closeTertiaryAgentInstance === undefined
+        ? {}
+        : { closeAgentInstance: options.closeTertiaryAgentInstance }),
     });
   }
 
