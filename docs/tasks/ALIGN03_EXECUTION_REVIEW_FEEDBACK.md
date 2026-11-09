@@ -593,3 +593,29 @@ const agentInstanceId =
 
 **仍未做（如实）**：裁决（verdict）闭环未做——只任命、无审查者执行与结论；
 跨项目拒绝缺装配级用例。
+
+### 01 裁决闭环：**产物证据驱动的结论**（2026-11-10）
+
+缺口：只"任命审查者"不够 —— 没有结论，任务永远停在待裁决。
+
+**交付**：`orchestration/artifact-backed-verdict.ts` `produceArtifactBackedVerdict`
+
+| 输入 | 结论 |
+|---|---|
+| 产物存在且非空 | `merge-ready`，证据 `artifact:<path>` + `artifact-bytes:<n>`（+ 可选 `commit:<sha>`） |
+| 产物缺失 / 空 / 越界 / 未登记路径 | `rework`，**不抛错**（"未产出"≠"审查失败"） |
+
+**关键设计**：证据前缀是 `artifact:` / `artifact-bytes:` / `commit:`，**不是**
+`self-report:`/`executor-report:`/`agent-claim:` —— 因此独立验收门禁不会把它当"执行者自报"拒绝，
+而执行者也**无法**用自报伪造这条证据（它必须真的有一个非空文件）。
+
+**边界（如实标注，已写进模块注释）**：这是**本地产物存在性**验收，
+**不是**模型审查、**不是**人工验收。它只能回答"产物是否真的产出且非空"，
+不能回答"内容是否正确"。
+
+**证据**（`align03-artifact-backed-verdict` 6/6）：存在 ⇒ merge-ready 且证据非自报；
+缺失 ⇒ rework 不抛错；空文件 ⇒ rework；未登记路径 ⇒ rework；越界 ⇒ rework；带 commit ⇒ 证据含 `commit:`。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **681 files / 4620 passed + 3 skipped / exit 0**。
+
+**仍未接线**：该产出器**尚未**接进自动任命回调（下一步：任命后立即产结论并 `recordAcceptanceVerdict`）。
