@@ -500,3 +500,28 @@ Linux 的 bwrap 包装实现未写。
 公开全量 **657 files / 4485 passed + 3 skipped，exit 0**。
 
 **仍未做（如实）**：Linux bwrap 包装实现未写；提权后建档案的成功分支仍未验证。
+
+## 02 Linux 后端（bubblewrap，2026-11-09）
+
+**缺口**：Linux 没有实现 ⇒ 平台解析器只能返回 `null`。
+
+**新增** `packages/core/src/execution/bubblewrap-sandbox-backend.ts`：
+
+| 要点 | 实现 |
+|---|---|
+| 参数序列 | `--unshare-all --die-with-parent` + 只读 bind 运行时目录与工作目录 + `--dev /dev --proc /proc --chdir` + `--` 后接命令 |
+| 探测 | **真的跑一次最小沙箱命令**（`/bin/true`），不是只读 `--version` —— 版本能打印但用户命名空间被禁用时沙箱命令仍会失败 |
+| 拒绝 | 探测失败 ⇒ `start` 抛 `execution-backend-unsupported`，不降级到宿主执行 |
+| 平台解析 | `process.platform === "linux"` ⇒ 返回 bwrap 后端 |
+
+**证据**（`exec01-02-bubblewrap-backend` 6/6）：参数含 `--unshare-all`/`--die-with-parent`、
+只 bind 必需目录且**不出现 `--bind / /`**、命令在 `--` 之后；自定义 bind 生效；
+探测成功 ⇒ 可用；探测失败 ⇒ 不可用且原因带出；不可用 ⇒ `start` 拒绝；可用 ⇒ 启动并按退出码落状态。
+
+**隔离效果的真实证据**仍是 WSL 实测（网络只剩 loopback + DNS 失败、宿主 `$HOME` 不可见、
+bind 目录可读、内存上限挡住超额分配），本文件**不声称**隔离。
+
+公开全量 **658 files / 4491 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：裸机 Linux 复测；资源上限（`--rlimit-*` 在该 bwrap 构建不存在）尚未在
+后端里用 `prlimit`/cgroup 施加；提权后建档案的成功分支仍未验证。
