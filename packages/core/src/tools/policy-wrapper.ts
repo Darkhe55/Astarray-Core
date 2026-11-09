@@ -131,6 +131,18 @@ export interface PolicyWrapperOptions {
   configurablePermissionPolicyEngine?: ConfigurablePermissionPolicyEngine | null;
   /** B6R-03：当前权限组引用（可信运行时提供；配合引擎使用）。 */
   currentPermissionProfileReference?: PermissionProfileReference | null;
+  /**
+   * AUDIT-REPAIR-01 / 用户裁决（2026-11-09）：**每次工具执行前重新解析**当前有效权限组。
+   *
+   * 为什么必须每次解析：worker 的工具端口在任务派发时构造一次，而
+   * `switchPermissionProfile` / 项目会话覆盖可以在任务运行期间变化。
+   * 只读构造时的引用 ⇒ 收紧权限对**已在运行的 worker 无效**（实测：
+   * 切换到 deny 组后 worker 仍能调用工具）。给出解析器时以它为准，
+   * 静态引用仅作缺省回退。
+   */
+  resolveCurrentPermissionProfileReference?:
+    | (() => Promise<PermissionProfileReference | null>)
+    | null;
 }
 
 /**
@@ -302,6 +314,26 @@ export class PolicyWrapper implements ToolPort {
     }
   }
 
+  /**
+   * 解析**本次执行时**的有效权限组引用（优先解析器，回退静态引用）。
+   *
+   * 解析失败 ⇒ 返回 null（调用方按"未装配"处理 ⇒ 回退旧 PermissionDecider 或拒绝），
+   * 不静默使用过期引用。
+   */
+  private async resolveProfileReference(): Promise<PermissionProfileReference | null> {
+    const resolver = this.options.resolveCurrentPermissionProfileReference;
+    if (resolver !== null && resolver !== undefined) {
+      try {
+        const resolved = await resolver();
+        if (resolved !== null) return resolved;
+      } catch {
+        /** 解析失败：不得回退到构造时的旧引用（那会让收紧失效）。 */
+        return null;
+      }
+    }
+    return this.options.currentPermissionProfileReference ?? null;
+  }
+
   private async decidePermission(
     descriptor: ToolDescriptor,
     argumentsJson: string,
@@ -309,7 +341,7 @@ export class PolicyWrapper implements ToolPort {
     // B6R-03：装配可配置权限引擎时，实际执行前按当前 profile 快照裁决；
     // 派发预检不能替代执行前检查。未装配回退旧 PermissionDecider。
     const configurableEngine = this.options.configurablePermissionPolicyEngine;
-    const profileReference = this.options.currentPermissionProfileReference;
+    const profileReference = await this.resolveProfileReference();
     if (
       configurableEngine !== null &&
       configurableEngine !== undefined &&
@@ -348,7 +380,7 @@ export class PolicyWrapper implements ToolPort {
     argumentsJson: string;
   }): Promise<void> {
     const configurableEngine = this.options.configurablePermissionPolicyEngine;
-    const profileReference = this.options.currentPermissionProfileReference;
+    const profileReference = await this.resolveProfileReference();
     if (
       configurableEngine === null ||
       configurableEngine === undefined ||

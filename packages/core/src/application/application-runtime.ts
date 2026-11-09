@@ -3089,6 +3089,41 @@ export async function createApplicationRuntime(
           }
         : { kind: "custom", profileId: scopedPermission.permissionProfileId };
     }
+    /**
+     * AUDIT-REPAIR-01 / 用户裁决（2026-11-09）：**每次工具执行前重新解析**。
+     *
+     * 上面的 `effectivePermissionProfileReference` 只是构造时快照；worker 可能在
+     * 任务运行期间被收紧权限（切换权限组 / 项目或会话覆盖）。解析顺序与构造时
+     * 完全一致（会话覆盖 > 项目覆盖 > 当前选择），只是把"读一次"改成"每次读"。
+     */
+    const resolveEffectivePermissionProfileReferenceNow =
+      async (): Promise<PermissionProfileReference> => {
+        const scopedPermissionNow = resolveScopedPermissionOverride({
+          document: await scopedSettingsStore.read(),
+          projectIdentifier: input.projectIdentifier ?? null,
+          conversationIdentifier: input.conversationIdentifier ?? null,
+        });
+        if (scopedPermissionNow?.permissionProfileId != null) {
+          const isBuiltinNow = (["ponder", "assist", "devolve"] as const).includes(
+            scopedPermissionNow.permissionProfileId as "ponder" | "assist" | "devolve",
+          );
+          return isBuiltinNow
+            ? {
+                kind: "builtin",
+                profileId: scopedPermissionNow.permissionProfileId as
+                  | "ponder"
+                  | "assist"
+                  | "devolve",
+              }
+            : { kind: "custom", profileId: scopedPermissionNow.permissionProfileId };
+        }
+        /** 无作用域覆盖 ⇒ 读**当前**权限组选择（不是构造时的那个）。 */
+        const currentSelection = await currentPermissionSelectionStore
+          .readSelection()
+          .then((selection) => selection?.selectedReference ?? null)
+          .catch(() => null);
+        return currentSelection ?? currentPermissionProfileReference;
+      };
     return new PolicyWrapper({
       permissionDecider,
       registry,
@@ -3160,6 +3195,13 @@ export async function createApplicationRuntime(
         : null,
       currentPermissionProfileReference: input.useConfigurablePermissionProfileEngine
         ? effectivePermissionProfileReference
+        : null,
+      /**
+       * AUDIT-REPAIR-01（2026-11-09）：把"每次执行前重新解析"接进策略包装层。
+       * 只在可配置权限引擎生效时给出（旧 PermissionDecider 路径不受影响）。
+       */
+      resolveCurrentPermissionProfileReference: input.useConfigurablePermissionProfileEngine
+        ? resolveEffectivePermissionProfileReferenceNow
         : null,
     });
   };
