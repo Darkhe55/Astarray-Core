@@ -760,6 +760,8 @@ export interface ApplicationRuntimeOptions {
    * 打开后：`success` 但收据缺失/矛盾 ⇒ 任务置 blocked 并升级原因，不伪造 done。
    * 缺省关：该路径尚未实测，改变默认收口行为会把未验证的判断推给所有任务。
    */
+  /** ALIGN-03-01（2026-11-10）：任务成功后是否自动独立任命审查者（缺省 false）。 */
+  isIndependentReviewAutoAppointmentEnabled?: boolean;
   isCompletionReceiptRequired?: boolean;
   /**
    * ALIGN-04-02（2026-10-28）：恢复前是否启用**只读对账门禁**（缺省 false）。
@@ -4023,6 +4025,9 @@ export async function createApplicationRuntime(
      */
     ...(options.isCheckpointResumeEnabled === true ? { isCheckpointResumeEnabled: true } : {}),
     /** ALIGN-03-03：完成收据门禁（缺省关）。 */
+    ...(options.isIndependentReviewAutoAppointmentEnabled === true
+      ? { isIndependentReviewAutoAppointmentEnabled: true }
+      : {}),
     ...(options.isCompletionReceiptRequired === true
       ? { isCompletionReceiptRequired: true }
       : {}),

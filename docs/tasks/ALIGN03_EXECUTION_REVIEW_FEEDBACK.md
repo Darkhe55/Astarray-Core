@@ -554,3 +554,24 @@ const agentInstanceId =
 1. devolve 路径未迁移（仍 `scheduler:`、未强制）；
 2. **自动任命审查者 + 裁决仍未接**（01 的正题：任务完成时按同一上级任命并等待裁决）；
 3. 跨项目拒绝只在纯函数层有断言，**装配级没有**。
+
+### 01 迁移第 5 步：任务成功后**自动独立任命**（2026-11-10）
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 触发点 | `mission-orchestrator.ts` 成功收尾后 | 只触发、不代劳；任命失败只报告，**不反转完成状态** |
+| 任命实现 | `main-controller.ts` `onTaskCompletedForIndependentReview` | 登记 `reviewer:<mission>:<task>`（三级，挂在**同一责任次级**下），再调 `appointExecutionAndReview` |
+| 开关 | `isIndependentReviewAutoAppointmentEnabled`（控制器 + 运行时，缺省 **false**） | 没有真实审查 Worker 前开启会让任务停在"待裁决"，故默认关闭 |
+
+**证据**（`align03-auto-review-appointment`，装配级 2/2）：
+
+- 开启 ⇒ 真实 mission 跑完后目录里出现 `reviewer:*`，其 `owningSecondaryAgentInstanceId === secondary:<missionId>`，
+  且**不等于**贡献者个体（非自审）；
+- 关闭 ⇒ 无审查者（行为不变）。
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **680 files / 4614 passed + 3 skipped / exit 0**。
+
+**仍未做（如实）**：
+1. **默认关闭** ⇒ 生产里仍不自动任命（需要真实审查 Worker 才能开启，否则任务会卡住）；
+2. **裁决（verdict）仍未自动产生** —— 只做到"任命"，没有审查者执行与结论；
+3. devolve 路径未迁移；跨项目拒绝缺装配级用例。

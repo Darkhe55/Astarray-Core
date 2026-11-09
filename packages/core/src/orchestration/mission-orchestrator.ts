@@ -460,6 +460,18 @@ export interface MissionOrchestratorOptions {
    * （例如 devolve 与直接构造编排器的用例）。
    */
   isWorkerOwnershipEnforced?: boolean;
+  /**
+   * ALIGN-03-01（2026-11-10）：任务**成功收尾后**触发独立任命（可选）。
+   *
+   * 缺省不装配 ⇒ 行为不变（不任命、不阻塞完成）。
+   * 装配方负责"任命谁"——本类不猜审查者身份。
+   */
+  onTaskCompletedForIndependentReview?: (input: {
+    readonly missionId: string;
+    readonly taskId: string;
+    readonly contributorAgentInstanceId: string;
+    readonly responsibleSecondaryAgentInstanceId: string;
+  }) => void;
   registerTertiaryAgentInstance?: (input: {
     readonly agentInstanceId: string;
     readonly missionId: string;
@@ -1411,6 +1423,29 @@ export class MissionOrchestrator {
          * 而 `handleWorkerOutcome` 才是把 done 写进去的那一步。
          */
         await this.handleWorkerOutcome(action.taskId, outcome, agentInstanceId);
+        /**
+         * ALIGN-03-01（2026-11-10）：成功收尾后触发**独立任命**。
+         *
+         * 只触发、不代劳：任命谁由装配方决定（本类不猜审查者身份）。
+         * 失败只报告，**不得**反转任务终态。
+         */
+        if (outcome.outcome === "success") {
+          const responsibleSecondary = this.options.secondaryAgentInstanceId ?? null;
+          if (responsibleSecondary !== null) {
+            try {
+              this.options.onTaskCompletedForIndependentReview?.({
+                missionId: this.options.missionId,
+                taskId: action.taskId,
+                contributorAgentInstanceId: agentInstanceId,
+                responsibleSecondaryAgentInstanceId: responsibleSecondary,
+              });
+            } catch (reviewError) {
+              this.options.onUserEscalation(
+                `任务 ${action.taskId} 的独立任命失败（不改变完成状态）：${(reviewError as Error).message}`,
+              );
+            }
+          }
+        }
         /** R34：在途归零 ⇒ 结束本组（只清标记，不推进 V）。 */
         await this.maybeFinishGoalTaskGroup(
           outcome.outcome === "success" ? "completed" : "interrupted",

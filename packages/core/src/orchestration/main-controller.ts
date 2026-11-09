@@ -229,6 +229,12 @@ export interface MainControllerOptions {
    * ALIGN-03-03（2026-10-28）：是否要求 **Worker 完成收据** 才判 `done`（缺省 false）。
    * 打开后：`success` 但收据缺失/矛盾 ⇒ 任务置 blocked 并升级，**不伪造 done**。
    */
+  /**
+   * ALIGN-03-01（2026-11-10）：任务成功后是否**自动独立任命**审查者。
+   *
+   * 缺省 false：在没有真实审查 Worker 前开启会让任务停在"待裁决"。
+   */
+  isIndependentReviewAutoAppointmentEnabled?: boolean;
   isCompletionReceiptRequired?: boolean;
   /**
    * 计划 R7（2026-10-29）：**完成收据存储**（缺省 null ⇒ 不落盘）。
@@ -4757,6 +4763,54 @@ export class MainController {
         : { mainAgentInstanceId: this.options.mainAgentInstanceId }),
       /** ALIGN-03：assist 路径**强制**归属（解析不到上级即阻断派发）。 */
       isWorkerOwnershipEnforced: true,
+      /**
+       * ALIGN-03-01（2026-11-10）：任务成功后自动**独立任命**。
+       *
+       * 任命一个与贡献者不同的三级审查者（`reviewer:<mission>:<task>`，
+       * 同一责任次级），把"执行者自报"从完成路径里排除出去。
+       * 缺省关闭：在没有真实审查 Worker 前开启会让任务卡在"待裁决"。
+       */
+      ...(this.options.isIndependentReviewAutoAppointmentEnabled === true
+        ? {
+            onTaskCompletedForIndependentReview: (input: {
+              readonly missionId: string;
+              readonly taskId: string;
+              readonly contributorAgentInstanceId: string;
+              readonly responsibleSecondaryAgentInstanceId: string;
+            }) => {
+              const reviewerAgentInstanceId = `reviewer:${input.missionId}:${input.taskId}`;
+              const directory = this.options.registeredAgentDirectory;
+              if (
+                directory !== null &&
+                directory !== undefined &&
+                !directory.hasAgent(reviewerAgentInstanceId)
+              ) {
+                directory.registerAgent({
+                  agentInstanceId: reviewerAgentInstanceId,
+                  agentRole: "tertiary",
+                  missionId: input.missionId,
+                  owningSecondaryAgentInstanceId:
+                    input.responsibleSecondaryAgentInstanceId,
+                  boundTaskBundleId: input.taskId,
+                  registeredAtIso: new Date().toISOString(),
+                });
+              }
+              this.appointExecutionAndReview({
+                appointmentIdentifier: `appointment:${input.missionId}:${input.taskId}`,
+                missionIdentifier: input.missionId,
+                taskIdentifier: input.taskId,
+                taskRevision: 1,
+                riskLevel: "low",
+                appointingSecondaryAgentInstanceIdentifier:
+                  input.responsibleSecondaryAgentInstanceId,
+                implementationAgentInstanceIdentifier: input.contributorAgentInstanceId,
+                testingAgentInstanceIdentifier: input.contributorAgentInstanceId,
+                acceptanceAgentInstanceIdentifier: reviewerAgentInstanceId,
+                allowsSharedTestAndAcceptance: true,
+              });
+            },
+          }
+        : {}),
       /**
        * ALIGN-03：把派发出的三级 Worker 登记进目录，并写入**真实直属上级**。
        * 未装配目录 ⇒ 不登记（行为不变，不假装已绑定）。
