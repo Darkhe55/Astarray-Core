@@ -4749,7 +4749,8 @@ export class MainController {
       feedbackTransport: this.options.feedbackTransport,
       feedbackTransportFactory: async () => this.options.feedbackTransport,
       workArchiveStore: this.options.workArchiveStore ?? null,
-      secondaryAgentInstanceId: this.resolveSecondaryAgentInstanceIdentifier(missionId),
+      /** ALIGN-03（2026-11-10）：编排层的"次级身份"用**真实责任次级**，不再是 scheduler 标签。 */
+      secondaryAgentInstanceId: this.ensureResponsibleSecondaryAgentInstance(missionId),
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
       /** ALIGN-03-03：完成收据门禁（缺省关；开启后 success 无收据不判 done）。 */

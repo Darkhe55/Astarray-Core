@@ -466,3 +466,23 @@ const agentInstanceId =
    `owningSecondaryAgentInstanceId`）；
 2. 自动任命审查者 + 裁决未接（01 的正题）；
 3. `scheduler:` 与真实次级**并存**，尚未把前者从"上级"语义中彻底剥离。
+
+### 01/04 迁移第 2 步：编排层次级身份切到**真实责任次级**（2026-11-10）
+
+`main-controller.ts` 构造编排选项处，`secondaryAgentInstanceId` 由
+`resolveSecondaryAgentInstanceIdentifier(missionId)`（可能是 `scheduler:<missionId>`）
+改为 `ensureResponsibleSecondaryAgentInstance(missionId)`（`secondary:<missionId>`，已登记的真实次级）。
+
+**影响**：Worker 工作存档/集成分支属主等"次级身份"落点从调度器标签变为真实次级个体 ——
+这正是裁决要求的"调度器不是上级"。
+
+**证据**：`typecheck` / `lint` 通过；`orchestrator-git-integration`、`align03-responsible-secondary`、
+`align03-tertiary-close-wiring` 定向 8/8；**权威门禁 678 files / 4608 passed / exit 0**。
+
+**未做（如实）**：**没有直接的断言**证明"编排层拿到的就是 secondary: 而非 scheduler:"。
+我尝试用 Worker 工作存档目录（`missions/<id>/agents/<agentId>/`）做断言，
+实测该目录为空（存档只在任务终态写入，合成 mission 未跑到那时）⇒ **已撤掉该断言**，
+不留下一条靠运气通过的测试。下一步应改为：等 mission 跑完再断言存档属主。
+
+**仍未做**：`resolveWorkerDirectSuperior` 未接入派发；Worker 未写 `owningSecondaryAgentInstanceId`；
+自动任命与裁决未接。
