@@ -104,3 +104,31 @@
 
 
 
+
+## 存储预算收口（2026-11-09，`97698d04`）
+
+**真实缺陷**：`session-perf-collector` 的 `storageBytesUsed` 缺省是 `() => 0`，
+而 `prepareRunPerfCollection` 装配时**从未传它** ⇒ 已用存储恒为 0
+⇒ **10 MB 存储预算在生产永不触发**。这正是卡内明令禁止的"unknown 记作零"。
+
+**修复**：
+
+| 要点 | 位置 | 说明 |
+|---|---|---|
+| 占用可未知 | `observability-collection-contract.ts`、`observability-sampler.ts` | `storageBytesUsed: number \| null`；`null`（未知）**不**判超限 |
+| 真实统计 | `process-sample-store.ts` `readStorageBytesUsed()` | 统计 `perf/` 目录全部文件字节数；目录不存在 ⇒ `0`（真实为空）；任一文件读不到 ⇒ `null`（不能少算） |
+| 装配接线 | `run-perf-collection.ts` | 构造时**立即**统计一次，并在每次判定时后台刷新；不再缺省 0 |
+| 缺省不再撒谎 | `session-perf-collector.ts` | 未注入读取器时返回 `null`，不是 `0` |
+
+**证据**（`tests/core/integration/obs01-storage-budget.test.ts` 7/7）：
+
+- 已用达到预算 ⇒ `storage-budget-exhausted`（停可选采集并报告）；
+- 已用未知（`null`）⇒ **不**误判超限，仍按间隔采样；
+- 已用为 0（真实为空）⇒ 正常采样（区分"空"与"不知道"）；
+- 目录不存在 ⇒ 0；写入样本后真实字节数 > 0 且随写入增长；
+- 用真实占用 + 极小预算 ⇒ 必然超限（证明"0"不是真实值）。
+
+公开全量 **645 files / 4439 tests** 通过。
+
+**仍未做（如实）**：预算耗尽后的**停采状态呈现**（CLI/GUI 展示）未接；
+保留策略（10MB/24h 清理）与"停采后不删历史"的端到端联动未实测。
