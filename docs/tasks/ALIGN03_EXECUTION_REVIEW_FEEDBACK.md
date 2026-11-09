@@ -265,3 +265,33 @@ Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/�
 
 **仍未做（如实）**：`owningSecondaryAgentInstanceId` 在实际三级登记时是否**总是**被填 ——
 若生产登记路径漏填，隶属校验会静默退化为"不校验"。需要单独核对登记入口。
+
+### 04 隶属校验的生效条件核对（2026-11-09，**只核对，未改代码**）
+
+上一轮实现了"审查者必须与贡献者同一所属次级"。本轮核对它**在生产里是否真的生效**，结论是：**默认不生效**。
+
+**核对结果**（`git grep '\.registerAgent('`）：
+
+| 登记点 | 角色 | `owningSecondaryAgentInstanceId` |
+|---|---|---|
+| `application-runtime.ts:2322`（`registerAgentInstance`，控制面 API） | 调用方指定 | 调用方指定 |
+| `main-controller.ts:3881`（`registerAgent`，控制面 API） | 调用方指定 | 调用方指定 |
+| `main-controller.ts:3993`（自动登记） | `secondary` | **`null`** |
+
+**关键事实**：编排层**不会自动登记 Worker（三级）**。`DagScheduler.allocateAgentId` 产出
+`worker:<mission>:<task>`，但没有任何路径把它写进登记目录。
+
+因此生产默认状态下：
+
+- `contributorEntry` 为 `null` ⇒ `contributorOwningSecondary` 为 `null` ⇒ **隶属校验静默跳过**；
+- 审查者若不主动登记，**存在性校验也会拒绝**（这一条倒是真的会拦）。
+
+**这不是缺陷，是概念缺口**：`worker:<mission>:<task>` 由调度器直接派发，**没有"所属次级"**；
+"隶属"只对**四级委派**（次级 → 三级）那条路径成立（`secondary-continuous-dispatch-loop` +
+`UnboundedAgentInstanceRegistry`），那条路径目前也没把个体写进登记目录。
+
+**结论**：隶属校验当前对"调度器派发的 Worker"恒不触发。要让它生效，必须先决定
+**这些 Worker 的"所属次级"是谁**（main agent？发起该 mission 的次级？还是引入"mission 所有者"概念），
+属产品/架构决策，**不在本卡擅自决定**。
+
+**本卡据此保持 implemented-unverified**，并在下文列出待决策项。
