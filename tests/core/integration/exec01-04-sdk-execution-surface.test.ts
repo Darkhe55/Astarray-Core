@@ -194,6 +194,42 @@ describe("EXEC-01-04 SDK 执行控制面", () => {
     }
   }, 60_000);
 
+  it("状态变化发脱敏事件：取消后收到 execution-status，且不含句柄与原文", async () => {
+    const secret = "sk-zzzzsecretzzzz1234567890";
+    const runtime = await buildRuntime("运行中");
+    const facade = new AstarrayApplicationFacade(runtime);
+    try {
+      const session = await facade.createSession({
+        sessionId: "session-exec-events",
+        mode: "assist",
+      });
+      const receivedEvents: Array<Record<string, unknown>> = [];
+      facade.subscribe((event) => {
+        if (event.eventType === "execution-status") {
+          receivedEvents.push(event as unknown as Record<string, unknown>);
+        }
+      });
+      const executionId = await startExecution(runtime);
+      await facade.cancelProcessExecution({
+        sessionId: session.sessionId,
+        executionId,
+        /** 失败原因里塞一个密钥：事件流不得留原文。 */
+        reason: `调用方取消 token=${secret}`,
+      });
+      expect(receivedEvents.length).toBeGreaterThan(0);
+      const lastEvent = receivedEvents[receivedEvents.length - 1] as {
+        status?: string;
+        failureReason?: string | null;
+      };
+      expect(lastEvent.status).toBe("cancelled");
+      const serialized = JSON.stringify(receivedEvents);
+      expect(serialized).not.toContain("handle-");
+      expect(serialized).not.toContain(secret);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
+
   it("未知执行 ⇒ 公开错误（不泄漏内部细节）", async () => {
     const runtime = await buildRuntime("x");
     const facade = new AstarrayApplicationFacade(runtime);

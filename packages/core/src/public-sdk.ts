@@ -1671,6 +1671,19 @@ export type PublicAstarrayEvent = (
       budgetPolicyRevision: number;
       configuredMaximumGlobalContextTokenCount: number;
     }
+  /**
+   * EXEC-01-04：受控执行的状态事件。
+   *
+   * 只带**状态视图**字段：不含后端句柄、不含输出正文（输出另走
+   * `readProcessExecutionOutput` 且返回前脱敏）。失败原因也先脱敏再发。
+   */
+  | {
+      eventType: "execution-status";
+      executionId: string;
+      status: string;
+      exitCode: number | null;
+      failureReason: string | null;
+    }
 ) & {
   /** 权威状态 revision（任务链 revision；会话事件用会话内单调计数）。 */
   revision: number;
@@ -6336,6 +6349,19 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         requestingAgentInstanceIdentifier: this.runtime.mainAgentInstanceId,
         executionId: input.executionId,
       });
+      /**
+       * EXEC-01-04：**观察即发布**。状态变化（含终态）在查询时对外发一条脱敏事件。
+       *
+       * 为什么在查询时发：SDK 没有执行生命周期钩子，而调用方是通过轮询观察状态的；
+       * 以"上次已发布状态"为基线，只在**真的变化**时发，避免每次轮询重复投递。
+       */
+      this.emitExecutionStatusIfChanged({
+        sessionId: input.sessionId,
+        executionId: status.executionId,
+        status: status.status,
+        exitCode: status.exitCode,
+        failureReason: status.failureReason,
+      });
       return {
         executionId: status.executionId,
         status: status.status,
@@ -6404,6 +6430,13 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         executionId: input.executionId,
         reason: input.reason,
       });
+      this.emitExecutionStatusIfChanged({
+        sessionId: input.sessionId,
+        executionId: status.executionId,
+        status: status.status,
+        exitCode: status.exitCode,
+        failureReason: status.failureReason,
+      });
       return {
         executionId: status.executionId,
         status: status.status,
@@ -6412,6 +6445,34 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     } catch (error) {
       throw this.toProcessExecutionPublicError(error);
     }
+  }
+
+  /**
+   * 只在状态**真的变化**时发一条脱敏事件。
+   *
+   * 失败原因先过凭据目录（与运行历史同一口径）：执行失败常把命令与密钥片段带出来，
+   * 事件流同样不得留原文。
+   */
+  private emitExecutionStatusIfChanged(input: {
+    sessionId: string;
+    executionId: string;
+    status: string;
+    exitCode: number | null;
+    failureReason: string | null;
+  }): void {
+    const previousStatus = this.lastEmittedExecutionStatuses.get(input.executionId);
+    if (previousStatus === input.status) return;
+    this.lastEmittedExecutionStatuses.set(input.executionId, input.status);
+    this.emit({
+      eventType: "execution-status",
+      executionId: input.executionId,
+      status: input.status,
+      exitCode: input.exitCode,
+      failureReason:
+        input.failureReason === null ? null : redactSensitiveText(input.failureReason),
+      revision: this.nextSessionEventRevision(input.sessionId),
+      idempotencyId: this.nextEventIdempotencyId(),
+    });
   }
 
   /** 把执行控制面的领域错误映射成公开错误（不泄漏内部细节）。 */
@@ -7530,6 +7591,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    * **门面不代替界面做授权决定**。
    */
   private readonly installationInquiryRegistry: InstallationInquiryRegistry | null;
+
+  /** EXEC-01-04：上次已对外发布的执行状态（用于"只在变化时发"）。 */
+  private readonly lastEmittedExecutionStatuses = new Map<string, string>();
 
   private nextEventIdempotencyId(): string {
     this.eventCounter += 1;
