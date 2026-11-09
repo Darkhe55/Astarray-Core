@@ -231,3 +231,17 @@ Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/�
 **仍未做（如实）**：**隶属校验**（审查者是否属于同一/授权的次级）未做 ——
 `GitWorkerAllocation` 只有 `tertiaryAgentInstanceId`，没有 owning secondary，需先补数据；
 `agentDirectory` 也尚未从运行时装配进协调器（当前默认未传）。
+
+### 04 审查者目录装配（2026-11-09 追加）
+
+**缺口**：`assertReviewerIsRegistered` 已实现，但协调器**没有拿到登记目录**
+⇒ 生产里永远走"未装配 ⇒ 不校验"，等于死代码。
+
+**修复**：`application-runtime.ts` 构造 `GitIntegrationCoordinator` 时传入
+`agentDirectory: registeredAgentDirectory`（运行时已有同一实例，不新建第二份）。
+
+**验证**：`git-coordinator-branches` / `git-defensive-branches` / `e2e01-vertical-integration-report`
+共 16 条全通过（现有协调器路径未受新端口影响）；公开全量 **666 files / 4539 passed**。
+
+**仍未做（如实）**：**隶属校验**（审查者是否属于授权的次级）仍未做 ——
+`GitWorkerAllocation` 无 owning secondary 字段，需先补数据；本条只保证"审查者真实存在"。

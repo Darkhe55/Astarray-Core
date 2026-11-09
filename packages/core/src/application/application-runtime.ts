@@ -3963,6 +3963,12 @@ export async function createApplicationRuntime(
               ...(options.gitIntegration.isReviewRequiredForMerge === true
                 ? { isReviewRequiredForMerge: true }
                 : {}),
+              /**
+               * ALIGN-03-04（2026-11-09）：把**已登记 Agent 目录**接进协调器。
+               *
+               * 不接的话"审查者必须已登记"只是死代码 —— 生产里永远走"未装配 ⇒ 不校验"。
+               */
+              agentDirectory: registeredAgentDirectory,
             }),
             repositoryPath: options.gitIntegration.repositoryPath,
             targetBranchName: options.gitIntegration.targetBranchName,
