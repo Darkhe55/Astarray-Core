@@ -346,3 +346,30 @@
 
 **仍未做（如实）**：**对账的"执行"仍未做** —— 没有把任何任务真的放回 pending 或标记 done；
 "已产出 ⇒ 确认回执"缺一个受控动作；启动恢复回填映射对崩溃 mission 是否总能发生仍未验证。
+
+### 03 产物校验：有路径 ≠ 有产物（2026-11-10 追加）
+
+**动机**：任务链里"有 `resultLocation`"只证明**记了一条路径**。恢复前把它当成"已产出"会造成两种谎报：
+路径写错/产物被删 ⇒ 误以为有产出；路径指向仓库外 ⇒ 校验到错误位置。
+
+**交付**：`orchestration/output-artifact-check.ts` `checkOutputArtifact({projectRootPath, resultLocation})`
+
+| 结论 | 条件 |
+|---|---|
+| `present` | 位于项目根内、是普通文件、**非空** |
+| `missing` | 不存在 / 不是文件 / `resultLocation` 为空 |
+| `empty` | 存在但 0 字节 |
+| `outside-project-root` | `..` 越界、绝对路径、或指向根本身 |
+
+**证据**（`align04-output-artifact-check` 7/7）：非空产物 present；**路径记了但文件不存在 ⇒ missing**；
+空文件 ⇒ empty；三种越界路径 ⇒ outside-project-root；目录不算产物；空路径 ⇒ missing；根本身不算产物。
+
+**未接线（如实）**：`resumeMission` 的拒绝分支**尚未**调用它。我试过接线（在 `[对账]` 诊断里附
+`（产物校验：kind）`），但那次全量出现未处理拒绝，为排除变量已回退。
+
+**同时发现（与本卡无关的既有缺陷）**：公开全量**两次**在"全部测试通过"的情况下 `exit=1`，
+原因是 `AssistScheduler.handleWorkerOutcome` → `DagScheduler.finishTask` → `persistChain`
+在临时目录已删除后抛 `ENOENT`，且该拒绝未被收敛（栈来自
+`tests/core/integration/reliability-r4-ledger-concurrency.test.ts`，隔离运行 4/4 通过）。
+这与本卡历史修复过的"fire-and-forget 未处理拒绝"是同一类，**需单独修**（catch 分支里的
+`handleWorkerOutcome` 自身再次 reject 时无人接住）。
