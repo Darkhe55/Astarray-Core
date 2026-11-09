@@ -1639,6 +1639,13 @@ export const ASTARRAY_SDK_VERSION = "0.1.0";
 
 export type PublicTaskStatus =
   | "accepted"
+  /**
+   * SMART-01：**已接收并持久化，但未越窗启动**。
+   *
+   * 与 `accepted` 的区别：`accepted` 已有 mission 在跑，`queued` 还没有
+   * （它排在指令窗口外，等槽位释放后**只补一条**）。
+   */
+  | "queued"
   | "running"
   | "blocked"
   | "done"
@@ -2536,6 +2543,14 @@ interface TaskRecord {
   summaryPreview: string | null;
   /** 任务链 revision（权威状态版本；未拿到时保持上一次值）。 */
   revision: number;
+  /**
+   * SMART-01：已准入指令的关联（排队后释放槽位时需要它来提交回执）。
+   *
+   * `null` = 本次提交**没有**经过指令窗口（例如旧路径或控制通道）。
+   */
+  instructionLink: { instructionIdentifier: string; instructionRevision: number } | null;
+  /** SMART-01：排队中的任务需要保留原始提示词，释放槽位后才派发。 */
+  queuedPrompt: string | null;
 }
 
 /**
@@ -3050,6 +3065,14 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 
   private readonly sessionStates = new Map<string, PublicSessionState>();
   private readonly tasksByTaskIdentifier = new Map<string, TaskRecord>();
+  /**
+   * SMART-01：等待槽位的任务（**FIFO**）。
+   *
+   * 顺序必须稳定：释放一个槽位只补**一条**，按入队顺序取，不允许插队。
+   */
+  private readonly queuedTaskIdentifiers: string[] = [];
+  /** 串行化"补位"，保证同一时刻只放出**一条**。 */
+  private isDispatchingQueuedTask = false;
   /** 幂等账目（内存镜像；键 = `sessionId|idempotencyKey`）。 */
   private readonly taskIdempotencyLedger = new Map<string, TaskIdempotencyLedgerEntry>();
   private readonly idempotencyLedgerFilePath: string | null;
@@ -6266,6 +6289,49 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         );
       }
     }
+    /**
+     * SMART-01（用户裁决 2026-11-09）：**窗口满时禁止越窗准入与启动**。
+     *
+     * 语义：第 4 条业务指令**照常接收并持久化**（`admitInstruction` 落盘排队），
+     * 但**不启动** mission；槽位释放后**只补一条**。已准入任务及其必要下级派发不受影响
+     * （它们已经在跑，不经过这里）。
+     *
+     * 控制通道（取消/暂停/撤权）**不经过**此门：见 `cancelTask`，它不需要槽位。
+     */
+    /**
+     * 无状态目录 ⇒ **不启用**指令窗口（如实降级，不假装已准入）。
+     *
+     * 为什么不能直接抛错：没有状态目录的 facade 是既有合法装配（headless/单次调用），
+     * 让它连提交都失败属于"为控制面牺牲主路径"。此时 `instructionLink` 为 null，
+     * 既不排队也不占槽位，`submitTask` 行为与引入窗口之前一致。
+     */
+    const admission = await this.admitInstructionForTask(input);
+    if (admission.kind === "queued") {
+      /**
+       * 已持久化排队：**不启动**，也**不注册任务监视器**（没有 mission 可监视）。
+       * 释放槽位时由 `releaseInstructionSlotAndDispatchNext` 取出并派发。
+       */
+      const queuedRecord: TaskRecord = {
+        sessionId: input.sessionId,
+        missionIdentifier: null,
+        status: "queued",
+        summaryPreview: null,
+        revision: 0,
+        instructionLink: admission.link,
+        queuedPrompt: input.prompt,
+      };
+      this.tasksByTaskIdentifier.set(input.taskIdentifier, queuedRecord);
+      this.queuedTaskIdentifiers.push(input.taskIdentifier);
+      this.emit({
+        eventType: "task-status",
+        taskIdentifier: input.taskIdentifier,
+        status: "queued",
+        revision: 0,
+        idempotencyId: this.nextEventIdempotencyId(),
+      });
+      return this.toTaskResult(input.taskIdentifier, queuedRecord);
+    }
+    const instructionLink = admission.kind === "windowed" ? admission.link : null;
     let missionIdentifier: string;
     try {
       missionIdentifier = await this.runtime.controller.handleUserMessage(
@@ -6299,6 +6365,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       status: "accepted",
       summaryPreview: null,
       revision: 0,
+      instructionLink,
+      queuedPrompt: null,
     };
     this.tasksByTaskIdentifier.set(input.taskIdentifier, record);
     if (ledgerKey !== null) {
@@ -6528,6 +6596,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       return;
     }
     this.stopTaskMonitor(input.taskIdentifier);
+    /**
+     * SMART-01（用户裁决）：取消走**独立控制通道**，不受指令窗口约束。
+     *
+     * 排队中的任务还没有 mission，取消只需把它移出队列并提交回执；
+     * 不能因为"没有槽位"而拒绝取消。
+     */
+    const queueIndex = this.queuedTaskIdentifiers.indexOf(input.taskIdentifier);
+    if (queueIndex >= 0) {
+      this.queuedTaskIdentifiers.splice(queueIndex, 1);
+      record.queuedPrompt = null;
+    }
     if (record.missionIdentifier !== null) {
       await this.runtime.controller.cancelMission(record.missionIdentifier);
     }
@@ -6539,6 +6618,13 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       revision: record.revision,
       idempotencyId: this.nextEventIdempotencyId(),
     });
+    /**
+     * 取消同样是"已交办完成" ⇒ 释放槽位并补一条。
+     *
+     * 不能只依赖轮询发现终态：取消会**先停掉监视器**，轮询再也看不到终态，
+     * 于是槽位永远不释放（实测：取消后排队任务一直停在 queued）。
+     */
+    await this.releaseInstructionSlotAndDispatchNext(record, "cancelled");
   }
 
   subscribe(listener: (event: PublicAstarrayEvent) => void): { unsubscribe(): void } {
@@ -7502,6 +7588,13 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       revision: record.revision,
       idempotencyId: this.nextEventIdempotencyId(),
     });
+      /**
+       * SMART-01（用户裁决）：主 Agent 已完成并持久化交办 ⇒ **释放槽位**。
+       *
+       * 释放依据是"任务终态 + 已提交回执"，**不等待下级成果**（下级的持续派发
+       * 走统一任务序列，不需要占用用户指令窗口的槽位）。
+       */
+      await this.releaseInstructionSlotAndDispatchNext(record, status);
       return;
     }
     this.emit({
@@ -7511,6 +7604,166 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       revision: record.revision,
       idempotencyId: this.nextEventIdempotencyId(),
     });
+  }
+
+  /**
+   * SMART-01：为一次任务提交申请指令窗口准入。
+   *
+   * 三种结果，**互不混淆**：
+   *  - `windowed`：已进入窗口（占一个槽位），照常派发；
+   *  - `queued`：窗口已满，**已落盘排队**，本次**不得启动**；
+   *  - `unwindowed`：没有状态目录 ⇒ 未启用窗口（不占槽位，也不假装已准入）。
+   */
+  private async admitInstructionForTask(input: {
+    readonly sessionId: string;
+    readonly taskIdentifier: string;
+    readonly prompt: string;
+    readonly idempotencyKey?: string;
+  }): Promise<
+    | { kind: "windowed"; link: { instructionIdentifier: string; instructionRevision: number } }
+    | { kind: "queued"; link: { instructionIdentifier: string; instructionRevision: number } }
+    | { kind: "unwindowed" }
+  > {
+    if (this.stateDirectory === null) {
+      return { kind: "unwindowed" };
+    }
+    const store = await this.getInstructionWindowStore();
+    /**
+     * 窗口幂等键**按任务提交**生成，不复用用户的 `idempotencyKey`。
+     *
+     * 任务幂等已由 `taskIdempotencyLedger` 负责；窗口只负责**容量计数**。
+     * 若这里复用用户键，第二个实例用同键不同文本提交会被窗口判"同键异参"
+     * 而整单失败（实测：预算持久化用例因此翻红）。
+     */
+    const result = await store.admitInstruction({
+      instructionIdentifier: "task-instruction:" + input.taskIdentifier,
+      instructionRevision: 1,
+      sourceKind: "user",
+      instructionText: input.prompt,
+      /** 含内容摘要：同标识不同内容的**再次提交**也必须能各自占位，否则被判同键异参。 */
+      idempotencyKey:
+        "task:" +
+        input.sessionId +
+        ":" +
+        input.taskIdentifier +
+        ":" +
+        createHash("sha256").update(input.prompt, "utf8").digest("hex").slice(0, 16),
+    });
+    if (result.outcome === "idempotency-conflict") {
+      throw new PublicApplicationError(
+        "idempotency-key-conflict",
+        "同一幂等键绑定了不同的指令内容，拒绝接收: " +
+          String(input.idempotencyKey ?? input.taskIdentifier),
+      );
+    }
+    const link = {
+      instructionIdentifier: result.instructionIdentifier,
+      instructionRevision: 1,
+    };
+    return result.outcome === "queued" ? { kind: "queued", link } : { kind: "windowed", link };
+  }
+
+  /**
+   * SMART-01：释放该任务占用的指令槽位，并**只补一条**排队指令。
+   *
+   * 顺序（不可颠倒）：
+   *  1. 先提交回执 —— 没有回执就不算"已完成交办"，槽位不得释放；
+   *  2. 再取队首一条派发 —— 一次只补一条，避免并发下越过窗口容量；
+   *  3. 派发失败要**如实**把该任务标成失败，不能静默丢队列。
+   */
+  private async releaseInstructionSlotAndDispatchNext(
+    record: TaskRecord,
+    terminalStatus: PublicTaskStatus,
+  ): Promise<void> {
+    const instructionLink = record.instructionLink;
+    if (instructionLink === null) return;
+    const store = await this.getInstructionWindowStore();
+    const receiptOutcome =
+      terminalStatus === "cancelled"
+        ? "cancelled"
+        : terminalStatus === "done"
+          ? "completed"
+          : "failed";
+    await store
+      .submitReceipt({
+        instructionIdentifier: instructionLink.instructionIdentifier,
+        instructionRevision: instructionLink.instructionRevision,
+        receiptOutcome,
+        taskIdentifiers: [this.taskIdentifierOf(record)],
+        evidenceReferences: [],
+        unresolvedQuestions: [],
+      })
+      .catch(() => null);
+    record.instructionLink = null;
+    await this.dispatchNextQueuedTask();
+  }
+
+  /** 反查任务标识（回执需要它；找不到就不猜）。 */
+  private taskIdentifierOf(record: TaskRecord): string {
+    for (const [taskIdentifier, candidate] of this.tasksByTaskIdentifier) {
+      if (candidate === record) return taskIdentifier;
+    }
+    return "unknown-task";
+  }
+
+  /**
+   * 取队首一条并派发。
+   *
+   * 只补一条：并发终态可能同时触发，因此用一个进行中标记串行化，
+   * 避免同一时刻放出多条而越过窗口容量。
+   */
+  private async dispatchNextQueuedTask(): Promise<void> {
+    if (this.isDispatchingQueuedTask) return;
+    this.isDispatchingQueuedTask = true;
+    try {
+      const nextTaskIdentifier = this.queuedTaskIdentifiers.shift();
+      if (nextTaskIdentifier === undefined) return;
+      const record = this.tasksByTaskIdentifier.get(nextTaskIdentifier);
+      if (record === undefined || record.queuedPrompt === null) return;
+      const prompt = record.queuedPrompt;
+      record.queuedPrompt = null;
+      try {
+        const missionIdentifier = await this.runtime.controller.handleUserMessage(prompt, {
+          sessionIdentifier: record.sessionId,
+        });
+        record.missionIdentifier = missionIdentifier;
+        record.status = "accepted";
+        this.emit({
+          eventType: "task-status",
+          taskIdentifier: nextTaskIdentifier,
+          status: "accepted",
+          revision: record.revision,
+          idempotencyId: this.nextEventIdempotencyId(),
+        });
+        this.startTaskMonitor(nextTaskIdentifier);
+      } catch {
+        record.status = "failed";
+        record.summaryPreview = "排队指令派发失败";
+        this.emit({
+          eventType: "task-finished",
+          taskIdentifier: nextTaskIdentifier,
+          status: "failed",
+          revision: record.revision,
+          idempotencyId: this.nextEventIdempotencyId(),
+        });
+        if (record.instructionLink !== null) {
+          const store = await this.getInstructionWindowStore();
+          await store
+            .submitReceipt({
+              instructionIdentifier: record.instructionLink.instructionIdentifier,
+              instructionRevision: record.instructionLink.instructionRevision,
+              receiptOutcome: "failed",
+              taskIdentifiers: [nextTaskIdentifier],
+              evidenceReferences: [],
+              unresolvedQuestions: [],
+            })
+            .catch(() => null);
+          record.instructionLink = null;
+        }
+      }
+    } finally {
+      this.isDispatchingQueuedTask = false;
+    }
   }
 
   private assertOpen(): void {
