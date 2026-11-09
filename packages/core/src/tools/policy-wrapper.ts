@@ -30,6 +30,8 @@ import { InstallationGateGuard } from "./installation-gate-guard.js";
 import { LocalSensitiveOperationClassifier } from "./local-sensitive-operation-classifier.js";
 import type { ConfigurablePermissionPolicyEngine } from "./configurable-permission-policy-engine.js";
 import type { PermissionProfileReference } from "./permission-profile-store.js";
+import type { ProcessExecutionController } from "../execution/process-execution-controller.js";
+import type { ProcessExecutionOwnership } from "../execution/execution-contract.js";
 import {
   executeBuiltinTool,
   BUILTIN_TOOL_DESCRIPTORS,
@@ -96,6 +98,14 @@ export interface PolicyWrapperOptions {
   evidenceQueryGuard?: EvidenceQueryGuard | null;
   /** T06D：证据主张标识（缺省 "default-claim"）。 */
   factVerificationClaimIdentifier?: string | null;
+  /**
+   * EXEC-01-04（2026-11-09）：受控进程执行的控制器与**本次归属**。
+   *
+   * 两者都由装配层注入：模型既看不到也改不了归属字段；缺省 null ⇒
+   * `processExecution` 返回"未装配沙箱执行后端"，不降级到宿主执行。
+   */
+  processExecutionController?: ProcessExecutionController | null;
+  processExecutionOwnership?: ProcessExecutionOwnership | null;
   /** GUI-03-06：工具成功产生结构化产物时的接收器（身份由装配层捕获）。 */
   onProducedArtifacts?: (artifacts: ReadonlyArray<ProducedArtifact>) => void | Promise<void>;
   workWindowGateProvider?: () => Promise<{ isAllowed: boolean; reason: string }>;
@@ -408,6 +418,10 @@ export class PolicyWrapper implements ToolPort {
           evidenceQueryGuard: this.options.evidenceQueryGuard ?? null,
           factVerificationClaimIdentifier:
             this.options.factVerificationClaimIdentifier ?? null,
+          processExecutionController:
+            this.options.processExecutionController ?? null,
+          processExecutionOwnership:
+            this.options.processExecutionOwnership ?? null,
         });
         if (
           result.producedArtifacts !== undefined &&

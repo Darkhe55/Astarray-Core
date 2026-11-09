@@ -91,6 +91,13 @@ import {
 } from "../tools/scope-authorization-gate.js";
 import type { RegisteredProjectRoot } from "../tools/scope-resolution.js";
 import { PermissionCapabilityCatalog } from "../tools/permission-capability-catalog.js";
+// EXEC-01-04（2026-11-09）：受控进程执行的生产装配（环境登记 + 执行记录 + 后端端口）。
+import {
+  ExecutionEnvironmentRegistry,
+  type ProcessExecutionOwnership,
+} from "../execution/execution-contract.js";
+import { ProcessExecutionController } from "../execution/process-execution-controller.js";
+import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
 import { PermissionProfileStore } from "../tools/permission-profile-store.js";
 import type { PermissionProfileReference } from "../tools/permission-profile-store.js";
 import { ConfigurablePermissionPolicyEngine } from "../tools/configurable-permission-policy-engine.js";
@@ -1063,6 +1070,20 @@ export async function createApplicationRuntime(
   });
 
   // B6R-03：可配置权限引擎（执行前按当前 profile 快照裁决）
+  /**
+   * EXEC-01-04（2026-11-09）：受控进程执行的生产装配。
+   *
+   * - 环境登记表**默认为空**：没有随产品交付的沙箱与工具链（EXEC-01-02 阻塞），
+   *   因此不登记任何"看起来可用"的环境，`start` 会如实返回 unsupported；
+   * - 隔离后端显式传 `null`：**不**降级到宿主进程执行；
+   * - 执行记录落盘（可跨重启对账），毒化幂等键同样持久化。
+   */
+  const executionEnvironmentRegistry = new ExecutionEnvironmentRegistry();
+  const processExecutionController = new ProcessExecutionController({
+    environmentRegistry: executionEnvironmentRegistry,
+    store: new FileSystemProcessExecutionStore({ stateDirectory }),
+    sandboxBackend: null,
+  });
   const permissionCatalog = new PermissionCapabilityCatalog();
   const permissionProfileStore = new PermissionProfileStore({
     baseDirectory: stateDirectory,
@@ -3025,6 +3046,9 @@ export async function createApplicationRuntime(
       string,
       (argumentsJson: string, callId: string) => Promise<ToolCallResult>
     >;
+    /** EXEC-01-04：受控进程执行的控制器与本次归属（由装配层注入，模型不可改）。 */
+    processExecutionController?: ProcessExecutionController | null;
+    processExecutionOwnership?: ProcessExecutionOwnership | null;
   }): PolicyWrapper => {
     const folderGrantStore = new FolderGrantStore({ baseDirectory: stateDirectory });
     const taskWorkspaceBoundary =
@@ -3090,6 +3114,9 @@ export async function createApplicationRuntime(
       ponderGitRepositoryPath: taskWorkspaceBoundary.getWorkspaceRoot(),
       evidenceBundleBuilder,
       factVerificationClaimIdentifier: input.factVerificationClaimIdentifier,
+      /** EXEC-01-04：受控进程执行（控制器 + 归属）透传到内置工具执行上下文。 */
+      processExecutionController: input.processExecutionController ?? null,
+      processExecutionOwnership: input.processExecutionOwnership ?? null,
       onProducedArtifacts: async (artifacts) => {
         if (input.missionIdentifier === undefined || input.taskIdentifier === undefined) return;
         for (const artifact of artifacts) {
@@ -4020,6 +4047,21 @@ export async function createApplicationRuntime(
           customToolHandlers: new Map([
             [GOAL_PROPOSAL_TOOL_NAME, goalProposalHandler],
           ]),
+          /**
+           * EXEC-01-04（2026-11-09）：把执行控制器与**本次归属**注入策略包装层。
+           *
+           * 归属由装配层从真实上下文拼出，模型既看不到也改不了；
+           * attempt 暂固定 1（当前没有重试计数来源），授权 revision 取范围门禁的同一值。
+           */
+          processExecutionController,
+          processExecutionOwnership: {
+            projectIdentifier: projectIdentifier ?? "workspace",
+            agentInstanceIdentifier: agentInstanceId ?? `worker:${task.id}`,
+            missionIdentifier: missionIdentifier ?? null,
+            taskIdentifier: task.id,
+            attemptNumber: 1,
+            authorizationRevision: 1,
+          },
           ...(workspaceRootPath === undefined ? {} : { workspaceRootPath }),
           ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
           ...(conversationIdentifier === undefined ? {} : { conversationIdentifier }),

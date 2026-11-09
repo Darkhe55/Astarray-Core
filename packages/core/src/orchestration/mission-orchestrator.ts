@@ -11,7 +11,10 @@ import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-
 import { buildFullDocumentation } from "../tools/tool-documentation-recall.js";
 import type { ToolDocumentationRecallInjector } from "../tools/tool-documentation-recall.js";
 import type { RunHistoryStore } from "./run-history-store.js";
-import { spawnSync } from "node:child_process";
+import {
+  runInternalCommandAsync,
+  type InternalCommandOutcome,
+} from "./internal-command-runner.js";
 
 import type {
   AgentRuntime,
@@ -59,7 +62,6 @@ import type { AgentWorkArchiveStore } from "./work-archive-store.js";
 import { DomainError } from "../core/errors.js";
 import { shouldRetryCompletionProtocolFailure } from "./completion-protocol-retry.js";
 import type { MissionLeaseStore } from "../infra/mission-lease-store.js";
-import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 import { DagScheduler } from "./dag-scheduler.js";
 import type { ScheduleAction } from "./dag-scheduler.js";
 import { ToolFailureCounter } from "./failure-counter.js";
@@ -1808,15 +1810,26 @@ export class MissionOrchestrator {
       `解析 worker 提交 head`,
     );
     const headCommit = headResult.stdoutText.trim();
-    // 证据命令：在 worktree 实际执行，上报真实退出码
-    const executedChecks = gitIntegration.integrationTestCommands.map(
-      (command) => ({
+    /**
+     * 证据命令：在 worktree 实际执行，上报**真实退出码**。
+     *
+     * EXEC-01-04（2026-11-09）：改为异步执行 —— 原来用 `spawnSync` 会阻塞事件循环，
+     * 慢证据命令期间状态查询与取消请求都停摆。这里逐条 await，保持"全部执行完
+     * 再提交"的原语义；退出码为 null（超时/取消/启动失败）时如实记为 -1。
+     */
+    const executedChecks: Array<{ command: string; exitCode: number }> = [];
+    for (const command of gitIntegration.integrationTestCommands) {
+      const outcome = await this.runEvidenceCommand(allocation.worktreePath, command);
+      executedChecks.push({
         command,
-        exitCode: this.runEvidenceCommand(allocation.worktreePath, command)
-          ? 0
-          : 1,
-      }),
-    );
+        exitCode: outcome.exitCode ?? -1,
+      });
+      if (!outcome.isSuccessful) {
+        this.options.onUserEscalation(
+          `证据命令未成功（${String(outcome.failureReason ?? "未知原因")}）：${command}`,
+        );
+      }
+    }
     const submission = await gitIntegration.coordinator.submitContribution({
       missionId: this.options.missionId,
       taskId,
@@ -1851,19 +1864,21 @@ export class MissionOrchestrator {
     };
   }
 
-  /** 在指定目录以 shell 执行证据命令；返回是否成功。 */
-  private runEvidenceCommand(workingDirectoryPath: string, command: string): boolean {
-    const result = spawnSync(command, {
-      cwd: workingDirectoryPath,
-      shell: true,
-      windowsHide: true,
-      timeout: 300_000,
-      encoding: "utf8",
-      /** SEC-02-07：证据命令不继承宿主凭据环境（只带运行必需变量）。 */
-      env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
-        .environment,
+  /**
+   * 在指定目录以 shell 执行证据命令（**异步、有超时、保留证据**）。
+   *
+   * EXEC-01-04：命令来源仍是**会话配置**（可信控制面），不是模型输入；
+   * 隔离等级为"非沙箱"，返回值里如实标注，不把环境白名单说成沙箱。
+   */
+  private runEvidenceCommand(
+    workingDirectoryPath: string,
+    command: string,
+  ): Promise<InternalCommandOutcome> {
+    return runInternalCommandAsync({
+      command,
+      workingDirectoryPath,
+      timeoutMilliseconds: 300_000,
     });
-    return result.status === 0;
   }
 
   /** R85：是否已经收口（防止后续 "cancelled" 覆盖已定的 blocked/done）。 */

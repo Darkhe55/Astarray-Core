@@ -8,7 +8,10 @@
  * 门禁规则：git push、PR、发布、强制推送、受保护分支修改始终需要独立授权；
  * 协调器只提供受控的本地合并，不允许模型可控的"跳过审查/跳过备份/强制合并"。
  */
-import { spawnSync } from "node:child_process";
+import {
+  runInternalCommandAsync,
+  type InternalCommandOutcome,
+} from "./internal-command-runner.js";
 
 import { DomainError } from "../core/errors.js";
 import type {
@@ -22,7 +25,6 @@ import { GitProcess } from "./git-process.js";
 import type { GitRecoveryPointService } from "./git-recovery-point-service.js";
 import { GitWorktreeAllocator, decodeGitRefSegment } from "./git-worktree-allocator.js";
 import { evaluateContributionReviewEvidence } from "./git-review-evidence.js";
-import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
 
 export interface StartIntegrationSessionInput {
   missionId: string;
@@ -401,12 +403,21 @@ export class GitIntegrationCoordinator {
     }
     // 集成测试（命令由会话配置，在仓库目录以 shell 执行，全部必须成功）
     for (const testCommand of input.integrationTestCommands) {
-      const testResult = this.runIntegrationTestCommand(
+      const testOutcome = await this.runIntegrationTestCommand(
         input.repositoryPath,
         testCommand,
       );
-      if (!testResult) {
-        report.unresolvedRisks.push(`集成测试失败: ${testCommand}`);
+      if (!testOutcome.isSuccessful) {
+        /** EXEC-01-04：不再只用 boolean 隐藏原因 —— 退出码/超时/取消/stderr 尾部都要进报告。 */
+        const diagnosticParts = [
+          `集成测试失败: ${testCommand}`,
+          `原因: ${String(testOutcome.failureReason ?? "未知原因")}`,
+          `退出码: ${String(testOutcome.exitCode ?? "null")}`,
+        ];
+        if (testOutcome.stderrTail.trim() !== "") {
+          diagnosticParts.push(`stderr 尾部: ${testOutcome.stderrTail.trim()}`);
+        }
+        report.unresolvedRisks.push(diagnosticParts.join(" | "));
       }
     }
     if (report.unresolvedRisks.length > 0) {
@@ -520,20 +531,21 @@ export class GitIntegrationCoordinator {
     }
   }
 
-  /** 在仓库目录以 shell 执行集成测试命令（命令由会话配置，非模型输入）。 */  private runIntegrationTestCommand(
+  /**
+   * 在仓库目录以 shell 执行集成测试命令（命令由会话配置，非模型输入）。
+   *
+   * EXEC-01-04（2026-11-09）：改为**异步**执行并保留证据。原来 `spawnSync`
+   * 会在慢测试期间阻塞事件循环，用户的状态查询与取消请求都停摆。
+   * 隔离等级为"非沙箱"，返回值如实标注。
+   */
+  private runIntegrationTestCommand(
     repositoryPath: string,
     command: string,
-  ): boolean {
-    const result = spawnSync(command, {
-      cwd: repositoryPath,
-      shell: true,
-      windowsHide: true,
-      timeout: this.integrationTestTimeoutSeconds * 1000,
-      encoding: "utf8",
-      /** SEC-02-07：集成测试命令不继承宿主凭据环境（只带运行必需变量）。 */
-      env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env })
-        .environment,
+  ): Promise<InternalCommandOutcome> {
+    return runInternalCommandAsync({
+      command,
+      workingDirectoryPath: repositoryPath,
+      timeoutMilliseconds: this.integrationTestTimeoutSeconds * 1000,
     });
-    return result.status === 0;
   }
 }

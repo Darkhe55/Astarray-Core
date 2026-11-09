@@ -220,6 +220,19 @@ export class ProcessExecutionController {
     readonly request: ProcessExecutionStartRequest;
     readonly remainingTaskBudgetMilliseconds?: number | null;
   }): Promise<ProcessExecutionStartResult> {
+    /**
+     * EXEC-01-04：**先探后端，再查环境**。
+     *
+     * 顺序有讲究：没有可用隔离后端是平台级前提，比"环境标识写错"更根本；
+     * 反过来先报"环境不存在"会把"这台机器根本没装沙箱"误导成配置问题。
+     */
+    const capabilityFirst = await this.probeBackendCapability();
+    if (!capabilityFirst.isAvailable || this.sandboxBackend === null) {
+      throw new DomainError(
+        "execution-backend-unsupported",
+        `当前平台没有可用的隔离执行后端：${String(capabilityFirst.reasonUnavailable ?? "未知原因")}`,
+      );
+    }
     const environmentEntry = this.environmentRegistry.get(
       input.request.environmentIdentifier,
     );
@@ -294,14 +307,6 @@ export class ProcessExecutionController {
           isReusedByIdempotencyKey: true,
         };
       }
-    }
-
-    const capability = await this.probeBackendCapability();
-    if (!capability.isAvailable || this.sandboxBackend === null) {
-      throw new DomainError(
-        "execution-backend-unsupported",
-        `当前平台没有可用的隔离执行后端：${String(capability.reasonUnavailable ?? "未知原因")}`,
-      );
     }
 
     const identity = buildProcessExecutionIdentity({
