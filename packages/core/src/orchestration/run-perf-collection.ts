@@ -41,6 +41,17 @@ export function prepareRunPerfCollection(input: {
 }): SessionPerfCollector | null {
   if (input.isPerfCollectionEnabled !== true) return null;
   const store = new ProcessSampleStore({ baseDirectory: input.stateDirectory });
+  /**
+   * 已用存储量的**最近一次已知值**（`null` = 未知）。
+   *
+   * 采样判定是同步的，而目录统计是异步的：这里用"上次统计结果"驱动判定，
+   * 并在后台持续刷新。首次统计完成前为 `null`（未知），不是 0。
+   */
+  let latestStorageBytesUsed: number | null = null;
+  /** 立即做一次统计：否则首个判定恒为"未知"（虽然安全，但会推迟预算生效）。 */
+  void store.readStorageBytesUsed().then((bytes) => {
+    latestStorageBytesUsed = bytes;
+  });
   return createSessionPerfCollector({
     timerPort: input.schedulingTimerPort ?? defaultSchedulingTimerPort,
     samplingPorts: createProcessSampleStorePorts({
@@ -50,5 +61,17 @@ export function prepareRunPerfCollection(input: {
     baseDirectory: input.stateDirectory,
     isCollectionEnabled: true,
     agentInstanceIdentifier: input.agentInstanceIdentifier,
+    /**
+     * OBS-01（2026-11-09）：接上**真实**已用存储量。
+     *
+     * 此前未传 ⇒ 缺省 `() => 0` ⇒ 10 MB 预算在生产**永不触发**（实测缺陷）。
+     * 拿不到时返回 `null`（未知），不记作 0。
+     */
+    storageBytesUsed: () => {
+      void store.readStorageBytesUsed().then((bytes) => {
+        latestStorageBytesUsed = bytes;
+      });
+      return latestStorageBytesUsed;
+    },
   });
 }

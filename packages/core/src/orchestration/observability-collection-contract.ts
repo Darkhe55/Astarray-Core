@@ -60,7 +60,14 @@ export function evaluatePerfCollection(input: {
   readonly isCollectionEnabled: boolean;
   readonly lastSampleAtIso: string | null;
   readonly nowIso: string;
-  readonly storageBytesUsed: number;
+  /**
+   * OBS-01（2026-11-09）：**已用存储字节数**。
+   *
+   * `null` 表示**未知**（拿不到占用）。未知**不得当作 0**：那会让"10 MB 预算"
+   * 在生产永不触发（实测缺陷）。未知时如实降级为"预算无法判定"，仍按间隔采样，
+   * 但把该事实写进判定理由，供诊断区分"没超"与"不知道有没有超"。
+   */
+  readonly storageBytesUsed: number | null;
   readonly storageBudgetBytes?: number;
   readonly minimumSampleIntervalSeconds?: number;
 }): PerfCollectionDecision {
@@ -72,7 +79,7 @@ export function evaluatePerfCollection(input: {
     };
   }
   const storageBudgetBytes = input.storageBudgetBytes ?? DEFAULT_PERF_STORAGE_BUDGET_BYTES;
-  if (input.storageBytesUsed >= storageBudgetBytes) {
+  if (input.storageBytesUsed !== null && input.storageBytesUsed >= storageBudgetBytes) {
     return {
       kind: "skip",
       reasonCode: "storage-budget-exhausted",

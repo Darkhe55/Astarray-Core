@@ -33,10 +33,16 @@ export function createSessionPerfCollector(input: {
   readonly agentInstanceIdentifier: string | null;
   readonly intervalSeconds?: number;
   readonly nowIso?: () => string;
-  readonly storageBytesUsed?: () => number;
+  /**
+   * OBS-01（2026-11-09）：已用存储字节数读取器。
+   *
+   * 返回 `null` 表示**未知**（不得当作 0：那会让存储预算永不触发）。
+   * 未注入时同样返回 `null`，而不是默认 0。
+   */
+  readonly storageBytesUsed?: () => number | null;
 }): SessionPerfCollector {
   const nowIso = input.nowIso ?? (() => new Date().toISOString());
-  const storageBytesUsed = input.storageBytesUsed ?? (() => 0);
+  const storageBytesUsed = input.storageBytesUsed ?? (() => null);
   let lastSampleAtIso: string | null = null;
   let droppedSampleCount = 0;
 

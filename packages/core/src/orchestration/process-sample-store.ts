@@ -87,6 +87,34 @@ export class ProcessSampleStore {
   }
 
   /** 追加一条（父目录不存在则创建）。 */
+  /**
+   * OBS-01（2026-11-09）：**已用存储字节数**（`perf/` 目录下所有文件之和）。
+   *
+   * 返回 `null` 表示**未知**（目录不可读等）—— 调用方不得把未知当 0，
+   * 否则"10 MB 预算"永远不会触发（这正是本轮修复的缺陷）。
+   */
+  async readStorageBytesUsed(): Promise<number | null> {
+    const perfDirectoryPath = path.dirname(this.filePath);
+    let fileNames: string[];
+    try {
+      fileNames = await fs.readdir(perfDirectoryPath);
+    } catch (error) {
+      if (isErrorCode(error, "ENOENT")) return 0;
+      return null;
+    }
+    let totalBytes = 0;
+    for (const fileName of fileNames) {
+      try {
+        const fileStat = await fs.stat(path.join(perfDirectoryPath, fileName));
+        if (fileStat.isFile()) totalBytes += fileStat.size;
+      } catch {
+        /** 单文件读不到 ⇒ 整体占用**未知**（不能少算）。 */
+        return null;
+      }
+    }
+    return totalBytes;
+  }
+
   async append(sample: ProcessSampleEventV1): Promise<void> {
     if (!isProcessSampleEvent(sample)) {
       throw new Error("拒绝写入非法的进程样本（字段不在白名单或数值非法）");
@@ -125,4 +153,14 @@ export class ProcessSampleStore {
     }
     return { samples, discardedLineCount };
   }
+}
+
+/** 判断 Node 错误码（避免 `any`）。 */
+function isErrorCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === code
+  );
 }

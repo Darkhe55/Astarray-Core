@@ -61,7 +61,8 @@ export async function runPerfSamplingTick(input: {
   readonly ports: PerfSamplingPorts;
   readonly isCollectionEnabled: boolean;
   readonly lastSampleAtIso: string | null;
-  readonly storageBytesUsed: number;
+  /** OBS-01：`null` 表示未知（不得当作 0）。 */
+  readonly storageBytesUsed: number | null;
   readonly agentInstanceIdentifier: string | null;
   readonly previousDroppedSampleCount?: number;
   readonly minimumSampleIntervalSeconds?: number;
