@@ -525,3 +525,21 @@ bind 目录可读、内存上限挡住超额分配），本文件**不声称**�
 
 **仍未做（如实）**：裸机 Linux 复测；资源上限（`--rlimit-*` 在该 bwrap 构建不存在）尚未在
 后端里用 `prlimit`/cgroup 施加；提权后建档案的成功分支仍未验证。
+
+## 02 超时在执行层真的生效（2026-11-09）
+
+**缺口**：Linux 后端接受 `timeoutMilliseconds` 却**忽略它** ⇒ 挂住的命令会一直跑，
+只能靠外部 kill（"超时"变成一句状态文案，不是真的停住）。
+
+**修复**：进程内定时器，到点**终止 bwrap** 并落 `timed-out`；进程自然退出时清除定时器。
+**不用** `timeout(1)` 包一层：那会给产品增加一个外部命令依赖。
+
+Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（实测 3.1 秒返回、无残留）。
+
+**证据**（`exec01-02-bubblewrap-backend` 7/7，新增 1 条）：假进程永不自然退出 ⇒
+超时后断言**进程真的被终止**（`isTerminated === true`）且状态为 `timed-out`、原因含"超过时限"。
+
+公开全量 **658 files / 4492 passed + 3 skipped，exit 0**。
+
+**仍未做（如实）**：资源上限（内存/进程数）在 Linux 后端尚未施加（该 bwrap 构建无 `--rlimit-*`，
+需 `prlimit`/cgroup）；裸机 Linux 复测未做。
