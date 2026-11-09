@@ -1816,3 +1816,23 @@ AssertionError: 第 4 次提交未被接受: expected 'queued' to be 'accepted'
 而不是容量或泄漏问题。
 
 **口径**：11.H.5 里"可能是真实缺陷"的表述**作废**，以免后续按错误方向改产品代码。
+
+#### 11.H.7 `public-sdk` 1/70 抖动的当前定位（2026-11-10，**已挂起**）
+
+**已排除**：并发墙钟（串行仍有）、端口冲突（`listen(0)`）、teardown 顺序（已 `shutdown`）、
+指令窗口泄漏（`submitReceipt` 会释放并回填）。
+
+**当前假设**：`queryMissionHistory` **从状态目录读**（`public-sdk.ts:3898` 起，经
+`queryMissionHistory({ stateDirectory, … })`），而 `submitTask` 是否**同步等待**该 mission 记录
+（含 `projectIdentifier`）落盘尚未确认。若写入是"提交后异步登记"，
+则"提交 → 立刻查历史"存在读己之写竞态 ⇒ 偶发查不到 `projectIdentifier`，与观测频率（1/70）吻合。
+
+**为什么挂起**：验证它需要能稳定复现（当前 1/70，命中后重跑不复现），
+在没有复现手段前继续读代码只能得到"看起来像"的结论；
+而按"看起来像"改产品代码的风险高于收益。
+
+**挂起不等于解决**：本条留在台账里，任何"公开全量全绿"的声明都须注明
+`public-sdk.test.ts` 存在已知 1/70 抖动。
+
+**若将来复现，第一条检查**：`submitTask` 内部对 mission 登记（写 `projectIdentifier`）
+是否 `await`；以及 `queryMissionHistory` 是否应支持"读己之写"（读内存快照兜底）。
