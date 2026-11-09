@@ -99,6 +99,49 @@ describe("EXEC-01-02 bubblewrap 探测与拒绝", () => {
     ).rejects.toThrow(/不可用/u);
   });
 
+  it("超时 ⇒ 真的终止沙箱进程并落 timed-out（不是只标记）", async () => {
+    let isTerminated = false;
+    let resolveHangingExit: ((code: number | null) => void) | null = null;
+    let callCount = 0;
+    const backend = new BubblewrapSandboxBackend({
+      spawnProcess: () => {
+        callCount += 1;
+        if (callCount === 1) return buildFakeProcess({ exitCode: 0 });
+        /** 永不自然退出：只能被 terminate 结束。 */
+        return {
+          processIdentifier: 999,
+          standardOutput: (async function* () {
+            // 无输出
+          })(),
+          standardError: (async function* () {
+            // 无输出
+          })(),
+          exited: new Promise<number | null>((resolve) => {
+            resolveHangingExit = resolve;
+          }),
+          terminate: () => {
+            isTerminated = true;
+            resolveHangingExit?.(137);
+          },
+        };
+      },
+    });
+    const started = await backend.start({
+      identity: { executionId: "exec-timeout" },
+      executableEntryPoint: "node",
+      arguments: [],
+      workingDirectory: "/work",
+      timeoutMilliseconds: 80,
+      streamStorageLimitBytes: 1_024,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    /** 关键：**进程真的被终止**，而不只是状态变成超时。 */
+    expect(isTerminated).toBe(true);
+    const status = await backend.readStatus(started.backendExecutionHandle);
+    expect(status.status).toBe("timed-out");
+    expect(status.failureReason).toContain("超过时限");
+  });
+
   it("可用 ⇒ 正常启动并按退出码落状态", async () => {
     let callCount = 0;
     const backend = new BubblewrapSandboxBackend({

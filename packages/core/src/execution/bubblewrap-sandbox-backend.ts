@@ -190,7 +190,24 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
     this.executions.set(backendExecutionHandle, entry);
     void this.collect(entry, "stdout");
     void this.collect(entry, "stderr");
+    /**
+     * 超时必须在**执行层**真的停住，而不是只让调用方看到"已经超时"。
+     *
+     * 为什么不用 `timeout(1)` 包一层：那会给产品增加一个外部命令依赖；
+     * 这里用进程内定时器，到点直接终止 bwrap（`--die-with-parent` 保证子进程一起收掉）。
+     */
+    const timeoutTimer = setTimeout(() => {
+      if (entry.status.status !== "running") return;
+      entry.process.terminate();
+      entry.status = {
+        status: "timed-out",
+        exitCode: null,
+        failureReason: "超过时限 " + String(input.timeoutMilliseconds) + " ms（已终止沙箱进程）",
+      };
+    }, Math.max(1, input.timeoutMilliseconds));
+    timeoutTimer.unref?.();
     void process.exited.then((exitCode) => {
+      clearTimeout(timeoutTimer);
       if (entry.status.status !== "running") return;
       entry.status =
         exitCode === 0
