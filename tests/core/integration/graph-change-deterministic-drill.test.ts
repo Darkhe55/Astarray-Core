@@ -39,7 +39,13 @@ afterEach(async () => {
     await new Promise<void>((resolve) => server?.close(() => resolve()));
     server = null;
   }
-  await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 5 });
+  /**
+   * 收尾前短暂沉降：mission 终态后仍有后台原子写（task-chain / summary）在飞，
+   * 立刻删目录会让 `writeAtomicJson` 的 rename 撞上 ENOENT，产生**未处理拒绝**
+   * 并把整轮门禁的退出码打成非 0（实测：本轮 gate 4469 全绿仍 exit 1）。
+   */
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
 });
 
 function sseToolCall(toolName: string, argumentsJson: string): string {
