@@ -486,3 +486,23 @@ const agentInstanceId =
 
 **仍未做**：`resolveWorkerDirectSuperior` 未接入派发；Worker 未写 `owningSecondaryAgentInstanceId`；
 自动任命与裁决未接。
+
+### 第 2 步证据补强：**失败并已撤回**（2026-11-10）
+
+**尝试**：等 mission 跑完后读 `missions/<id>/agents/` 目录，断言存在 `secondary_<missionId>`、
+不存在 `scheduler_`。
+
+**实测结果**（打印实际目录名）：
+
+```
+实际目录=worker%3Amission-55025b2b%3AT-001%3A1
+```
+
+只有 **Worker** 的存档目录；**没有**次级自己的存档目录 —— 次级只在"集成决策"等场景写档案，
+本用例的合成 mission 没走到那里。而且净化规则是 URL 编码（`worker%3A…`），不是我先前假设的 `_`。
+
+**处置**：断言**已撤回**。理由同前：留着会失败，加条件又会变成靠运气通过。
+
+**结论**：**当前没有可用的产物能证明"编排层身份已切换"**。要证明它，必须让 Worker
+**登记进目录并带上 `owningSecondaryAgentInstanceId`** —— 那正是下一步的实现内容，
+证明与实现合并做，而不是先造一个观测点。

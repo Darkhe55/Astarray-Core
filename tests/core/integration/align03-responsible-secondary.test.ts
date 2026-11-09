@@ -56,6 +56,8 @@ describe("ALIGN-03 责任次级", () => {
       const missionIdentifier = await runtime.controller.handleUserMessage("责任次级测试", {
         projectIdentifier: "project-alpha",
       });
+
+
       const summaryPath = path.join(
         stateDirectory,
         "missions",
@@ -72,6 +74,8 @@ describe("ALIGN-03 责任次级", () => {
       /** 关键反例：**不得**把调度器当成上级。 */
       expect(String(responsibleSecondary).startsWith("scheduler:")).toBe(false);
       expect(String(responsibleSecondary)).not.toBe("main-agent-1");
+
+
     } finally {
       await runtime.shutdown().catch(() => undefined);
     }
