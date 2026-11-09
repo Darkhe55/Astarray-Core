@@ -346,3 +346,26 @@ Git 资源端口未装配（恒 `no-git-allocation`）；移交文件**读入/�
 
 **仍未做（如实）**：**执行侧仍不消费信包**（orchestrator/worker 派发仍用原工具端口与提示词）；
 `createTaskBundle` 仍无生产调用方；`deniedToolNames` 只上报不升级。
+
+### 02 执行侧消费**前置条件未满足**（2026-11-10 核对）
+
+**核对**：全仓 `createTaskBundle` **只有一个定义、零调用方**
+（`task-sequence-controllers.ts:483`）。
+
+⇒ 生产里**根本不存在**任务包，执行侧（Worker 派发的 `task.toolNames`）自然无从消费。
+
+**这意味着"把信包接进执行侧"当前是伪任务**：即使把派发改成
+「有信包用 `envelope.allowedToolNames`，否则回退 `task.toolNames`」，
+回退分支会 **100% 命中**，改动不改变任何行为，只是又一处"看起来接好了"的假接线。
+
+**真正的先后关系**：
+
+1. 规划/派发路径必须**先创建任务包**（`createTaskBundle` 需要生产调用方）；
+2. 任务包随序列落盘（`dispatchEnvelope` 已有 schema）；
+3. **然后**执行侧才有东西可消费。
+
+**因此本条记为"等待前置条件"**，不写成"未做"——避免下一个人再去写一段注定走回退分支的代码。
+
+**另记**：`task.toolNames` 到 Worker 工具端口的链路已确认
+（`mission-orchestrator.ts:956` `getTaskToolNames` → `application-runtime` `buildWorkerToolPort`），
+将来接信包时改这一处即可。
