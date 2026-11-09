@@ -169,3 +169,23 @@
 **仍未做（如实）**：**"崩溃 running ⇒ 拒绝恢复"的应用级用例仍未跑**（需构造 mission 处于 running
 且进程消失的场景）；对账动作（把 running/blocked/已产出任务放回 pending）仍未实现；
 "属主进程已死但未过期"的探测未做。
+
+### 03 崩溃 running ⇒ 拒绝恢复（2026-11-09 追加）
+
+**缺口（本卡记录）**："未跑'崩溃 running ⇒ 拒绝恢复'任何一条"。
+
+**本轮**：用**只读投影** `inspectMissionResumeReadiness` 补 4 条应用级用例
+（不启动真实 mission，只把任务链写进存储再问"能不能自动恢复"）：
+
+| 场景 | 期望 |
+|---|---|
+| **崩溃留下 `running`** | `isAutoResumable=false`，该任务进 `uncertainSideEffectTaskIdentifiers`，且 `blockedReasons` 非空 |
+| `blocked` | 不可恢复，进 `blockedAwaitingDecisionTaskIdentifiers` |
+| 有 `resultLocation` 却非 done | 不可恢复，进 `producedButUnacknowledgedTaskIdentifiers` |
+| 只有干净 `pending` | **可以**恢复，进 `readyPendingTaskIdentifiers`（不误伤正常场景） |
+
+公开全量 **668 files / 4554 passed + 3 skipped**（首次运行有 1 条既有 `anthropic-messages-runtime`
+用例在满载下翻红，隔离 24/24 通过后重跑全量绿）。
+
+**仍未做（如实）**：**对账动作**（把 running/blocked/已产出任务放回 pending 或记录对账结论）仍未实现
+—— 本轮只验证"拒绝自动恢复"这一侧；"属主进程已死但租约未过期"的探测仍未做。
