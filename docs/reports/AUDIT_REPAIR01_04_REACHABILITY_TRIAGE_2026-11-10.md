@@ -380,3 +380,36 @@ capabilityIntent: "需要访问远端仓库", blockingReason: "no-known-match"
 
 **说明**：其余 11 个候选（生产提及 1–6）尚未逐项核对；本批刻意只做 5 个，
 避免一次性下结论却没有逐个读调用链。
+
+## 17. 候选逐项分诊（第二批 10 个，2026-11-10 第二十八轮）
+
+核对方式同上：`git grep -l <类名> -- packages/core/src`，看**是否出现在自身定义文件之外**。
+
+| 候选 | 生产出现文件 | 判定 |
+|---|---|---|
+| `AgentModelAssignmentController` | 仅 `agent-model-assignment-controller.ts` | **未接入** |
+| `AnthropicMessagesAdapter` | 仅 `anthropic-gemini-adapters.ts` | **未接入** |
+| `GeminiInteractionsAdapter` | 仅 `anthropic-gemini-adapters.ts` | **未接入** |
+| `BoundedProviderFallbackGuard` | 仅 `bounded-provider-fallback-guard.ts` | **未接入** |
+| `QuaternaryPermissionIntersectionGuard` | 仅 `quaternary-boundary-guards.ts` | **未接入** |
+| `TaskChainCumulativeBudgetController` | 仅 `task-chain-cumulative-budget.ts` | **未接入** |
+| `HumanWorktreeObserver` | 仅 `human-worktree-observer.ts` | **未接入** |
+| `TertiaryAgentAssignmentPlanner` | 仅 `tertiary-lifecycle.ts` | **未接入（同文件内使用）** |
+| `TertiarySingleChainExecutionGuard` | 仅 `tertiary-lifecycle.ts` | **未接入（同文件内使用）** |
+| `OpenAiChatCompletionsAdapter` | `openai-adapters.ts` + 被 `azure-openai-adapter.ts` 继承 | **未接入**（有继承关系，但无外部构造点） |
+
+**共同形态**：这些类**都有实现与单元测试，但没有任何生产装配点**。
+按卡内要求，这**不能算"已交付"**——"存在源码"不等于可达。
+
+**后继工作（按组）**：
+1. **Provider 适配器组**（`AnthropicMessagesAdapter`/`GeminiInteractionsAdapter`/`OpenAiChatCompletionsAdapter`/
+   `AzureOpenAiAdapter`/`BedrockConverseAdapter`）：需确认 provider 选择链路是否**应**支持这些后端；
+   若应 ⇒ 属产品缺口；若不应 ⇒ 标"未接入且无计划"。
+2. **边界/预算守卫组**（`QuaternaryPermissionIntersectionGuard`/`TaskChainCumulativeBudgetController`/
+   `BoundedProviderFallbackGuard`）：确认是否已被现有门禁替代；被替代 ⇒ 标历史并保留。
+3. **生命周期组**（`HumanWorktreeObserver`/`TertiaryAgentAssignmentPlanner`/`TertiarySingleChainExecutionGuard`）：
+   同文件内使用＝只在构造文件内部闭环，需确认是否应挂到 `tertiary-lifecycle` 的生产装配。
+4. `AgentModelAssignmentController`：与已有的 `setAgentModelBinding` 门面方法比对，确认是否被替代。
+
+**本批仍未做**：`MetricsRegistry`、`AgentAddressGuard`、`TokenMeasurementService`（生产提及 5–6，
+最可能是"已接入但脚本计数偏低"，下一批用调用链确认）。
