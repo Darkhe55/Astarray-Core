@@ -161,3 +161,33 @@ derive-ok
 
 **因此 EXEC-01-02 状态**：初始化分支 **verified**；受控执行分支 **仍 implemented-unverified**，
 断点在上面的"授权给 SID"。
+
+## 执行记录（2026-11-10 第三段：用户在普通窗口跑验收）
+
+用户实测输出（真实）：
+
+| 检查 | 结果 |
+|---|---|
+| 1 沙箱内正常执行 | `CreateProcessW 失败: 5` |
+| 2 文件越界 | `CreateProcessW 失败: 5` |
+| 3 网络拒绝 | `CreateProcessW 失败: 5` |
+| 对照 `--no-appcontainer` | ✅ `job-assigned` → `job-ok` → `exit-code 0` |
+
+**结论**：Job Object 半区通过；AppContainer 半区在**进程创建**这一步就失败（连检查 2/3 都跑不到）。
+
+### 追加排查（本轮）
+
+| 排查 | 结果 | 含义 |
+|---|---|---|
+| `probe` | `derive` 成功、**`appcontainer-created sid-present=true`**、`job-created` | 非提权下**建档案**本身可行；不是权限面被整体封死 |
+| 显式给工作目录（`%LOCALAPPDATA%\Packages\<profile>\Temp`） | 仍 `失败: 5` | **不是**"继承父进程工作目录导致无权" |
+| 显式全路径 `C:\Windows\System32\cmd.exe` | 仍 `失败: 5` | **不是** PATH 解析问题 |
+
+**仍未定位**：`CreateProcessW` 在挂载 `PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES` 后返回
+`ERROR_ACCESS_DENIED`。已排除：档案不存在、结构布局错、缓冲区对齐、工作目录、PATH。
+
+**下一步排查顺序（未做）**：
+1. 用 `icacls` 查 `astarray-exec` 的 SID 对 `cmd.exe` 的实际 ACL（确认是否缺 `ALL APPLICATION PACKAGES` 读执行）；
+2. 用同一 SID 建一个**最小**测试（仅 `CreateProcessW` + 空 capability），确认是否与 capability 集为空有关；
+3. 检查档案创建者上下文（提权建 vs 非提权建）是否影响 SID 可用性——`probe` 显示非提权建档案可行，
+   可尝试用**非提权**方式重建同名档案后重测。

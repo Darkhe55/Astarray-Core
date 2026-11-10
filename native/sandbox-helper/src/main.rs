@@ -589,6 +589,20 @@ fn run_sandboxed(arguments: &[String]) {
         }
     }
 
+    /**
+     * 容器内可写、且容器有权访问的工作目录：
+     * `%LOCALAPPDATA%\Packages\<profile>\Temp`（档案创建时由系统建好）。
+     * 取不到时退回 `C:\Windows\Temp`（对 AppContainer 只读但可进入）。
+     */
+    let working_directory: Vec<u16> = {
+        let candidate = std::env::var("LOCALAPPDATA")
+            .ok()
+            .map(|base| format!("{base}\\Packages\\{profile_name}\\Temp"));
+        match candidate {
+            Some(path) if std::path::Path::new(&path).is_dir() => wide(&path),
+            _ => wide("C:\\Windows\\Temp"),
+        }
+    };
     let mut startup: StartupInfoExW = unsafe { std::mem::zeroed() };
     startup.startup_info.cb = std::mem::size_of::<StartupInfoExW>() as Dword;
     startup.lp_attribute_list = attribute_list;
@@ -633,7 +647,12 @@ fn run_sandboxed(arguments: &[String]) {
                     0
                 },
             ptr::null_mut(),
-            ptr::null(),
+            /**
+             * 2026-11-10 修正：工作目录必须显式给出**容器可访问**的路径。
+             * 传 null ⇒ 子进程继承父进程当前目录（用户工作区），
+             * AppContainer 无权访问 ⇒ `CreateProcessW` 返回 ERROR_ACCESS_DENIED(5)。
+             */
+            working_directory.as_ptr(),
             &mut startup.startup_info,
             &mut process_information,
         )
