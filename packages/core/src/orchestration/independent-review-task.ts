@@ -26,6 +26,8 @@ export interface BuildReviewTaskNodeInput {
   readonly reviewedTaskIdentifier: string;
   readonly reviewerAgentInstanceId: string;
   readonly acceptanceCriteria: string | null;
+  /** 送审产物路径（来自完成收据）；审查者据此复核，报告证据必须引用其中之一。 */
+  readonly artifactPaths?: readonly string[];
   /** 审查任务自身标识；缺省按 `review:<reviewedTaskId>` 生成。 */
   readonly reviewTaskIdentifier?: string;
 }
@@ -62,7 +64,11 @@ export function buildReviewTaskNode(input: BuildReviewTaskNodeInput): TaskDepend
       REVIEW_EVIDENCE_LINE_PREFIX +
       " <可复核引用>\n" +
       "验收要求：" +
-      criteria,
+      criteria +
+      (input.artifactPaths === undefined || input.artifactPaths.length === 0
+        ? ""
+        : "\n送审产物（证据必须引用其中之一）：\n" +
+          input.artifactPaths.map((path) => "EVIDENCE: artifact:" + path).join("\n")),
     dependsOn: [input.reviewedTaskIdentifier],
     taskType: "review",
     toolNames: [],
@@ -135,6 +141,11 @@ export interface ResolveReviewVerdictInput {
   /** 审查任务登记的报告路径（相对项目根）；未登记时为空。 */
   readonly resultLocation: string | null;
   readonly reviewOutcome: "success" | "failure";
+  /**
+   * 送审产物路径。给出时，报告的 `EVIDENCE: artifact:*` **必须**命中其中之一，
+   * 否则视为证据不匹配 ⇒ rework（防止审查者引用别的文件冒充本次产物）。
+   */
+  readonly expectedArtifactPaths?: readonly string[];
 }
 
 export interface ResolvedReviewVerdict {
@@ -193,9 +204,41 @@ export async function resolveReviewVerdict(
         "审查报告缺少有效裁决行（需 VERDICT: accept|rework，且 accept 必须带 EVIDENCE）。",
     };
   }
+  const expectedArtifactPaths = input.expectedArtifactPaths ?? [];
+  if (parsedReport.verdict === "merge-ready" && expectedArtifactPaths.length > 0) {
+    const citedArtifactPaths = parsedReport.evidenceReferences
+      .filter((reference) => reference.startsWith("artifact:"))
+      .map((reference) => reference.slice("artifact:".length).trim());
+    const isMatched = citedArtifactPaths.some((cited) => expectedArtifactPaths.includes(cited));
+    if (!isMatched) {
+      return {
+        verdict: "rework",
+        evidenceReferences: [`check:review-evidence-mismatch:${reportLocation}`],
+        reason:
+          "审查报告的证据未引用本次送审产物（期望引用其中之一：" +
+          expectedArtifactPaths.join("、") +
+          "）。",
+      };
+    }
+  }
   return {
     verdict: parsedReport.verdict,
     evidenceReferences: [`review-report:${reportLocation}`, ...parsedReport.evidenceReferences],
     reason: parsedReport.reason,
   };
+}
+/** 从审查任务描述里取回"送审产物路径"（构造时写入，供裁决校验用）。 */
+export function parseReviewArtifactPathsFromDescription(
+  description: string,
+): readonly string[] {
+  const paths: string[] = [];
+  for (const line of description.split(/\r?\n/u)) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine.startsWith(REVIEW_EVIDENCE_LINE_PREFIX)) continue;
+    const reference = trimmedLine.slice(REVIEW_EVIDENCE_LINE_PREFIX.length).trim();
+    if (!reference.startsWith("artifact:")) continue;
+    const artifactPath = reference.slice("artifact:".length).trim();
+    if (artifactPath !== "") paths.push(artifactPath);
+  }
+  return paths;
 }

@@ -160,7 +160,11 @@ import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
 import { projectTaskReconciliationVerdicts } from "./task-reconciliation-verdict.js";
 import { checkOutputArtifact } from "./output-artifact-check.js";
 import { evaluateArtifactPrecondition } from "./artifact-precondition.js";
-import { buildReviewTaskNode, resolveReviewVerdict } from "./independent-review-task.js";
+import {
+  buildReviewTaskNode,
+  parseReviewArtifactPathsFromDescription,
+  resolveReviewVerdict,
+} from "./independent-review-task.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
 import type { CrossAgentContextAttachmentController } from "./cross-agent-attachment-controller.js";
 import type { DirectDispatchController } from "./direct-dispatch-controller.js";
@@ -4779,6 +4783,7 @@ export class MainController {
               readonly taskId: string;
               readonly contributorAgentInstanceId: string;
               readonly responsibleSecondaryAgentInstanceId: string;
+              readonly artifactPaths: readonly string[];
             }) => {
               const reviewerAgentInstanceId = `reviewer:${input.missionId}:${input.taskId}`;
               const directory = this.options.registeredAgentDirectory;
@@ -4835,9 +4840,13 @@ export class MainController {
               const task = taskChain?.tasks.find(
                 (candidate) => candidate.id === input.taskId,
               );
+              /**
+               * 方案 C：送审产物取自**完成收据**（`input.artifactPaths`），
+               * 不读 `task.resultLocation`（后者在既有流程里另有消费者）。
+               */
               const artifactPrecondition = await evaluateArtifactPrecondition({
                 projectRootPath,
-                resultLocation: task?.resultLocation ?? null,
+                artifactPaths: input.artifactPaths,
               });
               if (artifactPrecondition.isSatisfied) {
                 /**
@@ -4854,6 +4863,7 @@ export class MainController {
                     reviewedTaskIdentifier: input.taskId,
                     reviewerAgentInstanceId,
                     acceptanceCriteria: task?.acceptanceCriteria ?? null,
+                    artifactPaths: artifactPrecondition.confirmedArtifactPaths,
                   }),
                 };
               }
@@ -4906,6 +4916,18 @@ export class MainController {
                       reviewTaskIdentifier: reviewInput.taskId,
                       resultLocation: reviewInput.resultLocation,
                       reviewOutcome: reviewInput.outcome,
+                      /** 送审产物路径由审查任务描述携带（构造时写入）。 */
+                      expectedArtifactPaths: await (async () => {
+                        const chain = await this.options.taskStore.readTaskChain(
+                          reviewInput.missionId,
+                        );
+                        const reviewNode = chain?.tasks.find(
+                          (candidate) => candidate.id === reviewInput.taskId,
+                        );
+                        return reviewNode === undefined
+                          ? []
+                          : parseReviewArtifactPathsFromDescription(reviewNode.description);
+                      })(),
                     });
               await this.recordAcceptanceVerdict({
                 appointmentIdentifier: `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`,

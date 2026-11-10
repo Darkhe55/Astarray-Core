@@ -475,6 +475,13 @@ export interface MissionOrchestratorOptions {
     readonly taskId: string;
     readonly contributorAgentInstanceId: string;
     readonly responsibleSecondaryAgentInstanceId: string;
+    /**
+     * ALIGN-03-01（方案 C）：送审产物路径，取自**完成收据**（本地真实落盘状态）。
+     *
+     * 送审前置检查读这里，而**不读** `resultLocation`——后者在既有流程里另有消费者，
+     * 直接回填会把返修任务卡成 blocked（2026-11-10 实测）。
+     */
+    readonly artifactPaths: readonly string[];
   }) => void | { readonly reviewTask: TaskDependencyNode } | Promise<void | {
     readonly reviewTask: TaskDependencyNode;
   }>;
@@ -1457,6 +1464,12 @@ export class MissionOrchestrator {
                   taskId: action.taskId,
                   contributorAgentInstanceId: agentInstanceId,
                   responsibleSecondaryAgentInstanceId: responsibleSecondary,
+                  artifactPaths:
+                    outcome.outcome === "success" &&
+                    outcome.completionReceipt !== undefined &&
+                    outcome.completionReceipt !== null
+                      ? [...outcome.completionReceipt.artifactPaths]
+                      : [],
                 });
               /**
                * 装配方给出审查任务 ⇒ 在**安全点**注入；拒绝（有在途任务）时如实上报，

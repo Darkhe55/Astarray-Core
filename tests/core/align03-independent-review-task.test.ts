@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReviewTaskIdentifier,
   buildReviewTaskNode,
+  parseReviewArtifactPathsFromDescription,
   parseReviewVerdictReport,
   resolveReviewVerdict,
 } from "../../packages/core/src/orchestration/independent-review-task.js";
@@ -169,5 +170,60 @@ describe("ALIGN-03-01 裁决只能来自审查报告（含真实文件）", () =
     } finally {
       await rm(root, { recursive: true, force: true, maxRetries: 10 });
     }
+  });
+});
+describe("ALIGN-03-01 报告证据必须引用本次送审产物（方案 C）", () => {
+  it("证据引用了送审产物 ⇒ merge-ready", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const root = await mkdtemp(join(tmpdir(), "astarray-review-evidence-"));
+    try {
+      await writeFile(join(root, "r.md"), "VERDICT: accept\nEVIDENCE: artifact:docs/out.md\n", "utf8");
+      const resolved = await resolveReviewVerdict({
+        projectRootPath: root,
+        reviewTaskIdentifier: "review:T-1",
+        resultLocation: "r.md",
+        reviewOutcome: "success",
+        expectedArtifactPaths: ["docs/out.md"],
+      });
+      expect(resolved.verdict).toBe("merge-ready");
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10 });
+    }
+  });
+
+  it("证据引用了**别的文件** ⇒ rework + review-evidence-mismatch（防冒充）", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const root = await mkdtemp(join(tmpdir(), "astarray-review-evidence-"));
+    try {
+      await writeFile(join(root, "r.md"), "VERDICT: accept\nEVIDENCE: artifact:docs/other.md\n", "utf8");
+      const resolved = await resolveReviewVerdict({
+        projectRootPath: root,
+        reviewTaskIdentifier: "review:T-1",
+        resultLocation: "r.md",
+        reviewOutcome: "success",
+        expectedArtifactPaths: ["docs/out.md"],
+      });
+      expect(resolved.verdict).toBe("rework");
+      expect(resolved.evidenceReferences[0]).toContain("check:review-evidence-mismatch");
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10 });
+    }
+  });
+
+  it("审查任务描述里的送审产物可被取回（控制器据此校验）", () => {
+    const node = buildReviewTaskNode({
+      reviewedTaskIdentifier: "T-1",
+      reviewerAgentInstanceId: "reviewer:1",
+      acceptanceCriteria: null,
+      artifactPaths: ["docs/out.md", "docs/report.md"],
+    });
+    expect(parseReviewArtifactPathsFromDescription(node.description)).toEqual([
+      "docs/out.md",
+      "docs/report.md",
+    ]);
   });
 });
