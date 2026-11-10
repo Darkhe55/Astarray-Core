@@ -329,6 +329,53 @@ struct Limits {
     max_cpu_time_100ns: i64,
 }
 
+#[link(name = "advapi32")]
+extern "system" {
+    fn ConvertSidToStringSidW(sid: *mut c_void, string_sid: *mut *mut u16) -> i32;
+}
+
+/**
+ * 打印档案的**权威 SID 字符串**（供 `icacls` 复核 ACL 用）。
+ *
+ * 手算 SID（名称哈希）曾给出无法 Translate 的值，因此必须以系统 API 为准。
+ */
+fn run_print_sid(arguments: &[String]) {
+    let mut profile_name = String::from("astarray-exec");
+    let mut index = 0;
+    while index < arguments.len() {
+        if arguments[index] == "--profile" {
+            profile_name = arguments
+                .get(index + 1)
+                .cloned()
+                .unwrap_or_else(|| profile_name.clone());
+            index += 2;
+            continue;
+        }
+        index += 1;
+    }
+    let name = wide(&profile_name);
+    let mut sid: *mut c_void = ptr::null_mut();
+    let result = unsafe { DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &mut sid) };
+    if result < 0 || sid.is_null() {
+        println!("derive-failed hresult=0x{:08X}", result as u32);
+        std::process::exit(3);
+    }
+    let mut string_sid: *mut u16 = ptr::null_mut();
+    let converted = unsafe { ConvertSidToStringSidW(sid, &mut string_sid) };
+    if converted == 0 || string_sid.is_null() {
+        println!("convert-failed lastError={}", unsafe { GetLastError() });
+        std::process::exit(3);
+    }
+    let mut length = 0usize;
+    unsafe {
+        while *string_sid.add(length) != 0 {
+            length += 1;
+        }
+    }
+    let slice = unsafe { std::slice::from_raw_parts(string_sid, length) };
+    println!("profile={} sid={}", profile_name, String::from_utf16_lossy(slice));
+    unsafe { LocalFree(string_sid as *mut c_void) };
+}
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let command = arguments.first().map(String::as_str).unwrap_or("probe");
@@ -336,6 +383,7 @@ fn main() {
         "probe" => run_probe(),
         "init-sandbox" => run_init_sandbox(&arguments[1..]),
         "run" => run_sandboxed(&arguments[1..]),
+        "print-sid" => run_print_sid(&arguments[1..]),
         other => {
             eprintln!("未知子命令: {other}");
             std::process::exit(2);

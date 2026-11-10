@@ -217,3 +217,30 @@ derive-ok
 3. 做**最小复现**：只调 `CreateProcessW` + 空 capability（不建 Job、不建属性列表外的任何东西），
    确认 5 是否来自属性列表；
 4. 修好后**再**请用户复跑 §5 四项，并先补 node 路径授权。
+
+## 排查工具：`print-sid`（2026-11-10）
+
+新增子命令，用系统 API（`DeriveAppContainerSidFromAppContainerName` + `ConvertSidToStringSidW`）
+打印档案的**权威 SID 字符串**：
+
+```powershell
+.\native\sandbox-helper\sandbox-helper.exe print-sid --profile astarray-exec
+# → profile=astarray-exec sid=S-1-15-2-3142755585-…（7 段）
+```
+
+**为什么必须用 API**：此前按名称哈希手算得到 `S-1-15-2-2959418034-…`（4 段），
+既不等于真实值、也无法被 `Translate` 解析 —— **手算不可信，不得据此判断 ACL**。
+
+### 据此复核到的事实
+
+| 检查 | 结果 |
+|---|---|
+| 档案目录存在 | ✅ `%LOCALAPPDATA%\Packages\astarray-exec` |
+| `cmd.exe` 对 AppContainer | ✅ 有 `ALL APPLICATION PACKAGES:(RX)`（`icacls` 按名称显示，故 grep `S-1-15-2` 无结果） |
+| `node.exe` 对 AppContainer | ❌ 无该条目 ⇒ **node 默认不可被容器执行** |
+| 我们的档案 SID 是否在 `node.exe` ACL 中 | ❌ 没有 |
+
+⇒ 即使 `CreateProcessW` 修好，`node -e` 类验收仍会失败在"无法执行 node"。
+必须把运行时路径授权给**项目派生 SID**（安装期 provisioning，属 EXEC-01-04）。
+
+**`CreateProcessW 5` 仍未定位**；已排除：档案不存在、结构布局、缓冲区对齐、工作目录、PATH、目标文件不可读。
