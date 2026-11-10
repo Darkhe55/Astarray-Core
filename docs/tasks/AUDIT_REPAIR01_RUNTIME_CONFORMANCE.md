@@ -347,3 +347,30 @@ worker 使用的 profile 引用在装配时固定，不读当前选择。本用�
 **本文件首版的一处测试自身缺陷（如实记录）**：`toolResultMessages` 是**累积**的，用 `flatMap`
 会把同一条结果重复计入，导致"第二次结果"其实还是第一次 —— 曾据此误判"收紧无效"。
 改为只取最后一条输入的 `toolResultMessages` 后，行为与断言一致。
+
+## 核对记录（2026-11-10）：**03 已完成**，卡面状态滞后
+
+| 检查点 | 卡面状态 | 代码/测试实际 | 判定 |
+|---|---|---|---|
+| 01 统一执行门禁 | pending（进度记录写"01 部分交付：旁路已删除，统一门禁生效"） | 进度记录已记 | 已被代码超越，卡面未同步 |
+| 02 Anthropic 流严格性 | pending（进度记录写"02 部分交付"） | `anthropic-messages-runtime` 等用例存在 | 部分交付，需逐条核 |
+| **03 磁盘缓存安全边界与 TTL** | pending | **全部实现且有测试** | **implemented-unverified** |
+| 04 生产可达性分诊 | pending | — | 未做 |
+| 05 包级验收 | pending | — | 平台条件 |
+
+### 03 的逐条证据（本轮实测）
+
+| 卡内"必须编码" | 代码 | 测试用例 |
+|---|---|---|
+| ① 可注入时钟 + `maximumEntryAgeMilliseconds`（默认 300000，0 禁用，非法拒绝） | `infra/cache.ts:127/134/139` | "TTL=0 禁用读写；非法配置拒绝" |
+| ② schemaVersion + expiresAtIso + 结构/键/时间校验 + 过期 stale-reject + 旧格式按 miss | `cache.ts:44/47` | "到期前命中；恰好到期/之后 stale-reject"、"旧格式/损坏/键不一致 ⇒ miss" |
+| ③ 键含项目/个体/profile/revision/工具版本/schema；缺隔离字段 bypass | `cache.ts` 键构造 | "身份/项目/profile/revision/工具版本/schema 任一不同 ⇒ 不同 key"、"缺必填隔离字段 ⇒ 明确 bypass" |
+| ④ key 只接受定长十六进制、拒绝路径穿越 | `cache.ts` 校验 | "非十六进制/路径穿越 key ⇒ bypass；写入拒绝" |
+| ⑤ 指纹失败 unavailable + bypass；不缓存失败/时间敏感/写/敏感内容 | `cache.ts` | "指纹不可用 ⇒ bypass"、"写/时间敏感/失败/敏感内容/工具指令 ⇒ bypass" |
+| ⑥ 命中也须过权限检查；ponder 不新增写入；过期仅逻辑失效不删盘 | `authorizeRead` | "authorizeRead=false ⇒ bypass（命中也不能绕过权限）" |
+| ⑦ 本检查点不入模型执行链 | — | 装配边界见 04 |
+
+**实测**：`npx vitest run tests/core/unit/cache-safety.test.ts tests/core/unit/cache-metrics.test.ts`
+⇒ **28 passed**，exit 0。
+
+**结论**：03 转 **implemented-unverified**（生产接线仍待 04 核查，符合卡内 ⑦）。
