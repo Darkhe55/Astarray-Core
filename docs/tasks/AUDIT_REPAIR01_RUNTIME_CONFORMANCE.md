@@ -408,3 +408,16 @@ chunks: ["data: {not-json}\n\n", sse({type:"message_stop"})]
 **结论**：01 转 **implemented-unverified**。
 **仍缺**：卡内完成判据里的"权限 revision 改变后旧批准失效"与"把统一策略替换为必拒绝策略"两条**反例**，
 当前测试集未直接覆盖 —— 记为待补项，不据此改判完成度。
+
+### 01 反例补齐（2026-11-10）
+
+| 完成判据 | 证据 | 结果 |
+|---|---|---|
+| **批准绑定本次参数**：批准 A 后改用 B ⇒ 重新裁决、不落盘 | 新增用例（`audit01-application-matrix`）：先 `grantSessionAuthorization("proposeGoal", A)`，脚本实际用 B 调用 | **通过**：无提案文件 |
+| **必拒绝策略反例**：统一策略拒绝时仍落盘 ⇒ 测试必须失败 | 既有 `blank-custom`（项目级覆盖到空白权限组，`goal.propose` 回退 deny）用例断言"无提案文件" | **已覆盖** |
+
+**说明**：第二条的"变异"含义由 `blank-custom` 用例承担——若存在绕过统一策略的旁路，
+该用例会因"deny 仍落盘"而失败；本轮未新增第二个等价用例，避免重复。
+
+**实测**：`audit01-application-matrix` ⇒ **10 passed**；全量 `check:low-parallel` ⇒
+**687 files / 4669 passed + 3 skipped，exit 0**。

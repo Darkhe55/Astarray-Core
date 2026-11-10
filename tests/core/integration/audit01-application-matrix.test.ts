@@ -123,6 +123,10 @@ async function runMatrixCase(input: {
   readonly restrictedToolNames?: readonly string[];
   /** `blank-custom`：切换到空白自定义权限组（`goal.propose` 回退 deny）。 */
   readonly permissionProfileSource?: "blank-custom";
+  /** 预先批准的参数串（用于验证"批准绑定本次参数"）。 */
+  readonly grantedArgumentsJson?: string;
+  /** 本次实际调用参数（缺省用 validProposalArguments）。 */
+  readonly callArgumentsJson?: string;
 }): Promise<{
   readonly toolResultText: string;
   readonly streamedText: string;
@@ -167,7 +171,7 @@ async function runMatrixCase(input: {
         } as AgentRuntime;
       }
       return buildScriptedRuntime({
-        argumentsJson: validProposalArguments,
+        argumentsJson: input.callArgumentsJson ?? validProposalArguments,
         recordedInputs,
       });
     },
@@ -184,6 +188,13 @@ async function runMatrixCase(input: {
         requestedBy: "user",
       });
       expect(activation.isActive).toBe(true);
+    }
+    if (input.grantedArgumentsJson !== undefined) {
+      await runtime.controller.grantSessionAuthorization(
+        "proposeGoal",
+        input.grantedArgumentsJson,
+        Math.floor(Date.now() / 1000),
+      );
     }
     if (input.permissionProfileSource === "blank-custom") {
       /**
@@ -356,6 +367,26 @@ describe("AUDIT-REPAIR-01 应用级矩阵", () => {
     expect(content.draft?.objectiveText).toContain("只读视图");
   }, 90_000);
 
+  it("**批准绑定参数**：批准 A 后改用 B ⇒ 重新裁决，且不落盘", async () => {
+    const result = await runMatrixCase({
+      mode: "assist",
+      isGoalModeActivated: true,
+      grantedArgumentsJson: validProposalArguments,
+      callArgumentsJson: JSON.stringify({
+        objectiveText: "换了一个完全不同的目标",
+        requirements: [
+          {
+            requirementIdentifier: "req-2",
+            description: "另一份要求",
+            evidenceRequirement: "artifact",
+            weight: 1,
+          },
+        ],
+      }),
+    });
+    /** 参数变了 ⇒ 旧批准不得沿用 ⇒ 不得落盘。 */
+    expect(result.proposalFiles).toEqual([]);
+  });
   it("同一断言对：未激活不落盘、激活才落盘", async () => {
     const withoutActivation = await runMatrixCase({
       mode: "devolve",
