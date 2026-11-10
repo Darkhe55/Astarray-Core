@@ -245,3 +245,27 @@
 下一轮第一步：在 `answerToolHelpRequest` 附近定位 revision 的权威来源
 （对比 `knownToolGroupRevision` 的比较点），再用正确值断言
 `usage-provided` / `known-but-not-usable` / `escalated-missing-tool` 三条。
+
+## 12. 工具说明回访（第二十二轮）：请求已进判定，仍差"分配集合"语义
+
+定位到陈旧检查口径：`tool-help-recall-controller.ts:185`
+`request.knownToolGroupRevision < currentToolGroupRevision ⇒ stale`（**只拒绝落后**）。
+按此把请求版本号取为不小于当前值后，请求**真正进入分配判定**：
+
+| 请求 | 实际 resolution |
+|---|---|
+| 任务链里声明的工具（`readFile`） | **`known-but-not-usable`** |
+| 不存在的工具 | 未跑到（前一条先失败） |
+
+`known-but-not-usable` 的语义是"注册表有、但**不属于请求者可用集合**"。
+但该工具确实出现在任务 `toolNames` 里 ⇒ 说明**分配集合的取法**与我的假设不同，
+可能是：请求者身份（`requesterAgentInstanceId`）与任务的 `assignedAgentId` 不匹配，
+或分配集合另有人权限来源（profile/allowedToolNames）。
+
+**本轮仍未留下用例**（第二次）：现在写死任何断言都可能是在验证我的错误假设。
+**下一轮第一步**：读 `answerToolHelpRequest` 里 `assignedDocumentation` 的完整构造与
+`known-but-not-usable` 的判定分支，确定"请求者可用集合"的真实来源，再一次性写对三条用例。
+
+**代价说明（如实）**：这一小项已经花了三轮（第 21、22 轮各一次失败），
+比预期高；如果下一轮仍不能一次写对，我会把它标为"需更深入了解，另开专项"，
+转去做收益更高的项，而不是继续在这里打转。
