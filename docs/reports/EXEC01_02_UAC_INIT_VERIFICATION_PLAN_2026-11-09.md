@@ -121,3 +121,43 @@ cd C:\Users\<username>\Documents\astarray\astarray
 
 然后**关闭该提权窗口**，在**普通**PowerShell 中按 §5 的四项验收逐条执行并把输出贴回。
 我据此更新本卡与台账（当前状态：`02 安装期初始化入口 = implemented-unverified`，成功分支未验证）。
+
+## 执行记录（2026-11-10 第二段：用户已在桌面完成初始化）
+
+**用户执行结果**（真实输出，非推断）：
+
+```
+profile-created name=astarray-exec
+derive-ok
+```
+
+档案已存在：`%LOCALAPPDATA%\Packages\astarray-exec`（创建时间 2026-11-10 12:30）。
+
+### 初始化成功后暴露的三个真实缺陷（已修）
+
+| # | 现象 | 根因 | 修复 |
+|---|---|---|---|
+| 1 | 非提权 `run` 仍报 `CreateAppContainerProfile 失败: HRESULT=0x80070005`（档案明明已存在） | 回退派生只覆盖 `ERROR_ALREADY_EXISTS`/`0x800700B7`，**没覆盖 `E_ACCESSDENIED`**；而"档案已存在 + 调用者未提权"正是返回 5 的情形 | 把 `0x80070005` 也纳入派生回退（派生不需要提权） |
+| 2 | 修 ①后 `UpdateProcThreadAttribute 失败: 87` | `SECURITY_CAPABILITIES` 结构**字段顺序错**：把 `CapabilityCount` 放在 `Capabilities` 指针之前 ⇒ 布局与 Win32 不一致 | 改为 `AppContainerSid, Capabilities, CapabilityCount, Reserved` |
+| 3 | 属性列表缓冲区 | `Vec<u8>` 只有 1 字节对齐，属性列表要求指针对齐 | 改用 `Vec<usize>` 分配 |
+
+### 验收进度（非提权执行，真实输出）
+
+| # | 检查 | 结果 |
+|---|---|---|
+| — | Job Object 半区（`--no-appcontainer`） | ✅ `job-assigned` → `job-ok` → `exit-code 0` |
+| 1 | AppContainer 内正常执行 | ❌ `CreateProcessW 失败: 5`（拒绝访问） |
+| 2–4 | 文件越界 / 网络 / 子进程 | 未执行（被 ①阻塞） |
+
+### 结论与下一步
+
+- **初始化（提权建档案）已真实验证通过**：`profile-created` + `derive-ok` + 档案目录存在；
+- **Job Object 限额半区已真实验证通过**；
+- **AppContainer 执行半区仍失败**（`CreateProcessW` 返回 5）。
+
+**最可能原因**：AppContainer SID 对目标可执行文件（`C:\Windows\System32\cmd.exe` 亦然）没有读取/执行权限，
+即"档案建好后还需要把受控执行所需路径**授权给该 SID**"这一步尚未实现——这一步需要提权，
+属安装期 provisioning 的一部分（EXEC-01-04/05），不是 `run` 阶段能自行完成的。
+
+**因此 EXEC-01-02 状态**：初始化分支 **verified**；受控执行分支 **仍 implemented-unverified**，
+断点在上面的"授权给 SID"。

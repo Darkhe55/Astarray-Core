@@ -44,8 +44,14 @@ struct SidAndAttributes {
 #[derive(Default, Clone, Copy)]
 struct SecurityCapabilities {
     app_container_sid: *mut c_void,
-    capability_count: Dword,
+    /**
+     * 2026-11-10 修正：字段顺序必须与 Win32 `SECURITY_CAPABILITIES` 一致：
+     * `AppContainerSid, Capabilities(指针), CapabilityCount, Reserved`。
+     * 之前把 `capability_count` 放在指针前面 ⇒ 布局错位 ⇒
+     * `UpdateProcThreadAttribute` 返回 `ERROR_INVALID_PARAMETER (87)`。
+     */
     capabilities: *const SidAndAttributes,
+    capability_count: Dword,
     reserved: Dword,
 }
 
@@ -262,8 +268,18 @@ fn ensure_app_container(profile_name: &str) -> Result<*mut c_void, String> {
     if result >= 0 {
         return Ok(sid);
     }
-    // 档案已存在：直接派生 SID（幂等，不重建）。
-    if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS || result as u32 == 0x8007_00B7 {
+    /**
+     * 档案已存在，或**调用者未提权**：都尝试派生 SID。
+     *
+     * 2026-11-10 实测：档案由提权进程创建后，普通用户调用 `CreateAppContainerProfile`
+     * 仍返回 `E_ACCESSDENIED (0x80070005)`（即使档案已存在）。派生 SID
+     * （`DeriveAppContainerSidFromAppContainerName`）**不需要提权**，因此这里必须一并回退，
+     * 否则"初始化成功"之后普通用户仍无法运行沙箱。
+     */
+    if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS
+        || result as u32 == 0x8007_00B7
+        || result as u32 == 0x8007_0005
+    {
         let mut derived: *mut c_void = ptr::null_mut();
         let derive_result = unsafe {
             DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &mut derived)
@@ -548,7 +564,8 @@ fn run_sandboxed(arguments: &[String]) {
         unsafe {
             InitializeProcThreadAttributeList(ptr::null_mut(), 1, 0, &mut attribute_size);
         }
-        attribute_buffer = vec![0u8; attribute_size];
+        // 用 `usize` 分配：属性列表要求指针对齐（`Vec<u8>` 只有 1 字节对齐）。
+        attribute_buffer = vec![0usize; (attribute_size + std::mem::size_of::<usize>() - 1) / std::mem::size_of::<usize>()];
         attribute_list = attribute_buffer.as_ptr() as *mut c_void;
         if unsafe { InitializeProcThreadAttributeList(attribute_list, 1, 0, &mut attribute_size) } == 0
         {
