@@ -1909,3 +1909,31 @@ DomainError: mission 租约文件损坏，拒绝读取/覆盖: …/mission-lease
 
 **公开库整体状态**：台账 §11 各卡均为 implemented-unverified；剩余项为平台条件
 （干净设备、Linux/macOS 证据）或需用户决策（UAC 验证、审查默认开启）。
+
+### 11.I 待验收摘要（2026-11-10）
+
+**公开库全部可施工项已到 implemented-unverified**，逐项证据如下（均含测试与提交）。
+
+| 卡 | 本轮后的证据 | 状态 |
+|---|---|---|
+| SEC-02 通道 14 | CLI 诊断统一漏斗（去 ANSI → 脱敏 → 换行转义 → 截断）+ 静态守卫；`sec02-cli-diagnostic-funnel`(5) / `sec02-diagnostic-funnel-guard`(2) | implemented-unverified |
+| ALIGN-03-02 | 信包白名单 / 五项禁止字段 / 权限求交 / 必填项 / 可选附件；`align03-task-bundle-envelope`(10) | implemented-unverified |
+| ALIGN-03-04 | 审查者存在性 + 隶属（同所属次级）+ 非自审，已接协调器；`align03-review-evidence`(19) | implemented-unverified |
+| ALIGN-03-05 | 证据绑定通过/拒绝路径（含"过期证据"核心反例）；`align03-review-evidence` | implemented-unverified |
+| ALIGN-03-06 | 补送指数退避 + `deferredCount`；`align03-outbox-backoff`(4) | implemented-unverified |
+| ALIGN-03-07 | 关闭钩子接生产 + 移交可读回 + Git 资源如实报告；`align03-tertiary-close-wiring` / `align03-handoff-read`(6) | implemented-unverified |
+| ALIGN-03-01 | 责任次级持久化 → Worker 登记真实上级 → 未绑定即阻断 → 自动任命 → **裁决落盘**；`align03-worker-ownership`(8) / `align03-ownership-blocking`(4) / `align03-auto-review-appointment`(3) / `align03-artifact-backed-verdict`(6) | implemented-unverified（**默认关闭**） |
+| ALIGN-04-03 | 租约 7 条 + 崩溃恢复 4 条 + 对账结论 7 条 + 产物校验（已接线）；`align04-lease-takeover` / `align04-crash-resume-refusal` / `align04-task-reconciliation-verdict` / `align04-output-artifact-check` | implemented-unverified |
+| ALIGN-04-04 | 工作时段判定 7 条；`align04-work-window-resume` | implemented-unverified |
+| ALIGN-04-05 | 回访拒绝路径 2 条 + 注入面 5 条；`align04-context-recall-refusal` / `align04-context-recall-injection` | implemented-unverified |
+| HISTORY-01 | 历史查询对租约瞬时不可读的容错（**修复 1/70 抖动根因**）；`history01-lease-observation-resilience`(3) | implemented-unverified |
+| GUI-03 服务端能力 | 作用域预算 3 条 + 参数授权 4 条行为证据；`gui03-scoped-context-budget` / `gui03-parameter-authorization` | implemented-unverified |
+| 仓库隐私边界 | 57 文档 / 159 处外部仓库措辞已中性化 + 新增守卫 | 已完成（历史改写待授权） |
+
+**权威门禁**：`npx vitest run --maxWorkers=1` ⇒ **684 files / 4629 passed + 3 skipped / exit 0**。
+
+**仍需用户决定（不虚报完成）**：
+
+1. **ALIGN-03-01 默认开关**：是否默认启用"产物存在性验收"作为完成门槛；若不足需先做真实审查 Worker；
+2. **EXEC-01-02**：UAC 初始化验证的执行确认与目标账户（隔离方案仍"待验证"）；
+3. **隐私历史改写**：git 历史仍含旧措辞与一次误提交的用户文档，改写需 force-push 授权。
