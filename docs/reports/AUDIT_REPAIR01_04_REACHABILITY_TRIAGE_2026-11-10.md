@@ -298,3 +298,29 @@
 然后断言 `usage-provided` / `known-but-not-usable` / `escalated-missing-tool` 三条。
 
 **三轮的教训**：我应该在第 21 轮就先读这段构造（30 行），而不是先写测试撞两次。
+
+## 14. 工具说明回访：**装配级已证**（2026-11-10 第二十四轮）
+
+按上一轮的根因**一次写对**：注入 `toolDocumentationRegistry` + `knownToolGroupRevision = taskChain.revision`。
+
+新增 `tests/core/integration/audit04-tool-help-assembly.test.ts`（1 条，含两段断言）：
+
+| 断言 | 结果 |
+|---|---|
+| 已分配工具（`readFile`）⇒ `usage-provided`，返回该工具用法，且 **`isAuthorizationGranted === false`** | ✅ |
+| 未知工具（`usage-help` 语义）⇒ `known-but-not-usable`，**不返回 schema**，且**不当成 missing-capability** | ✅ |
+
+**语义澄清**（修正我上一轮的猜测）：`escalated-missing-tool` 属 `missing-capability` **请求**，
+不是"未知工具名"的默认结果；`usage-help` + 未知工具名 ⇒ `known-but-not-usable`。
+
+**门禁**：`check:low-parallel` ⇒ **689 files / 4676 passed + 3 skipped，exit 0**。
+
+### 04 完成判据现状
+
+| 判据 | 状态 |
+|---|---|
+| delegation：成功 / 拒绝 / 撤销 / revision / 到期 / 拔线 | ✅ 全部有装配级或清单证据 |
+| tool-recall：已分配 ⇒ 用法；未知 ⇒ 不泄露 schema | ✅ **本轮** |
+| tool-recall：`missing-capability` ⇒ 向上级反馈 | ⬜ 仍缺（请求类型不同，需另写一条） |
+
+⇒ 04 **in_progress**，只差最后一条。
