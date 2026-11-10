@@ -2076,3 +2076,30 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 **仍未完成**：端到端（桩 Worker 声明收据产物 ⇒ 注入审查任务 ⇒ 桩写报告 ⇒ 裁决落盘）尚未编写。
 **下一步第一条动作**：在桩里让执行任务的 `runFinished` 之后产生 `persistedArtifactPaths`（写一个真实文件），
 使收据带产物路径，再断言审查任务被注入且 `completion-verdicts` 出现 `merge-ready`。
+
+#### 第八轮（2026-11-10）：派发分支已可测；端到端受**测试桩限制**
+
+**新增**：`decideIndependentReview`（`independent-review-task.ts`）——把控制器里的三分支集中成可测函数：
+
+| 输入 | 决策 |
+|---|---|
+| 收据有真实产物 | `dispatch-review` + 审查任务描述含 `EVIDENCE: artifact:<path>` |
+| 收据产物缺失/空/越界 | `record-rework` + 具体 `check:` 引用 |
+| 收据无任何产物 | `record-rework` + `check:artifact-paths-unregistered` |
+
+**测试**：`align03-independent-review-task` **21 条**（含真实文件）。
+**门禁**：`check:low-parallel` ⇒ **686 files / 4660 passed + 3 skipped，exit 0**。
+
+### 端到端为何仍做不到（如实）
+
+写端到端时发现**结构性限制**：`completionReceipt` 由 **worker-agent** 产生，
+而集成测试用的是 `workerRuntimeFactory` 的**桩**（只 `yield runFinished`），**不经过 worker-agent**，
+因此桩路径下 `outcome.completionReceipt` 永远为 `undefined` ⇒ 送审产物恒为空 ⇒ 只能走 rework 分支。
+
+**要用桩验证 accept 路径，必须先让桩也能产出完成收据**——要么给 `AgentRuntime` 契约加"收据回传"，
+要么端到端改用真实 worker-agent + 脚本化模型。两者都是新设计，不能靠改测试绕过。
+
+**当前结论**：accept 路径的证据停留在
+「`decideIndependentReview` 判定 dispatch + `resolveReviewVerdict` 解析报告 ⇒ merge-ready」两段各自可测，
+**中间"编排器真的把审查任务派给 Worker 并回收报告"这一段仍无自动化证据**。
+**卡保持未完成、不归档。**
