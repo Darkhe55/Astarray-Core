@@ -2038,3 +2038,22 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 
 **EXEC-01-02**：初始化 verified；AppContainer 执行仍失败（`CreateProcessW 5`），
 下一步是给 helper 加 `print-sid` 拿权威 SID，再做最小复现；**未阻塞部分已写明，不需用户操作**。
+
+#### 巡检记录（2026-11-10 第六轮）：端到端断点的**第一处未知已解开**，并发现一个真实断链
+
+**已查明**：`worker-agent.ts` 的成功分支里 `resultLocation` **恒为 `null`**
+（`packages/core/src/orchestration/worker-agent.ts` 成功分支），
+而 `MissionOrchestrator` 用 `outcome.resultLocation` 调 `dagScheduler.finishTask`。
+
+⇒ **送审前置检查在生产里永远读到"未登记产物路径" ⇒ 独立验收必然走 rework，闭环不可达。**
+
+**尝试过并撤回的改动**：把 `resultLocation` 回填为 `[...persistedArtifactPaths][0] ?? null`。
+撤回原因（实测）：该改动让 `e2e01-vertical-rework` 的返修任务从 `done` 变成 **`blocked`**
+（`第 2/3 次顺序任务（返修）未到终态: expected 'blocked' to be 'done'`），
+说明"产物路径"在既有流程里还有别的消费者（完成门禁/返修链），直接回填会改变它们的判定。
+**没有**降级断言或改期望值——直接撤回改动。
+
+**下一步第一条动作**：先查清 `e2e01-vertical-rework` 里"产物路径非空 ⇒ blocked"的具体判定点
+（很可能是 `completion-receipt` / 返修链对 `resultLocation` 的二次校验），
+再决定是"回填 resultLocation"还是"另设独立字段承载送审产物"。
+`git checkout -- packages/core/src/orchestration/worker-agent.ts` 已回滚，门禁恢复。
