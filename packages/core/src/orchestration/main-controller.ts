@@ -922,6 +922,22 @@ export class MainController {
     this.communicationDelegationController.assertDeliverable(input);
   }
 
+  /**
+   * AUDIT-REPAIR-01 检查点 04（2026-11-10）：**撤销入口**。
+   *
+   * 此前控制器只有创建/复检/不可转授三个入口，**没有撤销**，
+   * 导致"撤销后不可用"在装配层不可达。撤销即从存储删除授权 ⇒
+   * 之后的 `assertCommunicationDelegationDeliverable` 会因"句柄不存在或已撤销"拒绝。
+   */
+  revokeCommunicationDelegationGrant(communicationHandleIdentifier: string): boolean {
+    return this.communicationDelegationController.revokeByHandle(communicationHandleIdentifier);
+  }
+
+  /** 撤销某个体相关的全部转交授权（回收/降级时使用）。 */
+  revokeAllCommunicationDelegationsForAgent(agentInstanceId: string): number {
+    return this.communicationDelegationController.revokeAllForAgent(agentInstanceId);
+  }
+
   /** 句柄不可转授权（显式防线；存储层无句柄→句柄转换路径）。 */
   assertCommunicationDelegationNotReDelegable(
     communicationHandleIdentifier: string,

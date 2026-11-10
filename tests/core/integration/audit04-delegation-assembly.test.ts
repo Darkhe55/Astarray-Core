@@ -99,4 +99,29 @@ describe("AUDIT-REPAIR-01-04 装配级：通信转交入口", () => {
       await runtime.shutdown().catch(() => undefined);
     }
   }, 60_000);
+
+  it("**撤销后不可投递**（撤销入口已暴露；复检因句柄不存在而拒绝）", async () => {
+    const runtime = await createRuntime();
+    try {
+      const grant = runtime.controller.createCommunicationDelegationGrant(buildGrantInput());
+      const handle = grant.communicationHandleIdentifier;
+      expect(runtime.controller.revokeCommunicationDelegationGrant(handle)).toBe(true);
+      /** 再撤一次返回 false（已不存在），不抛错。 */
+      expect(runtime.controller.revokeCommunicationDelegationGrant(handle)).toBe(false);
+      /** 句柄已撤销 ⇒ 复检在"取不到授权"处即拒绝，无需上下文参与。 */
+      expect(() =>
+        runtime.controller.assertCommunicationDelegationDeliverable({
+          communicationHandleIdentifier: handle,
+          senderAgentInstanceId: "secondary-2",
+          messageType: "information",
+          missionId: "mission-1",
+          currentProfileRevision: 1,
+          context: {} as never,
+          currentInFlightMessages: 0,
+        }),
+      ).toThrow(/不存在或已撤销/u);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
 });

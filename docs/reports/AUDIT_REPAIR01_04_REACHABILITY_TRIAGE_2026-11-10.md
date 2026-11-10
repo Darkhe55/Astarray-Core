@@ -168,3 +168,32 @@
    （否则调用方漏传即绕过撤销）；
 3. 再补装配级用例：创建 ⇒ 撤销 ⇒ 复检必须拒绝；
 4. 到期与 revision 变化两条同理。
+
+## 9. **更正 + 撤销入口已补齐**（2026-11-10 第十九轮）
+
+### 更正上一条错误结论
+
+上一轮我写了「`assertDeliverable` 依赖调用方传入 `isRevokedByUser`，**调用方漏传就可能绕过撤销**」。
+**这是错的**：撤销是 `grantStore.revokeGrant` **删除授权记录**，而 `assertDeliverable` 第一步
+`getGrantByHandle` 取不到就抛「沟通句柄不存在或已撤销」（`:205-212`）。
+⇒ 撤销**不依赖**调用方那个 flag，flag 只是额外的一层。**该结论已作废。**
+
+### 补齐的入口
+
+| 位置 | 新增 |
+|---|---|
+| `AgentCommunicationDelegationController` | `revokeByHandle(handle)`、`revokeAllForAgent(agentId)` |
+| `MainController` | `revokeCommunicationDelegationGrant(handle)`、`revokeAllCommunicationDelegationsForAgent(agentId)` |
+
+### 新增装配级用例（3 条，全绿）
+
+```text
+创建授权 ⇒ revokeCommunicationDelegationGrant(handle) 返回 true
+         ⇒ 再撤一次返回 false（已不存在，不抛错）
+         ⇒ assertCommunicationDelegationDeliverable 抛「不存在或已撤销」
+```
+
+**实测**：`audit04-delegation-assembly` ⇒ **3 passed**；全量见下一节。
+
+⇒ 卡内 4 的"**撤销后不可使用**"现在**装配层可达且有证据**。
+到期与 revision 变化两条仍待补。

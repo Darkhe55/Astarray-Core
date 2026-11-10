@@ -278,6 +278,25 @@ export class AgentCommunicationDelegationController {
   }
 
   /** grant 不可转授权：句柄不能导出为另一个句柄。 */
+  /**
+   * 撤销一个转交授权（按句柄）。撤销后 `assertDeliverable` 因"句柄不存在或已撤销"拒绝。
+   *
+   * AUDIT-REPAIR-01 检查点 04（2026-11-10）：此前控制器只有创建/复检/不可转授，
+   * 没有撤销入口 ⇒ "撤销后不可用"在装配层不可达。
+   */
+  revokeByHandle(communicationHandleIdentifier: string): boolean {
+    const grant = this.grantStore.getGrantByHandle(communicationHandleIdentifier);
+    if (grant === null) {
+      return false;
+    }
+    return this.grantStore.revokeGrant(grant.grantId);
+  }
+
+  /** 撤销某个体相关的全部转交授权（回收/降级时使用）。 */
+  revokeAllForAgent(agentInstanceId: string): number {
+    return this.grantStore.revokeAllForAgent(agentInstanceId);
+  }
+
   assertNotReDelegable(communicationHandleIdentifier: string): void {
     // 句柄是唯一入口；存储层无句柄→句柄转换路径。此处为显式防线。
     if (this.grantStore.getGrantByHandle(communicationHandleIdentifier) === null) {
