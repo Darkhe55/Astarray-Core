@@ -1937,3 +1937,37 @@ DomainError: mission 租约文件损坏，拒绝读取/覆盖: …/mission-lease
 1. **ALIGN-03-01 默认开关**：是否默认启用"产物存在性验收"作为完成门槛；若不足需先做真实审查 Worker；
 2. **EXEC-01-02**：UAC 初始化验证的执行确认与目标账户（隔离方案仍"待验证"）；
 3. **隐私历史改写**：git 历史仍含旧措辞与一次误提交的用户文档，改写需 force-push 授权。
+
+### 11.J ALIGN-03-01 独立验收闭环：**本轮重新打开为未完成**（2026-11-10，用户裁决）
+
+**用户裁决（原文要点）**：ALIGN-03-01 对应**原设计的独立测试/验收闭环**，不是新增实验性功能。
+**暂不批准**把"产物存在且非空即 merge-ready"直接默认开启。要求：
+
+1. 产物存在性检查与独立验收**分离**；
+2. 接入**真实审查任务**；
+3. 明确"执行完成 / 待验收 / 返修 / 验收通过"的状态关系；
+4. **禁止**仅登记 reviewer 身份便视作已完成独立审查；
+5. **禁止**审查失败后仍向用户宣称任务最终完成；
+6. 闭环补齐并验证后**再**默认启用。
+
+#### 本轮已完成（有测试）
+
+| 项 | 实现 | 证据 |
+|---|---|---|
+| ① 分离 | 删除 `artifact-backed-verdict.ts`（产物存在 ⇒ merge-ready）；新增 `artifact-precondition.ts`：结果类型**没有** verdict 字段 | `align03-artifact-precondition.test.ts`（5 条） |
+| ② 状态机 | 新增 `independent-review-closure.ts`：`execution-done / pending-acceptance / rework / accepted` 四态与推导规则 | `align03-independent-review-closure.test.ts`（9 条） |
+| ③ 禁止身份冒充 | `reviewTaskIdentifier` 为空 ⇒ `execution-done` + `reviewer-registration-is-not-review` | 同上 |
+| ④ 禁止失败后宣称完成 | `isFinalCompletionAllowed` 仅对 `accepted` 返回 true；`describeAcceptanceState` 唯一措辞映射 | 同上 |
+| ⑤ 控制器改造 | 产物前置**满足** ⇒ **不写裁决**、直接返回（等真实审查任务）；**不满足** ⇒ 记录 rework（引用具体检查项） | `align03-auto-review-appointment.test.ts` 3/3 通过；静态守卫断言控制器不再引用旧模块 |
+
+**门禁**：`npx vitest run --maxWorkers=1` ⇒ 4637 passed / 3 skipped；2 条失败为
+Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无关。
+
+#### 仍未完成（保持未归档）
+
+- **真实审查任务的派发与消费**：当前"有产物 ⇒ 停在待验收"，但**尚未真正创建并调度审查任务**，
+  也没有"审查任务完成 ⇒ 写裁决 ⇒ 转 accepted/rework"的闭环；
+- **默认开关**：`isIndependentReviewAutoAppointmentEnabled` **保持默认关闭**，未默认启用；
+- 人工验收未做。
+
+**状态**：ALIGN-03-01 **未完成（reopened）**，不归档。
