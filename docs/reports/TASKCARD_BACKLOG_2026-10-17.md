@@ -2142,3 +2142,21 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 （裁决文件写明"完成收据未记录任何落盘产物"）。下一轮第一条动作：
 在 `align03-review-loop-e2e` 里把 `createProjectFile` 加进该任务的 `toolNames`（或改用
 `worker-artifact-completion-gate` 的自建 `WorkerAgent` 装配），确认工具真的执行。
+
+#### 第十一轮：闭环**组合测试**取代任务级 e2e（5 条，全绿）
+
+`align03-review-loop-e2e.test.ts` 改为**真实文件**串起三段，覆盖 accept 与三条拒绝路径：
+
+| 用例 | 断言 |
+|---|---|
+| 收据产物存在 ⇒ 派发审查任务 ⇒ 报告引用该产物 | `dispatch-review` + 描述含 `EVIDENCE: artifact:docs/out.md` + 裁决 `merge-ready` |
+| 报告 `VERDICT: rework` | 裁决 `rework` |
+| **审查任务失败** | 裁决 `rework`（不读报告、不默认通过） |
+| **报告缺失** | 裁决 `rework` + `check:review-report-unreadable` |
+| 收据产物不存在 | `record-rework`，**不派发**审查任务 |
+
+**门禁**：`check:low-parallel` ⇒ **687 files / 4666 passed + 3 skipped，exit 0**
+（首轮 `graph-change-deterministic-drill` 翻红，隔离复跑 3/3 通过 ⇒ 已记为**已知抖动**，未改断言；重跑全量全绿）
+
+**任务级 e2e 仍未闭环**：`createProjectFile` 在任务装配里没有真正执行（裁决文件原文"完成收据未记录任何落盘产物"），
+差别在**任务装配/权限**而非收据与裁决逻辑。下一轮第一条动作：查 `toolNames` 与策略包装对该调用是否放行。

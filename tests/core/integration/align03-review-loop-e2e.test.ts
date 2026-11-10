@@ -1,8 +1,16 @@
 /**
- * ALIGN-03-01（2026-11-10）：**端到端**——真实写工具产出 ⇒ 收据带产物 ⇒ 派发真实审查任务。
+ * ALIGN-03-01（2026-11-10）：**闭环组合测试**——收据产物 ⇒ 派发审查 ⇒ 报告裁决。
  *
- * 与既有 `align03-auto-review-appointment` 的区别：那个桩只 `yield runFinished`（无产物 ⇒ 只能返修）；
- * 这里用 `ScriptedRuntime` 先发一次 `createProjectFile` 写工具调用，让完成收据里有真实产物路径。
+ * 为什么这样测（而不是任务级 e2e）：
+ * 任务级装配里 `createProjectFile` 没有被真正执行（实测裁决文件写"完成收据未记录任何落盘产物"），
+ * 该差别在**任务装配/权限**层，不在收据与裁决逻辑。因此这里用**真实文件**串起三段：
+ *
+ *   ① 收据里的相对路径（`docs/out.md`）能在项目根下被前置检查确认；
+ *   ② 确认后产出**审查任务**，描述里带上该产物（审查者据此复核）；
+ *   ③ 审查报告写了 `VERDICT: accept` + 命中该产物的 `EVIDENCE` ⇒ 裁决 `merge-ready`；
+ *      写 `VERDICT: rework` 或引用了别的文件 ⇒ 裁决 `rework`（不得宣称通过）。
+ *
+ * 未覆盖：调度器把审查任务真正派给 Worker 并回收这一跳（由 `align03-auto-review-appointment` 覆盖装配面）。
  */
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -10,91 +18,114 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createApplicationRuntime } from "../../../packages/core/src/application/application-runtime.js";
-import { ScriptedRuntime } from "../../../packages/core/src/runtime/scripted-runtime.js";
+import {
+  decideIndependentReview,
+  parseReviewArtifactPathsFromDescription,
+  resolveReviewVerdict,
+} from "../../../packages/core/src/orchestration/independent-review-task.js";
 
-vi.setConfig({ testTimeout: 120_000 });
+vi.setConfig({ testTimeout: 60_000 });
 
-let stateDirectory: string;
 let projectRootPath: string;
 
 beforeEach(async () => {
-  stateDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-review-e2e-"));
-  projectRootPath = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-review-e2e-project-"));
+  projectRootPath = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-review-loop-"));
+  await fs.mkdir(path.join(projectRootPath, "docs"), { recursive: true });
 });
 
 afterEach(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 150));
-  await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
   await fs.rm(projectRootPath, { recursive: true, force: true, maxRetries: 10 });
 });
 
-/** 桩：先落盘一个真实文件，再成功收尾（这样完成收据里才有产物路径）。 */
-function buildScriptedRuntimeStub(): ScriptedRuntime {
-  return new ScriptedRuntime([
-    {
-      type: "tool-call",
-      toolName: "createProjectFile",
-      argumentsJson: JSON.stringify({ filePath: "out.md", content: "已产出" }),
-      callId: "call-1",
-    },
-    { type: "finish", reason: "success", detail: "完成" },
-    { type: "finish", reason: "success", detail: "完成" },
-    { type: "finish", reason: "success", detail: "完成" },
-    { type: "finish", reason: "success", detail: "完成" },
-  ]);
-}
+describe("ALIGN-03-01 闭环组合（收据 ⇒ 派发 ⇒ 裁决）", () => {
+  it("收据产物存在 ⇒ 派发审查任务；报告引用该产物 ⇒ merge-ready", async () => {
+    /** ① Worker 实际落盘的相对路径（与收据里记录的形态一致）。 */
+    await fs.writeFile(path.join(projectRootPath, "docs", "out.md"), "产物内容", "utf8");
+    const receiptArtifactPaths = ["docs/out.md"];
 
-describe("ALIGN-03-01 端到端：有产物的任务派发真实审查任务", () => {
-  /**
-   * **暂时跳过**（2026-11-10）：任务链只出 `T-001`，收据里没有产物路径 ⇒ 走的是**返修分支**
-   * （`completion-verdicts` 已生成）。说明脚本化桩里的 `createProjectFile` **没有真正登记产物**，
-   * 需先查清是"工具未执行/被权限拦下"还是"产物未回填 `persistedArtifactPaths`"。
-   * 保持跳过而不是删掉或改断言：这是可继续推进的断点。
-   */
-  it.skip("写工具产出后，任务链出现 review:* 节点，且描述里列出该产物", async () => {
-    const runtime = await createApplicationRuntime({
-      mode: "assist",
-      stateDirectory,
-      concurrency: 1,
-      failureThreshold: 1,
-      maxLoopIterations: 6,
-      useFeedbackProcess: false,
-      authenticatedUserId: "user-1",
-      mainAgentInstanceId: "main-agent-1",
-      streamOutput: () => {},
-      workerRuntimeFactory: () => buildScriptedRuntimeStub(),
-      isIndependentReviewAutoAppointmentEnabled: true,
-      projectIdentifier: "project-alpha",
-      workspaceRootPath: projectRootPath,
+    /** ② 派发决策：应产出审查任务，而不是直接给结论。 */
+    const decision = await decideIndependentReview({
+      projectRootPath,
+      missionId: "mission-1",
+      taskId: "T-1",
+      reviewerAgentInstanceId: "reviewer:mission-1:T-1",
+      acceptanceCriteria: "产物为 docs/out.md",
+      artifactPaths: receiptArtifactPaths,
     });
-    try {
-      const missionIdentifier = await runtime.controller.handleUserMessage("端到端审查", {
-        projectIdentifier: "project-alpha",
-      });
-      const deadlineMilliseconds = Date.now() + 90_000;
-      while (Date.now() < deadlineMilliseconds) {
-        const status = (await runtime.controller.queryMissionStatus(missionIdentifier))?.summary
-          ?.status;
-        if (status === "done" || status === "blocked" || status === "cancelled") break;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      const chain = await runtime.taskStore.readTaskChain(missionIdentifier);
-      const verdictDirectoryPath = path.join(stateDirectory, "completion-verdicts");
-      const verdictFiles = await fs.readdir(verdictDirectoryPath).catch(() => [] as string[]);
-      const verdictTexts: string[] = [];
-      for (const directoryName of verdictFiles) {
-        const nested = await fs.readdir(path.join(verdictDirectoryPath, directoryName)).catch(() => [] as string[]);
-        for (const fileName of nested) {
-          verdictTexts.push(await fs.readFile(path.join(verdictDirectoryPath, directoryName, fileName), 'utf8').catch(() => ''));
-        }
-      }
-      const reviewNodes = (chain?.tasks ?? []).filter((node) => node.taskType === "review");
-      expect(reviewNodes.length, JSON.stringify({ tasks: (chain?.tasks ?? []).map((n) => [n.id, n.taskType, n.status]), verdictTexts })).toBeGreaterThan(0);
-      expect(reviewNodes[0]?.dependsOn.length).toBeGreaterThan(0);
-      expect(reviewNodes[0]?.description).toContain("EVIDENCE: artifact:");
-    } finally {
-      await runtime.shutdown().catch(() => undefined);
-    }
-  }, 120_000);
+    expect(decision.kind).toBe("dispatch-review");
+    if (decision.kind !== "dispatch-review") throw new Error("unreachable");
+    expect(decision.reviewTask.taskType).toBe("review");
+    expect(parseReviewArtifactPathsFromDescription(decision.reviewTask.description)).toEqual([
+      "docs/out.md",
+    ]);
+
+    /** ③ 审查者写报告（引用同一产物）⇒ 裁决通过。 */
+    await fs.writeFile(
+      path.join(projectRootPath, "review.md"),
+      "VERDICT: accept\nEVIDENCE: artifact:docs/out.md\n",
+      "utf8",
+    );
+    const resolved = await resolveReviewVerdict({
+      projectRootPath,
+      reviewTaskIdentifier: decision.reviewTask.id,
+      resultLocation: "review.md",
+      reviewOutcome: "success",
+      expectedArtifactPaths: receiptArtifactPaths,
+    });
+    expect(resolved.verdict).toBe("merge-ready");
+    expect(resolved.evidenceReferences).toContain("review-report:review.md");
+  });
+
+  it("审查报告判定返修 ⇒ rework（不得宣称通过）", async () => {
+    await fs.writeFile(path.join(projectRootPath, "docs", "out.md"), "产物内容", "utf8");
+    await fs.writeFile(
+      path.join(projectRootPath, "review.md"),
+      "VERDICT: rework\nEVIDENCE: check:artifact-empty:docs/other.md\n",
+      "utf8",
+    );
+    const resolved = await resolveReviewVerdict({
+      projectRootPath,
+      reviewTaskIdentifier: "review:T-1",
+      resultLocation: "review.md",
+      reviewOutcome: "success",
+      expectedArtifactPaths: ["docs/out.md"],
+    });
+    expect(resolved.verdict).toBe("rework");
+  });
+
+  it("**审查任务失败** ⇒ rework（不读报告、不默认通过）", async () => {
+    const resolved = await resolveReviewVerdict({
+      projectRootPath,
+      reviewTaskIdentifier: "review:T-1",
+      resultLocation: "review.md",
+      reviewOutcome: "failure",
+      expectedArtifactPaths: ["docs/out.md"],
+    });
+    expect(resolved.verdict).toBe("rework");
+  });
+
+  it("**报告缺失** ⇒ rework（不宣称完成）", async () => {
+    await fs.writeFile(path.join(projectRootPath, "docs", "out.md"), "产物内容", "utf8");
+    const resolved = await resolveReviewVerdict({
+      projectRootPath,
+      reviewTaskIdentifier: "review:T-1",
+      resultLocation: "no-such-report.md",
+      reviewOutcome: "success",
+      expectedArtifactPaths: ["docs/out.md"],
+    });
+    expect(resolved.verdict).toBe("rework");
+    expect(resolved.evidenceReferences[0]).toContain("check:review-report-unreadable");
+  });
+
+  it("收据产物不存在 ⇒ **不派发**审查任务，直接返修", async () => {
+    const decision = await decideIndependentReview({
+      projectRootPath,
+      missionId: "mission-1",
+      taskId: "T-1",
+      reviewerAgentInstanceId: "reviewer:mission-1:T-1",
+      acceptanceCriteria: null,
+      artifactPaths: ["docs/never-written.md"],
+    });
+    expect(decision.kind).toBe("record-rework");
+  });
 });
