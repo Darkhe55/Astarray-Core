@@ -649,3 +649,60 @@ const agentInstanceId =
 1. **默认关闭**（`isIndependentReviewAutoAppointmentEnabled`），生产里尚不启用；
 2. 验收只依据**产物存在性**，不判内容正确性；
 3. 跨项目拒绝缺装配级用例。
+
+### 01 闭环最终形态（2026-11-10 收口，取代此前"产物即结论"的做法）
+
+**用户裁决**：ALIGN-03-01 对应**原设计的独立测试/验收闭环**，不是新增实验性功能；
+"产物存在且非空即 merge-ready"**不得**默认启用；禁止仅登记 reviewer 身份便视作完成独立审查；
+禁止审查失败后仍宣称任务最终完成。
+
+#### 实现边界（三层分离）
+
+| 层 | 模块 | 作用 |
+|---|---|---|
+| 产物前置 | `artifact-precondition.ts` | 只回答"有没有可送审的产物"；**类型上没有 verdict 字段** |
+| 状态机 | `independent-review-closure.ts` | `execution-done / pending-acceptance / rework / accepted`；**只有 accepted 允许对外宣称完成** |
+| 审查任务 | `independent-review-task.ts` | 构造真实 `taskType: "review"` 节点、解析报告、裁决消费 |
+
+#### 产物与报告都取自**完成收据**（不是 `resultLocation`）
+
+- 执行任务：`completionReceipt.artifactPaths` ⇒ 送审前置；
+- 审查任务：`completionReceipt.artifactPaths[0]` ⇒ 报告路径；
+- **为什么**：`resultLocation` 在既有流程里另有消费者，回填它会把返修任务卡成 `blocked`（实测）。
+
+#### 审查任务必须能写出报告
+
+`toolNames: ["createProjectFile"]`。否则审查者"只能想不能留证"，
+裁决永远因"没有可采信结论"失败（实测）。
+
+#### 报告契约
+
+```
+VERDICT: accept|rework
+EVIDENCE: <可复核引用>
+```
+
+- **无裁决行 ⇒ 不合规**；`accept` **无 EVIDENCE ⇒ 不合规**；
+- `EVIDENCE: artifact:<path>` 必须命中**本次送审产物**，否则
+  `check:review-evidence-mismatch` ⇒ rework（防引用别的文件冒充）。
+
+#### 装配
+
+`buildIndependentReviewOrchestrationOptions()` 由 **assist 与 devolve 共用**，
+受 `isIndependentReviewAutoAppointmentEnabled` 控制（**默认关**，关时返回空对象、行为不变）。
+
+#### 证据
+
+| 用例 | 覆盖 |
+|---|---|
+| `align03-review-loop-e2e`（6） | 组合：收据⇒派发⇒报告⇒裁决；**任务级**：devolve 任务写文件 ⇒ 注入 `review:*` ⇒ 审查 Worker 写报告 ⇒ `"verdict": "accepted"`（decider = reviewer） |
+| `align03-independent-review-task`（21） | 节点构造、报告解析、证据命中/不命中、收据解析四条异常路径 |
+| `align03-independent-review-closure`（11） | 四态推导 + 禁止身份冒充 + 唯一完成判定 |
+| `align03-artifact-precondition`（5） | 多产物、空收据、越界 |
+| `align03-auto-review-appointment`（3） | 装配面：审查者登记、无产物 ⇒ rejected、关闭 ⇒ 无审查者 |
+
+#### 仍未做（如实）
+
+- **默认开关未启用**（用户裁决：等验收后再决定）；
+- 审查者由脚本桩扮演，**尚未接入真实模型审查**（裁决质量取决于真实审查 Worker）；
+- 人工点击验收未做。
