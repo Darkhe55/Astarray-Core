@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReviewTaskIdentifier,
   buildReviewTaskNode,
+  decideIndependentReview,
   parseReviewArtifactPathsFromDescription,
   parseReviewVerdictReport,
   resolveReviewVerdict,
@@ -225,5 +226,57 @@ describe("ALIGN-03-01 报告证据必须引用本次送审产物（方案 C）",
       "docs/out.md",
       "docs/report.md",
     ]);
+  });
+});
+describe("ALIGN-03-01 完成后的下一步决策（可测的派发分支）", () => {
+  it("收据有真实产物 ⇒ **派发审查任务**，且审查任务里列出该产物", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const root = await mkdtemp(join(tmpdir(), "astarray-review-dispatch-"));
+    try {
+      await writeFile(join(root, "out.md"), "内容", "utf8");
+      const decision = await decideIndependentReview({
+        projectRootPath: root,
+        missionId: "m-1",
+        taskId: "T-1",
+        reviewerAgentInstanceId: "reviewer:m-1:T-1",
+        acceptanceCriteria: "产物为 out.md",
+        artifactPaths: ["out.md"],
+      });
+      expect(decision.kind).toBe("dispatch-review");
+      if (decision.kind !== "dispatch-review") throw new Error("unreachable");
+      expect(decision.reviewTask.taskType).toBe("review");
+      expect(decision.reviewTask.assignedAgentId).toBe("reviewer:m-1:T-1");
+      expect(decision.reviewTask.description).toContain("EVIDENCE: artifact:out.md");
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10 });
+    }
+  });
+
+  it("收据产物缺失 ⇒ **返修**，不派发审查任务", async () => {
+    const decision = await decideIndependentReview({
+      projectRootPath: "/nonexistent-root",
+      missionId: "m-1",
+      taskId: "T-1",
+      reviewerAgentInstanceId: "reviewer:m-1:T-1",
+      acceptanceCriteria: null,
+      artifactPaths: ["missing.md"],
+    });
+    expect(decision.kind).toBe("record-rework");
+  });
+
+  it("收据没有任何产物 ⇒ 返修 + artifact-paths-unregistered", async () => {
+    const decision = await decideIndependentReview({
+      projectRootPath: "/nonexistent-root",
+      missionId: "m-1",
+      taskId: "T-1",
+      reviewerAgentInstanceId: "reviewer:m-1:T-1",
+      acceptanceCriteria: null,
+      artifactPaths: [],
+    });
+    expect(decision.kind).toBe("record-rework");
+    if (decision.kind !== "record-rework") throw new Error("unreachable");
+    expect(decision.evidenceReferences).toContain("check:artifact-paths-unregistered");
   });
 });

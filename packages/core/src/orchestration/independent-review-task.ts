@@ -242,3 +242,54 @@ export function parseReviewArtifactPathsFromDescription(
   }
   return paths;
 }
+export interface DecideIndependentReviewInput {
+  readonly projectRootPath: string;
+  readonly missionId: string;
+  readonly taskId: string;
+  readonly reviewerAgentInstanceId: string;
+  readonly acceptanceCriteria: string | null;
+  /** 完成收据里的落盘产物路径。 */
+  readonly artifactPaths: readonly string[];
+}
+
+export type IndependentReviewDecision =
+  | { readonly kind: "dispatch-review"; readonly reviewTask: TaskDependencyNode }
+  | {
+      readonly kind: "record-rework";
+      readonly reason: string;
+      readonly evidenceReferences: readonly string[];
+    }
+  | { readonly kind: "skip" };
+
+/**
+ * 决定"任务完成之后下一步做什么"——把控制器里的分支逻辑集中到可测函数。
+ *
+ * - 产物前置**满足** ⇒ `dispatch-review`（派真实审查任务，**不写裁决**）；
+ * - 产物前置**不满足** ⇒ `record-rework`（返修，附具体检查项）；
+ * - 任务本身是审查任务 ⇒ `skip`（防递归）。
+ */
+export async function decideIndependentReview(
+  input: DecideIndependentReviewInput,
+): Promise<IndependentReviewDecision> {
+  const { evaluateArtifactPrecondition } = await import("./artifact-precondition.js");
+  const precondition = await evaluateArtifactPrecondition({
+    projectRootPath: input.projectRootPath,
+    artifactPaths: input.artifactPaths,
+  });
+  if (!precondition.isSatisfied) {
+    return {
+      kind: "record-rework",
+      reason: precondition.reason,
+      evidenceReferences: [...precondition.evidenceReferences],
+    };
+  }
+  return {
+    kind: "dispatch-review",
+    reviewTask: buildReviewTaskNode({
+      reviewedTaskIdentifier: input.taskId,
+      reviewerAgentInstanceId: input.reviewerAgentInstanceId,
+      acceptanceCriteria: input.acceptanceCriteria,
+      artifactPaths: precondition.confirmedArtifactPaths,
+    }),
+  };
+}
