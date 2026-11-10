@@ -123,6 +123,24 @@ describe("AUDIT-REPAIR-01-04 装配级：工具说明回访", () => {
       expect(unknownResponse.resolution).toBe("known-but-not-usable");
       expect(unknownResponse.usageDocumentation).toBeNull();
       expect(unknownResponse.escalationIdentifier).not.toBeNull();
+      /** `missing-capability` 请求：能力不存在 ⇒ 向上级反馈（missing-tool）。 */
+      const missingResponse = await runtime.controller.answerToolHelpRequest({
+        request: {
+          controlEventType: "ASTARRAY_TOOL_HELP_REQUEST_V1",
+          requestIdentifier: "req-missing",
+          taskExecutionIdentifier: "exec-1",
+          requestKind: "missing-capability",
+          toolIdentifier: null,
+          capabilityIntent: "需要访问远端仓库",
+          blockingReason: "no-known-match",
+          knownToolGroupRevision: chain.revision,
+        },
+        requesterAgentInstanceId: task.assignedAgentId ?? "worker-1",
+        defaultSuperiorAgentInstanceId: "secondary-1",
+        missionId: missionIdentifier,
+      });
+      expect(missingResponse.resolution).toBe("escalated-missing-tool");
+      expect(missingResponse.escalationIdentifier).not.toBeNull();
     } finally {
       await runtime.shutdown().catch(() => undefined);
     }

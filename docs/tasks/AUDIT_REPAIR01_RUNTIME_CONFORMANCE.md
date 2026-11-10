@@ -478,3 +478,12 @@ message_start → content_block_start(text) → content_block_delta → content_
 
 ⇒ 卡内 4 的"撤销后不可使用"在**装配层不可达**；这是**接线缺口**，不是测试缺口。
 已列入后继工作（暴露入口 + 复检改读存储 + 再补装配级用例）。
+
+### 04 转 implemented-unverified（2026-11-10）
+
+分诊报告 `docs/reports/AUDIT_REPAIR01_04_REACHABILITY_TRIAGE_2026-11-10.md` 的判据总表显示：
+delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recall 三条（用法/未知/能力缺失）
+**均已在装配级有证据**。
+
+**边界（不虚报）**：`DiskCache` 生产未接入；其余 16 个候选只做初步分诊。
+这些都写进报告，未算作完成。

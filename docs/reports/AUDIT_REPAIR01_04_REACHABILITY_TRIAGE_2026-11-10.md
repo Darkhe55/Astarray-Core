@@ -324,3 +324,36 @@
 | tool-recall：`missing-capability` ⇒ 向上级反馈 | ⬜ 仍缺（请求类型不同，需另写一条） |
 
 ⇒ 04 **in_progress**，只差最后一条。
+
+## 15. 04 完成判据**全部有证据**（2026-11-10 第二十五轮）
+
+补上最后一条（`missing-capability` 请求 ⇒ 向上级反馈）：
+
+```text
+requestKind: "missing-capability", toolIdentifier: null,
+capabilityIntent: "需要访问远端仓库", blockingReason: "no-known-match"
+⇒ resolution = "escalated-missing-tool"，escalationIdentifier 非空
+```
+
+### 判据总表
+
+| 判据 | 证据位置 | 状态 |
+|---|---|---|
+| delegation 成功 | `audit04-delegation-assembly`（创建 + 投递基线） | ✅ |
+| delegation 拒绝 | 同上（缺授权引用、跨级转交） | ✅ |
+| delegation 撤销 | 同上（撤销入口 + 复检拒绝） | ✅ |
+| delegation revision 变化 | 同上 | ✅ |
+| delegation 到期 | 同上 | ✅ |
+| tool-recall 已分配 ⇒ 用法 | `audit04-tool-help-assembly` | ✅ |
+| tool-recall 未知工具 ⇒ 不泄露 schema | 同上（`known-but-not-usable`） | ✅ |
+| tool-recall 能力缺失 ⇒ 向上级反馈 | 同上（本轮，`escalated-missing-tool`） | ✅ |
+| 拔线反例 | `wiring-manifest`（被拔线 ⇒ 红） | ✅ |
+| DiskCache 状态 | 组件已验证、**生产未接入**（03 ⑦ 边界） | ✅ 已如实标注 |
+
+**门禁**：`check:low-parallel` ⇒ **689 files / 4676 passed + 3 skipped，exit 0**。
+
+### 结论
+
+04 的**完成判据已全部有证据** ⇒ 转 **implemented-unverified**。
+**仍不宣称"产品已达生产可用"**：`DiskCache` 未接生产、其余 16 个候选只做了初步分诊，
+这些都在本报告第 4 节列为后继工作。
