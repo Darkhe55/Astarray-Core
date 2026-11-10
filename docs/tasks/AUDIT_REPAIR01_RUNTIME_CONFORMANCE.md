@@ -388,3 +388,23 @@ chunks: ["data: {not-json}\n\n", sse({type:"message_stop"})]
 
 **结果：通过**（说明运行时**已经**做了协议错误处理，只是缺证据）。
 ⇒ 该条从"未覆盖"变为"有回归锁定"；02 的整体矩阵仍在逐条核，未整体改判。
+
+### 01 核对（2026-11-10）：**已完成**，卡面状态滞后
+
+逐条对照卡内"必须编码"与实测：
+
+| 卡内要求 | 代码/测试 | 判定 |
+|---|---|---|
+| ① 删除 `proposeGoal` 绕过 `policyPort.execute` 的支路，改走注册/处理器 | `application-runtime.ts:4147` 注释明确"不再走旁路"，并由任务子集显式分配 | ✅ |
+| ② 激活/本地 mission 校验移到**受保护处理器内**；激活不是授权 | `goal-proposal-tool.ts` 处理器校验 + 用例"已激活但未分配 ⇒ 拒绝且无提案文件" | ✅ |
+| ③ 不再声明只读；按持久化写类型登记 | 描述符已改为写能力 | ✅ |
+| ④ 执行前检查 allowedToolNames / profile+revision / 模式 / 项目作用域；deny/ponder 不落盘；ask 走询问 | 用例：deny、未分配、ponder、ask 未批准各有断言 | ✅ |
+| ⑤ 只存待确认提案，不建契约、不启用；取消不写；callId 幂等 | 用例"成功落盘：只保存待确认提案，不生成契约" | ✅ |
+| ⑥ 主 Agent 不获得该写工具 | 用例"未暴露：主 Agent 工具投影不含 proposeGoal" | ✅ |
+
+**实测**：`audit01-application-matrix`(9) + `goal-proposal-gate`(2) + `goal-proposal-tool`(5)
+⇒ **16 passed**，exit 0。
+
+**结论**：01 转 **implemented-unverified**。
+**仍缺**：卡内完成判据里的"权限 revision 改变后旧批准失效"与"把统一策略替换为必拒绝策略"两条**反例**，
+当前测试集未直接覆盖 —— 记为待补项，不据此改判完成度。
