@@ -454,3 +454,17 @@ message_start → content_block_start(text) → content_block_delta → content_
 
 **结论**：02 的**矩阵条目已全部有覆盖**；但"全部有覆盖"不等于"实现无缺陷"——
 本轮仍只做证据补强，未整体改判为已验收（等人工/独立复核）。
+
+### 04 分诊报告（2026-11-10）
+
+已产出 `docs/reports/AUDIT_REPAIR01_04_REACHABILITY_TRIAGE_2026-11-10.md`：
+
+- `scripts/audit-product-reachability.mjs` **实跑通过**，候选 21 个，输出结构化表格；
+- 脚本的 `成员调用=0` 是**已知盲区**（只按 `实例.成员(` 计数），故分类以**调用链人工核对**为准；
+- **两项点名能力均判"已接入"**：`ToolDocumentationRecallController`（构造 `main-controller.ts:991`）、
+  `AgentCommunicationDelegationController`（构造 `:1197`，调用点 `:906/:922/:929`）；
+- `DiskCache`：组件已验证（03），**生产未接入**（符合 03 ⑦ 的本批边界），不得宣称命中收益；
+- 其余 16 项：**只做初步分诊**，逐项调用链核查与接线**不在本批**。
+
+**完成判据仍未满足**：两项能力的"成功 / 拒绝 / 撤销或未知工具"三条路径 + **拔线反例**均未做。
+⇒ 04 保持 **in_progress**，不改判。
