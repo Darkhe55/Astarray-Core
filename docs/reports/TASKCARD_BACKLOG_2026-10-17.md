@@ -2092,7 +2092,7 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 
 ### 端到端为何仍做不到（如实）
 
-写端到端时发现**结构性限制**：`completionReceipt` 由 **worker-agent** 产生，
+**更正（同日）**：此前写"桩不经过 worker-agent"是**错的**。`MissionOrchestrator` 在 `:1596` 自建 `WorkerAgent` 包住运行时，桩同样经过它，因此 `completionReceipt` **存在**，只是 `artifactPaths` 为空（桩不发工具调用 ⇒ 没有落盘产物）。真正的原因是：
 而集成测试用的是 `workerRuntimeFactory` 的**桩**（只 `yield runFinished`），**不经过 worker-agent**，
 因此桩路径下 `outcome.completionReceipt` 永远为 `undefined` ⇒ 送审产物恒为空 ⇒ 只能走 rework 分支。
 
@@ -2103,3 +2103,7 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 「`decideIndependentReview` 判定 dispatch + `resolveReviewVerdict` 解析报告 ⇒ merge-ready」两段各自可测，
 **中间"编排器真的把审查任务派给 Worker 并回收报告"这一段仍无自动化证据**。
 **卡保持未完成、不归档。**
+
+**因此方案 A（改 `AgentRuntime` 契约）并不需要**：`ScriptedRuntime` 已支持 `tool-call` 步骤，
+只要桩先发一次**写工具调用**（落盘一个真实文件）再 `finish`，收据里就会有 `artifactPaths`，
+端到端即可覆盖 accept 路径。**这是下一轮的第一条动作。**
