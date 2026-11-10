@@ -2242,3 +2242,25 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 已把文件级 `testTimeout` 提到 120s（**不是**改断言，是满足既有规则）。
 
 **推送**：本轮成功，`ahead=0`（含此前积压的 3 个提交）。
+
+#### 第十六轮（**闭环打通并验证**）：报告 ⇒ 裁决落盘，任务级已证
+
+三条真问题在本轮被逐个暴露并修掉：
+
+| 问题 | 现象 | 修复 |
+|---|---|---|
+| 审查任务没有写工具 | 审查任务 `toolNames: []` ⇒ 写报告被策略层拒绝 ⇒ 裁决永远"没有可采信结论" | 审查任务声明 `toolNames: ["createProjectFile"]` |
+| 报告路径取错来源 | `onReviewTaskCompleted` 只吃 `resultLocation`（恒 null） | 改为**优先取完成收据的产物路径**，与执行任务同一权威来源 |
+| 端到端断言时序 | 裁决异步落盘，立即读会读到旧/空 | 轮询等待（≤20s），不是放宽断言 |
+
+**任务级证据（devolve + 开关开启）**：
+
+- 执行任务写 `out.md` ⇒ 收据含 `artifact:out.md`；
+- 注入 `review:T-001` ⇒ 审查 Worker 写 `review.md`（`VERDICT: accept` + `EVIDENCE: artifact:out.md`）；
+- `completion-verdicts` 出现 `"verdict": "accepted"`，`deciderAgentInstanceIdentifier = reviewer:<mission>:T-001`。
+
+**门禁**：`check:low-parallel` ⇒ **687 files / 4667 passed + 3 skipped，exit 0**。
+
+**ALIGN-03-01 状态**：闭环**已验证**，证据齐备 ⇒ 转 **implemented-unverified（待验收）**；
+**仍不归档**，且 `isIndependentReviewAutoAppointmentEnabled` **仍默认关**（按用户裁决）。
+默认启用与否，等你验收后决定。
