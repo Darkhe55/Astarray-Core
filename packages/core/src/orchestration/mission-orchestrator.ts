@@ -495,6 +495,8 @@ export interface MissionOrchestratorOptions {
     readonly missionId: string;
     readonly taskId: string;
     readonly resultLocation: string | null;
+    /** 完成收据里的落盘产物；审查报告路径优先取这里（与执行任务同一权威来源）。 */
+    readonly artifactPaths: readonly string[];
     readonly outcome: "success" | "failure";
   }) => void | Promise<void>;
   registerTertiaryAgentInstance?: (input: {
@@ -1506,6 +1508,12 @@ export class MissionOrchestrator {
               missionId: this.options.missionId,
               taskId: action.taskId,
               resultLocation: outcome.outcome === "success" ? outcome.resultLocation : null,
+              artifactPaths:
+                outcome.outcome === "success" &&
+                outcome.completionReceipt !== undefined &&
+                outcome.completionReceipt !== null
+                  ? [...outcome.completionReceipt.artifactPaths]
+                  : [],
               outcome: outcome.outcome === "success" ? "success" : "failure",
             });
           } catch (reviewVerdictError) {

@@ -71,7 +71,11 @@ export function buildReviewTaskNode(input: BuildReviewTaskNodeInput): TaskDepend
           input.artifactPaths.map((path) => "EVIDENCE: artifact:" + path).join("\n")),
     dependsOn: [input.reviewedTaskIdentifier],
     taskType: "review",
-    toolNames: [],
+    /**
+     * 审查任务必须能**写出报告**，否则它只能"想"不能"留证"，
+     * 裁决将永远因"没有可采信结论"失败（2026-11-10 实测）。
+     */
+    toolNames: ["createProjectFile"],
     assignedAgentId: input.reviewerAgentInstanceId,
     status: "pending",
     resultLocation: null,

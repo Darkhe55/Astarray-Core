@@ -138,6 +138,7 @@ describe("ALIGN-03-01 任务级闭环（devolve 装配已接钩子）", () => {
     const { ScriptedRuntime } = await import(
       "../../../packages/core/src/runtime/scripted-runtime.js"
     );
+    let workerIndex = 0;
     const stateDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-review-mission-"));
     const missionProjectRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "astarray-review-mission-p-"),
@@ -152,19 +153,30 @@ describe("ALIGN-03-01 任务级闭环（devolve 装配已接钩子）", () => {
       authenticatedUserId: "user-1",
       mainAgentInstanceId: "main-agent-1",
       streamOutput: () => {},
-      /** 步序必须是 tool-call → finish(tool-calls) → text → finish(success)。 */
-      workerRuntimeFactory: () =>
-        new ScriptedRuntime([
+      /**
+       * 第 1 个 Worker = 执行任务（写 `out.md`）；
+       * 第 2 个 Worker = 审查任务（写报告并给出 `VERDICT: accept`）。
+       * 步序必须是 tool-call → finish(tool-calls) → text → finish(success)。
+       */
+      workerRuntimeFactory: () => {
+        workerIndex += 1;
+        const filePath = workerIndex === 1 ? "out.md" : "review.md";
+        const content =
+          workerIndex === 1
+            ? "已产出"
+            : "VERDICT: accept\nEVIDENCE: artifact:out.md\n";
+        return new ScriptedRuntime([
           {
             type: "tool-call",
             toolName: "createProjectFile",
-            argumentsJson: JSON.stringify({ filePath: "out.md", content: "已产出" }),
-            callId: "call-1",
+            argumentsJson: JSON.stringify({ filePath, content }),
+            callId: `call-${String(workerIndex)}`,
           },
           { type: "finish", reason: "tool-calls", detail: "请求工具" },
           { type: "text", text: "已完成。" },
           { type: "finish", reason: "success", detail: "完成" },
-        ]),
+        ]);
+      },
       isIndependentReviewAutoAppointmentEnabled: true,
       projectIdentifier: "project-alpha",
       workspaceRootPath: missionProjectRoot,
@@ -194,6 +206,35 @@ describe("ALIGN-03-01 任务级闭环（devolve 装配已接钩子）", () => {
         }),
       ).toBeGreaterThan(0);
       expect(reviewNodes[0]?.description).toContain("EVIDENCE: artifact:out.md");
+      /** 最后一环：审查报告 ⇒ 裁决落盘（accepted / merge-ready）。 */
+      const verdictDirectoryPath = path.join(stateDirectory, "completion-verdicts");
+      const readAllVerdictFiles = async (directoryPath: string): Promise<string[]> => {
+        const entries = await fs.readdir(directoryPath, { withFileTypes: true }).catch(() => []);
+        const collected: string[] = [];
+        for (const entry of entries) {
+          const entryPath = path.join(directoryPath, entry.name);
+          if (entry.isDirectory()) {
+            collected.push(...(await readAllVerdictFiles(entryPath)));
+            continue;
+          }
+          collected.push(await fs.readFile(entryPath, "utf8").catch(() => ""));
+        }
+        return collected;
+      };
+      /** 裁决落盘是异步的：轮询等待，直到出现 accepted 或超过 20 秒。 */
+      let verdictText = "";
+      const verdictDeadline = Date.now() + 20_000;
+      while (Date.now() < verdictDeadline) {
+        verdictText = (await readAllVerdictFiles(verdictDirectoryPath)).join("\n");
+        if (verdictText.includes("accepted")) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(verdictText, verdictText.slice(0, 500)).toContain("accepted");
+      /**
+       * 记录里只留裁决与理由（不含证据列表）；"accepted" 本身即证明报告证据命中了送审产物，
+       * 因为证据不匹配会被 `resolveReviewVerdict` 判成 rework。
+       */
+      expect(verdictText).toContain("reviewer:mission-");
     } finally {
       await runtime.shutdown().catch(() => undefined);
       await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });

@@ -3084,6 +3084,7 @@ export class MainController {
               readonly missionId: string;
               readonly taskId: string;
               readonly resultLocation: string | null;
+              readonly artifactPaths: readonly string[];
               readonly outcome: "success" | "failure";
             }) => {
               const reviewedTaskIdentifier = reviewInput.taskId.startsWith("review:")
@@ -3108,7 +3109,11 @@ export class MainController {
                   : await resolveReviewVerdict({
                       projectRootPath,
                       reviewTaskIdentifier: reviewInput.taskId,
-                      resultLocation: reviewInput.resultLocation,
+                      /** 报告路径优先取完成收据（与执行任务同一权威来源），回退到任务登记路径。 */
+                      resultLocation:
+                        reviewInput.artifactPaths.length > 0
+                          ? reviewInput.artifactPaths[0]!
+                          : reviewInput.resultLocation,
                       reviewOutcome: reviewInput.outcome,
                       /** 送审产物路径由审查任务描述携带（构造时写入）。 */
                       expectedArtifactPaths: await (async () => {
