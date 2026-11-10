@@ -2264,3 +2264,14 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 **ALIGN-03-01 状态**：闭环**已验证**，证据齐备 ⇒ 转 **implemented-unverified（待验收）**；
 **仍不归档**，且 `isIndependentReviewAutoAppointmentEnabled` **仍默认关**（按用户裁决）。
 默认启用与否，等你验收后决定。
+
+#### 第十七轮：ALIGN-03 卡已更新；两库门禁复核
+
+- `docs/tasks/ALIGN03_EXECUTION_REVIEW_FEEDBACK.md` 追加「01 闭环最终形态」：三层分离、
+  产物与报告均取自完成收据、审查任务必须能写报告、报告契约与证据命中规则、
+  assist/devolve 共享装配且默认关、五个测试文件的覆盖表、以及仍未做的三项（默认开关、真实模型审查、人工验收）。
+- 公开库：`check:low-parallel` ⇒ 687 files / 4667 passed + 3 skipped，exit 0（上一轮记录）。
+- 私有库复核：`npm run check` ⇒ exit 0；`npm run build:desktop` ⇒ **exit 0**，`failures: []`，桌面 CDP 冒烟通过。
+
+**说明**：`build:desktop` 首次跑出现一次 Node 运行错误（exit 1），紧接着重跑即通过且 `failures: []`；
+按纪律记录为**环境时序抖动**（未改动任何代码），随后用带退出码的复跑确认 exit 0。
