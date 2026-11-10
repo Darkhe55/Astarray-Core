@@ -128,3 +128,21 @@
 但**没有一条用例经由 `createApplicationRuntime` 走完这条链**。
 
 ⇒ 04 仍为 **in_progress**，缺口精确到：**装配级行为用例（delegation 与 tool-recall 各一条）**。
+
+## 7. 装配级用例（2026-11-10 续）：通信转交
+
+新增 `tests/core/integration/audit04-delegation-assembly.test.ts`（2 条，走 `createApplicationRuntime`）：
+
+| 用例 | 断言 | 结果 |
+|---|---|---|
+| **缺授权裁决引用 ⇒ 拒绝** | `userDecisionReference` 为空白 ⇒ 抛"授权/裁决"错误 | ✅ |
+| **合法输入 ⇒ 产出不透明句柄** | 句柄非空、**不含对端身份串**、到期字段类型正确 | ✅ |
+
+**过程中发现的一条真实约束**（此前未记）：`createGrant` 要求
+**`recipientRole` 与 `grantorRole` 同级**（"recipient 必须与 grantor 同级"），
+所以"上级 → 三级"这种跨级转交在入口处就被拒绝。这是**卡内 4 要的"仅有权直属上级转交给具体同级个体"**的落地证据。
+
+**仍未覆盖**：完整投递校验（`DelegationValidationContext` 形状较大）与"撤销/到期/revision 变化后不可用"
+在**装配层**的复现——单元层已有（`tool-recall-and-delegation` 的"grant 不可转授 + 撤销批量生效"）。
+
+**门禁**：`check:low-parallel` ⇒ **688 files / 4672 passed + 3 skipped，exit 0**。
