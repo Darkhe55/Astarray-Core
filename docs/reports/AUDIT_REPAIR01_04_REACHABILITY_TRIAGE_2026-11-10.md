@@ -96,3 +96,35 @@
 - 其余候选：**只做了初步分诊**，未逐项定性。
 
 ⇒ 本检查点状态：**in_progress**，不是 done。
+
+## 6. 完成判据核对（2026-11-10 续）：拔线反例**已有**
+
+卡内完成判据要求"拔掉相应装配后正向测试必须失败"。核对发现该反例**已经存在**：
+
+`tests/core/unit/wiring-manifest.test.ts`：
+
+| 用例 | 作用 |
+|---|---|
+| "标 `constructed` 的组件必须在装配/编排源码里被构造（**被拔线 ⇒ 红**）" | 把装配移除 ⇒ 该用例失败 |
+| "标 `unreachableByDesign` 的组件不得被构造（接了却没更新清单 ⇒ 红）" | 反向保护 |
+
+清单里**已登记**两个点名能力：`AgentCommunicationDelegationController`（L98）、
+`ToolDocumentationRecallController`（L104）。
+
+行为面证据（`tests/core/unit/tool-recall-and-delegation.test.ts`，11 条）覆盖：
+
+- 创建成功、句柄不透明、投递前失效检查；
+- **不可转授**（句柄不可导出为另一句柄）；
+- **撤销批量生效**；
+- 层级校验（target 低一级、recipient 同级、target 存活）；
+- 回执不继承、revision 变化重发、陈旧 revision 拒绝。
+
+**实测**：两个文件 **14 passed**。
+
+### 仍缺的唯一一条
+
+卡内要求"从**应用或 SDK 的真实装配入口**验证成功 / 拒绝 / 撤销"。
+现状是：**行为在单元层验证**（直接构造控制器）、**装配由清单守卫**，
+但**没有一条用例经由 `createApplicationRuntime` 走完这条链**。
+
+⇒ 04 仍为 **in_progress**，缺口精确到：**装配级行为用例（delegation 与 tool-recall 各一条）**。
