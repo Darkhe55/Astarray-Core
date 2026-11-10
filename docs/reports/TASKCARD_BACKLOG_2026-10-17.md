@@ -1971,3 +1971,23 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 - 人工验收未做。
 
 **状态**：ALIGN-03-01 **未完成（reopened）**，不归档。
+
+#### 本轮进展（2026-11-10 第二轮）：真实审查任务已接入
+
+| 项 | 实现 | 证据 |
+|---|---|---|
+| 审查任务节点 | 新增 `independent-review-task.ts`：`taskType: "review"`、`dependsOn: [执行任务]`、指派**审查者**、`status: pending` | `align03-independent-review-task.test.ts`（10 条） |
+| 报告解析 | 只认 `VERDICT: accept|rework` 与 `EVIDENCE: <引用>`；**无裁决行 / 通过但无证据 ⇒ null**（调用方按未通过处理） | 同上 |
+| 派发 | 产物前置通过 ⇒ 控制器**返回审查任务节点**，由编排器在**安全点** `injectTaskBySpec` 注入；拒绝时如实上报，不假装已开始 | `mission-orchestrator.ts` 注入分支 |
+| 裁决消费 | 新增 `onReviewTaskCompleted`：审查任务收尾 ⇒ 读报告 ⇒ 落裁决；失败/报告缺失/不可读/不合规 ⇒ **一律 rework** | `main-controller.ts` |
+| 防递归 | 审查任务自身不再派生审查任务（`taskType === "review"` 直接返回） | 同上 |
+
+**门禁**：`npx vitest run --maxWorkers=1` ⇒ **4648 passed / 3 skipped**；
+唯一失败是隐私守卫命中我本轮新写的 UAC 文档里的真实用户名路径，**已改为 `<username>` 占位**后通过。
+
+**仍未完成**：
+- 审查任务**端到端跑通**（真实 Worker 产出报告 ⇒ 解析 ⇒ accepted/rework）尚无集成测试；
+- `isIndependentReviewAutoAppointmentEnabled` 仍**默认关闭**；
+- 人工验收未做。
+
+**状态**：ALIGN-03-01 **仍未完成**，不归档。
