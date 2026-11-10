@@ -468,3 +468,13 @@ message_start → content_block_start(text) → content_block_delta → content_
 
 **完成判据仍未满足**：两项能力的"成功 / 拒绝 / 撤销或未知工具"三条路径 + **拔线反例**均未做。
 ⇒ 04 保持 **in_progress**，不改判。
+
+### 04 巡检发现（2026-11-10）：撤销入口未暴露，属"需宿主注入"
+
+`AgentCommunicationDelegationController` **有** `revokeGrant`/`revokeAllForAgent`，
+但 `main-controller` 只暴露了 `createGrant`/`assertDeliverable`/`assertNotReDelegable`，
+**没有撤销入口**；且 `assertDeliverable` 依赖调用方传入 `context.isRevokedByUser`
+（`:220`）——调用方漏传就可能绕过撤销。
+
+⇒ 卡内 4 的"撤销后不可使用"在**装配层不可达**；这是**接线缺口**，不是测试缺口。
+已列入后继工作（暴露入口 + 复检改读存储 + 再补装配级用例）。

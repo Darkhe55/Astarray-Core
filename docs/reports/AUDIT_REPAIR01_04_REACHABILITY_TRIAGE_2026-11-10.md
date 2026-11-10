@@ -146,3 +146,25 @@
 在**装配层**的复现——单元层已有（`tool-recall-and-delegation` 的"grant 不可转授 + 撤销批量生效"）。
 
 **门禁**：`check:low-parallel` ⇒ **688 files / 4672 passed + 3 skipped，exit 0**。
+
+## 8. 撤销路径核对（2026-11-10 巡检）：**装配层没有撤销入口**
+
+卡内 4 要求"撤销、到期和关联 revision 变化后不可使用"。核对结果：
+
+| 层 | 事实 |
+|---|---|
+| 控制器 `AgentCommunicationDelegationController` | **有** `revokeGrant(grantId)`、`revokeAllForAgent(agentInstanceId)`（`agent-communication-delegation.ts:73/77`） |
+| 投递复检 | `assertDeliverable` 在 `:220` 检查 **`input.context.isRevokedByUser`** —— 撤销状态由**调用方传入** |
+| `main-controller` 生产入口 | **只有**：`createGrant`(:906)、`assertDeliverable`(:922)、`assertNotReDelegable`(:929)。**没有撤销入口** |
+
+⇒ 结论：**撤销能力存在，但装配层未暴露入口**，且投递复检依赖调用方自己提供"是否已撤销"。
+
+**这属于卡内的"需宿主注入/未接入"，不是测试缺口**——因此本轮**没有**写"撤销后不可用"的装配级用例：
+那种用例只能直接构造内部控制器，与既有单元用例重复，无法证明装配可达性。
+
+**后继工作（精确）**：
+1. 在 `main-controller` 暴露 `revokeCommunicationDelegationGrant(handleIdentifier)`（转发到 `revokeGrant`）；
+2. 投递复检改为**从存储读取撤销状态**，而不是要求调用方传 `isRevokedByUser`
+   （否则调用方漏传即绕过撤销）；
+3. 再补装配级用例：创建 ⇒ 撤销 ⇒ 复检必须拒绝；
+4. 到期与 revision 变化两条同理。
