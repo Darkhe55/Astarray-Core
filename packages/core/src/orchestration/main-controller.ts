@@ -159,7 +159,7 @@ import type { SecondaryContinuousDispatchLoop } from "./secondary-continuous-dis
 import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
 import { projectTaskReconciliationVerdicts } from "./task-reconciliation-verdict.js";
 import { checkOutputArtifact } from "./output-artifact-check.js";
-import { produceArtifactBackedVerdict } from "./artifact-backed-verdict.js";
+import { evaluateArtifactPrecondition } from "./artifact-precondition.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
 import type { CrossAgentContextAttachmentController } from "./cross-agent-attachment-controller.js";
 import type { DirectDispatchController } from "./direct-dispatch-controller.js";
@@ -4817,10 +4817,14 @@ export class MainController {
                 allowsSharedTestAndAcceptance: true,
               });
               /**
-               * ALIGN-03-01（2026-11-10）：任命后**立即产出并记录结论**。
+               * ALIGN-03-01（2026-11-10 修订，用户裁决）：产物检查**只是前置条件**。
                *
-               * 只依据可复核产物（`artifact:` 证据），执行者无法用自报伪造；
-               * 无项目根 ⇒ 不产结论（不猜路径、不假装已裁决）。
+               * - 前置不满足 ⇒ 记录 **rework**（没有可送审的产物，返修单引用具体检查项）；
+               * - 前置满足 ⇒ **不产出任何裁决**，任务停在"待验收"，
+               *   等待**真实审查任务**给出结论。
+               *
+               * 这样从类型与流程上都杜绝了"产物存在即 merge-ready"，
+               * 也杜绝"仅登记审查者身份就视作完成独立审查"。
                */
               const projectRootPath = this.resolveProjectRootPathForMission(input.missionId);
               if (projectRootPath === null) {
@@ -4830,12 +4834,14 @@ export class MainController {
               const task = taskChain?.tasks.find(
                 (candidate) => candidate.id === input.taskId,
               );
-              const producedVerdict = await produceArtifactBackedVerdict({
+              const artifactPrecondition = await evaluateArtifactPrecondition({
                 projectRootPath,
-                taskIdentifier: input.taskId,
-                taskRevision: 1,
                 resultLocation: task?.resultLocation ?? null,
               });
+              if (artifactPrecondition.isSatisfied) {
+                /** 有产物可送审 ⇒ 等待真实审查任务；此处**不写裁决**。 */
+                return;
+              }
               await this.recordAcceptanceVerdict({
                 appointmentIdentifier,
                 verdict: {
@@ -4843,9 +4849,9 @@ export class MainController {
                   boundTaskIdentifier: input.taskId,
                   boundTaskRevision: 1,
                   boundCommitHash: null,
-                  verdict: producedVerdict.verdict,
-                  evidenceReferences: [...producedVerdict.evidenceReferences],
-                  reason: producedVerdict.reason,
+                  verdict: "rework",
+                  evidenceReferences: [...artifactPrecondition.evidenceReferences],
+                  reason: artifactPrecondition.reason,
                 },
               });
             },
