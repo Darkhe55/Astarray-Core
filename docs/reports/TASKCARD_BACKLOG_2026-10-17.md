@@ -2289,3 +2289,23 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 2. 把统一策略替换为**必拒绝策略**后仍能落盘 ⇒ 测试必须失败（防旁路回归）。
 
 下轮按"先写失败测试"的顺序做这两条。
+
+#### 第十九~二十五轮：AUDIT-REPAIR-01 四个检查点收口（2026-11-10）
+
+| 检查点 | 结论 | 关键证据 |
+|---|---|---|
+| 01 统一执行门禁 | implemented-unverified | `audit01-application-matrix`(10，含"批准绑定参数"反例) + `goal-proposal-gate` + 必拒绝组 |
+| 02 Anthropic 流严格性 | implemented-unverified（矩阵条目全覆盖） | `anthropic-messages-runtime`(25) + `anthropic-tool-loop-failclosed`(7，本轮补非法 JSON 与 `stop_sequence`) |
+| 03 缓存安全边界与 TTL | implemented-unverified | `cache-safety` + `cache-metrics`（28） |
+| 04 生产可达性分诊 | implemented-unverified | `audit04-delegation-assembly`(5) + `audit04-tool-help-assembly`(1) + `wiring-manifest`(拔线) + 分诊报告 |
+
+**本轮新增代码**（非仅文档）：
+- 暴露 `revokeCommunicationDelegationGrant` / `revokeAllCommunicationDelegationsForAgent`
+  （此前撤销在装配层不可达）；
+- 分诊报告 `docs/reports/AUDIT_REPAIR01_04_REACHABILITY_TRIAGE_2026-11-10.md`（含 21 候选结构化输出与分类）。
+
+**两次自我更正**（已写进报告）：
+1. "撤销依赖调用方传 `isRevokedByUser`、漏传即绕过" —— **错**，撤销是删除授权记录；
+2. "未知工具应返回 `escalated-missing-tool`" —— **错**，那是 `missing-capability` 请求的语义。
+
+**仍不虚报**：`DiskCache` 生产未接入；其余 16 个候选只做初步分诊；05 依赖平台矩阵。
