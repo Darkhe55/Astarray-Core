@@ -193,6 +193,16 @@ describe("AUDIT-REPAIR-01：失败路径工具执行计数为 0", () => {
     expect((await runWithCounter({ baseUrl: duplicate })).outcome).toBe("rejected");
   });
 
+  it("非法 JSON 数据事件 ⇒ 明确协议错误（不得静默丢弃）", async () => {
+    const baseUrl = await startServer({
+      chunks: ["data: {not-json}\n\n", sse({ type: "message_stop" })],
+    });
+    const result = await runWithCounter({ baseUrl });
+    expect(result.outcome).toBe("rejected");
+    const message = String((result.error as Error).message ?? "");
+    expect(message.toLowerCase()).toMatch(/json|协议|protocol/u);
+  });
+
   it("超时与取消：都不执行工具", async () => {
     const timeoutUrl = await startServer({
       chunks: [sse({ type: "message_start" })],

@@ -374,3 +374,17 @@ worker 使用的 profile 引用在装配时固定，不读当前选择。本用�
 ⇒ **28 passed**，exit 0。
 
 **结论**：03 转 **implemented-unverified**（生产接线仍待 04 核查，符合卡内 ⑦）。
+
+### 02 补充证据（2026-11-10）：非法 JSON 数据事件
+
+卡内 ① 要求"非法 JSON 数据事件返回明确协议错误，不静默丢弃"，此前**没有对应测试**。
+新增用例（`anthropic-tool-loop-failclosed`）：
+
+```
+chunks: ["data: {not-json}\n\n", sse({type:"message_stop"})]
+⇒ 运行被拒（rejected），错误信息匹配 /json|协议|protocol/
+⇒ 且工具执行计数为 0（该文件的 finally 统一断言）
+```
+
+**结果：通过**（说明运行时**已经**做了协议错误处理，只是缺证据）。
+⇒ 该条从"未覆盖"变为"有回归锁定"；02 的整体矩阵仍在逐条核，未整体改判。
