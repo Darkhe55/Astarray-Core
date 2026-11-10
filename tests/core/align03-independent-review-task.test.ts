@@ -13,6 +13,7 @@ import {
   buildReviewTaskIdentifier,
   buildReviewTaskNode,
   parseReviewVerdictReport,
+  resolveReviewVerdict,
 } from "../../packages/core/src/orchestration/independent-review-task.js";
 
 describe("ALIGN-03-01 真实审查任务节点", () => {
@@ -88,5 +89,85 @@ describe("ALIGN-03-01 审查报告解析", () => {
       "VERDICT: rework\nVERDICT: accept\nEVIDENCE: x",
     );
     expect(parsed?.verdict).toBe("rework");
+  });
+});
+
+describe("ALIGN-03-01 裁决只能来自审查报告（含真实文件）", () => {
+  it("报告写明 accept + 证据 ⇒ merge-ready，证据含报告引用", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const root = await mkdtemp(join(tmpdir(), "astarray-review-report-"));
+    try {
+      await writeFile(
+        join(root, "review.md"),
+        "VERDICT: accept\nEVIDENCE: artifact:docs/out.md\n",
+        "utf8",
+      );
+      const resolved = await resolveReviewVerdict({
+        projectRootPath: root,
+        reviewTaskIdentifier: "review:T-1",
+        resultLocation: "review.md",
+        reviewOutcome: "success",
+      });
+      expect(resolved.verdict).toBe("merge-ready");
+      expect(resolved.evidenceReferences[0]).toBe("review-report:review.md");
+      expect(resolved.evidenceReferences).toContain("artifact:docs/out.md");
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10 });
+    }
+  });
+
+  it("审查任务**失败** ⇒ rework（不读报告、不默认通过）", async () => {
+    const resolved = await resolveReviewVerdict({
+      projectRootPath: "/nonexistent-root",
+      reviewTaskIdentifier: "review:T-1",
+      resultLocation: "review.md",
+      reviewOutcome: "failure",
+    });
+    expect(resolved.verdict).toBe("rework");
+    expect(resolved.evidenceReferences).toEqual(["check:review-task-failed:review:T-1"]);
+  });
+
+  it("未登记报告路径 ⇒ rework + review-report-unregistered", async () => {
+    const resolved = await resolveReviewVerdict({
+      projectRootPath: "/nonexistent-root",
+      reviewTaskIdentifier: "review:T-1",
+      resultLocation: null,
+      reviewOutcome: "success",
+    });
+    expect(resolved.verdict).toBe("rework");
+    expect(resolved.evidenceReferences[0]).toContain("check:review-report-unregistered");
+  });
+
+  it("报告不可读 ⇒ rework + review-report-unreadable", async () => {
+    const resolved = await resolveReviewVerdict({
+      projectRootPath: "/nonexistent-root",
+      reviewTaskIdentifier: "review:T-1",
+      resultLocation: "missing.md",
+      reviewOutcome: "success",
+    });
+    expect(resolved.verdict).toBe("rework");
+    expect(resolved.evidenceReferences[0]).toContain("check:review-report-unreadable");
+  });
+
+  it("报告**没有裁决行** ⇒ rework + review-verdict-missing（绝不默认通过）", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const root = await mkdtemp(join(tmpdir(), "astarray-review-report-"));
+    try {
+      await writeFile(join(root, "review.md"), "看起来可以。", "utf8");
+      const resolved = await resolveReviewVerdict({
+        projectRootPath: root,
+        reviewTaskIdentifier: "review:T-1",
+        resultLocation: "review.md",
+        reviewOutcome: "success",
+      });
+      expect(resolved.verdict).toBe("rework");
+      expect(resolved.evidenceReferences[0]).toContain("check:review-verdict-missing");
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10 });
+    }
   });
 });

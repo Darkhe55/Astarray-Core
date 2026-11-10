@@ -5,8 +5,6 @@
  * 权限询问转达用户并记录会话授权。
  */
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import { buildToolPublicDocumentation } from "../tools/tool-public-documentation-registry.js";
@@ -162,7 +160,7 @@ import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
 import { projectTaskReconciliationVerdicts } from "./task-reconciliation-verdict.js";
 import { checkOutputArtifact } from "./output-artifact-check.js";
 import { evaluateArtifactPrecondition } from "./artifact-precondition.js";
-import { buildReviewTaskNode, parseReviewVerdictReport } from "./independent-review-task.js";
+import { buildReviewTaskNode, resolveReviewVerdict } from "./independent-review-task.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
 import type { CrossAgentContextAttachmentController } from "./cross-agent-attachment-controller.js";
 import type { DirectDispatchController } from "./direct-dispatch-controller.js";
@@ -4887,83 +4885,41 @@ export class MainController {
               const reviewedTaskIdentifier = reviewInput.taskId.startsWith("review:")
                 ? reviewInput.taskId.slice("review:".length)
                 : reviewInput.taskId;
-              const appointmentIdentifier = `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`;
-              const reviewerAgentInstanceId = `reviewer:${reviewInput.missionId}:${reviewedTaskIdentifier}`;
-              const recordRework = async (reason: string, checkReference: string) => {
-                await this.recordAcceptanceVerdict({
-                  appointmentIdentifier,
-                  verdict: {
-                    acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
-                    boundTaskIdentifier: reviewedTaskIdentifier,
-                    boundTaskRevision: 1,
-                    boundCommitHash: null,
-                    verdict: "rework",
-                    evidenceReferences: [checkReference],
-                    reason,
-                  },
-                });
-              };
-              if (reviewInput.outcome === "failure") {
-                await recordRework(
-                  "审查任务执行失败：没有可采信的审查结论。",
-                  `check:review-task-failed:${reviewInput.taskId}`,
-                );
-                return;
-              }
               const projectRootPath = this.resolveProjectRootPathForMission(
                 reviewInput.missionId,
               );
-              if (projectRootPath === null) {
-                await recordRework(
-                  "无法确定项目根：审查报告不能复核。",
-                  `check:review-project-root-unresolved:${reviewInput.taskId}`,
-                );
-                return;
-              }
-              const reportLocation = reviewInput.resultLocation?.trim() ?? "";
-              if (reportLocation === "") {
-                await recordRework(
-                  "审查任务未登记报告路径：没有可采信的审查结论。",
-                  `check:review-report-unregistered:${reviewInput.taskId}`,
-                );
-                return;
-              }
-              const reportText = await readFile(
-                path.join(projectRootPath, reportLocation),
-                "utf8",
-              ).catch(() => null);
-              if (reportText === null) {
-                await recordRework(
-                  "审查报告不可读取：" + reportLocation,
-                  `check:review-report-unreadable:${reportLocation}`,
-                );
-                return;
-              }
-              const parsedReport = parseReviewVerdictReport(reportText);
-              if (parsedReport === null) {
-                await recordRework(
-                  "审查报告缺少有效裁决行（需 VERDICT: accept|rework，且 accept 必须带 EVIDENCE）。",
-                  `check:review-verdict-missing:${reportLocation}`,
-                );
-                return;
-              }
+              /**
+               * 裁决**只能**来自审查报告；解析逻辑集中在 `resolveReviewVerdict`，
+               * 任何异常路径都收敛为 rework（不抛错、不默认通过）。
+               */
+              const resolvedVerdict =
+                projectRootPath === null
+                  ? {
+                      verdict: "rework" as const,
+                      evidenceReferences: [
+                        `check:review-project-root-unresolved:${reviewInput.taskId}`,
+                      ],
+                      reason: "无法确定项目根：审查报告不能复核。",
+                    }
+                  : await resolveReviewVerdict({
+                      projectRootPath,
+                      reviewTaskIdentifier: reviewInput.taskId,
+                      resultLocation: reviewInput.resultLocation,
+                      reviewOutcome: reviewInput.outcome,
+                    });
               await this.recordAcceptanceVerdict({
-                appointmentIdentifier,
+                appointmentIdentifier: `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
                 verdict: {
-                  acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
+                  acceptingAgentInstanceIdentifier: `reviewer:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
                   boundTaskIdentifier: reviewedTaskIdentifier,
                   boundTaskRevision: 1,
                   boundCommitHash: null,
-                  verdict: parsedReport.verdict,
-                  evidenceReferences: [
-                    `review-report:${reportLocation}`,
-                    ...parsedReport.evidenceReferences,
-                  ],
-                  reason: parsedReport.reason,
+                  verdict: resolvedVerdict.verdict,
+                  evidenceReferences: [...resolvedVerdict.evidenceReferences],
+                  reason: resolvedVerdict.reason,
                 },
               });
-            },
-          }
+            },          }
         : {}),
       /**
        * ALIGN-03：把派发出的三级 Worker 登记进目录，并写入**真实直属上级**。

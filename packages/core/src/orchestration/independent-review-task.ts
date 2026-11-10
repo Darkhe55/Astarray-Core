@@ -128,3 +128,74 @@ export function parseReviewVerdictReport(reportText: string): ReviewVerdictRepor
     reason: "审查报告判定通过，并给出证据引用。",
   };
 }
+
+export interface ResolveReviewVerdictInput {
+  readonly projectRootPath: string;
+  readonly reviewTaskIdentifier: string;
+  /** 审查任务登记的报告路径（相对项目根）；未登记时为空。 */
+  readonly resultLocation: string | null;
+  readonly reviewOutcome: "success" | "failure";
+}
+
+export interface ResolvedReviewVerdict {
+  readonly verdict: "merge-ready" | "rework";
+  readonly evidenceReferences: readonly string[];
+  readonly reason: string;
+}
+
+/**
+ * 由**审查任务的报告**解析裁决（唯一合法来源）。
+ *
+ * 任何异常路径都收敛为 `rework` 并带具体检查引用：
+ *  - 审查任务失败 ⇒ `check:review-task-failed:<task>`
+ *  - 未登记报告路径 ⇒ `check:review-report-unregistered:<task>`
+ *  - 报告不可读 ⇒ `check:review-report-unreadable:<path>`
+ *  - 报告不合规（无裁决行 / 通过无证据）⇒ `check:review-verdict-missing:<path>`
+ *
+ * **永不抛错、永不默认通过。**
+ */
+export async function resolveReviewVerdict(
+  input: ResolveReviewVerdictInput,
+): Promise<ResolvedReviewVerdict> {
+  const { readFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  if (input.reviewOutcome === "failure") {
+    return {
+      verdict: "rework",
+      evidenceReferences: [`check:review-task-failed:${input.reviewTaskIdentifier}`],
+      reason: "审查任务执行失败：没有可采信的审查结论。",
+    };
+  }
+  const reportLocation = input.resultLocation?.trim() ?? "";
+  if (reportLocation === "") {
+    return {
+      verdict: "rework",
+      evidenceReferences: [`check:review-report-unregistered:${input.reviewTaskIdentifier}`],
+      reason: "审查任务未登记报告路径：没有可采信的审查结论。",
+    };
+  }
+  const reportText = await readFile(join(input.projectRootPath, reportLocation), "utf8").catch(
+    () => null,
+  );
+  if (reportText === null) {
+    return {
+      verdict: "rework",
+      evidenceReferences: [`check:review-report-unreadable:${reportLocation}`],
+      reason: "审查报告不可读取：" + reportLocation,
+    };
+  }
+  const parsedReport = parseReviewVerdictReport(reportText);
+  if (parsedReport === null) {
+    return {
+      verdict: "rework",
+      evidenceReferences: [`check:review-verdict-missing:${reportLocation}`],
+      reason:
+        "审查报告缺少有效裁决行（需 VERDICT: accept|rework，且 accept 必须带 EVIDENCE）。",
+    };
+  }
+  return {
+    verdict: parsedReport.verdict,
+    evidenceReferences: [`review-report:${reportLocation}`, ...parsedReport.evidenceReferences],
+    reason: parsedReport.reason,
+  };
+}
