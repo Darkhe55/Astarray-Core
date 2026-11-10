@@ -2017,3 +2017,24 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 4. 后续若启用，需要用户再次明确批准，且前提是端到端测试通过（当前仍缺）。
 
 **本轮未做**：未改任何默认值（代码里本来就是缺省关闭，无需改动）。
+
+#### 巡检状态（2026-11-10 第五轮，定时）：断点与下一步第一条动作
+
+**已完成且绿**：ALIGN-03-01 的四项能力（产物前置分离、四态状态机、真实审查任务注入、报告裁决解析）
+定向测试 **34/34 通过**（`align03-independent-review-closure` / `align03-independent-review-task` /
+`align03-artifact-precondition` / `align03-auto-review-appointment`）。
+
+**仍未完成（唯一编码缺口）**：整链**端到端**测试 —— 真实 Worker 跑审查任务 ⇒ 写报告 ⇒ 注入 ⇒ 裁决落盘。
+
+**断点（下一轮第一条动作）**：
+改 `tests/core/integration/align03-auto-review-appointment.test.ts` 的 `buildRuntimeStub`：
+让它按提示词区分「执行任务」与「独立审查任务」，在后者里向项目根写一份
+`VERDICT: accept\nEVIDENCE: artifact:docs/out.md` 的报告并把该路径作为 `resultLocation` 返回；
+然后断言 `completion-verdicts` 里出现 `merge-ready`，且再写一条 `VERDICT: rework` 的断言 `rework`
+**且任务未被宣称最终完成**。
+
+**注意**：写测试前需先确认桩 Worker 的 `resultLocation` 如何回传到任务链
+（当前桩只 `runFinished`，不设产物路径）——这是该断点的第一处未知。
+
+**EXEC-01-02**：初始化 verified；AppContainer 执行仍失败（`CreateProcessW 5`），
+下一步是给 helper 加 `print-sid` 拿权威 SID，再做最小复现；**未阻塞部分已写明，不需用户操作**。
