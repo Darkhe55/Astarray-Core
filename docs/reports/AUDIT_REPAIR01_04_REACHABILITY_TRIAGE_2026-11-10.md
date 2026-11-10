@@ -269,3 +269,32 @@
 **代价说明（如实）**：这一小项已经花了三轮（第 21、22 轮各一次失败），
 比预期高；如果下一轮仍不能一次写对，我会把它标为"需更深入了解，另开专项"，
 转去做收益更高的项，而不是继续在这里打转。
+
+## 13. 根因找到（第二十三轮）：**文档登记表需宿主注入**，不是缺陷
+
+读了 `answerToolHelpRequest` 的完整构造（`main-controller.ts:988-1012`），三点决定性事实：
+
+1. `currentToolGroupRevision: mission.taskChain.revision` —— 陈旧检查用的是**任务链 revision**（动态值）；
+2. 分配集合来自任务 `toolNames` ∩ `registry.getDescriptor(...)`；
+3. **`buildToolPublicDocumentation` 抛错 ⇒ `catch` 静默跳过 ⇒ 该工具视为"未分配"**（fail-closed，
+   注释原文："公开用法登记不完整 ⇒ 不暴露半套说明"）。
+
+而 `application-runtime.ts:853` 的 `toolDocumentationRegistry` 是**注入选项**。
+装配级用例里没注入它 ⇒ 每个工具都走 catch ⇒ 全部"未分配" ⇒ 于是返回
+`known-but-not-usable`。
+
+⇒ **`known-but-not-usable` 不是缺陷，是"宿主未注入文档登记表"的正确表现。**
+
+### 分类更正
+
+| 能力 | 原分类 | 更正 |
+|---|---|---|
+| `ToolDocumentationRecallController` | 已接入 | **已接入 + 需宿主注入（`toolDocumentationRegistry`）** |
+
+### 下一轮（一步到位，不再试错）
+
+装配级用例里注入最小 `toolDocumentationRegistry`（给一个已分配工具写完整登记项），
+并让 `knownToolGroupRevision` 取 `mission.taskChain.revision`（不要再用 999999），
+然后断言 `usage-provided` / `known-but-not-usable` / `escalated-missing-tool` 三条。
+
+**三轮的教训**：我应该在第 21 轮就先读这段构造（30 行），而不是先写测试撞两次。
