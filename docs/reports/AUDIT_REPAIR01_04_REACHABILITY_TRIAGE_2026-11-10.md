@@ -228,3 +228,20 @@
 
 **门禁**：`check:low-parallel` ⇒ **688 files / 4675 passed + 3 skipped，exit 0**
 （首轮 `g4-tool-documentation-e2e` 翻红，隔离复跑 2/2 通过 ⇒ 记为**已知抖动**，未改断言；重跑全绿）。
+
+## 11. 工具说明回访（2026-11-10 第二十一轮）：入口可达，缺 revision 取值
+
+用装配级用例（`controller.answerToolHelpRequest`）实测得到：
+
+| 观察 | 含义 |
+|---|---|
+| 请求体字段不全 ⇒ `resolution: "rejected"` | 入口对**非法请求**明确拒绝（不是抛错） |
+| 补全字段（`controlEventType`/`requestIdentifier`/`taskExecutionIdentifier`/`requestKind`/`toolIdentifier`/`capabilityIntent`/`blockingReason`/`knownToolGroupRevision`）后 ⇒ `resolution: "stale-request"` | **入口确实在生产装配里工作**，只是我给的 `knownToolGroupRevision` 与当前工具组 revision 不一致 |
+
+⇒ 结论：`ToolDocumentationRecallController` 的**装配入口可达**（有真实响应，不是"不可达"）。
+缺的只是"当前工具组 revision"的正确取值来源。
+
+**本轮未留下该用例**：为避免把"revision 猜错"写成失败测试，文件已删除；
+下一轮第一步：在 `answerToolHelpRequest` 附近定位 revision 的权威来源
+（对比 `knownToolGroupRevision` 的比较点），再用正确值断言
+`usage-provided` / `known-but-not-usable` / `escalated-missing-tool` 三条。
