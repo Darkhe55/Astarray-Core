@@ -357,3 +357,26 @@ capabilityIntent: "需要访问远端仓库", blockingReason: "no-known-match"
 04 的**完成判据已全部有证据** ⇒ 转 **implemented-unverified**。
 **仍不宣称"产品已达生产可用"**：`DiskCache` 未接生产、其余 16 个候选只做了初步分诊，
 这些都在本报告第 4 节列为后继工作。
+
+## 16. 候选逐项分诊（第一批 5 个，2026-11-10 第二十七轮）
+
+对脚本里"生产提及 = 0"的前 5 个候选做调用链核对（`git grep` 生产与测试两侧，并读定义处注释）：
+
+| 候选 | 生产出现位置 | 判定 | 依据 |
+|---|---|---|---|
+| `AzureOpenAiAdapter` | **仅定义文件自身** `runtime/azure-openai-adapter.ts:34` | **未接入** | 全仓库没有第二处构造/引用；provider 工厂未接它 |
+| `BedrockConverseAdapter` | **仅定义文件自身** `runtime/bedrock-converse-adapter.ts:122` | **未接入** | 同上 |
+| `ContinuationCoordinator` | `agent-run-watchdog.ts` 里的**接口与注释** | **未接入（仅契约）** | 只有 `ContinuationCoordinatorOptions` 接口，无实现被构造 |
+| `FaultInjectionRecoveryVerifier` | **仅定义文件自身** | **测试专用** | 生产无引用；测试里有构造（故障注入验证器） |
+| `LocalCompletionVerifier` | 其他文件仅**注释提及** | **被替代** | `completion-receipt.ts:9` 注释原文："`LocalCompletionVerifier` 至今**零调用方**"；完成收据门禁已取代它 |
+
+**后继工作（精确）**：
+1. `AzureOpenAiAdapter`/`BedrockConverseAdapter`：确认 provider 选择链路是否**应当**支持这两家；
+   若应当 ⇒ 属产品缺口（接线）；若不应当 ⇒ 标"未接入且无计划"，避免长期飘着；
+2. `ContinuationCoordinator`：确认"检查点续跑"是否已有替代（`continuation-breakpoint` 系列）；
+   有 ⇒ 标被替代；无 ⇒ 订一个"契约无实现"的缺口；
+3. `FaultInjectionRecoveryVerifier`：标测试专用即可，不进产品能力清单；
+4. `LocalCompletionVerifier`：标"被替代历史"，按卡内要求**保留不删除**。
+
+**说明**：其余 11 个候选（生产提及 1–6）尚未逐项核对；本批刻意只做 5 个，
+避免一次性下结论却没有逐个读调用链。
