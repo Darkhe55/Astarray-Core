@@ -2107,3 +2107,19 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 **因此方案 A（改 `AgentRuntime` 契约）并不需要**：`ScriptedRuntime` 已支持 `tool-call` 步骤，
 只要桩先发一次**写工具调用**（落盘一个真实文件）再 `finish`，收据里就会有 `artifactPaths`，
 端到端即可覆盖 accept 路径。**这是下一轮的第一条动作。**
+
+#### 第九轮（2026-11-10）：端到端测试骨架已建立，卡在"脚本桩的写工具未登记产物"
+
+新建 `tests/core/integration/align03-review-loop-e2e.test.ts`（**暂时 skip**，理由写在文件内）：
+用 `ScriptedRuntime` 先发 `createProjectFile` 再 `finish`，期望任务链出现 `review:*`。
+
+**实测结果**：
+
+| 配置 | 结果 |
+|---|---|
+| `mode: "devolve"` | 无裁决文件、无审查节点 ⇒ **审查钩子根本没跑**（该模式没有责任次级） |
+| `mode: "assist"` | 出现 `completion-verdicts/mission-*` ⇒ 钩子跑了，但走的是**返修分支** ⇒ 收据里 `artifactPaths` 为空 |
+
+⇒ 结论：**脚本桩里的 `createProjectFile` 没有进入 `persistedArtifactPaths`**。
+下一轮第一条动作：查清是「工具未执行 / 被权限拦下」还是「执行了但产物未回填」——
+先看裁决文件里的 `reason` 与 `evidenceReferences`，再决定是否需要在测试装配里注册该工具或改用 `devolve`+显式责任次级。
