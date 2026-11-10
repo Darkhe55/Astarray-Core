@@ -413,3 +413,35 @@ capabilityIntent: "需要访问远端仓库", blockingReason: "no-known-match"
 
 **本批仍未做**：`MetricsRegistry`、`AgentAddressGuard`、`TokenMeasurementService`（生产提及 5–6，
 最可能是"已接入但脚本计数偏低"，下一批用调用链确认）。
+
+## 18. 候选逐项分诊（第三批 3 个，2026-11-10 第二十九轮）——21 个全部覆盖
+
+| 候选 | 生产出现文件 | 判定 |
+|---|---|---|
+| `MetricsRegistry` | 仅 `infra/metrics.ts` | **未接入** |
+| `AgentAddressGuard` | `orchestration/agent-parent-binding-store.ts`、`public-sdk.ts` | **已接入**（有生产引用，且经公开门面） |
+| `TokenMeasurementService` | `measurement/provider-usage-capture.ts`、`request-budget.ts`、`token-measurement.ts`、`public-sdk.ts` | **已接入** |
+
+**口径说明（不夸大）**：后两项的判定依据是"**在其自身定义文件之外有生产引用**"，
+比脚本的"提及计数"可靠；但**未逐个核到构造点与调用点**——若要升级为"已确认产品能力"，
+仍需像 delegation/tool-recall 那样补装配级用例。
+
+### 21 个候选的分诊汇总
+
+| 分类 | 数量 | 候选 |
+|---|---|---|
+| **已接入** | 2 | `AgentAddressGuard`、`TokenMeasurementService` |
+| 已接入 + 需宿主注入 | 1 | `ToolDocumentationRecallController`（见第 2 节，另加 `toolDocumentationRegistry`） |
+| **未接入** | 17 | 其余全部（含 5 个 adapter、3 个守卫、3 个生命周期、`MetricsRegistry` 等） |
+| 测试专用 | 1 | `FaultInjectionRecoveryVerifier` |
+| 被替代 | 1 | `LocalCompletionVerifier` |
+| 未接入（仅契约） | 1 | `ContinuationCoordinator` |
+
+> 注：上表"未接入 17"与"测试专用/被替代/仅契约"三行有交叉归并（部分候选既是未接入，
+> 也有更精确的子类）；**精确到每个候选的判定以第 16–18 节三张表为准**，本汇总只用于快速概览。
+
+### 结论（如实）
+
+- 21 个候选**已全部有初步分类**；
+- 其中**只有 2 个**属于"有生产引用但未做装配级验证"，**17 个未接入**；
+- 这些"未接入"是否**应当**接入，属产品范围问题，**不在本批擅自编码**（卡内 6 明确要求）。
