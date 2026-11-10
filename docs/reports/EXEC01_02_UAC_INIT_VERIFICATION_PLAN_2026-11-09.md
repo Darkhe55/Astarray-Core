@@ -88,3 +88,36 @@ AppContainer 注册表键可写；`DeriveAppContainerSidFromAppContainerName` �
 并明确：以下**均不构成**"开箱即用"的证据 ——
 ① 成功分支的断言（从未真实执行）；② SID 派生可用；③ 拒绝路径测试；
 ④ 参数构造与协议测试。
+
+## 执行记录（2026-11-10，用户已批准触发）
+
+用户已明确同意触发本次 UAC 验证。实际尝试与结果：
+
+| 尝试 | 方式 | 结果 |
+|---|---|---|
+| 1 | `Start-Process pwsh -Verb RunAs` 包装（写日志） | 进程返回，**未生成日志**，无 `astarray-exec` 档案 |
+| 2 | `Start-Process sandbox-helper -Verb RunAs -PassThru -Wait` | 长时间挂起（无 `consent.exe` 出现），已终止 |
+| 3 | `Start-Process cmd /c "helper … > log" -Verb RunAs` | `exit=1`，**无日志** |
+| 4 | 同上 + 显式 `1>` 重定向与 ERRORLEVEL | `exit=1`，**无日志** |
+
+**环境事实**（实测）：
+- 当前进程 `本机账户`，`IsInRole(Administrator) = False`（未提权）；
+- 非提权直接运行 `sandbox-helper.exe init-sandbox …` ⇒ `HRESULT=0x80070005`（预期）；
+- 触发 UAC 期间**未见 `consent.exe`**，也**未生成任何日志文件**。
+
+**结论**：本会话（非交互式宿主）**无法真正弹出并完成 UAC 同意**，
+因此 EXEC-01-02 的成功分支**仍未验证**。这不是"已执行但失败"，而是"**没能发起提权**"。
+
+## 需要用户在本机交互式执行
+
+请在**你自己登录的桌面会话**中打开一个 PowerShell，执行：
+
+```powershell
+cd C:\Users\<user>\Documents\astarray\astarray
+.\native\sandbox-helper\sandbox-helper.exe init-sandbox --confirm-create-profile --profile astarray-exec
+```
+
+预期：弹出 UAC ⇒ 点"是" ⇒ 输出 `profile-created name=…` 与 `derive-ok`。
+
+然后**关闭该提权窗口**，在**普通**PowerShell 中按 §5 的四项验收逐条执行并把输出贴回。
+我据此更新本卡与台账（当前状态：`02 安装期初始化入口 = implemented-unverified`，成功分支未验证）。
