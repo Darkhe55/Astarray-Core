@@ -421,3 +421,36 @@ chunks: ["data: {not-json}\n\n", sse({type:"message_stop"})]
 
 **实测**：`audit01-application-matrix` ⇒ **10 passed**；全量 `check:low-parallel` ⇒
 **687 files / 4669 passed + 3 skipped，exit 0**。
+
+### 02 矩阵核对（2026-11-10 续）：`stop_sequence` 成功路径
+
+卡内 ⑤："`end_turn`/`stop_sequence` 只有在**无待执行工具**且 `message_stop` 完整时返回 success"。
+此前**0 条**用例覆盖 `stop_sequence`。
+
+新增用例（`anthropic-tool-loop-failclosed`）：
+
+```
+message_start → content_block_start(text) → content_block_delta → content_block_stop
+→ message_delta(stop_reason: "stop_sequence") → message_stop
+⇒ 运行正常结束（outcome = events，不是 rejected）
+⇒ 工具执行计数 0（该文件 finally 统一断言）
+```
+
+**结果：通过**。
+
+#### 02 矩阵覆盖现状（逐条）
+
+| 卡内 | 覆盖 |
+|---|---|
+| ① SSE 组装/CRLF/多行/分块 + 非法 JSON 协议错误 | ✅（本轮前一轮补非法 JSON） |
+| ② `error` 事件 ⇒ 领域错误（`type: "error"` 用例存在） | ✅ |
+| ③ message_start / 工具块 / message_delta / message_stop 跟踪 | ✅ |
+| ④ 只有合法终态才释放工具、任一失败整批不释放 | ✅（部分工具后 error、完整工具后 error、截断、重复 ID、max_tokens） |
+| ⑤ end_turn/stop_sequence 成功条件；max_tokens/未知/EOF/取消/超时分类 | ✅（本轮补 `stop_sequence`） |
+| ⑥ 历史参数损坏不替换成 `{}`；system 指导合入顶层 | ✅（有专门用例） |
+| ⑦ 用量观测至多一次、失败不覆盖主错误 | ✅（⑨⑩⑪ 用例） |
+
+**门禁**：`check:low-parallel` ⇒ **687 files / 4670 passed + 3 skipped，exit 0**。
+
+**结论**：02 的**矩阵条目已全部有覆盖**；但"全部有覆盖"不等于"实现无缺陷"——
+本轮仍只做证据补强，未整体改判为已验收（等人工/独立复核）。

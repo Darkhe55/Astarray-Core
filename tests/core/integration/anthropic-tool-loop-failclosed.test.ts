@@ -203,6 +203,28 @@ describe("AUDIT-REPAIR-01：失败路径工具执行计数为 0", () => {
     expect(message.toLowerCase()).toMatch(/json|协议|protocol/u);
   });
 
+  it("stop_sequence 且无待执行工具 ⇒ 成功（不得报错）", async () => {
+    const baseUrl = await startServer({
+      chunks: [
+        sse({ type: "message_start" }),
+        sse({
+          type: "content_block_start",
+          index: 0,
+          content_block: { type: "text", text: "" },
+        }),
+        sse({
+          type: "content_block_delta",
+          index: 0,
+          delta: { type: "text_delta", text: "好" },
+        }),
+        sse({ type: "content_block_stop", index: 0 }),
+        sse({ type: "message_delta", delta: { stop_reason: "stop_sequence" } }),
+        sse({ type: "message_stop" }),
+      ],
+    });
+    const result = await runWithCounter({ baseUrl });
+    expect(result.outcome).toBe("events");
+  });
   it("超时与取消：都不执行工具", async () => {
     const timeoutUrl = await startServer({
       chunks: [sse({ type: "message_start" })],
