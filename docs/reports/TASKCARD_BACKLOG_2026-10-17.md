@@ -1991,3 +1991,16 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 - 人工验收未做。
 
 **状态**：ALIGN-03-01 **仍未完成**，不归档。
+
+#### 本轮进展（2026-11-10 第三轮，定时巡检）：裁决消费已可测、门禁全绿
+
+| 项 | 实现 | 证据 |
+|---|---|---|
+| 裁决消费下沉 | 报告读取与失败映射移出控制器，集中到 `resolveReviewVerdict` | `align03-independent-review-task.test.ts`（15 条） |
+| 四条异常路径 | 审查失败 / 未登记报告 / 报告不可读 / 报告不合规 ⇒ **一律 rework** 并带具体 `check:` 引用 | 同上（真实文件 + 不存在路径各验一遍） |
+| accept 路径 | `VERDICT: accept` + `EVIDENCE:` ⇒ merge-ready，证据含 `review-report:<path>` | 同上 |
+
+**门禁**：`npm run check:low-parallel` ⇒ **686 files / 4654 passed + 3 skipped，exit 0**。
+
+**仍未完成**：整条链的**端到端**（真实 Worker 跑审查任务 ⇒ 写报告 ⇒ 注入 ⇒ 裁决落盘）仍无集成测试；
+`isIndependentReviewAutoAppointmentEnabled` 仍默认关闭。**ALIGN-03-01 保持未完成、不归档。**
