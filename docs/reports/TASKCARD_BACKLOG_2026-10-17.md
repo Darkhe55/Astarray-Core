@@ -2057,3 +2057,22 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 （很可能是 `completion-receipt` / 返修链对 `resultLocation` 的二次校验），
 再决定是"回填 resultLocation"还是"另设独立字段承载送审产物"。
 `git checkout -- packages/core/src/orchestration/worker-agent.ts` 已回滚，门禁恢复。
+
+#### 方案 C 已落地（2026-11-10 第七轮）：送审产物改由**完成收据**提供
+
+| 项 | 实现 |
+|---|---|
+| 产物来源 | 编排器把 `outcome.completionReceipt.artifactPaths` 随审查钩子传入；前置检查读它，**不读** `resultLocation` |
+| 多产物 | 任一存在且非空即"可送审"，`confirmedArtifactPaths` 只含被确认的 |
+| 审查任务 | 描述里列出送审产物（`EVIDENCE: artifact:<path>`），审查者据此复核 |
+| **防冒充** | 报告写 `VERDICT: accept` 但证据引用了**别的文件** ⇒ `rework` + `check:review-evidence-mismatch` |
+| 不碰 resultLocation | 保持 `null` 语义，既有消费者零影响 |
+
+**测试**：`align03-artifact-precondition`(5) + `align03-independent-review-task`(18)，含"引用别的文件 ⇒ 拒绝"。
+
+**门禁**：`npm run check:low-parallel` ⇒ **686 files / 4657 passed + 3 skipped，exit 0**
+（首次一轮 `graph-change-deterministic-drill` 翻红，隔离复跑 3/3 通过 ⇒ 负载抖动，重跑全量全绿）。
+
+**仍未完成**：端到端（桩 Worker 声明收据产物 ⇒ 注入审查任务 ⇒ 桩写报告 ⇒ 裁决落盘）尚未编写。
+**下一步第一条动作**：在桩里让执行任务的 `runFinished` 之后产生 `persistedArtifactPaths`（写一个真实文件），
+使收据带产物路径，再断言审查任务被注入且 `completion-verdicts` 出现 `merge-ready`。
