@@ -201,3 +201,19 @@ describe("完成门禁 × 产物对账（Worker 运行时）", () => {
     }
   });
 });
+
+describe("ALIGN-03-01：写工具成功 ⇒ 完成收据带产物路径（端到端缺这一环）", () => {
+  it("① 成功结案时 completionReceipt.artifactPaths 含实际落盘路径", async () => {
+    const relativePath = "docs/RECEIPT-ARTIFACT.md";
+    const worker = buildWorker({
+      toolPort: buildWritingToolPort({ relativePath, content: "# R\n" }),
+      finalText: "已完成。\n" + completionMarkerLine({ attemptId: "attempt-receipt" }),
+      relativePath,
+    });
+    const outcome = await worker.run();
+    expect(outcome.outcome).toBe("success");
+    if (outcome.outcome !== "success") throw new Error("unreachable");
+    /** 这一步是送审前置检查的唯一输入来源；为空则独立验收永远走返修。 */
+    expect(outcome.completionReceipt?.artifactPaths).toContain(relativePath);
+  });
+});

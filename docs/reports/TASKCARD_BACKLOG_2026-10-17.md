@@ -2123,3 +2123,22 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 ⇒ 结论：**脚本桩里的 `createProjectFile` 没有进入 `persistedArtifactPaths`**。
 下一轮第一条动作：查清是「工具未执行 / 被权限拦下」还是「执行了但产物未回填」——
 先看裁决文件里的 `reason` 与 `evidenceReferences`，再决定是否需要在测试装配里注册该工具或改用 `devolve`+显式责任次级。
+
+#### 第十轮：**收据链路已被直接证明**，端到端断点缩小到"工具没被执行"
+
+新增用例（`worker-artifact-completion-gate` 第 5 条）：
+用 `ScriptedRuntime` 发 `createProjectFile` → `WorkerAgent` 成功结案 ⇒
+断言 `completionReceipt.artifactPaths` **包含实际落盘路径**。**通过**。
+
+⇒ 三条链已各自有证据：
+
+| 环节 | 证据 |
+|---|---|
+| 写工具成功 ⇒ 收据带产物 | 本轮新增用例（真实文件） |
+| 收据有产物 ⇒ 派发审查任务（`EVIDENCE: artifact:`） | `decideIndependentReview` 单测 |
+| 报告裁决 ⇒ accepted / rework（含证据防冒充） | `resolveReviewVerdict` 单测 |
+
+**剩余唯一缺口**：**任务级**端到端里 `createProjectFile` 没有被真正执行
+（裁决文件写明"完成收据未记录任何落盘产物"）。下一轮第一条动作：
+在 `align03-review-loop-e2e` 里把 `createProjectFile` 加进该任务的 `toolNames`（或改用
+`worker-artifact-completion-gate` 的自建 `WorkerAgent` 装配），确认工具真的执行。
