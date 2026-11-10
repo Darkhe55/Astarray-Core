@@ -2219,3 +2219,26 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
    但需先回答上一轮的裁决问题：**devolve 是否也要独立验收**（当前 devolve 装配没有审查钩子）。
 
 **本轮未留失败测试**：新增用例已撤回，`align03-review-loop-e2e` 保持 5 条组合测试全绿。
+
+#### 第十五轮（**任务级闭环已跑通**）：devolve 装配补上审查钩子 + 端到端通过
+
+**改动 1（代码）**：把独立验收的编排装配抽成 `buildIndependentReviewOrchestrationOptions()`
+（开关关 ⇒ 返回 `{}`，行为与接线前完全一致），assist 与 devolve **两处装配共用**。
+此前只有 assist 接线 ⇒ **devolve 任务永远不做独立验收**，这是真实缺口而非测试问题。
+
+**改动 2（测试）**：`align03-review-loop-e2e` 新增任务级用例，`mode: "devolve"` +
+`isIndependentReviewAutoAppointmentEnabled: true` + 脚本步
+`tool-call(createProjectFile) → finish(tool-calls) → text → finish(success)`。
+
+**结果（真实断言）**：
+- 文件 `out.md` 确实被创建（`isFileCreated: true`）；
+- 任务链出现 `review:T-001`（`taskType: "review"`）；
+- 其描述含 `EVIDENCE: artifact:out.md` ⇒ **收据产物真的传到了审查任务**。
+
+⇒ 目标①的链路「执行产出 ⇒ 收据带产物 ⇒ 注入真实审查任务」**已有自动化证据**。
+
+**门禁**：`check:low-parallel` ⇒ **687 files / 4667 passed + 3 skipped，exit 0**。
+中途 `subprocess-test-timeout-budget` 活规则拦下（该文件 `deadline=60s` 不小于 `testTimeout=60s`），
+已把文件级 `testTimeout` 提到 120s（**不是**改断言，是满足既有规则）。
+
+**推送**：本轮成功，`ahead=0`（含此前积压的 3 个提交）。
