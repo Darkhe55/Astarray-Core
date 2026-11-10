@@ -82,8 +82,15 @@ describe("ALIGN-03-01 端到端：有产物的任务派发真实审查任务", (
       const chain = await runtime.taskStore.readTaskChain(missionIdentifier);
       const verdictDirectoryPath = path.join(stateDirectory, "completion-verdicts");
       const verdictFiles = await fs.readdir(verdictDirectoryPath).catch(() => [] as string[]);
+      const verdictTexts: string[] = [];
+      for (const directoryName of verdictFiles) {
+        const nested = await fs.readdir(path.join(verdictDirectoryPath, directoryName)).catch(() => [] as string[]);
+        for (const fileName of nested) {
+          verdictTexts.push(await fs.readFile(path.join(verdictDirectoryPath, directoryName, fileName), 'utf8').catch(() => ''));
+        }
+      }
       const reviewNodes = (chain?.tasks ?? []).filter((node) => node.taskType === "review");
-      expect(reviewNodes.length, JSON.stringify({ tasks: (chain?.tasks ?? []).map((n) => [n.id, n.taskType, n.status]), verdictFiles })).toBeGreaterThan(0);
+      expect(reviewNodes.length, JSON.stringify({ tasks: (chain?.tasks ?? []).map((n) => [n.id, n.taskType, n.status]), verdictTexts })).toBeGreaterThan(0);
       expect(reviewNodes[0]?.dependsOn.length).toBeGreaterThan(0);
       expect(reviewNodes[0]?.description).toContain("EVIDENCE: artifact:");
     } finally {
