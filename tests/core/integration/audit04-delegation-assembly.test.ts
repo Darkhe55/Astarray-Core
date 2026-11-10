@@ -124,4 +124,66 @@ describe("AUDIT-REPAIR-01-04 装配级：通信转交入口", () => {
       await runtime.shutdown().catch(() => undefined);
     }
   }, 60_000);
+  it("**profile revision 变化 ⇒ 投递被拒**（授权绑定 revision）", async () => {
+    const runtime = await createRuntime();
+    try {
+      const grant = runtime.controller.createCommunicationDelegationGrant(buildGrantInput());
+      const buildInput = (revision: number) => ({
+        communicationHandleIdentifier: grant.communicationHandleIdentifier,
+        senderAgentInstanceId: "secondary-2",
+        messageType: "information" as const,
+        missionId: "mission-1",
+        currentProfileRevision: revision,
+        context: {
+          profileRevision: revision,
+          isTargetRecycled: false,
+          isGrantorStillDirectSuperior: true,
+          isMissionEnded: false,
+          isRevokedByUser: false,
+        },
+        currentInFlightMessages: 0,
+      });
+      /** 先证明同一 revision 下可投递（否则下面的拒绝可能来自别的原因）。 */
+      expect(() =>
+        runtime.controller.assertCommunicationDelegationDeliverable(buildInput(grant.revision)),
+      ).not.toThrow();
+      expect(() =>
+        runtime.controller.assertCommunicationDelegationDeliverable(
+          buildInput(grant.revision + 1),
+        ),
+      ).toThrow(/revision/u);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
+
+  it("**已到期 ⇒ 投递被拒**", async () => {
+    const runtime = await createRuntime();
+    try {
+      const grant = runtime.controller.createCommunicationDelegationGrant({
+        ...buildGrantInput(),
+        /** 明确设为过去时刻，模拟"已到期"。 */
+        expiresAtIso: new Date(Date.now() - 60_000).toISOString(),
+      });
+      expect(() =>
+        runtime.controller.assertCommunicationDelegationDeliverable({
+          communicationHandleIdentifier: grant.communicationHandleIdentifier,
+          senderAgentInstanceId: "secondary-2",
+          messageType: "information",
+          missionId: "mission-1",
+          currentProfileRevision: grant.revision,
+          context: {
+            profileRevision: grant.revision,
+            isTargetRecycled: false,
+            isGrantorStillDirectSuperior: true,
+            isMissionEnded: false,
+            isRevokedByUser: false,
+          },
+          currentInFlightMessages: 0,
+        }),
+      ).toThrow(/到期/u);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
 });

@@ -197,3 +197,34 @@
 
 ⇒ 卡内 4 的"**撤销后不可使用**"现在**装配层可达且有证据**。
 到期与 revision 变化两条仍待补。
+
+## 10. 到期与 revision 变化（2026-11-10 第二十轮）：装配级已证
+
+新增两条用例（`audit04-delegation-assembly`）：
+
+| 用例 | 断言 |
+|---|---|
+| profile revision 变化 | 同 revision 下**可投递**（先证明基线）；`revision + 1` ⇒ 抛 `revision` |
+| 已到期 | `expiresAtIso` 设为过去 ⇒ 抛 `到期` |
+
+**关键写法**：revision 用例先断言"基线可投递"，否则"拒绝"可能来自别的原因（比如上下文非法）——
+这是避免假阳性的必要一步。
+
+**实测**：`audit04-delegation-assembly` ⇒ **5 passed**。
+
+### 04 完成判据现状（delegation 一侧）
+
+| 判据 | 状态 |
+|---|---|
+| 成功 | ✅ 创建授权 + 投递基线 |
+| 拒绝 | ✅ 缺授权引用、跨级转交（同级规则） |
+| 撤销 | ✅ **本轮**（撤销入口 + 复检拒绝） |
+| revision 变化 | ✅ **本轮** |
+| 到期 | ✅ **本轮** |
+| 拔线反例 | ✅ 既有 `wiring-manifest`（构造即要求） |
+
+**仍缺**：`ToolDocumentationRecallController` 的装配级三条路径（成功/拒绝/未知工具）。
+⇒ 04 仍 **in_progress**，但 delegation 一侧的判据已全部有证据。
+
+**门禁**：`check:low-parallel` ⇒ **688 files / 4675 passed + 3 skipped，exit 0**
+（首轮 `g4-tool-documentation-e2e` 翻红，隔离复跑 2/2 通过 ⇒ 记为**已知抖动**，未改断言；重跑全绿）。
