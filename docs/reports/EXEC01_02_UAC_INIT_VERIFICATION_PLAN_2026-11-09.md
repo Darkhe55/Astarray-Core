@@ -191,3 +191,29 @@ derive-ok
 2. 用同一 SID 建一个**最小**测试（仅 `CreateProcessW` + 空 capability），确认是否与 capability 集为空有关；
 3. 检查档案创建者上下文（提权建 vs 非提权建）是否影响 SID 可用性——`probe` 显示非提权建档案可行，
    可尝试用**非提权**方式重建同名档案后重测。
+
+## 排查记录（2026-11-10 第四段：ACL 事实）
+
+用 `icacls` 直接看两个目标可执行文件的 ACL（真实输出）：
+
+| 目标 | `ALL APPLICATION PACKAGES` 授权 |
+|---|---|
+| `C:\Windows\System32\cmd.exe` | **有** `(RX)` |
+| `C:\Program Files\nodejs\node.exe` | **没有**（`icacls` 无该条目） |
+
+**两个结论**：
+
+1. **node.exe 默认对 AppContainer 不可执行** ⇒ 即使 `CreateProcessW` 修好，
+   验收 §5 的第 1–3 项（都用 `node -e`）仍会失败在"无法执行 node"。
+   ⇒ **运行时路径必须显式授权给项目派生 SID**，这是安装期 provisioning 的一部分（EXEC-01-04）。
+2. `cmd.exe` 有 `(RX)` 却仍返回 5 ⇒ `CreateProcessW 失败: 5` **不是**"目标文件不可读"，
+   问题在**进程创建属性**本身（capability 集为空 / 属性列表构造 / 令牌约束）。
+
+**因此下一步（按顺序）**：
+
+1. 给 helper 加 `print-sid` 子命令（`ConvertSidToStringSidW`），拿到 `astarray-exec` 的**权威 SID 字符串**
+   （本轮用名称哈希手算的 `S-1-15-2-2959418034-…` **无法被 Translate 解析**，说明手算不可信，不得据此下结论）；
+2. 用权威 SID 复核 `cmd.exe`/`node.exe` 的 ACL；
+3. 做**最小复现**：只调 `CreateProcessW` + 空 capability（不建 Job、不建属性列表外的任何东西），
+   确认 5 是否来自属性列表；
+4. 修好后**再**请用户复跑 §5 四项，并先补 node 路径授权。
