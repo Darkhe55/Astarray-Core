@@ -24,44 +24,16 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<{ readonly label: string; readonly patte
   { label: "外部 TUI 包目录", pattern: /外部\s*TUI\s*包/u },
   { label: "外部 UI 测试目录", pattern: /外部\s*GUI\s*测试/u },
   { label: "外部仓库名", pattern: /ui-package/u },
-  { label: "本机用户目录", pattern: /C:\\Users\\<username>st KNOWN_LEGACY_FILES: ReadonlySet<string> = new Set([
-  "docs/reports/BRIDGE01_04_STDIO_CLOSED_LOOP_EVIDENCE_2026-09-19.md",
-  "docs/reports/CROSS_CARD_RECONCILIATION_2026-10-10_SESSION_END.md",
-  "docs/reports/E2E01_04_LOCAL_REFRESH_2026-10-09.md",
-  "docs/reports/GUI_MANUAL_ACCEPTANCE_2026-10-12.md",
-  "docs/reports/GUI_MANUAL_EXPERIENCE_ROUND3_2026-11-08.md",
-  "docs/reports/GUI01_R_01_SCOPE_FREEZE.md",
-  "docs/reports/GUI01_R_02_LOCAL_SERVER_EVIDENCE.md",
-  "docs/reports/GUI01_R_03_SETTINGS_RECOVERY_EVIDENCE.md",
-  "docs/reports/GUI01_R_03B_VERIFICATION_DECISION_EVIDENCE.md",
-  "docs/reports/GUI01_R_04_MANUAL_ACCEPTANCE_CHECKLIST.md",
-  "docs/reports/GUI01_R_04_MANUAL_ACCEPTANCE_RECORD_2026-10-10.md",
-  "docs/reports/GUI01_R_04_MANUAL_ACCEPTANCE_RECORD_2026-10-11.md",
-  "docs/reports/GUI01_R_04A_UX_STATIC_EVIDENCE.md",
-  "docs/reports/GUI01_R_04B_DANGLING_PROFILE_SELECTION_FINDING_2026-09-19.md",
-  "docs/reports/GUI02_04_RESUME_PATH_2026-11-08.md",
-  "docs/reports/HANDOFF_2026-09-28.md",
-  "docs/reports/INT00_PRODUCT_PATH_MATRIX.md",
-  "docs/reports/INT00_STATUS_RECONCILIATION.md",
-  "docs/reports/LINUX_ACCEPTANCE_ENVIRONMENT_PROBE_2026-09-19.md",
-  "docs/reports/OBS01_RECONCILIATION_2026-11-08.md",
-  "docs/reports/PLATFORM_EVIDENCE_INDEX_2026-11-08.md",
-  "docs/reports/RELIABILITY_01_01_AUDIT_MATRIX_2026-10-02.md",
-  "docs/reports/RELIABILITY_SHUTDOWN_FIX_AND_FLAKE_QUANTIFICATION_2026-11-08.md",
-  "docs/reports/SESSION_HANDOFF_2026-10-12.md",
-  "docs/reports/T07D_R1_04_CONSUMER_PARITY_EVIDENCE.md",
-  "docs/reports/T08_GIT_INTEGRATION_PRODUCT_PATH_GAP_2026-11-08.md",
-  "docs/reports/TASKCARD_BACKLOG_2026-10-17.md",
-  "docs/tasks/ALIGN_CORE_HANDOFF.md",
-  "docs/tasks/GUI_MVP_CODING_TASK_CARD.md",
-  "docs/tasks/GUI01_R_PRODUCT_WORKBENCH_TASK_CARD.md",
-  "docs/tasks/HISTORY01_LOCAL_RUN_HISTORY_AND_RESUME_VIEW_TASK_CARD.md",
-  "docs/tasks/MERGE01_NODECTX01_TASK_CARDS.md",
-  "docs/tasks/PROJECT01_ISOLATION_AND_CROSS_PROJECT_BORROWING_TASK_CARD.md",
-  "docs/tasks/SMART01_INSTRUCTION_WINDOW_AND_MAIN_RESPONSIVENESS_TASK_CARD.md",
-  "docs/tasks/TOOLKIT01_PROJECT_TO_GENERAL_TOOL_LIFECYCLE_TASK_CARD.md",
-  "docs/tasks/UX01_IMPLEMENTATION_MAP.md",
-]);
+  /** 只匹配**真实用户名**：`C:\Users\<username>` 这类占位写法是刻意匿名，不算泄漏。 */
+  { label: "本机用户目录", pattern: /C:\\Users\\<username>\.\.\.)/u },
+];
+
+/**
+ * 历史文件白名单：已存在上述措辞的文档。
+ *
+ * **只减不增**：新增文件不得出现在这里；删除某文件里的措辞后应把它从名单移除。
+ */
+const KNOWN_LEGACY_FILES: ReadonlySet<string> = new Set([]);
 
 async function listMarkdownFiles(directoryPath: string): Promise<string[]> {
   const entries = await fs.readdir(directoryPath, { withFileTypes: true });
