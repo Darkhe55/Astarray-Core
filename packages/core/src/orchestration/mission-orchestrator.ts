@@ -466,11 +466,29 @@ export interface MissionOrchestratorOptions {
    * 缺省不装配 ⇒ 行为不变（不任命、不阻塞完成）。
    * 装配方负责"任命谁"——本类不猜审查者身份。
    */
+  /**
+   * 返回值可选：给出 `reviewTask` 时由本类在**安全点**注入真实审查任务。
+   * 装配方只负责"审查任务长什么样"，注入与调度归编排器。
+   */
   onTaskCompletedForIndependentReview?: (input: {
     readonly missionId: string;
     readonly taskId: string;
     readonly contributorAgentInstanceId: string;
     readonly responsibleSecondaryAgentInstanceId: string;
+  }) => void | { readonly reviewTask: TaskDependencyNode } | Promise<void | {
+    readonly reviewTask: TaskDependencyNode;
+  }>;
+  /**
+   * ALIGN-03-01：**审查任务收尾**后回调（可选）。
+   *
+   * 审查任务是 `taskType === "review"` 的真实任务；其产物是审查报告。
+   * 装配方据此解析裁决并落盘。缺省不装配 ⇒ 不产裁决（任务停在待验收）。
+   */
+  onReviewTaskCompleted?: (input: {
+    readonly missionId: string;
+    readonly taskId: string;
+    readonly resultLocation: string | null;
+    readonly outcome: "success" | "failure";
   }) => void | Promise<void>;
   registerTertiaryAgentInstance?: (input: {
     readonly agentInstanceId: string;
@@ -1433,17 +1451,54 @@ export class MissionOrchestrator {
           const responsibleSecondary = this.options.secondaryAgentInstanceId ?? null;
           if (responsibleSecondary !== null) {
             try {
-              await this.options.onTaskCompletedForIndependentReview?.({
-                missionId: this.options.missionId,
-                taskId: action.taskId,
-                contributorAgentInstanceId: agentInstanceId,
-                responsibleSecondaryAgentInstanceId: responsibleSecondary,
-              });
+              const reviewInstruction =
+                await this.options.onTaskCompletedForIndependentReview?.({
+                  missionId: this.options.missionId,
+                  taskId: action.taskId,
+                  contributorAgentInstanceId: agentInstanceId,
+                  responsibleSecondaryAgentInstanceId: responsibleSecondary,
+                });
+              /**
+               * 装配方给出审查任务 ⇒ 在**安全点**注入；拒绝（有在途任务）时如实上报，
+               * **不**假装审查已开始。
+               */
+              if (
+                reviewInstruction !== undefined &&
+                reviewInstruction !== null &&
+                "reviewTask" in reviewInstruction
+              ) {
+                const injection = await this.injectTaskBySpec(
+                  reviewInstruction.reviewTask,
+                );
+                if (injection.outcome !== "injected") {
+                  this.options.onUserEscalation(
+                    `任务 ${action.taskId} 的审查任务未能注入（${injection.reasonCode}）：${injection.reason}`,
+                  );
+                }
+              }
             } catch (reviewError) {
               this.options.onUserEscalation(
                 `任务 ${action.taskId} 的独立任命失败（不改变完成状态）：${(reviewError as Error).message}`,
               );
             }
+          }
+        }
+        /**
+         * ALIGN-03-01：审查任务收尾 ⇒ 交给装配方解析裁决。
+         * 只报告结果，**不**自行判定通过（裁决必须来自报告）。
+         */
+        if (this.dagScheduler.getCurrentGraph().getNode(action.taskId)?.taskType === "review") {
+          try {
+            await this.options.onReviewTaskCompleted?.({
+              missionId: this.options.missionId,
+              taskId: action.taskId,
+              resultLocation: outcome.outcome === "success" ? outcome.resultLocation : null,
+              outcome: outcome.outcome === "success" ? "success" : "failure",
+            });
+          } catch (reviewVerdictError) {
+            this.options.onUserEscalation(
+              `审查任务 ${action.taskId} 的裁决记录失败：${(reviewVerdictError as Error).message}`,
+            );
           }
         }
         /** R34：在途归零 ⇒ 结束本组（只清标记，不推进 V）。 */

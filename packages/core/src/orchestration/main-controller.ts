@@ -5,6 +5,8 @@
  * 权限询问转达用户并记录会话授权。
  */
 import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import { buildToolPublicDocumentation } from "../tools/tool-public-documentation-registry.js";
@@ -160,6 +162,7 @@ import type { TertiaryAgentLifecycleController } from "./tertiary-lifecycle.js";
 import { projectTaskReconciliationVerdicts } from "./task-reconciliation-verdict.js";
 import { checkOutputArtifact } from "./output-artifact-check.js";
 import { evaluateArtifactPrecondition } from "./artifact-precondition.js";
+import { buildReviewTaskNode, parseReviewVerdictReport } from "./independent-review-task.js";
 import type { AgentIndividualMemoryStore } from "./agent-individual-memory.js";
 import type { CrossAgentContextAttachmentController } from "./cross-agent-attachment-controller.js";
 import type { DirectDispatchController } from "./direct-dispatch-controller.js";
@@ -4839,8 +4842,22 @@ export class MainController {
                 resultLocation: task?.resultLocation ?? null,
               });
               if (artifactPrecondition.isSatisfied) {
-                /** 有产物可送审 ⇒ 等待真实审查任务；此处**不写裁决**。 */
-                return;
+                /**
+                 * 有产物可送审 ⇒ 派发**真实审查任务**（不是在此写裁决）。
+                 *
+                 * 审查任务由编排器在安全点注入并调度；裁决只能来自它的报告。
+                 * 若该任务本身就是审查任务 ⇒ 不再派生（防递归）。
+                 */
+                if (task?.taskType === "review") {
+                  return;
+                }
+                return {
+                  reviewTask: buildReviewTaskNode({
+                    reviewedTaskIdentifier: input.taskId,
+                    reviewerAgentInstanceId,
+                    acceptanceCriteria: task?.acceptanceCriteria ?? null,
+                  }),
+                };
               }
               await this.recordAcceptanceVerdict({
                 appointmentIdentifier,
@@ -4852,6 +4869,97 @@ export class MainController {
                   verdict: "rework",
                   evidenceReferences: [...artifactPrecondition.evidenceReferences],
                   reason: artifactPrecondition.reason,
+                },
+              });
+            },
+            /**
+             * ALIGN-03-01：**审查任务收尾** ⇒ 解析报告并落裁决。
+             *
+             * 裁决只来自审查报告（`VERDICT:` / `EVIDENCE:` 行），
+             * 报告缺失/不合规/审查失败 ⇒ 一律 rework，**绝不**默认通过。
+             */
+            onReviewTaskCompleted: async (reviewInput: {
+              readonly missionId: string;
+              readonly taskId: string;
+              readonly resultLocation: string | null;
+              readonly outcome: "success" | "failure";
+            }) => {
+              const reviewedTaskIdentifier = reviewInput.taskId.startsWith("review:")
+                ? reviewInput.taskId.slice("review:".length)
+                : reviewInput.taskId;
+              const appointmentIdentifier = `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`;
+              const reviewerAgentInstanceId = `reviewer:${reviewInput.missionId}:${reviewedTaskIdentifier}`;
+              const recordRework = async (reason: string, checkReference: string) => {
+                await this.recordAcceptanceVerdict({
+                  appointmentIdentifier,
+                  verdict: {
+                    acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
+                    boundTaskIdentifier: reviewedTaskIdentifier,
+                    boundTaskRevision: 1,
+                    boundCommitHash: null,
+                    verdict: "rework",
+                    evidenceReferences: [checkReference],
+                    reason,
+                  },
+                });
+              };
+              if (reviewInput.outcome === "failure") {
+                await recordRework(
+                  "审查任务执行失败：没有可采信的审查结论。",
+                  `check:review-task-failed:${reviewInput.taskId}`,
+                );
+                return;
+              }
+              const projectRootPath = this.resolveProjectRootPathForMission(
+                reviewInput.missionId,
+              );
+              if (projectRootPath === null) {
+                await recordRework(
+                  "无法确定项目根：审查报告不能复核。",
+                  `check:review-project-root-unresolved:${reviewInput.taskId}`,
+                );
+                return;
+              }
+              const reportLocation = reviewInput.resultLocation?.trim() ?? "";
+              if (reportLocation === "") {
+                await recordRework(
+                  "审查任务未登记报告路径：没有可采信的审查结论。",
+                  `check:review-report-unregistered:${reviewInput.taskId}`,
+                );
+                return;
+              }
+              const reportText = await readFile(
+                path.join(projectRootPath, reportLocation),
+                "utf8",
+              ).catch(() => null);
+              if (reportText === null) {
+                await recordRework(
+                  "审查报告不可读取：" + reportLocation,
+                  `check:review-report-unreadable:${reportLocation}`,
+                );
+                return;
+              }
+              const parsedReport = parseReviewVerdictReport(reportText);
+              if (parsedReport === null) {
+                await recordRework(
+                  "审查报告缺少有效裁决行（需 VERDICT: accept|rework，且 accept 必须带 EVIDENCE）。",
+                  `check:review-verdict-missing:${reportLocation}`,
+                );
+                return;
+              }
+              await this.recordAcceptanceVerdict({
+                appointmentIdentifier,
+                verdict: {
+                  acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
+                  boundTaskIdentifier: reviewedTaskIdentifier,
+                  boundTaskRevision: 1,
+                  boundCommitHash: null,
+                  verdict: parsedReport.verdict,
+                  evidenceReferences: [
+                    `review-report:${reportLocation}`,
+                    ...parsedReport.evidenceReferences,
+                  ],
+                  reason: parsedReport.reason,
                 },
               });
             },

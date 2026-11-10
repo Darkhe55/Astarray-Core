@@ -1,0 +1,130 @@
+/**
+ * ALIGN-03-01（2026-11-10 续）：**真实审查任务**——派发节点与报告解析。
+ *
+ * 上一轮已经把"产物存在性"从验收结论里剥离（见 `artifact-precondition.ts`）。
+ * 本轮补上闭环的另一半：
+ *
+ *   执行任务完成 + 产物前置通过
+ *        ⇒ 注入一个 `taskType: "review"` 的**真实审查任务**（指派给审查者）
+ *        ⇒ 审查任务产出报告文件，报告里**明确写出裁决**
+ *        ⇒ 解析报告 ⇒ 记录裁决 ⇒ 任务转 `accepted` / `rework`
+ *
+ * 关键约束（对应用户裁决）：
+ *  - 审查裁决**只能来自审查任务的报告**，不能来自产物是否存在；
+ *  - 报告缺失或格式不合规 ⇒ 一律 `rework`（`check:review-verdict-missing`），
+ *    **不得**默认通过；
+ *  - 审查任务未完成 ⇒ 停在待验收（由 `independent-review-closure.ts` 的状态机保证）。
+ */
+import type { TaskDependencyNode } from "../core/types.js";
+
+/** 报告里声明裁决的行格式（大小写不敏感，允许前后空白）。 */
+export const REVIEW_VERDICT_LINE_PREFIX = "VERDICT:";
+/** 报告里声明证据的行格式；可多行。 */
+export const REVIEW_EVIDENCE_LINE_PREFIX = "EVIDENCE:";
+
+export interface BuildReviewTaskNodeInput {
+  readonly reviewedTaskIdentifier: string;
+  readonly reviewerAgentInstanceId: string;
+  readonly acceptanceCriteria: string | null;
+  /** 审查任务自身标识；缺省按 `review:<reviewedTaskId>` 生成。 */
+  readonly reviewTaskIdentifier?: string;
+}
+
+/** 审查任务的标识约定（幂等：同一执行任务只应有一个审查任务）。 */
+export function buildReviewTaskIdentifier(reviewedTaskIdentifier: string): string {
+  return `review:${reviewedTaskIdentifier}`;
+}
+
+/**
+ * 构造审查任务节点。
+ *
+ * - `taskType: "review"` —— 调度与后续判定据此**不**再给审查任务派生审查任务（防递归）；
+ * - `dependsOn: [reviewedTaskIdentifier]` —— 执行任务完成前不会被调度；
+ * - `assignedAgentId: reviewerAgentInstanceId` —— 指派给**审查者**，不是执行者；
+ * - `resultLocation: null` —— 由审查任务自己产出报告，不预设路径。
+ */
+export function buildReviewTaskNode(input: BuildReviewTaskNodeInput): TaskDependencyNode {
+  const reviewTaskIdentifier =
+    input.reviewTaskIdentifier ?? buildReviewTaskIdentifier(input.reviewedTaskIdentifier);
+  const criteria =
+    input.acceptanceCriteria === null || input.acceptanceCriteria.trim() === ""
+      ? "未声明（按任务描述与产物判断）"
+      : input.acceptanceCriteria;
+  return {
+    id: reviewTaskIdentifier,
+    description:
+      "独立审查任务：审查 " +
+      input.reviewedTaskIdentifier +
+      " 的产物与证据，并在报告中写明裁决。\n" +
+      "报告格式（逐行）：\n" +
+      REVIEW_VERDICT_LINE_PREFIX +
+      " accept|rework\n" +
+      REVIEW_EVIDENCE_LINE_PREFIX +
+      " <可复核引用>\n" +
+      "验收要求：" +
+      criteria,
+    dependsOn: [input.reviewedTaskIdentifier],
+    taskType: "review",
+    toolNames: [],
+    assignedAgentId: input.reviewerAgentInstanceId,
+    status: "pending",
+    resultLocation: null,
+    acceptanceCriteria: criteria,
+  };
+}
+
+export interface ReviewVerdictReport {
+  readonly verdict: "merge-ready" | "rework";
+  readonly evidenceReferences: readonly string[];
+  readonly reason: string;
+}
+
+/**
+ * 解析审查报告。
+ *
+ * 返回 `null` 表示**报告不合规**（没有 `VERDICT:` 行，或取值不是 accept/rework）。
+ * 调用方必须把 `null` 当作**未通过**处理，不得默认通过。
+ */
+export function parseReviewVerdictReport(reportText: string): ReviewVerdictReport | null {
+  const lines = reportText.split(/\r?\n/u);
+  let declaredVerdict: string | null = null;
+  const evidenceReferences: string[] = [];
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    const upperCaseLine = trimmedLine.toUpperCase();
+    if (upperCaseLine.startsWith(REVIEW_VERDICT_LINE_PREFIX)) {
+      if (declaredVerdict === null) {
+        declaredVerdict = trimmedLine
+          .slice(REVIEW_VERDICT_LINE_PREFIX.length)
+          .trim()
+          .toLowerCase();
+      }
+      continue;
+    }
+    if (upperCaseLine.startsWith(REVIEW_EVIDENCE_LINE_PREFIX)) {
+      const reference = trimmedLine.slice(REVIEW_EVIDENCE_LINE_PREFIX.length).trim();
+      if (reference !== "") {
+        evidenceReferences.push(reference);
+      }
+    }
+  }
+  if (declaredVerdict !== "accept" && declaredVerdict !== "rework") {
+    return null;
+  }
+  if (declaredVerdict === "rework") {
+    return {
+      verdict: "rework",
+      evidenceReferences,
+      reason: "审查报告判定返修。",
+    };
+  }
+  /** 判定通过但**没有证据** ⇒ 视为不合规（不能只凭一句话通过）。 */
+  if (evidenceReferences.length === 0) {
+    return null;
+  }
+  return {
+    verdict: "merge-ready",
+    evidenceReferences,
+    reason: "审查报告判定通过，并给出证据引用。",
+  };
+}

@@ -113,7 +113,7 @@ AppContainer 注册表键可写；`DeriveAppContainerSidFromAppContainerName` �
 请在**你自己登录的桌面会话**中打开一个 PowerShell，执行：
 
 ```powershell
-cd C:\Users\<user>\Documents\astarray\astarray
+cd C:\Users\<username>\Documents\astarray\astarray
 .\native\sandbox-helper\sandbox-helper.exe init-sandbox --confirm-create-profile --profile astarray-exec
 ```
 
