@@ -2202,3 +2202,20 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 
 **下一轮**：等裁决；若"devolve 也要独立验收"，则把钩子抽成方法并在两处装配同时展开，
 再用 `mode: "devolve"` 写任务级 e2e（该模式下写工具本来就放行）。
+
+#### 第十四轮：assist 预授权**没有生效**，任务级 e2e 仍卡在权限层
+
+尝试：`controller.grantSessionAuthorization("createProjectFile", <与脚本逐字一致的参数>, now)`
+后再跑 assist mission（脚本步已改为 `tool-call → finish(tool-calls) → text → finish(success)`）。
+
+**结果**：任务仍 `failed`，文件仍未创建（`isFileCreated: false`）。
+
+⇒ 说明该授权没有覆盖到实际裁决路径（`grantSessionAuthorization` 里除 sessionManager 外还要写
+`configurablePermissionPolicyEngine`，且**绑定当前 profile reference**；该引用为空时引擎那一半没写进去）。
+
+**下一步（二选一，已写进台账）**：
+1. 先查该 mission 下 `profileReference` 是否为空，若空则在测试里显式指定权限档案；
+2. 或者接受"assist 需要交互批准"，把任务级 e2e 放到 **devolve**（该模式写工具本来就放行、文件确实被创建），
+   但需先回答上一轮的裁决问题：**devolve 是否也要独立验收**（当前 devolve 装配没有审查钩子）。
+
+**本轮未留失败测试**：新增用例已撤回，`align03-review-loop-e2e` 保持 5 条组合测试全绿。
