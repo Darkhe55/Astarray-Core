@@ -24,7 +24,7 @@ import {
   resolveReviewVerdict,
 } from "../../../packages/core/src/orchestration/independent-review-task.js";
 
-vi.setConfig({ testTimeout: 60_000 });
+vi.setConfig({ testTimeout: 120_000 });
 
 let projectRootPath: string;
 
@@ -128,4 +128,76 @@ describe("ALIGN-03-01 闭环组合（收据 ⇒ 派发 ⇒ 裁决）", () => {
     });
     expect(decision.kind).toBe("record-rework");
   });
+});
+
+describe("ALIGN-03-01 任务级闭环（devolve 装配已接钩子）", () => {
+  it("写工具产出后，任务链出现 review:* 节点，且描述里列出该产物", async () => {
+    const { createApplicationRuntime } = await import(
+      "../../../packages/core/src/application/application-runtime.js"
+    );
+    const { ScriptedRuntime } = await import(
+      "../../../packages/core/src/runtime/scripted-runtime.js"
+    );
+    const stateDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-review-mission-"));
+    const missionProjectRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "astarray-review-mission-p-"),
+    );
+    const runtime = await createApplicationRuntime({
+      mode: "devolve",
+      stateDirectory,
+      concurrency: 1,
+      failureThreshold: 1,
+      maxLoopIterations: 6,
+      useFeedbackProcess: false,
+      authenticatedUserId: "user-1",
+      mainAgentInstanceId: "main-agent-1",
+      streamOutput: () => {},
+      /** 步序必须是 tool-call → finish(tool-calls) → text → finish(success)。 */
+      workerRuntimeFactory: () =>
+        new ScriptedRuntime([
+          {
+            type: "tool-call",
+            toolName: "createProjectFile",
+            argumentsJson: JSON.stringify({ filePath: "out.md", content: "已产出" }),
+            callId: "call-1",
+          },
+          { type: "finish", reason: "tool-calls", detail: "请求工具" },
+          { type: "text", text: "已完成。" },
+          { type: "finish", reason: "success", detail: "完成" },
+        ]),
+      isIndependentReviewAutoAppointmentEnabled: true,
+      projectIdentifier: "project-alpha",
+      workspaceRootPath: missionProjectRoot,
+    });
+    try {
+      const missionIdentifier = await runtime.controller.handleUserMessage("任务级闭环", {
+        projectIdentifier: "project-alpha",
+      });
+      const deadline = Date.now() + 60_000;
+      while (Date.now() < deadline) {
+        const status = (await runtime.controller.queryMissionStatus(missionIdentifier))?.summary
+          ?.status;
+        if (status === "done" || status === "blocked" || status === "cancelled") break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const chain = await runtime.taskStore.readTaskChain(missionIdentifier);
+      const isFileCreated = await fs
+        .readFile(path.join(missionProjectRoot, "out.md"), "utf8")
+        .then(() => true)
+        .catch(() => false);
+      const reviewNodes = (chain?.tasks ?? []).filter((node) => node.taskType === "review");
+      expect(
+        reviewNodes.length,
+        JSON.stringify({
+          tasks: (chain?.tasks ?? []).map((node) => [node.id, node.taskType, node.status]),
+          isFileCreated,
+        }),
+      ).toBeGreaterThan(0);
+      expect(reviewNodes[0]?.description).toContain("EVIDENCE: artifact:out.md");
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+      await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
+      await fs.rm(missionProjectRoot, { recursive: true, force: true, maxRetries: 10 });
+    }
+  }, 120_000);
 });

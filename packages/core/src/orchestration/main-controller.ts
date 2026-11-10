@@ -2961,6 +2961,184 @@ export class MainController {
    *
    * 产物校验必须限定在项目根内；没有根就无法判断越界，因此返回 `null` 并跳过校验。
    */
+  /**
+   * ALIGN-03-01：独立验收的编排装配（assist / devolve **共用**）。
+   *
+   * 受 `isIndependentReviewAutoAppointmentEnabled` 开关控制：
+   * 关（默认）⇒ 返回空对象，行为与接线前完全一致；开 ⇒ 两个钩子都生效。
+   */
+  private buildIndependentReviewOrchestrationOptions(): Record<string, unknown> {
+    if (this.options.isIndependentReviewAutoAppointmentEnabled !== true) {
+      return {};
+    }
+    return {
+            onTaskCompletedForIndependentReview: async (input: {
+              readonly missionId: string;
+              readonly taskId: string;
+              readonly contributorAgentInstanceId: string;
+              readonly responsibleSecondaryAgentInstanceId: string;
+              readonly artifactPaths: readonly string[];
+            }) => {
+              const reviewerAgentInstanceId = `reviewer:${input.missionId}:${input.taskId}`;
+              const directory = this.options.registeredAgentDirectory;
+              if (
+                directory !== null &&
+                directory !== undefined &&
+                !directory.hasAgent(reviewerAgentInstanceId)
+              ) {
+                directory.registerAgent({
+                  agentInstanceId: reviewerAgentInstanceId,
+                  agentRole: "tertiary",
+                  missionId: input.missionId,
+                  owningSecondaryAgentInstanceId:
+                    input.responsibleSecondaryAgentInstanceId,
+                  boundTaskBundleId: input.taskId,
+                  registeredAtIso: new Date().toISOString(),
+                });
+              }
+              const appointmentIdentifier = `appointment:${input.missionId}:${input.taskId}`;
+              this.appointExecutionAndReview({
+                appointmentIdentifier,
+                missionIdentifier: input.missionId,
+                taskIdentifier: input.taskId,
+                taskRevision: 1,
+                riskLevel: "low",
+                appointingSecondaryAgentInstanceIdentifier:
+                  input.responsibleSecondaryAgentInstanceId,
+                implementationAgentInstanceIdentifier: input.contributorAgentInstanceId,
+                /**
+                 * 三个身份必须**互不相同**：实现者（Worker）、测试者（责任次级）、
+                 * 验收者（审查者）。测试者等于实现者会被"作者自验"拒绝，
+                 * 等于验收者会被"测试者不能签发自己的验收结论"拒绝。
+                 */
+                testingAgentInstanceIdentifier:
+                  input.responsibleSecondaryAgentInstanceId,
+                acceptanceAgentInstanceIdentifier: reviewerAgentInstanceId,
+                allowsSharedTestAndAcceptance: true,
+              });
+              /**
+               * ALIGN-03-01（2026-11-10 修订，用户裁决）：产物检查**只是前置条件**。
+               *
+               * - 前置不满足 ⇒ 记录 **rework**（没有可送审的产物，返修单引用具体检查项）；
+               * - 前置满足 ⇒ **不产出任何裁决**，任务停在"待验收"，
+               *   等待**真实审查任务**给出结论。
+               *
+               * 这样从类型与流程上都杜绝了"产物存在即 merge-ready"，
+               * 也杜绝"仅登记审查者身份就视作完成独立审查"。
+               */
+              const projectRootPath = this.resolveProjectRootPathForMission(input.missionId);
+              if (projectRootPath === null) {
+                return;
+              }
+              const taskChain = await this.options.taskStore.readTaskChain(input.missionId);
+              const task = taskChain?.tasks.find(
+                (candidate) => candidate.id === input.taskId,
+              );
+              /**
+               * 方案 C：送审产物取自**完成收据**（`input.artifactPaths`），
+               * 不读 `task.resultLocation`（后者在既有流程里另有消费者）。
+               */
+              const artifactPrecondition = await evaluateArtifactPrecondition({
+                projectRootPath,
+                artifactPaths: input.artifactPaths,
+              });
+              if (artifactPrecondition.isSatisfied) {
+                /**
+                 * 有产物可送审 ⇒ 派发**真实审查任务**（不是在此写裁决）。
+                 *
+                 * 审查任务由编排器在安全点注入并调度；裁决只能来自它的报告。
+                 * 若该任务本身就是审查任务 ⇒ 不再派生（防递归）。
+                 */
+                if (task?.taskType === "review") {
+                  return;
+                }
+                return {
+                  reviewTask: buildReviewTaskNode({
+                    reviewedTaskIdentifier: input.taskId,
+                    reviewerAgentInstanceId,
+                    acceptanceCriteria: task?.acceptanceCriteria ?? null,
+                    artifactPaths: artifactPrecondition.confirmedArtifactPaths,
+                  }),
+                };
+              }
+              await this.recordAcceptanceVerdict({
+                appointmentIdentifier,
+                verdict: {
+                  acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
+                  boundTaskIdentifier: input.taskId,
+                  boundTaskRevision: 1,
+                  boundCommitHash: null,
+                  verdict: "rework",
+                  evidenceReferences: [...artifactPrecondition.evidenceReferences],
+                  reason: artifactPrecondition.reason,
+                },
+              });
+            },
+            /**
+             * ALIGN-03-01：**审查任务收尾** ⇒ 解析报告并落裁决。
+             *
+             * 裁决只来自审查报告（`VERDICT:` / `EVIDENCE:` 行），
+             * 报告缺失/不合规/审查失败 ⇒ 一律 rework，**绝不**默认通过。
+             */
+            onReviewTaskCompleted: async (reviewInput: {
+              readonly missionId: string;
+              readonly taskId: string;
+              readonly resultLocation: string | null;
+              readonly outcome: "success" | "failure";
+            }) => {
+              const reviewedTaskIdentifier = reviewInput.taskId.startsWith("review:")
+                ? reviewInput.taskId.slice("review:".length)
+                : reviewInput.taskId;
+              const projectRootPath = this.resolveProjectRootPathForMission(
+                reviewInput.missionId,
+              );
+              /**
+               * 裁决**只能**来自审查报告；解析逻辑集中在 `resolveReviewVerdict`，
+               * 任何异常路径都收敛为 rework（不抛错、不默认通过）。
+               */
+              const resolvedVerdict =
+                projectRootPath === null
+                  ? {
+                      verdict: "rework" as const,
+                      evidenceReferences: [
+                        `check:review-project-root-unresolved:${reviewInput.taskId}`,
+                      ],
+                      reason: "无法确定项目根：审查报告不能复核。",
+                    }
+                  : await resolveReviewVerdict({
+                      projectRootPath,
+                      reviewTaskIdentifier: reviewInput.taskId,
+                      resultLocation: reviewInput.resultLocation,
+                      reviewOutcome: reviewInput.outcome,
+                      /** 送审产物路径由审查任务描述携带（构造时写入）。 */
+                      expectedArtifactPaths: await (async () => {
+                        const chain = await this.options.taskStore.readTaskChain(
+                          reviewInput.missionId,
+                        );
+                        const reviewNode = chain?.tasks.find(
+                          (candidate) => candidate.id === reviewInput.taskId,
+                        );
+                        return reviewNode === undefined
+                          ? []
+                          : parseReviewArtifactPathsFromDescription(reviewNode.description);
+                      })(),
+                    });
+              await this.recordAcceptanceVerdict({
+                appointmentIdentifier: `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
+                verdict: {
+                  acceptingAgentInstanceIdentifier: `reviewer:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
+                  boundTaskIdentifier: reviewedTaskIdentifier,
+                  boundTaskRevision: 1,
+                  boundCommitHash: null,
+                  verdict: resolvedVerdict.verdict,
+                  evidenceReferences: [...resolvedVerdict.evidenceReferences],
+                  reason: resolvedVerdict.reason,
+                },
+              });
+    },
+    };
+  }
+
   private resolveProjectRootPathForMission(missionId: string): string | null {
     const projectIdentifier = this.missionProjectIdentifiers.get(missionId);
     if (projectIdentifier === undefined) {
@@ -4776,173 +4954,7 @@ export class MainController {
        * 同一责任次级），把"执行者自报"从完成路径里排除出去。
        * 缺省关闭：在没有真实审查 Worker 前开启会让任务卡在"待裁决"。
        */
-      ...(this.options.isIndependentReviewAutoAppointmentEnabled === true
-        ? {
-            onTaskCompletedForIndependentReview: async (input: {
-              readonly missionId: string;
-              readonly taskId: string;
-              readonly contributorAgentInstanceId: string;
-              readonly responsibleSecondaryAgentInstanceId: string;
-              readonly artifactPaths: readonly string[];
-            }) => {
-              const reviewerAgentInstanceId = `reviewer:${input.missionId}:${input.taskId}`;
-              const directory = this.options.registeredAgentDirectory;
-              if (
-                directory !== null &&
-                directory !== undefined &&
-                !directory.hasAgent(reviewerAgentInstanceId)
-              ) {
-                directory.registerAgent({
-                  agentInstanceId: reviewerAgentInstanceId,
-                  agentRole: "tertiary",
-                  missionId: input.missionId,
-                  owningSecondaryAgentInstanceId:
-                    input.responsibleSecondaryAgentInstanceId,
-                  boundTaskBundleId: input.taskId,
-                  registeredAtIso: new Date().toISOString(),
-                });
-              }
-              const appointmentIdentifier = `appointment:${input.missionId}:${input.taskId}`;
-              this.appointExecutionAndReview({
-                appointmentIdentifier,
-                missionIdentifier: input.missionId,
-                taskIdentifier: input.taskId,
-                taskRevision: 1,
-                riskLevel: "low",
-                appointingSecondaryAgentInstanceIdentifier:
-                  input.responsibleSecondaryAgentInstanceId,
-                implementationAgentInstanceIdentifier: input.contributorAgentInstanceId,
-                /**
-                 * 三个身份必须**互不相同**：实现者（Worker）、测试者（责任次级）、
-                 * 验收者（审查者）。测试者等于实现者会被"作者自验"拒绝，
-                 * 等于验收者会被"测试者不能签发自己的验收结论"拒绝。
-                 */
-                testingAgentInstanceIdentifier:
-                  input.responsibleSecondaryAgentInstanceId,
-                acceptanceAgentInstanceIdentifier: reviewerAgentInstanceId,
-                allowsSharedTestAndAcceptance: true,
-              });
-              /**
-               * ALIGN-03-01（2026-11-10 修订，用户裁决）：产物检查**只是前置条件**。
-               *
-               * - 前置不满足 ⇒ 记录 **rework**（没有可送审的产物，返修单引用具体检查项）；
-               * - 前置满足 ⇒ **不产出任何裁决**，任务停在"待验收"，
-               *   等待**真实审查任务**给出结论。
-               *
-               * 这样从类型与流程上都杜绝了"产物存在即 merge-ready"，
-               * 也杜绝"仅登记审查者身份就视作完成独立审查"。
-               */
-              const projectRootPath = this.resolveProjectRootPathForMission(input.missionId);
-              if (projectRootPath === null) {
-                return;
-              }
-              const taskChain = await this.options.taskStore.readTaskChain(input.missionId);
-              const task = taskChain?.tasks.find(
-                (candidate) => candidate.id === input.taskId,
-              );
-              /**
-               * 方案 C：送审产物取自**完成收据**（`input.artifactPaths`），
-               * 不读 `task.resultLocation`（后者在既有流程里另有消费者）。
-               */
-              const artifactPrecondition = await evaluateArtifactPrecondition({
-                projectRootPath,
-                artifactPaths: input.artifactPaths,
-              });
-              if (artifactPrecondition.isSatisfied) {
-                /**
-                 * 有产物可送审 ⇒ 派发**真实审查任务**（不是在此写裁决）。
-                 *
-                 * 审查任务由编排器在安全点注入并调度；裁决只能来自它的报告。
-                 * 若该任务本身就是审查任务 ⇒ 不再派生（防递归）。
-                 */
-                if (task?.taskType === "review") {
-                  return;
-                }
-                return {
-                  reviewTask: buildReviewTaskNode({
-                    reviewedTaskIdentifier: input.taskId,
-                    reviewerAgentInstanceId,
-                    acceptanceCriteria: task?.acceptanceCriteria ?? null,
-                    artifactPaths: artifactPrecondition.confirmedArtifactPaths,
-                  }),
-                };
-              }
-              await this.recordAcceptanceVerdict({
-                appointmentIdentifier,
-                verdict: {
-                  acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
-                  boundTaskIdentifier: input.taskId,
-                  boundTaskRevision: 1,
-                  boundCommitHash: null,
-                  verdict: "rework",
-                  evidenceReferences: [...artifactPrecondition.evidenceReferences],
-                  reason: artifactPrecondition.reason,
-                },
-              });
-            },
-            /**
-             * ALIGN-03-01：**审查任务收尾** ⇒ 解析报告并落裁决。
-             *
-             * 裁决只来自审查报告（`VERDICT:` / `EVIDENCE:` 行），
-             * 报告缺失/不合规/审查失败 ⇒ 一律 rework，**绝不**默认通过。
-             */
-            onReviewTaskCompleted: async (reviewInput: {
-              readonly missionId: string;
-              readonly taskId: string;
-              readonly resultLocation: string | null;
-              readonly outcome: "success" | "failure";
-            }) => {
-              const reviewedTaskIdentifier = reviewInput.taskId.startsWith("review:")
-                ? reviewInput.taskId.slice("review:".length)
-                : reviewInput.taskId;
-              const projectRootPath = this.resolveProjectRootPathForMission(
-                reviewInput.missionId,
-              );
-              /**
-               * 裁决**只能**来自审查报告；解析逻辑集中在 `resolveReviewVerdict`，
-               * 任何异常路径都收敛为 rework（不抛错、不默认通过）。
-               */
-              const resolvedVerdict =
-                projectRootPath === null
-                  ? {
-                      verdict: "rework" as const,
-                      evidenceReferences: [
-                        `check:review-project-root-unresolved:${reviewInput.taskId}`,
-                      ],
-                      reason: "无法确定项目根：审查报告不能复核。",
-                    }
-                  : await resolveReviewVerdict({
-                      projectRootPath,
-                      reviewTaskIdentifier: reviewInput.taskId,
-                      resultLocation: reviewInput.resultLocation,
-                      reviewOutcome: reviewInput.outcome,
-                      /** 送审产物路径由审查任务描述携带（构造时写入）。 */
-                      expectedArtifactPaths: await (async () => {
-                        const chain = await this.options.taskStore.readTaskChain(
-                          reviewInput.missionId,
-                        );
-                        const reviewNode = chain?.tasks.find(
-                          (candidate) => candidate.id === reviewInput.taskId,
-                        );
-                        return reviewNode === undefined
-                          ? []
-                          : parseReviewArtifactPathsFromDescription(reviewNode.description);
-                      })(),
-                    });
-              await this.recordAcceptanceVerdict({
-                appointmentIdentifier: `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
-                verdict: {
-                  acceptingAgentInstanceIdentifier: `reviewer:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
-                  boundTaskIdentifier: reviewedTaskIdentifier,
-                  boundTaskRevision: 1,
-                  boundCommitHash: null,
-                  verdict: resolvedVerdict.verdict,
-                  evidenceReferences: [...resolvedVerdict.evidenceReferences],
-                  reason: resolvedVerdict.reason,
-                },
-              });
-            },          }
-        : {}),
+      ...this.buildIndependentReviewOrchestrationOptions(),
       /**
        * ALIGN-03：把派发出的三级 Worker 登记进目录，并写入**真实直属上级**。
        * 未装配目录 ⇒ 不登记（行为不变，不假装已绑定）。
@@ -5274,6 +5286,7 @@ export class MainController {
         missionId,
       ),
       isWorkerOwnershipEnforced: true,
+      ...this.buildIndependentReviewOrchestrationOptions(),
       gitIntegration: this.completeGitIntegrationOrchestrationOptions(missionId),
       requireCompletionControlEvent: this.options.requireCompletionControlEvent ?? false,
       /** ALIGN-03-03：完成收据门禁（缺省关；开启后 success 无收据不判 done）。 */
