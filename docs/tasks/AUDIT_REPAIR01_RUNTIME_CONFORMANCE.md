@@ -487,3 +487,36 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 
 **边界（不虚报）**：`DiskCache` 生产未接入；其余 16 个候选只做初步分诊。
 这些都写进报告，未算作完成。
+
+## 05 进度（2026-11-11）：隔离包已跑通第一步
+
+| 项 | 值 |
+|---|---|
+| 代码 SHA | `230ce0b8` |
+| tarball | `astarray-0.1.0.tgz` |
+| tarball SHA256 | `59A0E47DE0D9F6BD35FA78D066ACD3F2A4DF6139E299FDEC9CD797BFB6693897` |
+| 打包命令 | `npm run build` + `npm pack --ignore-scripts`（跳过 prepack，未联网） |
+| 安装 | `npm install ./astarray-0.1.0.tgz --no-audit --no-fund` ⇒ added 43 packages, 20s，**无联网取包失败** |
+| 入口探针 | `import("astarray")` ⇒ **成功，435 个导出** |
+
+### 两处必须更正的观察（避免误报）
+
+1. **`require("astarray")` 失败不是缺陷**：`package.json` 为 `type: "module"`，
+   `exports` 只给了 `import` 条件 ⇒ CJS 解析失败是**设计如此**。
+   我第一次探针先用 `require.resolve` 才误以为"包坏了"，实际是我的探针写法错了。
+2. **`main`/`types` 为空也不是缺陷**：ESM-only 包用 `exports` 提供入口即可。
+
+### 包级入口的真实名称
+
+`createApplicationRuntime` **未导出**；导出的是 **`AstarrayApplicationFacade`**
+（另有 `AnthropicMessagesRuntime`、`ProviderRuntimeRegistry`、`convertPriorMessagesToAnthropicMessages`）。
+
+⇒ 05-3 要求的两条闭环应通过 `AstarrayApplicationFacade` 在隔离包里驱动。
+
+### 尚未完成
+
+- 05-3：用 `AstarrayApplicationFacade` 在隔离包中跑"目标提案权限"与"Anthropic fake-server"两条闭环；
+- 05-1：本批未再跑全量（上一轮已跑：690 files / 4684 passed，exit 0）；
+- 05-4/05-5：设计—实现矩阵与状态纠偏（矩阵已在 01–04 各节分列，尚未汇总成一表）。
+
+**结论**：05 **仍是 in_progress**，不是 done。
