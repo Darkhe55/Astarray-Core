@@ -520,3 +520,32 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 - 05-4/05-5：设计—实现矩阵与状态纠偏（矩阵已在 01–04 各节分列，尚未汇总成一表）。
 
 **结论**：05 **仍是 in_progress**，不是 done。
+
+### 05-3 断点记录（2026-11-11，新目标第 1 轮）
+
+包级入口已核实：`AstarrayApplicationFacade.create(options: PublicApplicationOptions)`。
+相关字段（`public-sdk.ts`）：
+
+| 字段 | 行号 | 说明 |
+|---|---|---|
+| `mode`（必需） | 2123 | `AgentMode` |
+| `stateDirectory`（必需） | — | 状态目录 |
+| `runtime?: "mock" \| "provider"` | 2125 | 缺省 `mock` |
+| `provider?` | 2127 | `PublicProviderConfiguration` |
+| `providerRuntimeRegistry?` | 2139 | `ProviderRuntimeRegistry` |
+| `authenticatedUserId?` | 2248 | 认证主体 |
+| `workspaceRootPath?` | — | 缺省为进程 cwd，**测试须显式指定** |
+
+**关键事实**：公开选项里**没有** `workerRuntimeFactory` ⇒ mock 运行时由应用层内部创建，
+包级用例无法注入脚本运行时。因此 05-3 的两条闭环要这样落：
+
+1. **Anthropic fake-server 闭环**（可行）：`runtime: "provider"` +
+   `providerRuntimeRegistry` 注册 `createAnthropicMessagesProviderRegistration` +
+   `provider` 指向本机 fake server ⇒ 在隔离包里断言请求真的打到 fake server；
+2. **目标提案权限闭环**：需要 mock 路径下驱动 `proposeGoal`。若 facade 无注入点，
+   则该闭环在**包级不可达**——这本身就是 05-3 要记录的事实（不是我的测试写不出来），
+   届时按卡内口径记录"包级不可达"，并给出最小后继（例如公开一个受控的测试运行时注入点）。
+
+**下一步第一条动作**：读 `createAnthropicMessagesProviderRegistration` 与
+`PublicProviderConfiguration` 的字段，然后在 `.tmp/audit05-install/audit05-loops.mjs` 里
+只 `import "astarray"` 跑第 1 条闭环。
