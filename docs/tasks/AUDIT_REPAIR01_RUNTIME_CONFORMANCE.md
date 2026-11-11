@@ -569,3 +569,25 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 脚本对 `entryPath` 有防回落断言：若解析到仓库目录内即 `exit 2`。
 
 **仍未做**：05-3 的第二条闭环（目标提案权限）；05-4 矩阵汇总；05-5 状态纠偏。
+
+#### 05-3 第二条闭环（目标提案权限）：**包级不可达，需改验证路径**
+
+核查结论（2026-11-11）：
+
+| 事实 | 证据 |
+|---|---|
+| `PublicApplicationOptions` 没有运行时可注入点 | 只有 `runtime: "mock" \| "provider"`、`provider`、`providerRuntimeRegistry` |
+| mock 运行时由应用层内部脚本化 | 不会发出 `proposeGoal` 工具调用 |
+| 目标提案相关符号未从公开 SDK 导出 | `PermissionCapabilityCatalog` / `createGoalProposalToolHandler` 在 `public-sdk.ts` 无命中 |
+
+⇒ 第二条闭环**不能**像 CLUSTER 那样用"脚本化 worker"在隔离包里跑出来。
+
+### 两条可行替代（下一轮选一条）
+
+| 方案 | 做法 | 代价 |
+|---|---|---|
+| **A**（推荐） | 用 `runtime: "provider"` + **本机 fake Anthropic server**：让真实 WorkerAgent 从假服务收到 `tool_use: proposeGoal`，走完整权限门禁 | 需要 fake server 协议与任务子集配合 |
+| B | 在公开 SDK 暴露受控的测试运行时注入点 | 改动公开 API 面，风险更高 |
+
+**本轮不改代码**：A 需要在隔离包里构造 provider 运行时 + fake server + 任务子集，
+属完整一轮的工作量，不适合与收口同时进行。
