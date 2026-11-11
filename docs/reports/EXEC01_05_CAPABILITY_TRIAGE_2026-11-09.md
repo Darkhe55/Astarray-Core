@@ -239,3 +239,18 @@
 **仍未做（真正生效的那一步）**：把控制器接进**读取路径**（`readFile` builtin / 策略包装层），
 让超额读取被拒绝；以及单个 Agent 的 `WorkingSetBudgetTracker`（同样 0 处构造）。
 ⇒ 现状是"可达但未被强制"，不计为完成。
+
+## 返修进展（第 36 轮）：`readFile` 预算接线的**契约先行**
+
+本轮只加**契约**，未加行为（如实记录）：
+
+- `BuiltinToolExecutionContext` 新增可选 `taskChainCumulativeBudget`（只需 `registerTaskChainSource`）
+  与 `taskChainIdentifier`；**未注入 ⇒ 行为完全不变**。
+
+**为什么没在这一轮直接强制**：`readFile` 分支较长（参数校验 + 视图/格式处理 + 受保护存储策略），
+我还没确认"登记来源"应放在哪一步（读取前预留还是读取成功后按实际字节登记）。
+放错位置会导致：读失败也计数，或超大文件读取绕过计数。**先定契约、下一轮再接**，避免半截实现。
+
+**下一轮第一步（精确）**：在 `readFile` 成功返回处登记（`contentBytes` 用返回文本字节数、
+`estimatedTokenCount` 按既有估算口径），超额抛 `task-sequence-permission-denied`；
+再在策略包装层把装配层的控制器与任务链标识传进上下文。

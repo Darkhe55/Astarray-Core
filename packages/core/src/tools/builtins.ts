@@ -68,6 +68,21 @@ export interface BuiltinToolExecutionContext {
   /** 当前调用的项目范围（聚类只在该项目内检索）。 */
   diagnosticClusterProjectIdentifier?: string;
   /**
+   * REPAIR（T07E-04）：任务链累计读取预算（可选）。
+   * 装配层注入后，读取类工具执行成功需登记来源；未注入 ⇒ 行为不变。
+   */
+  taskChainCumulativeBudget?: {
+    registerTaskChainSource(input: {
+      taskChainIdentifier: string;
+      agentInstanceId: string;
+      canonicalSourceIdentity: string;
+      contentBytes: number;
+      estimatedTokenCount: number;
+    }): Promise<{ cumulativeSourceFileCount: number; isBudgetExceeded: boolean }>;
+  };
+  /** 本次调用所属任务链（预算按任务链累计）。 */
+  taskChainIdentifier?: string;
+  /**
    * T05C：任务序列状态控制面（只读工具注入；未装配时调用报错）。
    * 调用者身份由 harness 注入（requestingAgentInstanceId），模型无法填写
    * 他人 ID 获得他人视图。
