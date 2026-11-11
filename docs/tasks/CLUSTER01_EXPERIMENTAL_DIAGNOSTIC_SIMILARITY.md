@@ -164,3 +164,15 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：`findRelated` 查询、资源上限节流（每批 200 行/2,000 条/16 MiB/5,000 ms/100,000 次比较）、
 单项目写租约与幂等、工具与权限入口、SDK 导出、接线到应用装配。
+
+### 切片 6：`findRelated` 相似案例检索（§3 第 7 条）——**已交付**
+
+- `diagnostic-related-cases.ts`：`findRelatedDiagnosticCases({ event, snapshot, limit, minimumSimilarity })`。
+- **只接受已授权事件引用**（`DiagnosticClusterInput`），**不提供"传一段字符串来查"的重载**——
+  卡内要求输入不是任意待执行文本，避免调用方把模型输出直接喂进来。
+- 同桶 + 同算法；默认 5、上限钳到 20；低于阈值不返回；结果按分数降序、同分按组 ID 字典序。
+- 返回值显式带 `isRootCauseConfidence: false`：**相似度不是正确概率，也不是根因置信度**。
+- 测试 4 条：跨桶不返回 + 分数阈值 + 标志位、低相似度空结果、limit 默认/夹紧、确定性排序。
+
+**仍未做**：资源上限节流（每批 200 行/2,000 条/16 MiB/5,000 ms/100,000 次比较）、
+单项目写租约与幂等、工具与权限入口、SDK 导出、接线到应用装配、用户纠正记录。
