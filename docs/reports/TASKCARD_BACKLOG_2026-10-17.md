@@ -2380,3 +2380,18 @@ CLUSTER-01 改动了公开核心（`packages/core/src/orchestration/**`、`appli
 
 **下一轮选择**：`COMM-01-02` 后续切片——它有明确的切片①交付记录，接续点清楚；
 `CLIENT01` 体量更大（授权 + 秘书 + onboarding 三段），需要单独规划。
+
+#### 第 66+ 轮：COORD-01 收口（2026-11-11）
+
+COORD-01 四个检查点全部达到 **implemented-unverified**，新增/接线模块：
+`coordination-partition-lease`、`coordination-state-transaction`、`coordination-message-consumer`、
+`coordination-retry-store`、`coordination-submission-identity`、`coordination-wake-coordinator`、
+`reply-artifact-verification`、`control-bypass`、`context-admission`、
+`instruction-window-store`（交办回执）、`mailbox-journal`（三状态/文件名编码/上下文写入点）、
+`public-sdk`（协调只读与控制入口）。
+
+**顺带修复的真实缺陷**：① Windows 文件名不许冒号导致 `agent:<id>` 消息无法入库；
+② 租约同持有者重复获取被判 `held-by-other`（崩溃恢复会卡死）；
+③ 门禁无解析器时曾经可能放行（现 fail-closed）。
+
+**待人测清单**：COORD-01 全部 + 既有 CLUSTER-01 / AUDIT-REPAIR-01 项。
