@@ -136,3 +136,18 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：聚类算法本身（分桶键、`diagnostic-text-v1` 规范化、三元组 Jaccard、0.85 阈值、leader 聚类）、
 派生索引与游标持久化、工具与权限入口、SDK 导出。
+
+### 切片 4：纯聚类算法（§3）——**已交付**
+
+- `packages/core/src/orchestration/diagnostic-clusterer.ts`：
+  `normalizeDiagnosticText`（`diagnostic-text-v1`：NFC、统一换行/空白、**只**替换 ISO 时间戳与 UUID）、
+  `computeTrigramSet`（Unicode 码点三元组；不足 3 码点用整串）、`computeJaccardSimilarity`、
+  `buildDiagnosticBucketKey`（严格分桶，`null` 保持未知）、`clusterDiagnosticEvents`（leader 聚类，0.85 阈值）。
+- 输入类型 `DiagnosticClusterInput` + `toDiagnosticClusterInput(event, projectIdentifier)`：
+  **项目标识由调用方的可信关系索引传入**（§3 第 1 条：不接受模型自填项目 ID）。
+  `sourceRecordIdentifier` 取 `请求标识#revision`，保证同一次记录稳定且唯一。
+- 测试 10 条，含四个关键反例：分桶不同不聚合、`null` 不被推断、**禁止传递合并**（A~B、B~C 但 A!~C ⇒ 组大小 [2,1]）、
+  空文本不参与模糊归组；另有规范化**不泛化数字/路径/大小写**、确定性重复聚类一致。
+
+**仍未做**：派生索引与游标持久化（`analysis/diagnostic-clusters/`）、
+`findRelated` 查询、资源上限节流与租约、工具/权限入口、SDK 导出、接线到应用装配。
