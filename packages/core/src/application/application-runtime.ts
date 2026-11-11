@@ -36,6 +36,7 @@ import {
 import { CoordinationStateTransactionStore } from "../orchestration/coordination-state-transaction.js";
 import { CoordinationRetryStore } from "../orchestration/coordination-retry-store.js";
 import { CoordinationWakeCoordinator } from "../orchestration/coordination-wake-coordinator.js";
+import { CoordinationSubmissionIdentityStore } from "../orchestration/coordination-submission-identity.js";
 import { TaskChainCumulativeBudgetController } from "../orchestration/task-chain-cumulative-budget.js";
 import {
   createDefaultGitCommandRunner,
@@ -308,6 +309,19 @@ export interface ApplicationRuntime {
   coordinationMessageConsumer: CoordinationMessageConsumer;
   coordinationRetryStore: CoordinationRetryStore;
   coordinationWakeCoordinator: CoordinationWakeCoordinator;
+  coordinationSubmissionIdentityStore: CoordinationSubmissionIdentityStore;
+  /**
+   * COORD-01-03 §3：稳定提交身份。**相同文本不会自动合并**——必须有请求 ID 才复用。
+   */
+  resolveCoordinationSubmission: (input: {
+    sourceIdentifier: string;
+    requestIdentifier?: string;
+    contentFingerprint: string;
+  }) => Promise<
+    | { outcome: "created" | "reused"; messageIdentifier: string; recoveryToken: string }
+    | { outcome: "conflict"; messageIdentifier: string }
+    | { outcome: "invalid"; reason: string }
+  >;
   /**
    * COORD-01-02 §4.5：消费完消息后**重算 ready set**（唤醒是可重复信号，不直接派发）。
    * ready-set 的来源由调用方注入（调度器始终是唯一权威，不在协调器里复制一套选择逻辑）。
@@ -1116,6 +1130,10 @@ export async function createApplicationRuntime(
     leaseStore: coordinationLeaseStore,
     stateStore: coordinationStateStore,
     retryStore: coordinationRetryStore,
+    nowUnixMilliseconds: () => Date.now(),
+  });
+  const coordinationSubmissionIdentityStore = new CoordinationSubmissionIdentityStore({
+    stateDirectory: path.join(stateDirectory, "coordination", "identity"),
     nowUnixMilliseconds: () => Date.now(),
   });
   const coordinationWakeCoordinator = new CoordinationWakeCoordinator({
@@ -4765,6 +4783,32 @@ export async function createApplicationRuntime(
     coordinationMessageConsumer,
     coordinationRetryStore,
     coordinationWakeCoordinator,
+    coordinationSubmissionIdentityStore,
+    resolveCoordinationSubmission: async (input: {
+      sourceIdentifier: string;
+      requestIdentifier?: string;
+      contentFingerprint: string;
+    }) => {
+      const outcome = await coordinationSubmissionIdentityStore.submit({
+        partitionKey: coordinationPartitionKey,
+        sourceIdentifier: input.sourceIdentifier,
+        ...(input.requestIdentifier === undefined
+          ? {}
+          : { requestIdentifier: input.requestIdentifier }),
+        contentFingerprint: input.contentFingerprint,
+      });
+      if (outcome.outcome === "created" || outcome.outcome === "reused") {
+        return {
+          outcome: outcome.outcome,
+          messageIdentifier: outcome.record.messageIdentifier,
+          recoveryToken: outcome.record.recoveryToken,
+        };
+      }
+      if (outcome.outcome === "conflict") {
+        return { outcome: "conflict", messageIdentifier: outcome.existingRecord.messageIdentifier };
+      }
+      return { outcome: "invalid", reason: outcome.reason };
+    },
     recomputeCoordinationReadySet: async (input: {
       partitionKey?: string;
       selectReadyTasks: () => Promise<readonly string[]>;

@@ -54,6 +54,47 @@ describe("本地协调器装配接线", () => {
     }
   }, 60_000);
 
+  it("⑥ 稳定提交身份：同文本无请求 ID 是两条；同请求 ID 复用；异内容冲突", async () => {
+    const runtime = await createRuntime();
+    try {
+      const first = await runtime.resolveCoordinationSubmission({
+        sourceIdentifier: "user:alice",
+        contentFingerprint: "同一段文字",
+      });
+      const second = await runtime.resolveCoordinationSubmission({
+        sourceIdentifier: "user:alice",
+        contentFingerprint: "同一段文字",
+      });
+      expect(first.outcome).toBe("created");
+      expect(second.outcome).toBe("created");
+      if (first.outcome !== "created" || second.outcome !== "created") throw new Error("期望 created");
+      expect(first.messageIdentifier).not.toBe(second.messageIdentifier);
+
+      const reused = await runtime.resolveCoordinationSubmission({
+        sourceIdentifier: "user:alice",
+        requestIdentifier: "request-1",
+        contentFingerprint: "任务 A",
+      });
+      const replayed = await runtime.resolveCoordinationSubmission({
+        sourceIdentifier: "user:alice",
+        requestIdentifier: "request-1",
+        contentFingerprint: "任务 A",
+      });
+      expect(replayed.outcome).toBe("reused");
+      if (reused.outcome === "invalid" || replayed.outcome === "invalid") throw new Error("期望非 invalid");
+      expect(replayed.messageIdentifier).toBe(reused.messageIdentifier);
+
+      const conflicted = await runtime.resolveCoordinationSubmission({
+        sourceIdentifier: "user:alice",
+        requestIdentifier: "request-1",
+        contentFingerprint: "任务 B",
+      });
+      expect(conflicted.outcome).toBe("conflict");
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
+
   it("⑤ 唤醒 → 重算 ready set：应用一次后重算一次，再调用不重复重算", async () => {
     const runtime = await createRuntime();
     try {

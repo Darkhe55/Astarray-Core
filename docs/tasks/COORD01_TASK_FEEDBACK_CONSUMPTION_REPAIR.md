@@ -241,3 +241,19 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 **重算抛错不推进计数并能重试** / 重启后计数保留不重复消费。加 1 条装配层集成（消费→重算一次→再调不重算）。
 
 **CHECKPOINT 状态**：COORD-01-02 → **implemented-unverified**（全部子项已接线且有反例；人工验收未做）。
+
+### COORD-01-03 进展（2026-11-11 目标轮 8）：稳定重试身份（§3）
+
+| 交付 | 说明 |
+|---|---|
+| `CoordinationSubmissionIdentityStore.submit` | 有 `requestIdentifier` 时按 **(来源, 请求 ID)** 判重并复用同一 `messageIdentifier` 与**恢复令牌**；无请求 ID 时**每次生成新身份** |
+| `resumeByRecoveryToken` | 凭令牌找回提交记录（响应丢失/进程恢复） |
+| 冲突处理 | 同请求 ID **异内容** ⇒ `conflict`，交回既有记录，**不覆盖** |
+| 接线 | `runtime.resolveCoordinationSubmission(...)` / `runtime.coordinationSubmissionIdentityStore` |
+
+**用例 5 条**：① **相同文本、无请求 ID ⇒ 两条独立消息**（禁止按文本猜测"这是重试"）；
+② 同请求 ID 同内容复用身份与令牌；③ 同请求 ID 异内容冲突；④ 令牌可重放、未知令牌 null；⑤ 重启后仍复用。
+加 1 条装配层集成（三种结果都经运行时入口取得）。
+
+**本片边界**：身份原语已接线可调用，但**上游提交入口（主控指令）尚未改为携带请求 ID** —— 那需要用户消息标识的贯通，
+属 03 后续切片，未做即不宣称 03 完成。
