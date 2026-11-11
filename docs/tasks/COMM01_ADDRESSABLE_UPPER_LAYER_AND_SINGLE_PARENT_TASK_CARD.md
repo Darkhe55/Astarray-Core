@@ -392,3 +392,24 @@ git grep 'messageIdentifier|messageId' -- orchestration/agent-mailbox*.ts orches
 COMM-01-02 目前已完成并可交付的部分：
 - 创建来源登记 / 地址完整性 / 反馈反向通道 / 经唯一上级转达（既有）；
 - **投递前复检**（撤销/在途量/revision/到期）与**跨 mission 拒绝**的自动化证据（本会话补齐，6 条用例）。
+
+### 更正（2026-11-11，用户澄清后核对）：重放/迟到由**队列消费口**统一管理
+
+用户澄清：消息统一推入任务消息序列，幂等与迟到由队列消费口统一管理，只有**投递失败**是投递层问题。
+
+**代码核对结论：用户说法成立，我此前的判断有误（仅对"委派授权层"成立，对消息投递层不成立）**：
+
+| 关注点 | 实际位置 | 证据 |
+|---|---|---|
+| **重放/幂等** | 协同收件箱 + 反馈进程 mailbox journal | `collaboration-inbox.enqueue`：以 `messageIdentifier` 判重，命中返回 `duplicate` 并**复用回执**（`duplicateDeliveryCount += 1`）；`mailbox-journal.enqueue` 有**幂等入库**（`idempotencyKey`，同键异内容拒绝，ALIGN-03-06） |
+| **投递失败** | 反馈进程 `delivery-worker` | `runDeliveryStep`：`peekNext` → 收件人非 idle ⇒ `recipient-busy` + 素数退避；**只有成败与退避**，无重放/迟到判定 |
+| **消息→任务绑定** | 同上 | `enqueue` 必填 `taskIdentifier`、`correlationIdentifier`；`buildCollaborationFeedbackMessage` 把 `taskIdentifier`/`correlationIdentifier` 透传进 `FeedbackMessagePayload` |
+
+⇒ 三项中**两项已有实现**，我先前把它们列为"需新增语义"是**错误分类**，已更正。
+
+**真正的缺口（用户指出的那一条）**：回复**只带 `taskIdentifier`，不带"原任务产物"引用**。
+`FeedbackMessagePayload` 目前是 `{kind, messageIdentifier, correlationIdentifier, taskIdentifier, summary, authorizationEpoch, hopCount}`，
+没有任何 artifact / 产物 revision 字段 ⇒ 接收方无法把回复与其依据的产物绑定。
+
+**下一步（可编码）**：给回复载荷增加**产物引用**（沿用既有产物标识 + revision 口径，不新造 ID 体系），
+反例：空产物标识被拒、revision 缺失被拒、无产物的回复仍然合法（向后兼容）。
