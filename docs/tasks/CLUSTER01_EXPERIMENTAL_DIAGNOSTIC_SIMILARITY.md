@@ -320,3 +320,15 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：工具执行经 `policyPort.execute` 的集成用例（未分配 ⇒ 拒绝 / ask ⇒ 询问 / 允许 ⇒ 执行）、
 `feedback` 存储、CLI。
+
+### 切片 9d：能力默认值锁定（§5）——已交付
+
+`tests/core/unit/cluster01-capability-defaults.test.ts`（4 条）：
+能力已登记、**查询默认 allow / 构建默认 ask**（默认值写反会静默放行写操作）、
+工具映射同时登记两个能力、`getCapabilityIdsForCall(tool, action)` 能区分读写。
+
+**已确认的接线缺口（下一轮第一件事）**：
+工具描述符已注册、能力已映射，但**执行处理器尚未接进 `tools/builtins.ts` 的 dispatch**。
+⇒ 现在 worker 真调用 `diagnosticClusters` 会走到未知分支。
+要接它必须把 `DiagnosticClusterService` 与项目上下文传入 builtins 的执行上下文——
+这是"统一工具层"的最后一步，**未做完就不算工具接线完成**。
