@@ -200,3 +200,23 @@ AUTH-SCOPE 系列体量更大（按模式/范围/上级裁决授权 + 迁移旧�
 
 **下一检查点**：ACCURACY-02/03（设置与产品入口、关闭后无新增模型审查/人工阻塞、标准/严格档工作量上限）。
 下一轮先读这两条的"必需验收"，确认是接线还是新行为。
+
+## 整体对账（2026-11-11，第 57 轮）
+
+| 小节 | 实际状态 | 证据 |
+|---|---|---|
+| ACCURACY-01/02/03 | **对账 done** | 卡内状态列（2026-10-21/23）+ `scripts/verify-accuracy-settings-package.mjs`；第 55 轮实测 23 项通过 |
+| READ-FORMAT | **已实现** | `builtins.ts:165-166` 暴露 `shouldIncludeComments` / `shouldIncludeImports`；`scripts/verify-read-format-package.mjs` 存在 |
+| AUTH-SCOPE-01 | **本地可证部分 done（2026-10-…）** | 卡内状态列 |
+| AUTH-SCOPE-02/03 | **无对账标记 ⇒ 剩余真实工作** | 卡内状态列为空 |
+| 其余小节 | 未核 | — |
+
+⇒ 这份"设计增量卡"**绝大部分已实现**，卡头"全部 pending"确实过期。
+
+**剩余可编码项：AUTH-SCOPE-02/03。**
+
+AUTH-SCOPE-02 的必证反例（卡内原文）：
+链接逃逸 / 路径前缀碰撞 / 跨根写入 / 全局安装 / 子进程外写 / 失效上级 / revision 变化。
+
+**下一轮第一步**：`git grep` 这些情形在测试中的覆盖情况（`scope-authorization-gate` 已存在），
+缺哪类补哪类的反例；若反例暴露出实现漏洞，先修实现——这是真正的接线+行为工作，不是审计。
