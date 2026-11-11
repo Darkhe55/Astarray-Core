@@ -54,6 +54,15 @@ export interface AgentEditIntentGuardOptions {
   /** 指纹器（默认 sha256 文件指纹；可注入以便测试）。 */
   fingerprintPort?: HumanFileFingerprintPort;
   nowUnixMilliseconds?: () => number;
+  /**
+   * REPAIR（17 项分诊 · HumanWorktreeObserver）：**人工工作树的触发点**。
+   *
+   * agent 记录"自写"之前先观察一次人工工作树，才能把"人工改动"与"agent 改动"分开；
+   * 缺省不注入 ⇒ 行为完全不变（不观察、不写 journal）。
+   */
+  worktreeObserver?: {
+    observeWorktree(input: { observationIdentifier: string; nowIso: string }): Promise<unknown>;
+  };
 }
 
 export interface RecordReadBaselineInput {
@@ -107,11 +116,15 @@ export class AgentEditIntentGuard implements AgentEditIntentGuardPort {
   private readonly fingerprintPort: HumanFileFingerprintPort;
   private readonly nowUnixMilliseconds: () => number;
   private readonly staleWriteGuard: StaleWriteGuard;
+  private readonly worktreeObserver:
+    | { observeWorktree(input: { observationIdentifier: string; nowIso: string }): Promise<unknown> }
+    | undefined;
 
   constructor(options: AgentEditIntentGuardOptions) {
     this.baseDirectory = options.baseDirectory;
     this.fingerprintPort = options.fingerprintPort ?? new Sha256FileFingerprinter();
     this.nowUnixMilliseconds = options.nowUnixMilliseconds ?? Date.now;
+    this.worktreeObserver = options.worktreeObserver;
     this.staleWriteGuard = new StaleWriteGuard({
       fingerprintPort: this.fingerprintPort,
       patchVaultBaseDirectory: this.baseDirectory,
@@ -122,6 +135,17 @@ export class AgentEditIntentGuard implements AgentEditIntentGuardPort {
   }
 
   async recordReadBaseline(input: RecordReadBaselineInput): Promise<void> {
+    /**
+     * 先观察人工工作树（失败不阻塞写入：观察是旁路证据，不是写入门禁）。
+     */
+    if (this.worktreeObserver !== undefined) {
+      await this.worktreeObserver
+        .observeWorktree({
+          observationIdentifier: `agent-write:${input.taskExecutionIdentifier ?? "unspecified"}`,
+          nowIso: new Date(this.nowUnixMilliseconds()).toISOString(),
+        })
+        .catch(() => undefined);
+    }
     const document = await this.loadDocument(input.agentInstanceId);
     const taskKey = input.taskExecutionIdentifier ?? UNSPECIFIED_TASK_EXECUTION_IDENTIFIER;
     const existingIntent = document.intents.find(
@@ -164,6 +188,17 @@ export class AgentEditIntentGuard implements AgentEditIntentGuardPort {
   }
 
   async recordOwnWrite(input: RecordOwnWriteInput): Promise<void> {
+    /**
+     * 先观察人工工作树（失败不阻塞写入：观察是旁路证据，不是写入门禁）。
+     */
+    if (this.worktreeObserver !== undefined) {
+      await this.worktreeObserver
+        .observeWorktree({
+          observationIdentifier: `agent-write:${input.taskExecutionIdentifier ?? "unspecified"}`,
+          nowIso: new Date(this.nowUnixMilliseconds()).toISOString(),
+        })
+        .catch(() => undefined);
+    }
     const document = await this.loadDocument(input.agentInstanceId);
     const taskKey = input.taskExecutionIdentifier ?? UNSPECIFIED_TASK_EXECUTION_IDENTIFIER;
     const intent = document.intents.find(
@@ -180,6 +215,17 @@ export class AgentEditIntentGuard implements AgentEditIntentGuardPort {
   }
 
   async guardOverwrite(input: GuardOverwriteInput): Promise<GuardOverwriteOutcome> {
+    /**
+     * 先观察人工工作树（失败不阻塞写入：观察是旁路证据，不是写入门禁）。
+     */
+    if (this.worktreeObserver !== undefined) {
+      await this.worktreeObserver
+        .observeWorktree({
+          observationIdentifier: `agent-write:${input.taskExecutionIdentifier ?? "unspecified"}`,
+          nowIso: new Date(this.nowUnixMilliseconds()).toISOString(),
+        })
+        .catch(() => undefined);
+    }
     const document = await this.loadDocument(input.agentInstanceId);
     const taskKey = input.taskExecutionIdentifier ?? UNSPECIFIED_TASK_EXECUTION_IDENTIFIER;
     const intent = document.intents.find(

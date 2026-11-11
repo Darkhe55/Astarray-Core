@@ -175,3 +175,15 @@
 
 **仍未做**：生产流程里**主动触发**观察的检查点（目前是构造 + 可从装配入口调用，
 尚无业务路径自动调用）；以及 `gitReadonlyView` 复用同一端口的接线。
+
+## 返修进展（第 32 轮）：`HumanWorktreeObserver` **生产触发点已接**
+
+- `AgentEditIntentGuard` 新增**可选** `worktreeObserver`：agent 记录"自写"前先观察一次人工工作树，
+  标识为 `agent-write:<taskExecutionIdentifier>`；**未注入时行为完全不变**。
+- 装配层把已构造的 `humanWorktreeObserver` 传进 guard ⇒ 生产路径上**真的会观察**。
+- 观察失败**不阻塞写入**（观察是旁路证据，不是写入门禁）——有用例锁定。
+
+**证据**（`tests/core/unit/human-worktree-observer-trigger.test.ts`，3 条）：
+调用了观察器且标识带任务前缀；观察抛错时拒绝原因**不是** observe-boom；未注入时不因观察报错。
+
+**仍未做**：`gitReadonlyView` 复用同一 status 端口；journal 的读取/展示入口（CLI）。

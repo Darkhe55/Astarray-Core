@@ -3139,9 +3139,7 @@ export async function createApplicationRuntime(
 
 
   // E2E-01-03 S1 / T05D-03：Agent 编辑意图与陈旧写入强制（按状态目录持久化基线）。
-  const agentEditIntentGuard = new AgentEditIntentGuard({
-    baseDirectory: stateDirectory,
-  });
+
   /**
    * REPAIR（17 项分诊 · HumanWorktreeObserver）：**写端终于被构造**。
    * 此前全仓库 `new HumanWorktreeObserver` 为 0 处，journal 生产恒空。
@@ -3156,6 +3154,11 @@ export async function createApplicationRuntime(
     fingerprintPort: new Sha256FileFingerprinter(),
     authenticatedUserSourceIdentifier: options.authenticatedUserId ?? "unknown",
     journalBaseDirectory: stateDirectory,
+  });
+  /** agent 记录自写前先观察人工工作树（观察失败不阻塞写入）。 */
+  const agentEditIntentGuard = new AgentEditIntentGuard({
+    baseDirectory: stateDirectory,
+    worktreeObserver: humanWorktreeObserver,
   });
   // T06B/ADR-0014：策略包装器（worker 任务端口与思索模式只读端口共用同一套安全端口）。
   const createPolicyWrapperForAgent = (input: {
