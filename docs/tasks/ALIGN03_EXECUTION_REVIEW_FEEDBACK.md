@@ -706,3 +706,22 @@ EVIDENCE: <可复核引用>
 - **默认开关未启用**（用户裁决：等验收后再决定）；
 - 审查者由脚本桩扮演，**尚未接入真实模型审查**（裁决质量取决于真实审查 Worker）；
 - 人工点击验收未做。
+
+### 巡检轮（2026-11-12）：完成收据**补测试**（此前零覆盖）
+
+盘点发现 `packages/core/src/orchestration/completion-receipt.ts` 被
+`main-controller` / `artifact-precondition` / `goal-requirement-assessment` 使用，
+但 `tests/` 下**零引用** —— 生产路径上的"完成是否成立"判定没有自动化守护。
+
+新增 `tests/core/unit/align03-completion-receipt.test.ts`（6 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① 无收据 | 不足，原因含"缺少完成收据"（不补默认收据） |
+| ② 要求完成事件但未声明已校验 | 不足 |
+| ③ 缺任务标识 | 判定不足；`buildCompletionReceipt` 直接抛错 |
+| ④ 工具计数负数/非整数 | 不足 |
+| ⑤ 空产物路径 | 不足（宁可 block 不谎报） |
+| ⑥ 合法收据 | 足够；构造出的产物数组是副本，外部修改不污染 |
+
+**性质**：补的是**证据**，实现本身未改动（判定行为符合卡内"缺失即不足"）。
