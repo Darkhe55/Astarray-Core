@@ -45,3 +45,25 @@
 - 本表**未改任何代码**，只做定性；
 - `替代` 与 `未来` 两类明确**不做接线**，避免重复实现与范围扩张；
 - `返修` 9 项按公开库既有纪律逐项施工（先写反例、再实现、跑定向 + 全量、按显式路径提交）。
+
+## 分类修正（2026-11-11，第 41–45 轮实测）
+
+对"返修 9 项"逐项核实"**是否存在可达的生产路径**后，发现一类被误分类的项：
+
+| 项 | 原分类 | 实测 | 新分类 |
+|---|---|---|---|
+| `QuaternaryPermissionIntersectionGuard` | 返修 | `createQuaternaryAgent` **0 个调用方** ⇒ 四级生命周期整体不在生产路径 | **未接入（无执行路径）**，待产品确认范围 |
+| `BoundedProviderFallbackGuard` | 返修 | 运行时按单一 provider 构造；`runtime/` 下无任何 fallback 链路 ⇒ `guardFallbackAttempt` 无调用方 | **未接入（无 fallback 执行路径）**，属新功能而非接线 |
+
+**判别标准（新增，避免继续误分类）**：
+
+```text
+"返修"必须同时满足：
+  ① 该能力被某张已验收卡要求；
+  ② 存在**已经运行**的生产路径，只是没接上这一步。
+若整条路径都不存在（如四级生命周期、provider fallback），
+则它是"功能未构建"，应走产品范围决策，不能按接线返修处理。
+```
+
+**保留的返修项**（仍需逐项核 ①②）：`SecondaryAgentSessionController`、`TertiaryAgentAssignmentPlanner`、
+`TertiarySingleChainExecutionGuard`、`AnthropicMessagesAdapter`/`OpenAiResponsesAdapter` 等适配器类（多为"未注册"而非"路径不存在"）。
