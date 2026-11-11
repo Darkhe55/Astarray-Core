@@ -35,6 +35,7 @@ import {
 } from "../orchestration/coordination-partition-lease.js";
 import { CoordinationStateTransactionStore } from "../orchestration/coordination-state-transaction.js";
 import { CoordinationRetryStore } from "../orchestration/coordination-retry-store.js";
+import { CoordinationWakeCoordinator } from "../orchestration/coordination-wake-coordinator.js";
 import { TaskChainCumulativeBudgetController } from "../orchestration/task-chain-cumulative-budget.js";
 import {
   createDefaultGitCommandRunner,
@@ -306,6 +307,20 @@ export interface ApplicationRuntime {
   coordinationMailboxJournal: MailboxJournal;
   coordinationMessageConsumer: CoordinationMessageConsumer;
   coordinationRetryStore: CoordinationRetryStore;
+  coordinationWakeCoordinator: CoordinationWakeCoordinator;
+  /**
+   * COORD-01-02 §4.5：消费完消息后**重算 ready set**（唤醒是可重复信号，不直接派发）。
+   * ready-set 的来源由调用方注入（调度器始终是唯一权威，不在协调器里复制一套选择逻辑）。
+   */
+  recomputeCoordinationReadySet: (input: {
+    partitionKey?: string;
+    selectReadyTasks: () => Promise<readonly string[]>;
+  }) => Promise<{
+    isRecomputed: boolean;
+    pendingWakeCount: number;
+    consumedWakeCount: number;
+    selection: readonly string[] | null;
+  }>;
   /** COORD-01-02 §3：三状态只读查询（delivery / application / context 分开返回）。 */
   readCoordinationMessageStatus: (
     messageIdentifier?: string,
@@ -1102,6 +1117,9 @@ export async function createApplicationRuntime(
     stateStore: coordinationStateStore,
     retryStore: coordinationRetryStore,
     nowUnixMilliseconds: () => Date.now(),
+  });
+  const coordinationWakeCoordinator = new CoordinationWakeCoordinator({
+    stateStore: coordinationStateStore,
   });
   const coordinationPartitionKey = buildCoordinationPartitionKey({
     projectIdentifier: options.projectIdentifier ?? "workspace",
@@ -4746,6 +4764,15 @@ export async function createApplicationRuntime(
     coordinationMailboxJournal,
     coordinationMessageConsumer,
     coordinationRetryStore,
+    coordinationWakeCoordinator,
+    recomputeCoordinationReadySet: async (input: {
+      partitionKey?: string;
+      selectReadyTasks: () => Promise<readonly string[]>;
+    }) =>
+      await coordinationWakeCoordinator.recomputeIfWakePending({
+        partitionKey: input.partitionKey ?? coordinationPartitionKey,
+        selectReadyTasks: input.selectReadyTasks,
+      }),
     readCoordinationMessageStatus: async (messageIdentifier?: string) =>
       await coordinationMailboxJournal.readMessageStatusView({
         recipientId: `agent:${options.mainAgentInstanceId ?? "main-agent"}`,

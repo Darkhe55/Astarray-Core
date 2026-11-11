@@ -31,6 +31,8 @@ export interface CoordinationPartitionStateDocument {
   readonly appliedMessages: readonly AppliedMessageRecord[];
   /** 待唤醒标志：可重复消费的"重算 ready set"信号计数。 */
   readonly pendingWakeCount: number;
+  /** 已消费的唤醒计数（用于判断"是否有新唤醒待处理"，不删除历史）。 */
+  readonly consumedWakeCount?: number;
 }
 
 export type CoordinationApplyOutcome =
@@ -151,6 +153,18 @@ export class CoordinationStateTransactionStore {
     };
     await this.writeState(created);
     return created;
+  }
+
+  /** 记录唤醒已被消费到某个计数（只推进、不回退）。 */
+  async markWakeConsumed(input: {
+    partitionKey: string;
+    wakeCount: number;
+  }): Promise<void> {
+    const existing = await this.readState(input.partitionKey);
+    if (existing === null) return;
+    const currentConsumed = existing.consumedWakeCount ?? 0;
+    if (input.wakeCount <= currentConsumed) return;
+    await this.writeState({ ...existing, consumedWakeCount: input.wakeCount });
   }
 
   /**

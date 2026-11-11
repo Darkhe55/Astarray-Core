@@ -67,7 +67,7 @@
 | 检查点 | 必须交付 | 状态 |
 |---|---|---|
 | COORD-01-01 | 原接口→生产调用方→持久状态→消费方对账表；冻结信封/三状态；核实 EVENT 卡冲突状态，以源码证据纠正 | **对账表已交付（2026-11-11）**：[COORD01_01_ALIGNMENT_TABLE_2026-11-11.md](../reports/COORD01_01_ALIGNMENT_TABLE_2026-11-11.md)。EVENT 独立卡不存在（4 处引用已列出）待确认 |
-| COORD-01-02 | 反馈可靠接收→状态幂等更新→调度重评估；分区、租约、短事务、失败恢复及查询入口 | pending |
+| COORD-01-02 | 反馈可靠接收→状态幂等更新→调度重评估；分区、租约、短事务、失败恢复及查询入口 | **implemented-unverified（2026-11-11）**：分区租约+fencing、短事务（幂等/CAS/待唤醒）、消费步、持久退避、三状态查询、唤醒→重算 ready set 均已接线并有反例；待人测 |
 | COORD-01-03 | 稳定重试身份、执行/产物版本、交办回执释放窗口、控制旁路与上下文准入接线 | pending |
 | COORD-01-04 | 故障注入、并发/权限回归、真实应用入口和 tarball 隔离验证，更新相关卡状态与证据索引 | pending |
 
@@ -228,3 +228,16 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 **用例 1 条（装配）**：经运行时入口查询，应用前 `pending`、消费步应用后 `applied`。
 
 **COORD-01-02 只剩一项**：`isWakeRequested` → **真实 ready-set 重算**接线（卡 §4.5）。
+
+### COORD-01-02 收口（2026-11-11 目标轮 7）：唤醒 → 重算 ready set
+
+| 交付 | 说明 |
+|---|---|
+| `CoordinationStateTransactionStore.markWakeConsumed` | 已消费唤醒计数**只推进不回退**，持久化 |
+| `CoordinationWakeCoordinator.recomputeIfWakePending` | 有**新**唤醒才重算；**重算只读、不派发**（派发仍走既有租约与幂等接口）；重算抛错时**不推进计数**，下一轮重试 |
+| 接线 | `runtime.coordinationWakeCoordinator` + `runtime.recomputeCoordinationReadySet({selectReadyTasks})`；ready-set 来源由调度器注入，**不在协调器里复制一套选择逻辑** |
+
+**用例 5 条**：无唤醒不重算 / 有新唤醒重算一次并推进计数 / 同一唤醒重复调用不重算（幂等）/
+**重算抛错不推进计数并能重试** / 重启后计数保留不重复消费。加 1 条装配层集成（消费→重算一次→再调不重算）。
+
+**CHECKPOINT 状态**：COORD-01-02 → **implemented-unverified**（全部子项已接线且有反例；人工验收未做）。

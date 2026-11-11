@@ -54,6 +54,46 @@ describe("本地协调器装配接线", () => {
     }
   }, 60_000);
 
+  it("⑤ 唤醒 → 重算 ready set：应用一次后重算一次，再调用不重复重算", async () => {
+    const runtime = await createRuntime();
+    try {
+      await runtime.coordinationMailboxJournal.enqueue({
+        protocolVersion: 1,
+        messageId: "message-wake-1",
+        source: { sourceType: "agent", agentInstanceId: "worker-1" },
+        recipientId: "agent:main-agent-1",
+        priority: "state",
+        createdAtIso: "2026-11-11T00:00:00.000Z",
+        idempotencyKey: "message-wake-1",
+        projectIdentifier: "project-alpha",
+        taskIdentifier: "T-001",
+        payload: { kind: "success", summary: "完成" },
+      } as never);
+
+      const consumption = await runtime.coordinationMessageConsumer.runConsumptionStep({
+        partitionKey: runtime.coordinationPartitionKey,
+        recipientId: "agent:main-agent-1",
+        ownerInstanceIdentifier: "main-agent-1",
+        leaseTtlMilliseconds: 60_000,
+        toSnapshot: (message) => ({ appliedMessage: message.messageId }),
+      });
+      expect(consumption.isWakeRequested).toBe(true);
+
+      const firstRecompute = await runtime.recomputeCoordinationReadySet({
+        selectReadyTasks: async () => ["T-001"],
+      });
+      expect(firstRecompute.isRecomputed).toBe(true);
+      expect(firstRecompute.selection).toEqual(["T-001"]);
+
+      const secondRecompute = await runtime.recomputeCoordinationReadySet({
+        selectReadyTasks: async () => ["T-001"],
+      });
+      expect(secondRecompute.isRecomputed).toBe(false);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
+
   it("④ 三状态查询：应用前 pending、应用后 applied（经运行时入口）", async () => {
     const runtime = await createRuntime();
     try {
