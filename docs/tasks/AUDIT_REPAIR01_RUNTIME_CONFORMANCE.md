@@ -624,3 +624,17 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 **仍缺（正向路径）**：已分配 + 已激活 ⇒ 提案真的落盘。该路径需要在隔离包里控制**任务子集**
 （由规划器输出决定），而规划器同样走 Provider —— 需要 fake server 同时扮演规划器返回
 `toolNames: ["proposeGoal"]`。这是下一步，**未做完不宣称 05-3 完成**。
+
+#### 05-3 第三条闭环（正向）：**已能区分规划器请求，但未推进到 worker**
+
+本轮进展：
+
+- fake server 现在按请求特征分流：`tools` 为空且 system 含"任务分解器" ⇒ **规划器请求**，
+  返回任务分解 JSON（节点 `toolNames: ["proposeGoal"]`）；其余 ⇒ worker 请求，返回 `tool_use: proposeGoal`。
+- 实测（`--propose-goal --planning`）：规划器确实被调用（1 次请求），但**之后没有 worker 请求**。
+
+⇒ 任务分解**没有被编排器采用**（或采用后未派发），因此正向路径仍不通。
+
+**下一步（下一轮第一步）**：确认分解 JSON 的**必填字段与校验规则**（`taskDecompositionDraftProvider`
+的返回契约），很可能是字段缺失导致整批分解被丢弃；确认后用正确形状重跑。
+**未完成前不宣称 05-3 闭环完成**。

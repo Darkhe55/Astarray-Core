@@ -52,6 +52,40 @@ const server = http.createServer((request, response) => {
     response.writeHead(200, { "content-type": "text/event-stream" });
     const send = (payload) => response.write(`data: ${JSON.stringify(payload)}\n\n`);
     const isProposeGoalMode = process.argv.includes("--propose-goal");
+    let parsedRequestBody = null;
+    try {
+      parsedRequestBody = JSON.parse(body);
+    } catch {
+      parsedRequestBody = null;
+    }
+    /** 规划器请求：`tools` 为空且 system 提到"任务分解器"（与 worker 请求可区分）。 */
+    const isPlannerRequest =
+      parsedRequestBody !== null &&
+      Array.isArray(parsedRequestBody.tools) &&
+      parsedRequestBody.tools.length === 0 &&
+      JSON.stringify(parsedRequestBody.system ?? "").includes("任务分解器");
+    if (isPlannerRequest) {
+      const decomposition = JSON.stringify({
+        nodes: [
+          {
+            id: "T-001",
+            description: "提议目标",
+            dependsOn: [],
+            acceptanceCriteria: "提案落盘",
+            toolNames: ["proposeGoal"],
+          },
+        ],
+      });
+      const escapedText = JSON.stringify(decomposition);
+      send({ type: "message_start", message: { usage: { input_tokens: 3 } } });
+      send({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } });
+      send({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: decomposition } });
+      send({ type: "content_block_stop", index: 0 });
+      send({ type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 20 } });
+      send({ type: "message_stop" });
+      response.end();
+      return;
+    }
     send({ type: "message_start", message: { usage: { input_tokens: 3 } } });
     if (isProposeGoalMode) {
       /** 返回 tool_use：proposeGoal（模拟模型要求写提案）。 */
@@ -113,6 +147,7 @@ try {
     mode: "assist",
     stateDirectory,
     authenticatedUserId: "user-1",
+    ...(process.argv.includes("--planning") ? { isModelTaskPlanningEnabled: true } : {}),
     runtime: "provider",
     providerRuntimeRegistry: registry,
     provider: {
@@ -171,6 +206,24 @@ try {
     if (proposalFileNames.length > 0) {
       console.error("③ 未分配却写入了提案：", proposalFileNames.join(", "));
       failureCount += 1;
+    }
+  }
+  if (process.argv.includes("--dump-bodies")) {
+    for (const [index, request] of receivedRequests.entries()) {
+      let parsed = null;
+      try {
+        parsed = JSON.parse(request.body);
+      } catch {
+        parsed = null;
+      }
+      const systemText = typeof parsed?.system === "string" ? parsed.system : JSON.stringify(parsed?.system ?? null);
+      const toolNames = Array.isArray(parsed?.tools) ? parsed.tools.map((tool) => tool?.name) : [];
+      const firstUser = Array.isArray(parsed?.messages)
+        ? JSON.stringify(parsed.messages[0]?.content ?? "").slice(0, 120)
+        : "";
+      console.log(
+        `#${String(index)} tools=[${toolNames.join(",")}] system=${String(systemText).slice(0, 100)} first=${firstUser}`,
+      );
     }
   }
   await facade.shutdown?.().catch(() => undefined);
