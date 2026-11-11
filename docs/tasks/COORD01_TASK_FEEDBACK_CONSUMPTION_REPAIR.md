@@ -144,3 +144,19 @@
 
 **下一步**：实现"接收入库 → 短事务内 CAS 更新权威状态 → 记 applied + 置待唤醒标志"，并在事务内先
 `assertIsCurrentOwner`（这才是 fencing 生效处），随后接调度重评估。
+
+### COORD-01-02 进展（2026-11-11 目标轮 2）：短状态事务（fencing + 幂等 + CAS + 待唤醒）
+
+| 交付 | 说明 |
+|---|---|
+| `CoordinationStateTransactionStore.applyMessage` | 顺序固定：① `assertIsCurrentOwner` → ② 幂等（同 `messageIdentifier` 复用结论）→ ③ CAS（`expectedStateVersion` 不符 ⇒ `stale`）→ ④ 状态与幂等记录**同一次原子写**，并 `pendingWakeCount + 1` |
+| `ensurePartitionState` / `readState` | 分区状态持久化（`schemaVersion`、`stateVersion`、`snapshot`、`appliedMessages`、`pendingWakeCount`） |
+| `readPendingWakeCount` | 唤醒是**可重复信号**（只读、不清零），对应卡 §4.5"重算 ready set 而非再启动一次任务" |
+
+**反例 5 条**：① 首次应用 applied + 唤醒计 1；② 同消息重复投递 ⇒ `idempotent-replay` 且**唤醒不重复计**；
+③ 版本不符 ⇒ `stale` 且状态不变；④ **旧 fencing token ⇒ `not-owner`**（事务内先校验所有权）；
+⑤ 崩溃恢复：新实例读回 `appliedMessages` 与唤醒计数，重放不重复应用。
+
+**仍未接线**：协调器尚未由反馈进程/应用装配调用（当前是两个可组合原语 + 用例）。
+⇒ **COORD-01-02 仍 pending**。下一步：把"入库消息 → applyMessage → 重算 ready set"接进真实消费路径，
+并补失败退避（1/2/4/8/16 秒、单轮最多 5 次、持久计数）与三状态查询入口。
