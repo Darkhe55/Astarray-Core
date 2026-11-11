@@ -156,7 +156,12 @@ export function readDiagnosticPageFromFile(options: ReadDiagnosticPageFromFileOp
 
   const fileDescriptor = openSync(options.filePath, "r");
   try {
-    const fileSize = fstatSync(fileDescriptor).size;
+    const fileStats = fstatSync(fileDescriptor);
+    /** 路径存在但不是普通文件（例如被目录占用）⇒ 视为源损坏，交由上层报错。 */
+    if (!fileStats.isFile()) {
+      throw new Error("diagnostic-source-unavailable");
+    }
+    const fileSize = fileStats.size;
     if (cursor.byteOffset >= fileSize) {
       return {
         records: [],

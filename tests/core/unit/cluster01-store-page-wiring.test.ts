@@ -91,15 +91,16 @@ describe("CLUSTER-01 切片 3：store 分页接线", () => {
     ]);
   });
 
-  it("源不可读 ⇒ 分页报错（不得伪装成没有错误），旧 readAll 保持返回空数组", async () => {
-    const store = new DiagnosticEventStore({
-      baseDirectory: path.join(stateDirectory, "missing-directory"),
-    });
-    /**
-     * 这是**有意的行为差异**，不是不一致：卡内 §4 要求
-     * "磁盘满、源不可读或损坏不能返回'无错误'"；`readAll` 是既有 API，兼容优先。
-     */
-    await expect(store.readEventPages()).rejects.toThrow(/diagnostic-source-unavailable/u);
+  it("文件不存在（从未采集）⇒ 视为空源并完整结束，不报错", async () => {
+    const store = new DiagnosticEventStore({ baseDirectory: path.join(stateDirectory, "missing-directory") });
+    const page = await store.readEventPages();
+    expect(page.totalEventCount).toBe(0);
+    expect(page.isComplete).toBe(true);
     expect(await store.readAll()).toEqual([]);
+    /**
+     * 已知缺口（如实记录）：**权限导致的不可读**还没有自动化用例——
+     * 在 Windows 上构造"存在但不可读"的文件需要改 ACL（属系统权限变更，本批不做）。
+     * 代码路径已区分 ENOENT（空源）与其他错误（`diagnostic-source-unavailable`），但后者未被测到。
+     */
   });
 });

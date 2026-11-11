@@ -25,6 +25,7 @@ import { WorkspaceBoundary } from "../tools/workspace-boundary.js";
 import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
+import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
 import { MainController } from "../orchestration/main-controller.js";
 // OBS-01／PERF-01-02（第 83 轮）：性能样本落库（此前只在生产里被构造用于"查询"）
 import { PerfEventStore } from "../orchestration/perf-event-store.js";
@@ -271,6 +272,11 @@ import {
 
 export interface ApplicationRuntime {
   controller: MainController;
+  /**
+   * CLUSTER-01（2026-11-11）：诊断聚类服务。**默认关闭**；
+   * 关闭时服务本身可用但一律返回 `disabled`，不产生任何副作用。
+   */
+  diagnosticClusterService: DiagnosticClusterService;
   missionManager: MissionManager;
   taskStore: TaskStore;
   supervisor: FeedbackProcessSupervisor | null;
@@ -726,6 +732,11 @@ export interface ApplicationRuntimeOptions {
    * **执行前拒绝与取消不会被上报**（卡内硬约束）。缺省关 ⇒ 不擅自改变生产行为。
    */
   isDiagnosticCollectionEnabled?: boolean;
+  /**
+   * CLUSTER-01：**实验性诊断聚类**开关。默认关闭；
+   * 与 `isDiagnosticCollectionEnabled` **是两个独立开关**——开启聚类不得偷偷开启采集。
+   */
+  isDiagnosticClusteringEnabled?: boolean;
   /** G2（第 130 轮）：活锁/循环守卫开关。**缺省 false**（不擅自改默认行为）。 */
   isProgressGuardEnabled?: boolean;
   /** G2（第 162 轮）：任务链总调用预算（缺省 undefined ⇒ 200，**默认行为不变**）。 */
@@ -4552,6 +4563,12 @@ export async function createApplicationRuntime(
     startupRecoveryReportStore.readReport();
 
   return {
+    diagnosticClusterService: new DiagnosticClusterService({
+      store: new DiagnosticEventStore({ baseDirectory: options.stateDirectory }),
+      stateDirectory: options.stateDirectory,
+      algorithmVersion: "diagnostic-cluster-v1",
+      isEnabled: options.isDiagnosticClusteringEnabled === true,
+    }),
     scanStartupRecovery,
     runStartupRecovery,
     readStartupRecoveryReport,

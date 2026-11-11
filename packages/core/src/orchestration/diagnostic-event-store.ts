@@ -214,9 +214,16 @@ export class DiagnosticEventStore {
             ? {}
             : { maximumLineBytesPerLine: input.maximumLineBytesPerLine }),
         });
-      } catch {
-        /** 源不可读不得伪装成"没有错误"：调用方据此报告 source-unavailable。 */
-        throw new Error("diagnostic-source-unavailable");
+      } catch (error) {
+        /**
+         * 区分两种情况（卡内要求"无数据"与"采集未开启"分别报告）：
+         * - 文件**不存在** ⇒ 从未采集过数据，返回空且完整（不是错误）；
+         * - 文件**不可读**（权限/IO/是目录）⇒ 必须报错，不得伪装成"没有错误"。
+         */
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          return { pages: [], nextCursor: cursor, isComplete: true, discardedLineCount, totalEventCount };
+        }
+        throw new Error("diagnostic-source-unavailable", { cause: error });
       }
       const events: DiagnosticEvent[] = [];
       for (const record of page.records) {

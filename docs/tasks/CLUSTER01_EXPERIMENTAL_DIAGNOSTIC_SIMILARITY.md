@@ -204,3 +204,22 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **尚未接线（下一轮必做）**：`application-runtime` 的 `isDiagnosticClusteringEnabled` 选项与返回对象字段、
 `public-sdk` 的公开导出与门面方法、以及"从真实装配入口可达"的集成用例。
+
+### 切片 8b：**装配接线完成**（§5）——已交付
+
+- `application-runtime.ts`：新增选项 `isDiagnosticClusteringEnabled`（**缺省关**，与 `isDiagnosticCollectionEnabled` 是**两个独立开关**），
+  并在 `ApplicationRuntime` 返回对象与接口中加入 `diagnosticClusterService`。
+- 集成用例 `tests/core/integration/cluster01-assembly-wiring.test.ts`（经 **`createApplicationRuntime`**）：
+  - 缺省关闭 ⇒ 服务存在但 `readLatest` 返回 `disabled`，且 `analysis/` 目录**不存在**（零副作用）；
+  - 开启 ⇒ 未构建前 `no-snapshot`；构建后 `isComplete` 且 `findRelated` 返回 `ready`。
+
+**顺带修正的语义**（此前会误报）：
+`readEventPages` 原先把"文件不存在"也当成 `diagnostic-source-unavailable` 抛错，
+导致**从未采集数据的项目**被报成"源不可用"。现区分：
+文件不存在 ⇒ 空源且完整（"无数据"）；其他读取错误 ⇒ 抛错（"不可读"）。
+
+**已知缺口（如实记录）**：
+"存在但不可读（权限）"这一分支**没有自动化用例**——在 Windows 上构造它需要改 ACL（属系统权限变更，本批不做）。
+
+**仍未做**：`public-sdk` 公开导出与门面方法、工具与权限入口（统一工具层）、用户纠正记录、
+"每批让出事件循环"的显式调度。
