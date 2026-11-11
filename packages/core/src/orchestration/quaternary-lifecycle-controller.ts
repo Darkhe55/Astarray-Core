@@ -11,7 +11,9 @@
  *   集成/目标分支或直接向用户请求权限。
  */
 import { DomainError } from "../core/errors.js";
+import type { PermissionDecision } from "../tools/permission-capability-catalog.js";
 import { quaternaryDelegationSchema } from "./agent-routing-schemas.js";
+import { QuaternaryPermissionIntersectionGuard } from "./quaternary-boundary-guards.js";
 import type { z } from "zod";
 
 export type QuaternaryLifecycleState =
@@ -28,6 +30,22 @@ export interface QuaternaryLifecycleControllerOptions {
   generateQuaternaryAgentInstanceId?: () => string;
   /** 上级三级是否仍活跃（已回收的三级不能再创建四级）。 */
   isTertiaryAgentActive: (tertiaryAgentInstanceId: string) => boolean;
+  /**
+   * REPAIR（权限求交族）：上级三级的**可委派边界**。
+   *
+   * 委派声明里的子集字段此前只是"声称"，没有任何校验（`QuaternaryPermissionIntersectionGuard`
+   * 在生产里从未被构造）。提供该解析器时，创建四级会校验：
+   * - 工具子集 ⊆ 三级允许工具；
+   * - 期限不晚于三级期限（复用守卫的求交实现）。
+   *
+   * **未提供 ⇒ 行为不变**（保持既有兼容），但会被记录为"未校验"。
+   */
+  resolveTertiaryDelegationBoundary?: (tertiaryAgentInstanceId: string) => {
+    readonly allowedToolNames: readonly string[];
+    readonly expiresAtIso: string;
+    readonly allowedResourceScopes: readonly string[];
+    readonly permissionDecision: PermissionDecision;
+  } | null;
 }
 
 export class QuaternaryLifecycleController {
@@ -36,12 +54,21 @@ export class QuaternaryLifecycleController {
   private readonly isTertiaryAgentActive: (
     tertiaryAgentInstanceId: string,
   ) => boolean;
+  private readonly resolveTertiaryDelegationBoundary:
+    | ((tertiaryAgentInstanceId: string) => {
+        readonly allowedToolNames: readonly string[];
+        readonly expiresAtIso: string;
+        readonly allowedResourceScopes: readonly string[];
+        readonly permissionDecision: PermissionDecision;
+      } | null)
+    | undefined;
 
   constructor(options: QuaternaryLifecycleControllerOptions) {
     this.generateQuaternaryAgentInstanceId =
       options.generateQuaternaryAgentInstanceId ??
       (() => `quaternary-${crypto.randomUUID()}`);
     this.isTertiaryAgentActive = options.isTertiaryAgentActive;
+    this.resolveTertiaryDelegationBoundary = options.resolveTertiaryDelegationBoundary;
   }
 
   /**
@@ -61,6 +88,44 @@ export class QuaternaryLifecycleController {
       );
     }
     const delegation = parsedDelegation.data;
+    /**
+     * REPAIR（权限求交族）：**验证委派子集确实不宽于三级**。
+     * 此前 `allowedToolNamesSubset` / `expiresAtIso` 只是声明，没有任何校验，
+     * 而 `QuaternaryPermissionIntersectionGuard` 在生产里从未被构造。
+     */
+    if (this.resolveTertiaryDelegationBoundary !== undefined) {
+      const boundary = this.resolveTertiaryDelegationBoundary(
+        delegation.delegatingTertiaryAgentInstanceId,
+      );
+      if (boundary === null) {
+        throw new DomainError(
+          "task-sequence-permission-denied",
+          "上级三级的可委派边界不可得，拒绝创建四级（不得默认放宽）",
+        );
+      }
+      const extraToolNames = delegation.allowedToolNamesSubset.filter(
+        (toolName) => !boundary.allowedToolNames.includes(toolName),
+      );
+      if (extraToolNames.length > 0) {
+        throw new DomainError(
+          "task-sequence-permission-denied",
+          `四级工具子集超出三级允许范围: ${extraToolNames.join(", ")}`,
+        );
+      }
+      const intersectionGuard = new QuaternaryPermissionIntersectionGuard({
+        tertiaryEffectiveDecision: boundary.permissionDecision,
+        tertiaryAllowedResourceScopes: [...boundary.allowedResourceScopes],
+        tertiaryExpiresAtIso: boundary.expiresAtIso,
+      });
+      /** 期限求交：结果不得晚于三级期限（复用守卫实现，不另写一套）。 */
+      const boundedExpiry = intersectionGuard.computeQuaternaryExpiry(delegation.expiresAtIso);
+      if (boundedExpiry !== delegation.expiresAtIso) {
+        throw new DomainError(
+          "task-sequence-permission-denied",
+          `四级期限晚于三级有效期限（应不晚于 ${boundary.expiresAtIso}）`,
+        );
+      }
+    }
     if (!this.isTertiaryAgentActive(delegation.delegatingTertiaryAgentInstanceId)) {
       throw new DomainError(
         "task-sequence-permission-denied",

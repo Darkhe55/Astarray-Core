@@ -313,3 +313,20 @@
 ③求交结果存哪（生命周期记录？会话状态？）。
 三个都需要先读 `QuaternaryLifecycleRecord` 与派发路径，否则就是"接上去但语义错"。
 **下一轮第一步**：读 `quaternary-lifecycle-controller.ts` 的记录结构与 `main-controller` 的派发入口。
+
+## 返修进展（第 42 轮）：四级委派**子集校验已接**（求交族第 1 步）
+
+`QuaternaryLifecycleController` 新增可选 `resolveTertiaryDelegationBoundary`；提供时创建四级会校验：
+
+| 校验 | 处理 |
+|---|---|
+| 工具子集 ⊆ 三级允许工具 | 超出 ⇒ `task-sequence-permission-denied`（列出越界工具） |
+| 期限不晚于三级 | 用 `QuaternaryPermissionIntersectionGuard.computeQuaternaryExpiry` 求交，结果不同 ⇒ 拒绝 |
+| 边界解析返回 `null` | **拒绝**（不得默认放宽） |
+
+4 条用例：越界工具被拒、过期期限被拒、边界不可得被拒、合法子集创建成功。
+
+**仍未做**：
+- `resolveTertiaryDelegationBoundary` 尚未从装配层注入（当前只有控制器支持，**未注入 ⇒ 不校验**）；
+- `allowedResourceScopes` / `permissionDecision` 的求交校验还没接到创建流程（本轮只用了期限那一条）；
+- 三级求交（`TertiaryPermissionDelegationGuard`）本身仍无生产调用方。
