@@ -113,6 +113,21 @@ describe("沟通转交：投递前复检", () => {
     ).toThrow();
   });
 
+  it("⑥ **跨任务（mission 不同）** ⇒ 投递被拒，不得借他人句柄投递", () => {
+    const controller = buildController();
+    const grant = createGrant(controller) as { communicationHandleIdentifier: string; revision?: number };
+    expect(() =>
+      controller.assertDeliverable({
+        communicationHandleIdentifier: grant.communicationHandleIdentifier,
+        senderAgentInstanceId: "secondary-2",
+        messageType: "report",
+        missionId: "mission-2",
+        currentProfileRevision: grant.revision as number,
+        context: aliveContext,
+        currentInFlightMessages: 0,
+      } as never),
+    ).toThrow();
+  });
   it("⑤ 已到期 ⇒ 投递被拒", () => {
     const controller = buildController(1_700_000_000_000);
     const grant = createGrant(controller, { expiresAtIso: "2023-11-14T00:00:00.000Z" }) as {
