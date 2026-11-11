@@ -35,6 +35,14 @@ export interface CollaborationInboxMessage {
   /** 是否经上级转达（不是直属上级原创指令）。 */
   readonly isRelayedRequest: boolean;
   readonly taskIdentifier: string;
+  /**
+   * COMM-01-02 修正：**回复所依据的原任务产物**（可选）。
+   * 无产物的回复（口头确认）仍然合法。
+   */
+  readonly artifactReferences?: ReadonlyArray<{
+    readonly artifactIdentifier: string;
+    readonly revision: number;
+  }>;
   readonly summary: string;
   readonly receivedAtIso: string;
   /** 入箱时的授权代（授权撤销/关系变更后旧代消息不得投递）。 */
@@ -118,6 +126,11 @@ export class CollaborationInbox {
     readonly isRelayedRequest?: boolean;
     readonly authorizationEpoch?: number;
     readonly relayChain?: CollaborationRelayChain;
+    /** COMM-01-02 修正：回复携带的原任务产物引用（可选）。 */
+    readonly artifactReferences?: ReadonlyArray<{
+      readonly artifactIdentifier: string;
+      readonly revision: number;
+    }>;
   }): CollaborationInboxEnqueueResult {
     for (const field of [
       input.messageIdentifier,
@@ -133,6 +146,31 @@ export class CollaborationInbox {
           message: null,
           receipt: null,
           reason: "消息缺少必填标识（message/correlation/recipient/sender/task）。",
+        };
+      }
+    }
+
+    /**
+     * COMM-01-02 修正：产物引用必须可用——空标识或非法 revision 一律拒收，
+     * 不允许"带了一个占位产物"蒙混过关（那会让回复看起来有依据，实际没有）。
+     */
+    for (const reference of input.artifactReferences ?? []) {
+      if (reference.artifactIdentifier.trim() === "") {
+        return {
+          outcome: "rejected-invalid",
+          isDuplicate: false,
+          message: null,
+          receipt: null,
+          reason: "产物引用缺少 artifactIdentifier。",
+        };
+      }
+      if (!Number.isInteger(reference.revision) || reference.revision < 1) {
+        return {
+          outcome: "rejected-invalid",
+          isDuplicate: false,
+          message: null,
+          receipt: null,
+          reason: "产物引用的 revision 必须是正整数。",
         };
       }
     }
@@ -198,6 +236,9 @@ export class CollaborationInbox {
       originalSourceAgentInstanceId: input.originalSourceAgentInstanceId ?? input.senderAgentInstanceId,
       isRelayedRequest: input.isRelayedRequest ?? false,
       taskIdentifier: input.taskIdentifier,
+      ...(input.artifactReferences === undefined
+        ? {}
+        : { artifactReferences: input.artifactReferences }),
       summary: input.summary,
       receivedAtIso: input.receivedAtIso,
       authorizationEpoch: input.authorizationEpoch ?? 0,

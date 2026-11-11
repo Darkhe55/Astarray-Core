@@ -430,3 +430,19 @@ COMM-01-02 目前已完成并可交付的部分：
 （同毫秒不同指令键不同 / 键与时间无关 / 键含 mission 与消息标识 / 空 mission 拒绝 / 空消息标识拒绝）。
 
 **仍未做**："同一指令跨重试只入队一次"需要**上游提供指令标识**（当前由框架每次生成新消息标识），属后续切片。
+
+### 修正落地 ②：回复绑定**原任务产物**（2026-11-11）
+
+用户指出："回复应该确实带上绑定原任务产物的信息"。核对后确认载荷原来**只有 `taskIdentifier`**，无产物引用。
+
+**交付**：
+
+| 位置 | 变更 |
+|---|---|
+| `core/types.ts` `FeedbackMessagePayload.collaboration-request` | 新增可选 `artifactReferences?: Array<{ artifactIdentifier, revision }>` |
+| `collaboration-inbox.ts` | 消息类型与 `enqueue` 入参新增可选 `artifactReferences`；**入箱校验**：空 `artifactIdentifier`、非正整数 `revision` ⇒ `rejected-invalid` |
+| `collaboration-feedback-mapping.ts` | 透传进反馈载荷 |
+
+**反例（4 条，全绿）**：空产物标识拒收 / revision=0 拒收 / **无产物回复仍合法**（向后兼容）/ 合法产物保留并透传。
+
+**边界**：本轮只做"携带与校验"。**未做**"接收方按产物 revision 核对是否陈旧"（需先定陈旧判定口径）。

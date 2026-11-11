@@ -46,6 +46,15 @@ export function buildCollaborationFeedbackMessage(input: {
     messageIdentifier: input.message.messageIdentifier,
     correlationIdentifier: input.message.correlationIdentifier,
     taskIdentifier: input.message.taskIdentifier,
+    /** COMM-01-02 修正：把原任务产物引用带到反馈载荷（接收方据此核对依据）。 */
+    ...(input.message.artifactReferences === undefined
+      ? {}
+      : {
+          artifactReferences: input.message.artifactReferences.map((reference) => ({
+            artifactIdentifier: reference.artifactIdentifier,
+            revision: reference.revision,
+          })),
+        }),
     summary: input.message.summary,
     authorizationEpoch: input.message.authorizationEpoch,
     hopCount: 0,

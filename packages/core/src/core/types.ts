@@ -406,6 +406,13 @@ export type FeedbackMessagePayload =
       messageIdentifier: string;
       correlationIdentifier: string;
       taskIdentifier: string;
+      /**
+       * COMM-01-02 修正（2026-11-11）：**回复所依据的原任务产物**。
+       *
+       * 只有 `taskIdentifier` 时，接收方知道"是哪个任务的回复"，但不知道"依据哪份产物、哪个 revision"。
+       * 可选：无产物的回复（如口头确认）仍合法，保持向后兼容。
+       */
+      artifactReferences?: Array<{ artifactIdentifier: string; revision: number }>;
       summary: string;
       authorizationEpoch: number;
       hopCount: number;
