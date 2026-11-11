@@ -51,11 +51,41 @@ const server = http.createServer((request, response) => {
     receivedRequests.push({ url: request.url ?? "", body });
     response.writeHead(200, { "content-type": "text/event-stream" });
     const send = (payload) => response.write(`data: ${JSON.stringify(payload)}\n\n`);
+    const isProposeGoalMode = process.argv.includes("--propose-goal");
     send({ type: "message_start", message: { usage: { input_tokens: 3 } } });
-    send({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } });
-    send({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ok" } });
-    send({ type: "content_block_stop", index: 0 });
-    send({ type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } });
+    if (isProposeGoalMode) {
+      /** 返回 tool_use：proposeGoal（模拟模型要求写提案）。 */
+      send({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "toolu_1", name: "proposeGoal", input: {} },
+      });
+      send({
+        type: "content_block_delta",
+        index: 0,
+        delta: {
+          type: "input_json_delta",
+          partial_json: JSON.stringify({
+            objectiveText: "把只读视图补齐到可验收",
+            requirements: [
+              {
+                requirementIdentifier: "req-1",
+                description: "视图能列出任务",
+                evidenceRequirement: "artifact",
+                weight: 1,
+              },
+            ],
+          }),
+        },
+      });
+      send({ type: "content_block_stop", index: 0 });
+      send({ type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 20 } });
+    } else {
+      send({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } });
+      send({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ok" } });
+      send({ type: "content_block_stop", index: 0 });
+      send({ type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } });
+    }
     send({ type: "message_stop" });
     response.end();
   });
@@ -123,6 +153,23 @@ try {
       typeof parsedBody.model !== "string"
     ) {
       console.error("② 请求体不是 Anthropic Messages 形态：", firstRequest.body.slice(0, 120));
+      failureCount += 1;
+    }
+  }
+  /**
+   * ③ 目标提案权限（负向）：即使模型要求 proposeGoal，未分配/未激活时**不得落盘**。
+   * 这是卡内"激活不是授权""未分配即拒绝"的包级证据。
+   */
+  if (process.argv.includes("--propose-goal")) {
+    const proposalsDirectory = path.join(stateDirectory, "goal-mode", "proposals");
+    let proposalFileNames = [];
+    try {
+      proposalFileNames = (await fs.readdir(proposalsDirectory)).filter((fileName) => fileName.endsWith(".json"));
+    } catch {
+      proposalFileNames = [];
+    }
+    if (proposalFileNames.length > 0) {
+      console.error("③ 未分配却写入了提案：", proposalFileNames.join(", "));
       failureCount += 1;
     }
   }

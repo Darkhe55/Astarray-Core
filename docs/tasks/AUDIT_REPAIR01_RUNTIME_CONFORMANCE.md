@@ -606,3 +606,21 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 注册器把 `baseUrl` 当完整端点。改为断言**请求体形态**（更接近"协议正确"的实质），才通过。
 
 **仍缺**：目标提案权限那条闭环（需要 fake server 返回 `tool_use: proposeGoal` 并配合任务子集）。
+
+#### 05-3 第三条闭环：目标提案权限（**负向路径**已在隔离包内跑通，2026-11-11）
+
+同一脚本加 `--propose-goal`：fake server 返回 `tool_use: proposeGoal`（含合法提案参数）。
+
+实测：
+
+| 断言 | 结果 |
+|---|---|
+| fake server 收到真实请求（5 次，含工具循环） | ✅ |
+| 请求体为 Anthropic Messages 形态 | ✅ |
+| **未分配/未激活时 `goal-mode/proposals/` 无任何 `.json`** | ✅ **提案未落盘** |
+
+⇒ 包级证据支持卡内"**激活不是授权**、未分配即拒绝"。
+
+**仍缺（正向路径）**：已分配 + 已激活 ⇒ 提案真的落盘。该路径需要在隔离包里控制**任务子集**
+（由规划器输出决定），而规划器同样走 Provider —— 需要 fake server 同时扮演规划器返回
+`toolNames: ["proposeGoal"]`。这是下一步，**未做完不宣称 05-3 完成**。
