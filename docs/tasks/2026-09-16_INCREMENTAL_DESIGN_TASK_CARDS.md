@@ -150,3 +150,21 @@ readFile 增加 shouldIncludeComments 和 shouldIncludeImports，可选且默认
 - [ ] 快速检查、格式矩阵、本地保全及 GUIDE 增量分别有可执行验收样例。
 - [ ] 所有状态保持 pending，直到各检查点真实完成并产生证据。
 
+
+## 接管评估（2026-11-11，第 53 轮）
+
+按新判别标准（"返修"须有已运行生产路径）先做可达性检查，避免重复"把未构建当接线"的错误：
+
+| 组件 | 构造点 | 结论 |
+|---|---|---|
+| `TaskAccuracyVerifier` | 1 | **已构造**（不是未构建） |
+| `AccuracyPolicyStore` | 1 | 已构造 |
+| `HumanVerificationController` | 1 | 已构造 |
+
+⇒ ACCURACY 系列**不是"从未构建"**，`ACCURACY-01` 的"审计现有签收/完成链路、先证明缺口"是**有意义的工作**：
+需要确认 `TaskAccuracyVerifier` 是否真的在完成路径上被调用、空证据/部分完成是否被拒。
+
+**下一轮第一步**：定位 `TaskAccuracyVerifier` 的调用点（`git grep -n 'TaskAccuracyVerifier'`），
+判断它是"构造但未调用"还是"调用但语义不完整"，再决定是接线还是补反例。
+
+AUTH-SCOPE 系列体量更大（按模式/范围/上级裁决授权 + 迁移旧矩阵），留待 ACCURACY 有结论后再评估。
