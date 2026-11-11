@@ -725,3 +725,24 @@ EVIDENCE: <可复核引用>
 | ⑥ 合法收据 | 足够；构造出的产物数组是副本，外部修改不污染 |
 
 **性质**：补的是**证据**，实现本身未改动（判定行为符合卡内"缺失即不足"）。
+
+### 巡检轮（2026-11-12）：`IndependentReviewGate` **补测试**（此前零覆盖）
+
+系统扫描 `packages/core/src/orchestration` 下**在 `tests/` 无任何引用**的模块（共 20 个），
+其中 `independent-review-gate.ts` 是安全判定（"谁有权任命、谁有权签字、拿什么签字"）且被装配使用，
+却**零测试引用**。已补 `tests/core/unit/align03-independent-review-gate.test.ts`（9 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① 自报证据判定 | 空 / 全 `self-report:` `executor-report:` `agent-claim:`（含大写）⇒ 只有自报；混入 `test-output:` ⇒ 不算 |
+| ② 任命者自签 | 拒绝（自审被拒） |
+| ③ 验收者未登记 | 拒绝（非空字符串不是认证） |
+| ④ 验收者不属于任命次级 | 拒绝（不得借人签字） |
+| ⑤ 验收者非三级 | 拒绝 |
+| ⑥ 实现者/测试者自签裁决 | 均拒绝 |
+| ⑦ 只有自报证据 | 拒绝 |
+| ⑧ 理由空白 | 拒绝 |
+| ⑨ 合法裁决 | 通过并落盘（`merge-ready ⇒ accepted`） |
+
+**性质**：只补证据，实现未改动。**剩余未测模块 19 个**（含 `goal-gate-cache`、`main-agent-turn-budget`、
+`remote-*`（平台阻塞）、各 `*-store`），可继续按"生产路径 + 安全语义"优先级逐个补测。
