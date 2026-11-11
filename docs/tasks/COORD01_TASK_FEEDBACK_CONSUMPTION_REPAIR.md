@@ -407,3 +407,30 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 
 `df10e0c3`（上下文准入装配）与本轮提交均**未能推送**：连续 10 次 `Connection reset by 20.205.243.166 port 22`。
 按单阶段 5 次上限规则已停止重试，本地保留待下次合并推送。
+
+### COORD-01-04 进展（2026-11-11 目标轮 18）：并发/权限回归 + **tarball 隔离验证**
+
+**并发/权限回归**（`coord01-concurrency-permission-regression`，5 条）：
+① 两个独立 store 实例（模拟两进程）竞争 ⇒ 后到者 `held-by-other`；
+② **旧 fencing token 迟提交 ⇒ `not-owner`**（若两条都生效，此用例必红）；
+③ agent 来源控制事件被拒；④ 产物门禁**无解析器时 fail-closed**；⑤ 信息类不注入上下文。
+
+**包级验证**（`scripts/verify-coord01-package.mjs`）：
+tarball（`npm pack --ignore-scripts`）→ 隔离目录 `npm install` → 只 import `node_modules/astarray/dist/public-sdk.js`：
+未知消息返回空数组（不伪造）/ agent 控制被拒 / 可信控制生效 / 未知消息准入返回 `message-not-found` ⇒
+`coord01-package: ok, failures=0`。
+
+**为可达性补齐的公开入口**（此前 SDK 门面**完全没有**协调链路）：新增
+`readCoordinationMessageStatus` / `applyCoordinationControlEvent` / `admitCoordinationContext` 三个门面方法。
+消费循环（`runConsumptionStep`）**仍不对外暴露**——它属内部调度职责，包级只验证安全相关读写。
+
+### COORD-01-04 收口判定
+
+| 项 | 状态 |
+|---|---|
+| 故障注入 | ✅ |
+| 并发/权限回归 | ✅ |
+| 真实应用入口 | ✅ 经 SDK 门面可达 |
+| tarball 隔离验证 | ✅ `coord01-package: ok` |
+
+⇒ COORD-01-04 **implemented-unverified**（无人工验收）。COORD-01 四个检查点至此全部有生产接线与自动化证据。

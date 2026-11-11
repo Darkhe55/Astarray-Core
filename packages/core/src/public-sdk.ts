@@ -6085,6 +6085,38 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.runtime.reconcileMissionTask(input);
   }
+  /**
+   * COORD-01-03 §3/§5：只读查询消息三状态（delivery / application / context）。
+   * 未知消息 ⇒ 空数组（不伪造）。
+   */
+  readCoordinationMessageStatus(messageIdentifier?: string) {
+    this.assertOpen();
+    return this.runtime.readCoordinationMessageStatus(messageIdentifier);
+  }
+
+  /**
+   * COORD-01-03 §2/§5：投递可信控制事件（取消/暂停/撤权/紧急停止）。
+   * agent 来源会被拒绝——控制权不得由模型自授。
+   */
+  applyCoordinationControlEvent(event: {
+    eventIdentifier: string;
+    kind: "cancel" | "pause" | "revoke" | "emergency-stop";
+    source: { sourceKind: "user" | "system" | "agent"; sourceIdentifier: string };
+    targetMissionIdentifier: string;
+    issuedAtIso: string;
+  }) {
+    this.assertOpen();
+    return this.runtime.controlBypass.applyControlEvent({ event });
+  }
+
+  /**
+   * COORD-01-03 §5：把一条已入库消息送进上下文准入（取代模型自行判断是否需要处理）。
+   */
+  admitCoordinationContext(input: { recipientId: string; messageId: string }) {
+    this.assertOpen();
+    return this.runtime.admitCoordinationContext(input);
+  }
+
 
   /**
    * GUI-03 F01：读取通知偏好（认证用户 + 项目；未配置 ⇒ 默认值）。
@@ -8053,7 +8085,6 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
-
 
 
 
