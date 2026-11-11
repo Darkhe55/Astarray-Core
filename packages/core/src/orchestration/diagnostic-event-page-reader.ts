@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 
 /**
  * CLUSTER-01 §2/§4：**有界分页读取**端口。
@@ -120,5 +121,82 @@ export function readAllDiagnosticPages(
     pages.push(page);
     if (page.isComplete) return pages;
     cursor = page.nextCursor;
+  }
+}
+
+/**
+ * 从磁盘按**有界块**读取一页（CLUSTER-01 §4：不把整文件读进内存）。
+ *
+ * 与 `readDiagnosticPage` 的分工：本函数只负责"读多少字节"，解析与游标语义完全复用前者；
+ * 因此分页行为在文件路径与字符串路径下**必然一致**，不会出现两套边界规则。
+ *
+ * 块大小默认 1 MiB，且不小于单行上限——否则永远凑不出完整行。
+ */
+export interface ReadDiagnosticPageFromFileOptions {
+  readonly filePath: string;
+  readonly cursor?: DiagnosticPageCursor;
+  readonly limit?: number;
+  readonly maximumLineBytesPerLine?: number;
+  /** 单次从磁盘读取的最大字节数（默认 1 MiB）。 */
+  readonly maximumBytesPerRead?: number;
+}
+
+export interface DiagnosticFilePage extends DiagnosticPage {
+  /** 本页实际从磁盘读取的字节数，用于验证"不整文件读入"。 */
+  readonly bytesRead: number;
+}
+
+export function readDiagnosticPageFromFile(options: ReadDiagnosticPageFromFileOptions): DiagnosticFilePage {
+  const limit = Math.max(1, options.limit ?? DEFAULT_LIMIT);
+  const maximumLineBytes = Math.max(1, options.maximumLineBytesPerLine ?? DEFAULT_MAX_LINE_BYTES);
+  const rawReadSize = options.maximumBytesPerRead ?? 1024 * 1024;
+  /** 块必须能装下至少一整行，否则永远读不出完整行。 */
+  const readSize = Math.max(rawReadSize, maximumLineBytes + 1);
+  const cursor = options.cursor ?? { byteOffset: 0, lineNumber: 0 };
+
+  const fileDescriptor = openSync(options.filePath, "r");
+  try {
+    const fileSize = fstatSync(fileDescriptor).size;
+    if (cursor.byteOffset >= fileSize) {
+      return {
+        records: [],
+        nextCursor: cursor,
+        isComplete: true,
+        skippedOversizeLineCount: 0,
+        bytesRead: 0,
+      };
+    }
+    const buffer = Buffer.alloc(Math.min(readSize, fileSize - cursor.byteOffset));
+    const bytesRead = readSync(fileDescriptor, buffer, 0, buffer.length, cursor.byteOffset);
+    const chunk = buffer.subarray(0, bytesRead);
+
+    const hasMoreBytes = cursor.byteOffset + bytesRead < fileSize;
+    const lastNewlineIndex = chunk.lastIndexOf(0x0a);
+    /**
+     * 只有当后面还有数据时才要求"切到换行"，否则最后一段（可能无换行）会被丢掉。
+     */
+    const usableLength = hasMoreBytes && lastNewlineIndex !== -1 ? lastNewlineIndex + 1 : bytesRead;
+    /**
+     * 关键：解析器的游标是**相对传入文本**的，而这里的文本是"从文件 byteOffset 开始的一段"，
+     * 因此必须用 0 作为解析起点，再把结果平移回文件绝对偏移。
+     * （此前直接把文件偏移传进去，导致每页开头被跳过，实测丢行。）
+     */
+    const baseByteOffset = cursor.byteOffset;
+    const page = readDiagnosticPage({
+      content: chunk.subarray(0, usableLength).toString("utf8"),
+      cursor: { byteOffset: 0, lineNumber: cursor.lineNumber },
+      limit,
+      maximumLineBytesPerLine: maximumLineBytes,
+    });
+
+    return {
+      ...page,
+      records: page.records.map((record) => ({ ...record, byteOffset: record.byteOffset + baseByteOffset })),
+      nextCursor: { byteOffset: page.nextCursor.byteOffset + baseByteOffset, lineNumber: page.nextCursor.lineNumber },
+      isComplete: !hasMoreBytes && page.isComplete,
+      bytesRead,
+    };
+  } finally {
+    closeSync(fileDescriptor);
   }
 }

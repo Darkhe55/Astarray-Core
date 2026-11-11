@@ -107,3 +107,17 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **尚未做**（后续切片）：把该端口接进 `DiagnosticEventStore` 的磁盘读取路径、
 按 §4 的 2,000 条/16 MiB 总上限做节流、以及在 `readWithIntegrity` 上复用哈希校验。
+
+### 切片 2：磁盘有界分页（§4"不整文件读入"）——**已交付**
+
+- `readDiagnosticPageFromFile`：按块 `readSync`（默认 1 MiB，**下限为单行上限 + 1**），
+  解析与游标语义**完全复用** `readDiagnosticPage`，因此文件路径与字符串路径的分页行为必然一致。
+- 返回值额外带 `bytesRead`，便于断言"没有整文件读入"。
+- 测试（新增 3 条，合计 11 条）：多页跨块读与一次性解析结果**完全一致**、
+  单页字节数不超过块上限、游标越界返回空页且 `isComplete`。
+
+**过程中修掉一个真 bug**（已写进注释）：解析器的游标是**相对传入文本**的，
+而文件分页传入的是"从文件偏移开始的一段"，若直接把文件偏移当解析游标，**每页开头会被跳过**。
+实测丢行（12 行只读到 7 行），改为"以 0 解析 + 结果平移回绝对偏移"后一致。
+
+**仍未做**：接进 `DiagnosticEventStore` 的磁盘读取路径（切片 3）。

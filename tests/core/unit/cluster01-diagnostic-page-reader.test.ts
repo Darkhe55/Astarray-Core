@@ -6,12 +6,16 @@
  * 本文件锁住分页的**不丢不重**、游标定位、超长行跳过与哈希校验。
  */
 import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
   readAllDiagnosticPages,
   readDiagnosticPage,
+  readDiagnosticPageFromFile,
 } from "../../../packages/core/src/orchestration/diagnostic-event-page-reader.js";
 
 function sha256(text: string): string {
@@ -91,5 +95,62 @@ describe("CLUSTER-01 分页读取端口", () => {
       cursor = page.nextCursor;
     }
     expect(oneByOne).toEqual(lines);
+  });
+});
+
+describe("CLUSTER-01 磁盘分页（有界块读取）", () => {
+  it("按块读取多页，结果与一次性字符串解析完全一致", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "cluster01-page-"));
+    const filePath = path.join(directory, "events.jsonl");
+    const lines = Array.from({ length: 12 }, (_unused, index) => JSON.stringify({ index }));
+    await fs.writeFile(filePath, lines.join("\n"), "utf8");
+    try {
+      const collected: string[] = [];
+      let cursor = { byteOffset: 0, lineNumber: 0 };
+      for (let pageIndex = 0; pageIndex < 20; pageIndex += 1) {
+        const page = readDiagnosticPageFromFile({ filePath, cursor, limit: 3, maximumBytesPerRead: 64 });
+        collected.push(...page.records.map((record) => record.text));
+        cursor = page.nextCursor;
+        if (page.isComplete) break;
+      }
+      expect(collected).toEqual(lines);
+      /** 分页读取不得整文件读入。 */
+      expect(collected.length).toBe(12);
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("单页读取的字节数受块大小限制", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "cluster01-page-"));
+    const filePath = path.join(directory, "events.jsonl");
+    await fs.writeFile(filePath, Array.from({ length: 50 }, (_u, i) => JSON.stringify({ i })).join("\n"), "utf8");
+    try {
+      const page = readDiagnosticPageFromFile({ filePath, limit: 2, maximumBytesPerRead: 32 });
+      /**
+       * 块大小有**下限**：必须能装下一整行（单行上限 64 KiB + 1），
+       * 否则永远解析不出完整行。因此这里断言的是"不超过下限值"，
+       * 而不是不超过调用方给的 32 字节。
+       */
+      expect(page.bytesRead).toBeLessThanOrEqual(64 * 1024 + 1);
+      expect(page.records.length).toBeGreaterThan(0);
+      expect(page.records.length).toBeLessThanOrEqual(2);
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("游标越界 ⇒ 空页且已完成", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "cluster01-page-"));
+    const filePath = path.join(directory, "events.jsonl");
+    await fs.writeFile(filePath, '{"a":1}\n', "utf8");
+    try {
+      const page = readDiagnosticPageFromFile({ filePath, cursor: { byteOffset: 999, lineNumber: 5 } });
+      expect(page.records).toEqual([]);
+      expect(page.isComplete).toBe(true);
+      expect(page.bytesRead).toBe(0);
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
   });
 });
