@@ -330,3 +330,28 @@
 - `resolveTertiaryDelegationBoundary` 尚未从装配层注入（当前只有控制器支持，**未注入 ⇒ 不校验**）；
 - `allowedResourceScopes` / `permissionDecision` 的求交校验还没接到创建流程（本轮只用了期限那一条）；
 - 三级求交（`TertiaryPermissionDelegationGuard`）本身仍无生产调用方。
+
+## 返修进展（第 43 轮）：求交接线**缺少数据源**（新发现）
+
+要把 `resolveTertiaryDelegationBoundary` 从装配层注入，需要"三级 Agent 当前有效权限"的权威来源。核查结果：
+
+| 候选来源 | 实况 |
+|---|---|
+| `AgentAppointmentRegistry` 记录 | 只有 `appointmentId`/`missionIdentifier`/`boundTaskIdentifier`/风险等级等，**没有权限或工具字段** |
+| `QuaternaryLifecycleController` 自身的活跃判定 | 构造时写死 `isTertiaryAgentActive: () => true` —— **连"上级是否存活"也是假的** |
+
+⇒ 不是"少注入一行"，而是**从来没有地方记录过子 Agent 的有效权限**。
+
+**这也解释了第 41 轮的发现**：三级求交守卫从未被调用，因为没有任何数据结构能给它输入。
+
+### 三条可选路径
+
+| 方案 | 做法 | 代价 |
+|---|---|---|
+| **A**（推荐） | 任命时把"有效权限/允许工具/期限"写进任命记录，创建四级时按它求交 | 需扩 `AgentAppointment` 结构与任命写入点 |
+| B | 由会话授权管理器按 agent 推导边界 | 需确认会话授权是否按个体记录 |
+| C | 保持不校验，只如实标注缺口 | 零成本，但"权限不得超过上级"继续无保障 |
+
+**本轮未改代码**：在 A/B 之间选择会影响数据结构与迁移，属设计决策；我不擅自扩 schema。
+
+**下一轮**：按 A 落地——先读 `createAppointment` 的写入点与调用方，确认加字段的最小改法。
