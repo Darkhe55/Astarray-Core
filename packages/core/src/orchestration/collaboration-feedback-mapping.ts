@@ -55,6 +55,8 @@ export function buildCollaborationFeedbackMessage(input: {
             revision: reference.revision,
           })),
         }),
+    /** 未填产物时把"没有产物相关信息"显式送达接收方。 */
+    artifactReferenceStatus: input.message.artifactReferenceStatus,
     summary: input.message.summary,
     authorizationEpoch: input.message.authorizationEpoch,
     hopCount: 0,

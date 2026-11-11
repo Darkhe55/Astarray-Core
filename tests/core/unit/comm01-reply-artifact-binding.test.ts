@@ -63,5 +63,23 @@ describe("回复的产物绑定", () => {
     });
     const payload = feedbackMessage.payload as { artifactReferences?: unknown };
     expect(payload.artifactReferences).toEqual([{ artifactIdentifier: "src/a.ts", revision: 3 }]);
+    expect((payload as { artifactReferenceStatus?: string }).artifactReferenceStatus).toBe("provided");
+  });
+
+  it("⑤ **未填产物 ⇒ 投递者明确看到 not-provided**（不是空白）", () => {
+    const result = buildInbox().enqueue(enqueueInput());
+    expect(result.message?.artifactReferenceStatus).toBe("not-provided");
+    const feedbackMessage = buildCollaborationFeedbackMessage({
+      message: result.message as never,
+      sourceAgentRole: "secondary" as never,
+    });
+    expect((feedbackMessage.payload as { artifactReferenceStatus?: string }).artifactReferenceStatus).toBe(
+      "not-provided",
+    );
+  });
+
+  it("⑥ 空数组同样按 not-provided 处理（防止用空数组冒充已检查）", () => {
+    const result = buildInbox().enqueue(enqueueInput({ artifactReferences: [] }));
+    expect(result.message?.artifactReferenceStatus).toBe("not-provided");
   });
 });

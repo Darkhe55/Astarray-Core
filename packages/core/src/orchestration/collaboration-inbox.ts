@@ -43,6 +43,8 @@ export interface CollaborationInboxMessage {
     readonly artifactIdentifier: string;
     readonly revision: number;
   }>;
+  /** 明确标注"是否携带产物"：未填写时投递者看到 not-provided，而不是空白。 */
+  readonly artifactReferenceStatus: "provided" | "not-provided";
   readonly summary: string;
   readonly receivedAtIso: string;
   /** 入箱时的授权代（授权撤销/关系变更后旧代消息不得投递）。 */
@@ -239,6 +241,10 @@ export class CollaborationInbox {
       ...(input.artifactReferences === undefined
         ? {}
         : { artifactReferences: input.artifactReferences }),
+      artifactReferenceStatus:
+        input.artifactReferences === undefined || input.artifactReferences.length === 0
+          ? "not-provided"
+          : "provided",
       summary: input.summary,
       receivedAtIso: input.receivedAtIso,
       authorizationEpoch: input.authorizationEpoch ?? 0,

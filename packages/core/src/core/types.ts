@@ -413,6 +413,11 @@ export type FeedbackMessagePayload =
        * 可选：无产物的回复（如口头确认）仍合法，保持向后兼容。
        */
       artifactReferences?: Array<{ artifactIdentifier: string; revision: number }>;
+      /**
+       * 是否携带产物信息。**未填写时必须显式告知投递者"没有产物相关信息"**，
+       * 而不是让字段缺失被误解为"已检查且无问题"。
+       */
+      artifactReferenceStatus?: "provided" | "not-provided";
       summary: string;
       authorizationEpoch: number;
       hopCount: number;
