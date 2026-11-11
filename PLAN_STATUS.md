@@ -5444,7 +5444,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > | 事项 | 为什么不是编码 |
 > |---|---|
 > | 返修 7 项（`SecondaryAgentSessionController`、三级规划/守卫、四个 Provider 适配器、`MetricsRegistry`、四级生命周期、Provider fallback） | 全部 **0 构造点**：功能从未构建，接上去也无调用方 |
-> | COMM-01-02 重放 / 迟到 / 回复路由 | 无幂等键、无时间窗字段 ⇒ 需先定语义（重放键来源、窗口长度、回复指向） |
+> | ~~COMM-01-02 重放 / 迟到 / 回复路由~~ **（2026-11-11 更正，本行原判断有误）** | 用户澄清 + 代码核对后确认：**重放由协同收件箱按 `messageIdentifier` 去重（复用回执）**、**幂等入库在 `mailbox-journal`（`idempotencyKey`，同键异内容拒绝）**、**迟到归队列消费口管理**，投递层只负责成败与退避。真正缺口只剩「**回复未携带原任务产物引用**」 |
 > | CLIENT01 FOLDER-01-03 / SECRETARY-01-04 | SDK 已导出判定与卡片构建；剩余为**包入口、人工体验、长历史性能**（平台/人工） |
 > | AUDIT-REPAIR-01-05 目标提案包级正向 | 需在公开 SDK 暴露受控运行时注入点（改公开 API 面） |
 > | B6R10 / 跨平台矩阵 | Linux / macOS 证据，按用户口径跳过 |

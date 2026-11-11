@@ -376,7 +376,7 @@ SDK/CLI/TUI/GUI 入口、只读拓扑/投递状态查询、tarball 隔离安装�
 ⇒ 这三项属**新增行为**，需先定语义（重放键用哪个 ID、迟到窗口多长、回复指向如何绑定任务），
 不适合在单轮内臆造实现。下一轮先读消息发送路径，确认是否存在既有的幂等键可复用。
 
-### 重放键核查（2026-11-11，第 64 轮）：**无可复用的幂等键**
+### 重放键核查（2026-11-11，第 64 轮）：**无可复用的幂等键** ⚠️ **本节结论已被同日更正取代**（重放在协同收件箱与 mailbox journal 已有实现，见下方"更正"节）
 
 ```
 git grep 'messageIdentifier|messageId' -- orchestration/agent-mailbox*.ts orchestration/main-controller.ts
@@ -413,3 +413,20 @@ COMM-01-02 目前已完成并可交付的部分：
 
 **下一步（可编码）**：给回复载荷增加**产物引用**（沿用既有产物标识 + revision 口径，不新造 ID 体系），
 反例：空产物标识被拒、revision 缺失被拒、无产物的回复仍然合法（向后兼容）。
+
+### 修正落地 ①：主控指令身份与幂等键（2026-11-11）
+
+用户澄清"消息身份由汇报路径自动填写"，据此修正 `main-controller` 里主控指令的幂等键：
+
+| 修正前 | 修正后 |
+|---|---|
+| `main-instruction:${missionId}:${Date.now()}` | `buildMainInstructionIdempotencyKey({ missionIdentifier, messageIdentifier })` ⇒ `main-instruction:<mission>:<messageId>` |
+
+**修正前的两个真实缺陷**：
+1. 同一毫秒的两条**不同**指令撞同一个键 ⇒ `mailbox-journal` 以"同键异内容"**拒收第二条合法指令**；
+2. 键随时间变化 ⇒ 跨重试**无法去重**（重试生成新键）。
+
+**交付**：`packages/core/src/orchestration/main-instruction-identity.ts` + 5 条反例用例
+（同毫秒不同指令键不同 / 键与时间无关 / 键含 mission 与消息标识 / 空 mission 拒绝 / 空消息标识拒绝）。
+
+**仍未做**："同一指令跨重试只入队一次"需要**上游提供指令标识**（当前由框架每次生成新消息标识），属后续切片。

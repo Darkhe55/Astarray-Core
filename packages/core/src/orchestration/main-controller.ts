@@ -90,6 +90,7 @@ import type { CurrentPermissionConfigurationExporter } from "../tools/session-sh
 import type { RegisteredAgentDirectory } from "./registered-agent-directory.js";
 import type { MainAgentReportArchiveIngestor } from "./main-agent-report-archive.js";
 import { MainAgentReportReader } from "./main-agent-report-archive.js";
+import { buildMainInstructionIdempotencyKey } from "./main-instruction-identity.js";
 import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
@@ -4682,17 +4683,25 @@ export class MainController {
     if (typeof schedulerWithInstruction?.handleInstruction === "function") {
       schedulerWithInstruction.handleInstruction(instructionText);
     }
+    const mainInstructionMessageIdentifier = randomUUID();
     void this.options.feedbackTransport
       .enqueue({
         protocolVersion: 1,
-        messageId: randomUUID(),
+        messageId: mainInstructionMessageIdentifier,
         source: { sourceType: "user", sourceIdentifier: "main-controller" },
         recipientId: `scheduler:${missionId}`,
         priority: "instruction",
         createdAtIso: new Date().toISOString(),
-        idempotencyKey: `main-instruction:${missionId}:${Date.now()}`,
-      payload: { kind: "instruction", instructionText },
-    });
+        /**
+         * COMM-01-02 修正：不用 `Date.now()` 当幂等键（同毫秒两条指令会撞键被拒收，
+         * 且键随时间变化使重试无法去重）；身份由消息标识决定。
+         */
+        idempotencyKey: buildMainInstructionIdempotencyKey({
+          missionIdentifier: missionId,
+          messageIdentifier: mainInstructionMessageIdentifier,
+        }),
+        payload: { kind: "instruction", instructionText },
+      });
   }
 
   private async resolveConversationIdentityForMission(
