@@ -26,6 +26,13 @@ import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
+import { MailboxJournal } from "../feedback-process/mailbox-journal.js";
+import { CoordinationMessageConsumer } from "../orchestration/coordination-message-consumer.js";
+import {
+  CoordinationPartitionLeaseStore,
+  buildCoordinationPartitionKey,
+} from "../orchestration/coordination-partition-lease.js";
+import { CoordinationStateTransactionStore } from "../orchestration/coordination-state-transaction.js";
 import { TaskChainCumulativeBudgetController } from "../orchestration/task-chain-cumulative-budget.js";
 import {
   createDefaultGitCommandRunner,
@@ -293,6 +300,10 @@ export interface ApplicationRuntime {
   humanWorktreeObserver: HumanWorktreeObserver;
   /** REPAIR：任务链累计预算（T07E-04；此前全仓库无构造点）。 */
   taskChainCumulativeBudget: TaskChainCumulativeBudgetController;
+  /** COORD-01-02：本地协调器（分区租约 + 短状态事务 + 消费步）。 */
+  coordinationMailboxJournal: MailboxJournal;
+  coordinationMessageConsumer: CoordinationMessageConsumer;
+  coordinationPartitionKey: string;
   /** 已注册工具名（只读快照）：用于验证"开关关闭时工具不存在"，不改动注册表。 */
   listRegisteredToolNames: () => string[];
   missionManager: MissionManager;
@@ -1058,6 +1069,33 @@ export async function createApplicationRuntime(
   }
 
   // T06A：自动备份库与删除授权控制器
+  /**
+   * COORD-01-02：**本地协调器**装配点。
+   *
+   * 反馈 journal 与反馈子进程共用 `stateDirectory`（子进程以 baseDirectory 初始化），
+   * 因此本地协调器读的是同一个 journal；分区键 = 项目 ID + 责任调度 Agent 个体 ID。
+   */
+  const coordinationMailboxJournal = new MailboxJournal(stateDirectory);
+  const coordinationLeaseStore = new CoordinationPartitionLeaseStore({
+    stateDirectory: path.join(stateDirectory, "coordination", "leases"),
+    nowUnixMilliseconds: () => Date.now(),
+  });
+  const coordinationStateStore = new CoordinationStateTransactionStore({
+    stateDirectory: path.join(stateDirectory, "coordination", "state"),
+    leaseStore: coordinationLeaseStore,
+    nowUnixMilliseconds: () => Date.now(),
+  });
+  const coordinationMessageConsumer = new CoordinationMessageConsumer({
+    journal: coordinationMailboxJournal,
+    leaseStore: coordinationLeaseStore,
+    stateStore: coordinationStateStore,
+    nowUnixMilliseconds: () => Date.now(),
+  });
+  const coordinationPartitionKey = buildCoordinationPartitionKey({
+    projectIdentifier: options.projectIdentifier ?? "workspace",
+    schedulerAgentInstanceIdentifier: options.mainAgentInstanceId ?? "main-agent",
+  });
+
   const backupVault = new BackupVault({ baseDirectory: stateDirectory });
   await backupVault.initialize();
   const backupDeletionAuditLog = new BackupDeletionAuditLog(stateDirectory);
@@ -3151,8 +3189,6 @@ export async function createApplicationRuntime(
   setPromptScanJournalSink((record) => {
     void promptScanJournalStore.append(record).catch(() => undefined);
   });
-
-
   // E2E-01-03 S1 / T05D-03：Agent 编辑意图与陈旧写入强制（按状态目录持久化基线）。
 
   /**
@@ -4271,6 +4307,7 @@ export async function createApplicationRuntime(
            * 未注入时不生效（与既有行为一致）。
            */
           taskChainCumulativeBudget: taskChainCumulativeBudgetController,
+
           taskChainIdentifier: missionIdentifier ?? "unknown-mission",
           customToolHandlers: new Map([
             [GOAL_PROPOSAL_TOOL_NAME, goalProposalHandler],
@@ -4694,6 +4731,9 @@ export async function createApplicationRuntime(
     listRegisteredToolNames: () => registry.getFullDescriptors().map((descriptor) => descriptor.name),
     diagnosticClusterService,
     humanWorktreeObserver,
+    coordinationMailboxJournal,
+    coordinationMessageConsumer,
+    coordinationPartitionKey,
     taskChainCumulativeBudget: taskChainCumulativeBudgetController,
     scanStartupRecovery,
     runStartupRecovery,
@@ -4819,22 +4859,6 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

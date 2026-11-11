@@ -177,3 +177,23 @@
 
 **仍待接线**：消费者尚未被反馈进程/应用装配调用（目前是可组合原语 + 用例）。
 下一步：在反馈进程的消息处理处调用 `runConsumptionStep`，并把返回的唤醒信号接到 ready-set 重算。
+
+### COORD-01-02 进展（2026-11-11 目标轮 4）：**装配接线完成**，并修掉一个真实平台缺陷
+
+**接线**：`createApplicationRuntime` 现在构造并暴露
+`coordinationMailboxJournal` / `coordinationMessageConsumer` / `coordinationPartitionKey`
+（分区键 = `project:<项目>|scheduler:<主 Agent 个体系 ID>`）。反馈 journal 与反馈子进程共用 `stateDirectory`，
+本地协调器读的是**同一个 journal**。
+
+**顺带发现并修复的真实缺陷（Windows）**：
+`MailboxJournal.journalFilePath` 直接用 `${recipientId}.json`，而协作收件人是 `agent:<id>`（含冒号）——
+Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `agent:<id>` 的消息根本无法入库**。
+修复：对文件名做**可逆编码**（仅转义非法字符），普通 ID 文件名保持不变（既有 journal 兼容），
+`listRecipientIds` 解码还原原始 ID。
+
+**用例**：
+- `coord01-coordination-wiring`（2 条，装配层）：分区键正确；真实 journal 消息经消费步应用，二次消费不重复应用；
+- `coord01-journal-filename-encoding`（3 条）：冒号 ID 可入库并读回 / `listRecipientIds` 还原 / 普通 ID 文件名不变。
+
+**COORD-01-02 仍差**：失败退避（1/2/4/8/16 秒、单轮最多 5 次、持久计数）、三状态查询入口、
+以及把 `isWakeRequested` 接到真实的 ready-set 重算。

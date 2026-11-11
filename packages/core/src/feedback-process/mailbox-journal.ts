@@ -61,6 +61,23 @@ export interface MailboxJournalDocument {
 
 export const MAILBOX_JOURNAL_SCHEMA_VERSION = 1;
 
+/**
+ * COORD-01-02 修正：收件人 ID 可能含 `:`（协作前缀 `agent:<id>`），而 Windows 文件名不允许冒号。
+ * 这里做**可逆编码**：只转义非法字符，普通 ID 文件名保持不变（对既有 journal 向后兼容）。
+ */
+function encodeRecipientFileName(recipientId: string): string {
+  return recipientId.replace(/[^A-Za-z0-9._-]/gu, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return `%${codePoint.toString(16).toUpperCase().padStart(2, "0")}`;
+  });
+}
+
+function decodeRecipientFileName(fileName: string): string {
+  return fileName.replace(/%([0-9A-F]{2})/gu, (_match, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  );
+}
+
 function priorityRank(priority: FeedbackMessage["priority"]): number {
   return MESSAGE_PRIORITY_ORDER.indexOf(priority);
 }
@@ -89,7 +106,7 @@ export class MailboxJournal {
   }
 
   private journalFilePath(recipientId: string): string {
-    return path.join(this.journalDirectoryPath, `${recipientId}.json`);
+    return path.join(this.journalDirectoryPath, `${encodeRecipientFileName(recipientId)}.json`);
   }
 
   private backupFilePath(recipientId: string): string {
@@ -321,7 +338,7 @@ export class MailboxJournal {
     }
     return entries
       .filter((entry) => entry.endsWith(".json") && !entry.endsWith(".json.bak"))
-      .map((entry) => entry.slice(0, -".json".length));
+      .map((entry) => decodeRecipientFileName(entry.slice(0, -".json".length)));
   }
 
   private async mutateRecipient(
