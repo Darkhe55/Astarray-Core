@@ -256,3 +256,18 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 - 实测：`exit 0`，`cases=3 failures=0`（tarball SHA256 `65ED9D78…5B78B`，代码 SHA `45c749ce`）。
 
 **仍未做**：统一工具层与权限入口、用户纠正记录、"每批让出事件循环"的显式调度。
+
+### 切片 9a：工具 action 级权限判定（§5）——已交付（**尚未注册进工具注册表**）
+
+- `diagnostic-cluster-tools.ts`：`DIAGNOSTIC_CLUSTER_TOOL_NAME`、action 级副作用表
+  （`list`/`inspect`/`find-related` = read-only，`build`/`feedback` = mutating）、
+  `classifyDiagnosticClusterAction`、`executeDiagnosticClusterAction`。
+- 判定顺序刻意固定为：**开关 → 权限 → 做事**，因此关闭时连权限查询都不发生。
+- 测试 6 条：分类正确、关闭 `feature-disabled` 且不建目录、只读主体调写 action 被拒、
+  **未知 action 不得被当只读放行**、可写主体 build 成功且只读主体 list 可用、
+  `feedback` 未实现时**显式拒绝**（不假装成功）。
+
+**明确未完成**（下一轮）：
+- 注册进现有工具注册表并接入 `policyPort.execute`（这才是"接线完成"）；
+- 主 Agent 只读投影中不出现写 action 的用例；
+- `feedback` 存储（用户纠正记录）。
