@@ -2,6 +2,7 @@ import type { MailboxJournal } from "../feedback-process/mailbox-journal.js";
 import type { CoordinationPartitionLeaseStore } from "./coordination-partition-lease.js";
 import type { CoordinationStateTransactionStore } from "./coordination-state-transaction.js";
 import type { CoordinationRetryStore } from "./coordination-retry-store.js";
+import { verifyReplyArtifactReferences } from "./reply-artifact-verification.js";
 
 /**
  * COORD-01-02（卡 §4.2/§4.4）：协调消费步。
@@ -30,6 +31,17 @@ export interface CoordinationMessageConsumerOptions {
   readonly stateStore: CoordinationStateTransactionStore;
   /** COORD-01-02 §4.7：可选失败退避（未提供则不退避，行为与之前一致）。 */
   readonly retryStore?: CoordinationRetryStore;
+  /**
+   * COORD-01-03 §3：**产物证明门禁**（可选）。提供时，要求产物证明的消息在应用前必须通过版本核对；
+   * 不合格 ⇒ 记 `blocked` 且**不应用**。
+   */
+  readonly artifactGate?: {
+    readonly isArtifactProofRequired: (message: {
+      messageId: string;
+      payload: unknown;
+    }) => boolean;
+    readonly resolveCurrentRevision: (artifactIdentifier: string) => Promise<number | null>;
+  };
   readonly nowUnixMilliseconds?: () => number;
 }
 
@@ -38,6 +50,17 @@ export class CoordinationMessageConsumer {
   private readonly leaseStore: CoordinationPartitionLeaseStore;
   private readonly stateStore: CoordinationStateTransactionStore;
   private readonly retryStore: CoordinationRetryStore | undefined;
+  private readonly artifactGate:
+    | {
+        readonly isArtifactProofRequired: (message: {
+          messageId: string;
+          payload: unknown;
+        }) => boolean;
+        readonly resolveCurrentRevision: (
+          artifactIdentifier: string,
+        ) => Promise<number | null>;
+      }
+    | undefined;
   private readonly nowUnixMilliseconds: () => number;
 
   constructor(options: CoordinationMessageConsumerOptions) {
@@ -45,6 +68,7 @@ export class CoordinationMessageConsumer {
     this.leaseStore = options.leaseStore;
     this.stateStore = options.stateStore;
     this.retryStore = options.retryStore;
+    this.artifactGate = options.artifactGate;
     this.nowUnixMilliseconds = options.nowUnixMilliseconds ?? (() => Date.now());
   }
 
@@ -115,6 +139,42 @@ export class CoordinationMessageConsumer {
     let blockedMessageCount = 0;
 
     for (const message of targets) {
+      /**
+       * COORD-01-03 §3：**要求产物证明的消息**先在本地核对引用版本；
+       * 不合格 ⇒ 记 blocked、不应用（不靠模型自述或字段缺失放行）。
+       */
+      if (this.artifactGate !== undefined) {
+        const isRequired = this.artifactGate.isArtifactProofRequired({
+          messageId: message.messageId,
+          payload: message.payload,
+        });
+        if (isRequired) {
+          const verification = await verifyReplyArtifactReferences({
+            references:
+              (message.payload as { artifactReferences?: ReadonlyArray<{ artifactIdentifier: string; revision: number }> })
+                .artifactReferences ?? [],
+            resolveCurrentRevision: this.artifactGate.resolveCurrentRevision,
+            isArtifactProofRequired: true,
+          });
+          if (!verification.isSatisfied) {
+            blockedMessageCount += 1;
+            await this.journal.recordApplicationState({
+              recipientId: input.recipientId,
+              messageId: message.messageId,
+              state: "blocked",
+              reason: verification.unsatisfiedReason,
+              targetStateVersion: (await this.stateStore.readState(input.partitionKey))?.stateVersion ?? 0,
+              updatedAtIso: new Date(this.nowUnixMilliseconds()).toISOString(),
+            });
+            await this.retryStore?.recordFailure({
+              partitionKey: input.partitionKey,
+              messageIdentifier: message.messageId,
+              reason: verification.unsatisfiedReason ?? "artifact-not-current",
+            });
+            continue;
+          }
+        }
+      }
       const currentState = await this.stateStore.readState(input.partitionKey);
       const expectedStateVersion = currentState?.stateVersion ?? 0;
       const outcome = await this.stateStore.applyMessage({

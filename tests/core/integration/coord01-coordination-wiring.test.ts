@@ -54,6 +54,47 @@ describe("本地协调器装配接线", () => {
     }
   }, 60_000);
 
+  it("⑦ 显式要求产物证明的完成消息：缺引用被门禁挡住（运行时路径）", async () => {
+    const runtime = await createRuntime();
+    try {
+      await runtime.coordinationMailboxJournal.enqueue({
+        protocolVersion: 1,
+        messageId: "message-proof-1",
+        source: { sourceType: "agent", agentInstanceId: "worker-1" },
+        recipientId: "agent:main-agent-1",
+        priority: "state",
+        createdAtIso: "2026-11-11T00:00:00.000Z",
+        idempotencyKey: "message-proof-1",
+        projectIdentifier: "project-alpha",
+        taskIdentifier: "T-001",
+        payload: {
+          kind: "collaboration-request",
+          messageIdentifier: "message-proof-1",
+          correlationIdentifier: "message-proof-1",
+          taskIdentifier: "T-001",
+          summary: "完成",
+          authorizationEpoch: 0,
+          hopCount: 0,
+          requiresArtifactProof: true,
+        },
+      } as never);
+
+      const result = await runtime.coordinationMessageConsumer.runConsumptionStep({
+        partitionKey: runtime.coordinationPartitionKey,
+        recipientId: "agent:main-agent-1",
+        ownerInstanceIdentifier: "main-agent-1",
+        leaseTtlMilliseconds: 60_000,
+        toSnapshot: (message) => ({ appliedMessage: message.messageId }),
+      });
+      expect(result.appliedMessageCount).toBe(0);
+      expect(result.blockedMessageCount).toBe(1);
+      const [view] = await runtime.readCoordinationMessageStatus("message-proof-1");
+      expect(view?.applicationState.reason).toContain("artifact-not-provided");
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
+
   it("⑥ 稳定提交身份：同文本无请求 ID 是两条；同请求 ID 复用；异内容冲突", async () => {
     const runtime = await createRuntime();
     try {

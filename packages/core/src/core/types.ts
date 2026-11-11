@@ -418,6 +418,8 @@ export type FeedbackMessagePayload =
        * 而不是让字段缺失被误解为"已检查且无问题"。
        */
       artifactReferenceStatus?: "provided" | "not-provided";
+      /** 该消息是否**要求产物证明**（门禁据此决定是否必须通过版本核对）。 */
+      requiresArtifactProof?: boolean;
       summary: string;
       authorizationEpoch: number;
       hopCount: number;

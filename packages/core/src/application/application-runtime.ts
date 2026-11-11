@@ -824,6 +824,11 @@ export interface ApplicationRuntimeOptions {
    * 供测试与宿主按项目规模收紧；不影响单 Agent 的既有上限。
    */
   maximumTaskChainCumulativeSourceFiles?: number;
+  /**
+   * COORD-01-03 §3：产物当前版本的本地权威解析（供产物证明门禁使用）。
+   * 未提供时门禁按"解析不到"处理（fail-closed），不会因为缺解析器而放行。
+   */
+  resolveArtifactRevision?: (artifactIdentifier: string) => Promise<number | null>;
   /** G2（第 130 轮）：活锁/循环守卫开关。**缺省 false**（不擅自改默认行为）。 */
   isProgressGuardEnabled?: boolean;
   /** G2（第 162 轮）：任务链总调用预算（缺省 undefined ⇒ 200，**默认行为不变**）。 */
@@ -1147,6 +1152,13 @@ export async function createApplicationRuntime(
     leaseStore: coordinationLeaseStore,
     stateStore: coordinationStateStore,
     retryStore: coordinationRetryStore,
+    /** COORD-01-03 §3：只有**显式要求产物证明**的消息才进门禁，默认行为不变。 */
+    artifactGate: {
+      isArtifactProofRequired: (message) =>
+        (message.payload as { requiresArtifactProof?: boolean }).requiresArtifactProof === true,
+      resolveCurrentRevision: async (artifactIdentifier) =>
+        await (options.resolveArtifactRevision?.(artifactIdentifier) ?? Promise.resolve(null)),
+    },
     nowUnixMilliseconds: () => Date.now(),
   });
   const coordinationSubmissionIdentityStore = new CoordinationSubmissionIdentityStore({

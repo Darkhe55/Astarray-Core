@@ -300,3 +300,18 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 本模块补的是**协作回复的 `artifactReferences`** 这条路径，两者口径一致（低于当前版本即陈旧）。
 
 **仍未做**：把该判定接进**审查/完成门禁的判定点**（当前仅运行时可调用，尚无门禁消费它）。
+
+### COORD-01-03 进展（2026-11-11 目标轮 12）：产物证明门禁**接进消费路径**
+
+| 交付 | 说明 |
+|---|---|
+| `FeedbackMessagePayload.requiresArtifactProof?` | 消息**显式声明**需要产物证明；默认不要求（既有流程行为不变） |
+| `CoordinationMessageConsumer.artifactGate` | 应用前先核对引用版本；不合格 ⇒ 记 `blocked`（含原因）+ 计入退避，**不应用** |
+| 装配接线 | 运行时按 `requiresArtifactProof === true` 进门禁；解析器来自 `options.resolveArtifactRevision`，**未提供即按解析不到处理（fail-closed）** |
+
+**用例 4 条（门禁）**：无引用 ⇒ `artifact-not-provided` 且 `appliedMessages` 为空 / 引用陈旧 ⇒ `artifact-not-current` /
+引用合格 ⇒ 应用 / 不要求证明的普通消息 ⇒ 不受影响。
+**用例 1 条（运行时集成）**：显式要求证明且缺引用 ⇒ 运行时不应用、状态查询显示 blocked 与原因。
+
+**仍未做**：审查/完成门禁（独立审查裁决、合并批准）尚未消费该判定；本卡只在**消费路径**设了门禁。
+另：交办回执释放窗口、控制旁路、上下文准入仍属 03 未完成项。
