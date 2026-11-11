@@ -333,3 +333,21 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 重复交办回执只释放一次 / 执行完成回执仍走 `completed`（两类回执分开）。
 
 **仍未做**：控制旁路、上下文准入接线（03 剩余两项）。
+
+### COORD-01-03 进展（2026-11-11 目标轮 14）：控制旁路（§2/§5）
+
+先核实：全仓库**没有**控制通道（`emergencyStop|controlChannel|cancelRequest` 零命中），本轮从零建立。
+
+| 交付 | 说明 |
+|---|---|
+| `ControlBypassController` | 可信来源（user/system）的取消/暂停/撤权/紧急停止 ⇒ **立即**设置本地执行门禁 |
+| 来源可信性 | **agent 来源一律拒绝**（模型不得自标 control 取得优先权） |
+| 幂等 | 按 `eventIdentifier` 去重，重复控制只生效一次 |
+| 在途处置 | `supports-cancel ⇒ confirmed-stopped`；`does-not-support-cancel ⇒ unsupported`；**`unknown` 绝不报成已停止** |
+| 派发门禁 | `MainController.dispatchMissionTask` 首行检查 `controlBypass.isExecutionBlocked` ⇒ `reasonCode: "control-blocked"` |
+| 接线 | 运行时构造并经 `MainController` 选项注入；`runtime.controlBypass` 可达 |
+
+**用例**：旁路 6 条（立即阻止 / agent 拒绝 / 幂等 / unknown 不报已停止 / unsupported 仍阻止 / supported 才报已停止）
+＋ 派发门禁 3 条（不受控不误拦 / 受控拒绝且原因正确 / 只影响目标 mission）。
+
+**仍未做**：上下文准入接线（03 最后一项）。

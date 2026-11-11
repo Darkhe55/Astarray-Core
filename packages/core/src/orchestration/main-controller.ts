@@ -601,6 +601,8 @@ export interface MainControllerOptions {
    * 缺省 ⇒ 不登记（旧行为），但也就没有权威待办来源。
    */
   taskSequenceManageController?: TaskSequenceManageController | null;
+  /** COORD-01-03 §2/§5：控制旁路门禁（取消/撤权后立即阻止派发）。 */
+  controlBypass?: { isExecutionBlocked: (missionIdentifier: string) => boolean };
   /**
    * ALIGN-04-01（2026-10-28）：**mission 关系索引**（显式关联的权威落盘）。
    *
@@ -4473,6 +4475,16 @@ export class MainController {
     readonly reasonCode: string;
     readonly reason: string;
   } {
+    /**
+     * COORD-01-03 §2/§5：**控制门禁优先于派发**（撤权/取消后不得因"任务在窗口里"而放行）。
+     */
+    if (this.options.controlBypass?.isExecutionBlocked(missionId) === true) {
+      return {
+        outcome: "refused",
+        reasonCode: "control-blocked",
+        reason: "该 mission 已被控制事件阻止：拒绝派发",
+      };
+    }
     const activeEntry = this.activeOrchestrators.get(missionId);
     if (activeEntry === undefined) {
       return {

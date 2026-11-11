@@ -37,6 +37,7 @@ import { CoordinationStateTransactionStore } from "../orchestration/coordination
 import { CoordinationRetryStore } from "../orchestration/coordination-retry-store.js";
 import { CoordinationWakeCoordinator } from "../orchestration/coordination-wake-coordinator.js";
 import { CoordinationSubmissionIdentityStore } from "../orchestration/coordination-submission-identity.js";
+import { ControlBypassController } from "../orchestration/control-bypass.js";
 import {
   verifyReplyArtifactReferences,
   type ReplyArtifactVerificationResult,
@@ -314,6 +315,8 @@ export interface ApplicationRuntime {
   coordinationRetryStore: CoordinationRetryStore;
   coordinationWakeCoordinator: CoordinationWakeCoordinator;
   coordinationSubmissionIdentityStore: CoordinationSubmissionIdentityStore;
+  /** COORD-01-03 §2/§5：控制旁路（取消/暂停/撤权/紧急停止，立即更新本地执行门禁）。 */
+  controlBypass: ControlBypassController;
   /**
    * COORD-01-03 §3：回复产物引用与实际版本核对（版本来源由调用方注入，模型不得自证）。
    */
@@ -1161,6 +1164,7 @@ export async function createApplicationRuntime(
     },
     nowUnixMilliseconds: () => Date.now(),
   });
+  const coordinationControlBypass = new ControlBypassController();
   const coordinationSubmissionIdentityStore = new CoordinationSubmissionIdentityStore({
     stateDirectory: path.join(stateDirectory, "coordination", "identity"),
     nowUnixMilliseconds: () => Date.now(),
@@ -3800,6 +3804,8 @@ export async function createApplicationRuntime(
   const controller = new MainController({
     /** R93（②）：独立验收门禁需要裁决存储，否则裁决只校验、不落盘（身份目录在下方已传）。 */
     completionVerdictStore,
+    /** COORD-01-03 §2/§5：控制旁路接入派发门禁。 */
+    controlBypass: coordinationControlBypass,
       /**
        * HISTORY-01-02（第 42–43 轮）：运行历史存储（落 stateDirectory）。
        *
@@ -4814,6 +4820,7 @@ export async function createApplicationRuntime(
     coordinationRetryStore,
     coordinationWakeCoordinator,
     coordinationSubmissionIdentityStore,
+    controlBypass: coordinationControlBypass,
     verifyCoordinationReplyArtifacts: verifyReplyArtifactReferences,
     resolveCoordinationSubmission: async (input: {
       sourceIdentifier: string;
@@ -4979,7 +4986,6 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
-
 
 
 
