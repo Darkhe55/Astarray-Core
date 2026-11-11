@@ -1,0 +1,105 @@
+/**
+ * CLUSTER-01 切片 3：`DiagnosticEventStore.readEventPages` 接线验证。
+ *
+ * 卡片要求"保留旧 API 兼容"：`readAll` 必须与分页读取**给出同样的解析结果**，
+ * 否则两套读法会互相矛盾（一个算丢行、一个不算）。
+ */
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { DiagnosticEventStore } from "../../../packages/core/src/orchestration/diagnostic-event-store.js";
+
+let stateDirectory: string;
+
+beforeEach(async () => {
+  stateDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "cluster01-store-page-"));
+});
+
+afterEach(async () => {
+  await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 5 });
+});
+
+function buildEvent(index: number) {
+  return {
+    eventType: "diagnostic" as const,
+    requestIdentifier: `event-${String(index)}`,
+    recordedAtIso: "2026-11-11T00:00:00.000Z",
+    errorCode: `E${String(index)}`,
+    component: "worker",
+    stage: "execute",
+    messageText: `错误 ${String(index)}`,
+    chain: { rootErrorCode: `E${String(index)}`, wrapperErrorCodes: [] },
+    missionIdentifier: "mission-1",
+    taskIdentifier: "T-001",
+    agentInstanceIdentifier: "worker-1",
+  };
+}
+
+describe("CLUSTER-01 切片 3：store 分页接线", () => {
+  it("分页解析结果与 readAll 完全一致（顺序、内容、数量）", async () => {
+    const store = new DiagnosticEventStore({ baseDirectory: stateDirectory });
+    for (let index = 0; index < 7; index += 1) {
+      await store.append(buildEvent(index) as never);
+    }
+
+    const allEvents = await store.readAll();
+    const paged = await store.readEventPages({ limit: 3 });
+
+    const flattened = paged.pages.flatMap((page) => page.events);
+    expect(flattened.map((event) => event.requestIdentifier)).toEqual(
+      allEvents.map((event) => event.requestIdentifier),
+    );
+    expect(paged.isComplete).toBe(true);
+    expect(paged.discardedLineCount).toBe(0);
+  });
+
+  it("损坏行与非法事件的计数与 readWithIntegrity 一致", async () => {
+    const store = new DiagnosticEventStore({ baseDirectory: stateDirectory });
+    await store.append(buildEvent(1) as never);
+    /** 直接写坏行与非诊断事件，模拟历史损坏。 */
+    const filePath = path.join(stateDirectory, "diagnostic-events.jsonl");
+    await fs.appendFile(filePath, "not-json\n", "utf8");
+    await fs.appendFile(filePath, JSON.stringify({ eventType: "summary" }) + "\n", "utf8");
+    await store.append(buildEvent(2) as never);
+
+    const integrity = await store.readWithIntegrity();
+    const paged = await store.readEventPages({ limit: 2 });
+
+    expect(paged.discardedLineCount).toBe(integrity.discardedLineCount);
+    expect(paged.totalEventCount).toBe(integrity.events.length);
+    expect(paged.totalEventCount).toBe(2);
+  });
+
+  it("受 maximumTotalEvents 限制时提前停止，并如实返回 isComplete=false", async () => {
+    const store = new DiagnosticEventStore({ baseDirectory: stateDirectory });
+    for (let index = 0; index < 9; index += 1) {
+      await store.append(buildEvent(index) as never);
+    }
+
+    const paged = await store.readEventPages({ limit: 2, maximumTotalEvents: 4 });
+    expect(paged.totalEventCount).toBeLessThanOrEqual(4);
+    expect(paged.isComplete).toBe(false);
+    /** 已读到的记录不重复、按原顺序。 */
+    expect(paged.pages.flatMap((page) => page.events).map((event) => event.requestIdentifier)).toEqual([
+      "event-0",
+      "event-1",
+      "event-2",
+      "event-3",
+    ]);
+  });
+
+  it("源不可读 ⇒ 分页报错（不得伪装成没有错误），旧 readAll 保持返回空数组", async () => {
+    const store = new DiagnosticEventStore({
+      baseDirectory: path.join(stateDirectory, "missing-directory"),
+    });
+    /**
+     * 这是**有意的行为差异**，不是不一致：卡内 §4 要求
+     * "磁盘满、源不可读或损坏不能返回'无错误'"；`readAll` 是既有 API，兼容优先。
+     */
+    await expect(store.readEventPages()).rejects.toThrow(/diagnostic-source-unavailable/u);
+    expect(await store.readAll()).toEqual([]);
+  });
+});

@@ -121,3 +121,18 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 实测丢行（12 行只读到 7 行），改为"以 0 解析 + 结果平移回绝对偏移"后一致。
 
 **仍未做**：接进 `DiagnosticEventStore` 的磁盘读取路径（切片 3）。
+
+### 切片 3：接进 `DiagnosticEventStore`（§2 缺口闭合）——**已交付**
+
+- 新增 `DiagnosticEventStore.readEventPages({ cursor, limit, maximumLineBytesPerLine, maximumTotalEvents, maximumTotalBytes })`：
+  按块读盘 + 每页限额 + 总量上限（默认 2,000 条 / 16 MiB），返回 `pages/nextCursor/isComplete/discardedLineCount/totalEventCount`。
+- **解析规则与 `readAll`/`readWithIntegrity` 完全一致**（损坏行、非诊断事件、空行），由对照用例锁定。
+- 测试：`tests/core/unit/cluster01-store-page-wiring.test.ts`（4 条）：
+  分页与 `readAll` 结果一致、丢弃计数与 `readWithIntegrity` 一致、`maximumTotalEvents` 提前停止且如实 `isComplete=false`、源不可读时报错。
+
+**一处有意的行为差异**（非缺陷，已写进用例注释）：
+`readAll` 在源不可读时返回 `[]`（既有兼容行为），而 `readEventPages` **抛 `diagnostic-source-unavailable`**——
+卡内 §4 明确"磁盘满、源不可读或损坏不能返回'无错误'"。
+
+**仍未做**：聚类算法本身（分桶键、`diagnostic-text-v1` 规范化、三元组 Jaccard、0.85 阈值、leader 聚类）、
+派生索引与游标持久化、工具与权限入口、SDK 导出。

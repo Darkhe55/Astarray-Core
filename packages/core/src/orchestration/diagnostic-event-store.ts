@@ -15,6 +15,8 @@
  *  ⑧ 纯函数可复算。
  */
 import { promises as fs } from "node:fs";
+import type { DiagnosticPageCursor, DiagnosticFilePage } from "./diagnostic-event-page-reader.js";
+import { readDiagnosticPageFromFile } from "./diagnostic-event-page-reader.js";
 import path from "node:path";
 
 import { selectCredentialMaskingRules } from "../tools/credential-detector-registry.js";
@@ -177,6 +179,88 @@ export class DiagnosticEventStore {
     }
     return { events, discardedLineCount };
   }
+
+  /**
+   * CLUSTER-01 §2/§4：**有界分页读取**（供后台聚类扫描使用）。
+   *
+   * `readAll` 保持"整文件读入"的既有语义不变；本方法沿用**同一套解析规则**
+   * （损坏行/非诊断事件/空行处理完全一致），但按块读盘并受总量上限约束。
+   */
+  async readEventPages(input: {
+    readonly cursor?: DiagnosticPageCursor;
+    readonly limit?: number;
+    readonly maximumLineBytesPerLine?: number;
+    readonly maximumTotalEvents?: number;
+    readonly maximumTotalBytes?: number;
+  } = {}): Promise<DiagnosticEventPagesResult> {
+    const limit = Math.max(1, input.limit ?? 200);
+    const maximumTotalEvents = Math.max(1, input.maximumTotalEvents ?? 2_000);
+    const maximumTotalBytes = Math.max(1, input.maximumTotalBytes ?? 16 * 1024 * 1024);
+    const pages: DiagnosticEventPage[] = [];
+    let cursor = input.cursor ?? { byteOffset: 0, lineNumber: 0 };
+    let discardedLineCount = 0;
+    let totalEventCount = 0;
+    let totalBytes = 0;
+    let isComplete = false;
+
+    while (!isComplete && totalEventCount < maximumTotalEvents && totalBytes < maximumTotalBytes) {
+      let page: DiagnosticFilePage;
+      try {
+        page = readDiagnosticPageFromFile({
+          filePath: this.filePath,
+          cursor,
+          limit,
+          ...(input.maximumLineBytesPerLine === undefined
+            ? {}
+            : { maximumLineBytesPerLine: input.maximumLineBytesPerLine }),
+        });
+      } catch {
+        /** 源不可读不得伪装成"没有错误"：调用方据此报告 source-unavailable。 */
+        throw new Error("diagnostic-source-unavailable");
+      }
+      const events: DiagnosticEvent[] = [];
+      for (const record of page.records) {
+        try {
+          const parsed = JSON.parse(record.text) as DiagnosticEvent;
+          if (parsed.eventType === "diagnostic" && typeof parsed.errorCode === "string") {
+            events.push(parsed);
+          } else {
+            discardedLineCount += 1;
+          }
+        } catch {
+          discardedLineCount += 1;
+        }
+      }
+      totalEventCount += events.length;
+      totalBytes += page.bytesRead;
+      pages.push({
+        events,
+        nextCursor: page.nextCursor,
+        isComplete: page.isComplete,
+        skippedOversizeLineCount: page.skippedOversizeLineCount,
+      });
+      cursor = page.nextCursor;
+      isComplete = page.isComplete || page.bytesRead === 0;
+    }
+
+    return { pages, nextCursor: cursor, isComplete, discardedLineCount, totalEventCount };
+  }
+}
+
+/** 一页解析后的诊断事件。 */
+export interface DiagnosticEventPage {
+  readonly events: readonly DiagnosticEvent[];
+  readonly nextCursor: DiagnosticPageCursor;
+  readonly isComplete: boolean;
+  readonly skippedOversizeLineCount: number;
+}
+
+export interface DiagnosticEventPagesResult {
+  readonly pages: readonly DiagnosticEventPage[];
+  readonly nextCursor: DiagnosticPageCursor;
+  readonly isComplete: boolean;
+  readonly discardedLineCount: number;
+  readonly totalEventCount: number;
 }
 
 export interface DiagnosticGroup {
