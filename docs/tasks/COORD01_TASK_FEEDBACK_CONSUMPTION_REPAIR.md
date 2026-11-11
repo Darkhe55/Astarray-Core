@@ -124,3 +124,23 @@
 **用例 3 条**：①归属键持久化；②同幂等键但 `taskIdentifier` 不同 ⇒ 拒绝；③旧消息缺归属键仍可入池（向后兼容）。
 
 **仍未做**：调度 Agent 个体 ID 分区、租约/fencing、状态更新→调度重评估接线、`contextDeliveryState` 写入点。
+
+### COORD-01-02 进展（2026-11-11 目标轮 1）：分区租约 + fencing
+
+按卡 §4.1/§4.3 落第一块：**协调分区**与**租约 ownership 校验**。
+
+| 交付 | 说明 |
+|---|---|
+| `buildCoordinationPartitionKey` | 分区键 = `project:<项目ID>|scheduler:<调度Agent个体ID>`；任一为空即拒绝（不用默认值猜） |
+| `CoordinationPartitionLeaseStore` | `tryAcquire / renewLease / releaseLease / assertIsCurrentOwner`，每分区一个 JSON（原子写 + 备份恢复读取） |
+| fencing token | 每次授权/接管/释放都**递增**，旧 token 永久失效 |
+
+**反例 5 条**（`coord01-partition-lease.test.ts`）：
+① 分区键空值拒绝；② 同分区竞争 ⇒ 后者 `held-by-other`；③ 过期接管 ⇒ token 1→2；
+④ **旧消费者迟提交 ⇒ `assertIsCurrentOwner` 为 false**（fencing 的唯一意义）；⑤ 释放后旧 token 失效且新 token 递增到 3。
+
+**本片尚未接线**：租约目前是独立原语，**没有生产消费者**——它要等"状态更新短事务"落地后由协调器使用。
+因此 **COORD-01-02 仍为 pending**，不虚报完成。
+
+**下一步**：实现"接收入库 → 短事务内 CAS 更新权威状态 → 记 applied + 置待唤醒标志"，并在事务内先
+`assertIsCurrentOwner`（这才是 fencing 生效处），随后接调度重评估。
