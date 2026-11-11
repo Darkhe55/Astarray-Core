@@ -26,6 +26,7 @@ import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
+import { TaskChainCumulativeBudgetController } from "../orchestration/task-chain-cumulative-budget.js";
 import {
   createDefaultGitCommandRunner,
   createHumanWorktreeStatusPort,
@@ -290,6 +291,8 @@ export interface ApplicationRuntime {
   diagnosticClusterService: DiagnosticClusterService;
   /** REPAIR：人工工作树观察器（写端已在装配层构造；journal 落 <stateDirectory>/human-change-journal）。 */
   humanWorktreeObserver: HumanWorktreeObserver;
+  /** REPAIR：任务链累计预算（T07E-04；此前全仓库无构造点）。 */
+  taskChainCumulativeBudget: TaskChainCumulativeBudgetController;
   /** 已注册工具名（只读快照）：用于验证"开关关闭时工具不存在"，不改动注册表。 */
   listRegisteredToolNames: () => string[];
   missionManager: MissionManager;
@@ -4655,6 +4658,9 @@ export async function createApplicationRuntime(
     listRegisteredToolNames: () => registry.getFullDescriptors().map((descriptor) => descriptor.name),
     diagnosticClusterService,
     humanWorktreeObserver,
+    taskChainCumulativeBudget: new TaskChainCumulativeBudgetController({
+      stateBaseDirectory: stateDirectory,
+    }),
     scanStartupRecovery,
     runStartupRecovery,
     readStartupRecoveryReport,

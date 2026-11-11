@@ -226,3 +226,16 @@
 | **只读展示入口（CLI）** | ✅ 本轮 |
 
 剩一条**需你裁决**的语义：`stale-write-guard` 是否应因"人工改动"拒绝 agent 覆盖（安全 vs 打断）。
+
+## 返修进展（第 35 轮）：`TaskChainCumulativeBudgetController` 第 1 步
+
+- **装配层已构造**（`stateBaseDirectory = stateDirectory`），通过 `runtime.taskChainCumulativeBudget` 暴露。
+- 实测（`tests/core/integration/task-chain-budget-wiring.test.ts`）：
+  - 一个 Agent 读 `src/a.ts` ⇒ 累计来源 1；
+  - **另一个 Agent 读同一文件 ⇒ 仍是 1**（去重，防"多开 Agent 藏读取量"）；
+  - `participatingAgentInstanceIds` 记录两个 Agent；
+  - `<stateDirectory>/task-chain-budget/` 有状态文件（重启可续算）。
+
+**仍未做（真正生效的那一步）**：把控制器接进**读取路径**（`readFile` builtin / 策略包装层），
+让超额读取被拒绝；以及单个 Agent 的 `WorkingSetBudgetTracker`（同样 0 处构造）。
+⇒ 现状是"可达但未被强制"，不计为完成。
