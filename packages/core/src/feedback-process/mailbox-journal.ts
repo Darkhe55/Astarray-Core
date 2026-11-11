@@ -371,6 +371,20 @@ export class MailboxJournal {
     }));
   }
 
+  /** COORD-01-03 §5：上下文注入状态写入点（与 applicationState 分开）。 */
+  async setContextDeliveryState(input: {
+    recipientId: string;
+    messageId: string;
+    contextDeliveryState: MailboxContextDeliveryStateName;
+  }): Promise<void> {
+    const document = await this.loadDocument(input.recipientId);
+    if (document === null) return;
+    const message = document.messages.find((candidate) => candidate.messageId === input.messageId);
+    if (message === undefined) return;
+    message.contextDeliveryState = input.contextDeliveryState;
+    await this.saveDocument(document);
+  }
+
   async countPending(recipientId: string): Promise<number> {
     const document = await this.loadDocument(recipientId);
     if (document === null) {

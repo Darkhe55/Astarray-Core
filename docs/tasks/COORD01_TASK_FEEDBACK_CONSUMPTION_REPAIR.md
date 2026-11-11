@@ -351,3 +351,20 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 ＋ 派发门禁 3 条（不受控不误拦 / 受控拒绝且原因正确 / 只影响目标 mission）。
 
 **仍未做**：上下文准入接线（03 最后一项）。
+
+### COORD-01-03 进展（2026-11-11 目标轮 15）：上下文准入（§5，**模块完成、装配未接**）
+
+| 交付 | 说明 |
+|---|---|
+| `classifyContextAdmission` | 依据**本地可信字段**判定：显式 `requiresModelDecision` / 带未决问题 / 澄清与披露请求 ⇒ 需模型处理；其余（普通进度、摘要）⇒ `archive-only` |
+| `ContextAdmissionController.admit` | 需模型处理 ⇒ 注入一次并记**注入回执**；重复 ⇒ `duplicate-injection-ignored`；`archive-only` ⇒ 不注入、**不请求续跑** |
+| `isResumeRequested` | 固定 `false`——注入回执**不等于**续跑请求（续跑只能由调度决定） |
+| `MailboxJournal.setContextDeliveryState` | 补上 `contextDeliveryState` 的**写入点**（此前只有字段无写入方） |
+
+**用例 5 条**：普通进度只归档 / 未决问题与显式要求需模型处理 / 重复注入只记一次 / archive-only 不注入且无回执 /
+**注入回执不影响 journal 的 applicationState**（两种状态分开）。
+
+**诚实记录一处失败**：本轮把 `contextAdmissionController` / `admitCoordinationContext` 装配进运行时返回对象时，
+字符串替换同时命中了**主控构造参数**与返回对象两处，随后按行删除又切掉了主控构造的收尾 ⇒ 语法错误。
+已 `git checkout --` 整体回退该文件，**装配接线未保留**，本片只交付模块 + journal 写入点，运行时装配留待下一轮
+（改用「先 read 精确行号、再单点插入、每次插完立即 typecheck」的方式重做）。
