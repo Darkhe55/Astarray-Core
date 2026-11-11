@@ -281,3 +281,15 @@
 
 **仍未做**：把上限做成可配置（`maximumTaskChainCumulativeSourceFiles`）并验证"超额被拒、且不产生部分读取"。
 现在用的是默认上限（10 × 单 Agent 上限），所以"拒绝"路径还没被自动化覆盖。
+
+## 返修进展（第 40 轮）：`TaskChainCumulativeBudgetController` **收口**
+
+- 运行时新增 `maximumTaskChainCumulativeSourceFiles` 选项并传入控制器（缺省仍用控制器默认值，行为不变）。
+- 端到端两条用例（`task-chain-budget-enforcement`）：
+  1. 同一文件读两次 ⇒ 累计来源 **1**（去重）；
+  2. **上限 = 1** 时读第二个文件 ⇒ 工具结果为拒绝（匹配"上限/拒绝/permission-denied"），
+     且累计来源**停在 1**（被拒的读取不产生计数）。
+
+⇒ 这一项转 **implemented-unverified**：装配可达、读取路径强制、超额拒绝均有自动化证据。
+
+**待人测**：真实项目规模下的预算口径是否合适（上限 10×单 Agent 默认值是否够用）。

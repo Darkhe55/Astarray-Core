@@ -755,6 +755,11 @@ export interface ApplicationRuntimeOptions {
    * 与 `isDiagnosticCollectionEnabled` **是两个独立开关**——开启聚类不得偷偷开启采集。
    */
   isDiagnosticClusteringEnabled?: boolean;
+  /**
+   * REPAIR（T07E-04）：任务链累计来源文件上限（缺省用控制器默认值）。
+   * 供测试与宿主按项目规模收紧；不影响单 Agent 的既有上限。
+   */
+  maximumTaskChainCumulativeSourceFiles?: number;
   /** G2（第 130 轮）：活锁/循环守卫开关。**缺省 false**（不擅自改默认行为）。 */
   isProgressGuardEnabled?: boolean;
   /** G2（第 162 轮）：任务链总调用预算（缺省 undefined ⇒ 200，**默认行为不变**）。 */
@@ -1013,6 +1018,9 @@ export async function createApplicationRuntime(
   /** REPAIR（T07E-04）：预算控制器单实例，注册/执行/读取路径共用。 */
   const taskChainCumulativeBudgetController = new TaskChainCumulativeBudgetController({
     stateBaseDirectory: stateDirectory,
+    ...(options.maximumTaskChainCumulativeSourceFiles === undefined
+      ? {}
+      : { maximumTaskChainCumulativeSourceFiles: options.maximumTaskChainCumulativeSourceFiles }),
   });
   /**
    * CLUSTER-01 §5：工具随开关注册。关闭时**不注册** ⇒ 对模型与工具说明都不可见，
