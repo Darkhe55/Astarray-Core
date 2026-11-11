@@ -10,6 +10,7 @@
  * 退出码：0 = 干净；1 = 有命中（打印位置）。
  */
 import { execFileSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 
 const patterns = [
   { name: "主机名", re: /\bDESKTOP-[A-Z0-9]{6,}\b/u },
@@ -20,6 +21,16 @@ const patterns = [
 
 /** 允许出现在文档里的占位写法。 */
 const allowPlaceholders = [/<user>/u, /<name>/u, /%USERPROFILE%/u, /example/u, /`?C:\\Users\\`?/u];
+
+const selfPath = "scripts/check-public-privacy.mjs";
+
+/**
+ * 自引用保护：本脚本自身包含这些正则的字面文本，
+ * 若不排除，`git grep` 与会把"加入本脚本的提交"算成命中。
+ */
+function isSelfReference(line) {
+  return line.startsWith(selfPath + ":");
+}
 
 function scanTree() {
   const hits = [];
@@ -35,6 +46,7 @@ function scanTree() {
     }
     for (const line of output.split("\n")) {
       if (line.trim() === "") continue;
+      if (isSelfReference(line)) continue;
       if (allowPlaceholders.some((allow) => allow.test(line))) continue;
       hits.push({ scope: "工作树", pattern: pattern.name, line });
     }
@@ -42,9 +54,11 @@ function scanTree() {
   return hits;
 }
 
-function scanHistory() {
+function scanHistory(ownSource) {
   const hits = [];
   for (const pattern of patterns) {
+    /** 模式文本就写在本脚本里 ⇒ 历史 -S 必然命中"加入脚本的提交"，这是自引用，不算泄露。 */
+    if (ownSource.includes(pattern.re.source)) continue;
     let output = "";
     try {
       output = execFileSync("git", ["log", "--all", "--format=%H", "-S", pattern.re.source], {
@@ -66,7 +80,8 @@ function scanHistory() {
   return hits;
 }
 
-const hits = [...scanTree(), ...scanHistory()];
+const ownSource = await readFile(new URL(import.meta.url), "utf8");
+const hits = [...scanTree(), ...scanHistory(ownSource)];
 if (hits.length === 0) {
   console.log("privacy-ok: 工作树与历史均未发现本机标识或凭据模式");
   process.exit(0);
