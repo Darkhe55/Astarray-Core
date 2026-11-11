@@ -285,3 +285,18 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 
 ⇒ 稳定重试身份的**通道已到公开入口**。仍需调用方（私有 UI/CLI）在"一次用户提交"里生成并复用该标识；
 本卡不修改 GUI，该侧落地属其自身检查点。
+
+### COORD-01-03 进展（2026-11-11 目标轮 11）：回复产物引用**与实际版本核对**（§3）
+
+| 交付 | 说明 |
+|---|---|
+| `verifyReplyArtifactReferences` | 逐条比对"引用版本 vs 当前版本"，四态：`current / stale / missing / future` |
+| 门禁规则 | 要求产物证明但**无引用** ⇒ `artifact-not-provided` 不通过；有引用但非 current ⇒ `artifact-not-current:<明细>` 不通过；**普通消息无引用仍合法** |
+| 接线 | `runtime.verifyCoordinationReplyArtifacts(...)`（版本解析由调用方注入，**模型不得自证**） |
+
+**用例 5 条**：无引用不通过 / 引用版本低 ⇒ stale / **引用版本高 ⇒ future（不得按"更新"放行）** / 产物不存在 ⇒ missing / 版本一致通过且普通消息无引用也通过。
+
+**与既有能力的关系（核实结论）**：完成证据侧的版本核对已存在于 `task-accuracy-verifier`（`artifactRevision > producedAtRevision` 判陈旧）；
+本模块补的是**协作回复的 `artifactReferences`** 这条路径，两者口径一致（低于当前版本即陈旧）。
+
+**仍未做**：把该判定接进**审查/完成门禁的判定点**（当前仅运行时可调用，尚无门禁消费它）。

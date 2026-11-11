@@ -37,6 +37,10 @@ import { CoordinationStateTransactionStore } from "../orchestration/coordination
 import { CoordinationRetryStore } from "../orchestration/coordination-retry-store.js";
 import { CoordinationWakeCoordinator } from "../orchestration/coordination-wake-coordinator.js";
 import { CoordinationSubmissionIdentityStore } from "../orchestration/coordination-submission-identity.js";
+import {
+  verifyReplyArtifactReferences,
+  type ReplyArtifactVerificationResult,
+} from "../orchestration/reply-artifact-verification.js";
 import { TaskChainCumulativeBudgetController } from "../orchestration/task-chain-cumulative-budget.js";
 import {
   createDefaultGitCommandRunner,
@@ -310,6 +314,14 @@ export interface ApplicationRuntime {
   coordinationRetryStore: CoordinationRetryStore;
   coordinationWakeCoordinator: CoordinationWakeCoordinator;
   coordinationSubmissionIdentityStore: CoordinationSubmissionIdentityStore;
+  /**
+   * COORD-01-03 §3：回复产物引用与实际版本核对（版本来源由调用方注入，模型不得自证）。
+   */
+  verifyCoordinationReplyArtifacts: (input: {
+    references: ReadonlyArray<{ artifactIdentifier: string; revision: number }>;
+    resolveCurrentRevision: (artifactIdentifier: string) => Promise<number | null>;
+    isArtifactProofRequired: boolean;
+  }) => Promise<ReplyArtifactVerificationResult>;
   /**
    * COORD-01-03 §3：稳定提交身份。**相同文本不会自动合并**——必须有请求 ID 才复用。
    */
@@ -4790,6 +4802,7 @@ export async function createApplicationRuntime(
     coordinationRetryStore,
     coordinationWakeCoordinator,
     coordinationSubmissionIdentityStore,
+    verifyCoordinationReplyArtifacts: verifyReplyArtifactReferences,
     resolveCoordinationSubmission: async (input: {
       sourceIdentifier: string;
       requestIdentifier?: string;
