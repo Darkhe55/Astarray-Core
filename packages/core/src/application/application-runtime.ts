@@ -550,7 +550,12 @@ export interface ApplicationRuntime {
     readonly reason: string;
   }>;
   /** R113：向运行中的调度器发送指令（同进程；用户/宿主运维动作）。 */
-  sendMissionInstruction: (missionIdentifier: string, instructionText: string) => void;
+  /** COORD-01-03 §3：第三个参数可选，用于重投时沿用同一消息身份。 */
+  sendMissionInstruction: (
+    missionIdentifier: string,
+    instructionText: string,
+    stableMessageIdentifier?: string,
+  ) => void;
   /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
   reconcileMissionTask: (input: {
     readonly missionIdentifier: string;

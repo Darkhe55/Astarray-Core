@@ -268,3 +268,20 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 
 **仍未做**：`handleUserMessage` 目前**不接受用户消息标识**（入参只有 `message` + 选项），因此运行时的派发调用**尚未传入**
 稳定标识 ⇒ 身份贯通只到"通道就绪"，未到"生产数据流"。这是 03 的下一片，需先在输入层生成/接收用户消息标识。
+
+### COORD-01-03 进展（2026-11-11 目标轮 10）：稳定身份贯通到**公开入口**
+
+本轮核对到关键事实：`sendMissionInstruction` **不是内部调用**，而是运行时对外 API（`application-runtime` 返回对象 +
+`public-sdk` 门面）——指令由 CLI/GUI 经它下发。
+
+| 变更 | 位置 |
+|---|---|
+| `sendMissionInstruction(missionIdentifier, instructionText, stableMessageIdentifier?)` | `application-runtime` 类型 + 实现 + `public-sdk` 门面 |
+
+**用例 2 条**（`coord01-instruction-identity-dispatch`，直接调用真实 `MainController.sendSchedulerInstruction`，
+用记录型传输观察入队参数）：
+① 同一 `stableMessageIdentifier` 两次 ⇒ `messageId` 与 `idempotencyKey` **完全相同**（重投不产生新身份）；
+② 不传 ⇒ 两次身份**不同**（不误合并）。
+
+⇒ 稳定重试身份的**通道已到公开入口**。仍需调用方（私有 UI/CLI）在"一次用户提交"里生成并复用该标识；
+本卡不修改 GUI，该侧落地属其自身检查点。

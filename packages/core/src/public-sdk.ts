@@ -6063,9 +6063,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.runtime.dispatchMissionTask(missionIdentifier, taskIdentifier, options);
   }
-  sendMissionInstruction(missionIdentifier: string, instructionText: string): void {
+  /**
+   * COORD-01-03 §3：可选 `stableMessageIdentifier` 让**重投不重复入队**。
+   * 调用方（CLI/GUI）应在一次用户提交时生成一次并复用；不传则维持既有行为。
+   */
+  sendMissionInstruction(
+    missionIdentifier: string,
+    instructionText: string,
+    stableMessageIdentifier?: string,
+  ): void {
     this.assertOpen();
-    this.runtime.sendMissionInstruction(missionIdentifier, instructionText);
+    this.runtime.sendMissionInstruction(missionIdentifier, instructionText, stableMessageIdentifier);
   }
 
   /** R109：任务级对账（在途任务重新排队，不重放已完成动作）。 */
