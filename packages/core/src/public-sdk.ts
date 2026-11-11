@@ -12,6 +12,8 @@ import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-stor
 import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 export { DiagnosticClusterService } from "./orchestration/diagnostic-cluster-service.js";
+import type { DiagnosticClusterInput } from "./orchestration/diagnostic-clusterer.js";
+import type { DiagnosticEvent } from "./orchestration/diagnostic-event-store.js";
 export type {
   DiagnosticClusteringStatus,
   DiagnosticClusteringStatus as PublicDiagnosticClusteringStatus,
@@ -3158,6 +3160,31 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 
   getMetricsSnapshot() {
     return this.runtime.controller.getMetricsSnapshot();
+  }
+
+  /**
+   * CLUSTER-01 §5：**受控门面方法**——聚类能力只能从这里进，不额外开一条旁路。
+   * 关闭时返回 `disabled`（不会静默构建）。
+   */
+  async buildDiagnosticClusterSnapshot(input: {
+    readonly projectIdentifier: string;
+    readonly generatedAtIso: string;
+    readonly resolveProjectIdentifier: (event: DiagnosticEvent) => string | null;
+  }) {
+    return await this.runtime.diagnosticClusterService.buildSnapshot(input);
+  }
+
+  async getDiagnosticClusteringStatus(projectIdentifier: string) {
+    return await this.runtime.diagnosticClusterService.readLatest(projectIdentifier);
+  }
+
+  async findRelatedDiagnosticCases(input: {
+    readonly projectIdentifier: string;
+    readonly event: DiagnosticClusterInput;
+    readonly limit?: number;
+    readonly minimumSimilarity?: number;
+  }) {
+    return await this.runtime.diagnosticClusterService.findRelated(input);
   }
 
   async handleUserMessage(message: string): Promise<string> {

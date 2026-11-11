@@ -234,3 +234,17 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 - `AstarrayApplicationFacade` 上的受控门面方法（`buildDiagnosticClusterSnapshot` / `findRelatedDiagnosticCases`）；
 - 用**隔离安装的包**验证一次（同时推进 AUDIT-REPAIR-01-05 的 05-3 第一条闭环）；
 - 统一工具层与权限入口、用户纠正记录。
+
+### 切片 8d：**SDK 门面可达**——已交付
+
+- `AstarrayApplicationFacade` 新增三个受控方法：
+  `buildDiagnosticClusterSnapshot` / `getDiagnosticClusteringStatus` / `findRelatedDiagnosticCases`，
+  全部转发到 `runtime.diagnosticClusterService`，**不另开旁路**。
+- 集成用例 `tests/core/integration/cluster01-sdk-facade.test.ts`（2 条，经 `AstarrayApplicationFacade.create`）：
+  - 缺省关闭 ⇒ 构建/查询都 `disabled`，且 `analysis/` 目录不存在；
+  - 开启 ⇒ 未构建 `no-snapshot`、构建成功、检索 `ready`。
+
+**门禁**：typecheck / lint 通过；两个 facade 用例通过。
+
+**仍未做**：隔离安装包验证（含 AUDIT-REPAIR-01-05 的 05-3）、统一工具层与权限入口、用户纠正记录、
+每批让出事件循环的显式调度。
