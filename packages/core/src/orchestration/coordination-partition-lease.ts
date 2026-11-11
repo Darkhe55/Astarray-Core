@@ -104,6 +104,17 @@ export class CoordinationPartitionLeaseStore {
       existing.expiresAtUnixMilliseconds !== null &&
       existing.expiresAtUnixMilliseconds > now
     ) {
+      /**
+       * 同一持有者再次获取 ⇒ **幂等复用**（不递增 token）。
+       * 否则"自己已持锁再问一次"会被判成 held-by-other，崩溃恢复时会误以为拿不到租约。
+       */
+      if (existing.ownerInstanceIdentifier === input.ownerInstanceIdentifier) {
+        return {
+          outcome: "acquired",
+          fencingToken: existing.fencingToken,
+          expiresAtUnixMilliseconds: existing.expiresAtUnixMilliseconds,
+        };
+      }
       return {
         outcome: "held-by-other",
         expiresAtUnixMilliseconds: existing.expiresAtUnixMilliseconds,
