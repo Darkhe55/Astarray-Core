@@ -591,3 +591,18 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 
 **本轮不改代码**：A 需要在隔离包里构造 provider 运行时 + fake server + 任务子集，
 属完整一轮的工作量，不适合与收口同时进行。
+
+#### 05-3 第二条闭环：**Anthropic fake-server 已在隔离包内跑通**（2026-11-11）
+
+- 脚本：`scripts/verify-anthropic-package-loop.mjs --package-dir .tmp/audit05-install`
+- 路径：只 import `node_modules/astarray/dist/public-sdk.js`（有防回落仓库断言）；
+  用**包导出的** `ProviderRuntimeRegistry` + `createAnthropicMessagesProviderRegistration`
+  接入本机 fake server，再 `AstarrayApplicationFacade.create({ runtime: "provider", ... })`，
+  发一条 `handleUserMessage` 触发真实 Provider 请求。
+- 实测：`fake server 收到 2 个请求`，请求体为 Anthropic Messages 形态（`messages` 数组 + `model`），
+  **exit 0**。
+
+**说明一处失败与修正**：最初按**路径**（`/v1/messages`）断言，实测路径是 `/` ——
+注册器把 `baseUrl` 当完整端点。改为断言**请求体形态**（更接近"协议正确"的实质），才通过。
+
+**仍缺**：目标提案权限那条闭环（需要 fake server 返回 `tool_use: proposeGoal` 并配合任务子集）。
