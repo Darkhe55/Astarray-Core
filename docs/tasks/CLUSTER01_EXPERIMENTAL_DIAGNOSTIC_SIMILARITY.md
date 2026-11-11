@@ -286,3 +286,25 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **教训**：先用 `answerToolHelpRequest` 做观测点是错的——它对**任意**未知工具名都返回
 `known-but-not-usable`，无法区分"已注册"与"未注册"。
+
+### 切片 9b：工具注册——**已交付**（根因已定位）
+
+**上一轮失败的真因**（本轮查明）：注册表会拒绝**未映射权限能力**的工具，
+抛 `工具 diagnosticClusters 未映射任何可配置权限，拒绝注册`。
+不是"注册表实例不一致"——我上一轮的猜测是错的。
+
+修法（复用现有能力目录，不新建权限系统）：
+
+| 能力 | 默认 | 说明 |
+|---|---|---|
+| `diagnostic.clusters.read` | devolve/assist = allow | 查询类（list/inspect/find-related） |
+| `diagnostic.clusters.build` | devolve/assist = ask | 构建落盘 |
+
+工具映射：`diagnosticClusters: ["diagnostic.clusters.read", "diagnostic.clusters.build"]`
+（按**最严格**能力登记，action 级再收窄——不把整个工具声明为只读）。
+
+**验证**（`tests/core/integration/cluster01-tool-registration.test.ts`，经 `createApplicationRuntime`）：
+开启 ⇒ 注册表含该工具；关闭 ⇒ **从不注册**（不是"注册后拒绝"）。2 条通过。
+
+**仍未做**：主 Agent 只读投影中不出现写 action 的用例、工具执行时经 `policyPort.execute` 的集成用例、
+`feedback` 存储、CLI。

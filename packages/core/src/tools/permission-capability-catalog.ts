@@ -87,6 +87,12 @@ const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
   { capabilityId: "agent.manage", displayName: "三级 Agent 管理", description: "次级 Agent 暂停、取消和回收所属三级 Agent", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["agent"], riskSummary: "高" },
   { capabilityId: "agent.communication-delegate", displayName: "沟通句柄转交", description: "直属上级把直属低一级 Agent 的限定沟通句柄授权给具体同级 Agent", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["agent"], riskSummary: "高" },
   { capabilityId: "goal.propose", displayName: "提议目标", description: "写入待用户确认的目标提案（不创建契约、不启用目标模式）", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["task"], riskSummary: "中" },
+  /**
+   * CLUSTER-01 §5：诊断聚类的读与写**分开授权**（action 级副作用判定），
+   * 只读查询不该要求"构建索引"的授权，反之亦然。
+   */
+  { capabilityId: "diagnostic.clusters.read", displayName: "诊断聚类查询", description: "查询相似问题组、组详情与相似案例（只读）", devolveDefault: "allow", assistDefault: "allow", applicableResources: ["task"], riskSummary: "低" },
+  { capabilityId: "diagnostic.clusters.build", displayName: "诊断聚类构建", description: "构建并落盘相似问题组索引", devolveDefault: "ask", assistDefault: "ask", applicableResources: ["task"], riskSummary: "低" },
   { capabilityId: "task.read", displayName: "任务读取", description: "查询任务和偏序集状态", devolveDefault: "allow", assistDefault: "allow", applicableResources: ["task"], riskSummary: "低" },
   { capabilityId: "task.manage", displayName: "任务管理", description: "创建、插入、改序、取消任务", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["task"], riskSummary: "中" },
   { capabilityId: "memory.read-selected", displayName: "记忆选择性读取", description: "读取明确选择的 Agent 存档条目", devolveDefault: "allow", assistDefault: "ask", applicableResources: ["memory"], riskSummary: "中" },
@@ -105,6 +111,8 @@ const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
 const DEFAULT_TOOL_CAPABILITY_MAPPINGS: Record<string, string[]> = {
   /** AUDIT-REPAIR-01：目标提议写本地提案（需用户确认后生效），使用专用能力，不冒充只读。 */
   proposeGoal: ["goal.propose"],
+  /** CLUSTER-01：混合读写工具按**最严格**能力登记（构建），action 级判定另行收窄。 */
+  diagnosticClusters: ["diagnostic.clusters.read", "diagnostic.clusters.build"],
   readFile: ["project.read"],
   listDirectory: ["project.read"],
   writeFileTemporary: ["project.create"],
