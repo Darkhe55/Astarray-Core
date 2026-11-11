@@ -54,6 +54,64 @@ describe("本地协调器装配接线", () => {
     }
   }, 60_000);
 
+  it("⑧ 上下文准入：未决问题消息被注入并写 contextDeliveryState；普通进度只归档", async () => {
+    const runtime = await createRuntime();
+    try {
+      await runtime.coordinationMailboxJournal.enqueue({
+        protocolVersion: 1,
+        messageId: "message-context-1",
+        source: { sourceType: "agent", agentInstanceId: "worker-1" },
+        recipientId: "agent:main-agent-1",
+        priority: "state",
+        createdAtIso: "2026-11-11T00:00:00.000Z",
+        idempotencyKey: "message-context-1",
+        payload: {
+          kind: "collaboration-request",
+          messageIdentifier: "message-context-1",
+          correlationIdentifier: "message-context-1",
+          taskIdentifier: "T-001",
+          summary: "需要澄清",
+          authorizationEpoch: 0,
+          hopCount: 0,
+          unresolvedQuestions: ["是否继续"],
+        },
+      } as never);
+      await runtime.coordinationMailboxJournal.enqueue({
+        protocolVersion: 1,
+        messageId: "message-context-2",
+        source: { sourceType: "agent", agentInstanceId: "worker-1" },
+        recipientId: "agent:main-agent-1",
+        priority: "information",
+        createdAtIso: "2026-11-11T00:00:01.000Z",
+        idempotencyKey: "message-context-2",
+        payload: { kind: "success", summary: "普通进度" },
+      } as never);
+
+      const injected = await runtime.admitCoordinationContext({
+        recipientId: "agent:main-agent-1",
+        messageId: "message-context-1",
+      });
+      expect(injected).toMatchObject({
+        outcome: "injected",
+        isInjected: true,
+        isResumeRequested: false,
+      });
+      const [injectedView] = await runtime.readCoordinationMessageStatus("message-context-1");
+      expect(injectedView?.contextDeliveryState).toBe("delivered");
+      expect(injectedView?.applicationState.state).toBe("pending");
+
+      const archived = await runtime.admitCoordinationContext({
+        recipientId: "agent:main-agent-1",
+        messageId: "message-context-2",
+      });
+      expect(archived).toMatchObject({ outcome: "archived-only", isInjected: false });
+      const [archivedView] = await runtime.readCoordinationMessageStatus("message-context-2");
+      expect(archivedView?.contextDeliveryState).toBe("not-required");
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
+
   it("⑦ 显式要求产物证明的完成消息：缺引用被门禁挡住（运行时路径）", async () => {
     const runtime = await createRuntime();
     try {

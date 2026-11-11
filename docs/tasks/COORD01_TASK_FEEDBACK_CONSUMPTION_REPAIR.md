@@ -368,3 +368,22 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 字符串替换同时命中了**主控构造参数**与返回对象两处，随后按行删除又切掉了主控构造的收尾 ⇒ 语法错误。
 已 `git checkout --` 整体回退该文件，**装配接线未保留**，本片只交付模块 + journal 写入点，运行时装配留待下一轮
 （改用「先 read 精确行号、再单点插入、每次插完立即 typecheck」的方式重做）。
+
+### COORD-01-03 收口（2026-11-11 目标轮 16）：上下文准入**装配完成**
+
+上一轮回退的装配本轮重做并验证通过（改用**行号插入**，不再用字符串替换做结构改动）：
+
+| 接线点 | 内容 |
+|---|---|
+| 构造 | `coordinationContextAdmission`（stateDirectory/coordination/context-admission） |
+| helper | `admitCoordinationContext({recipientId,messageId})`：按本地可信字段分类 → 准入 → 注入成功则写 `contextDeliveryState = delivered` |
+| 暴露 | `runtime.contextAdmissionController` / `runtime.admitCoordinationContext` |
+
+**集成用例（装配层）**：带 `unresolvedQuestions` 的消息 ⇒ `injected`、`isResumeRequested=false`、
+`contextDeliveryState=delivered`，且 **`applicationState` 仍为 pending**（两种状态分开）；
+普通进度消息 ⇒ `archived-only`、`contextDeliveryState=not-required`（不注入、不唤醒）。
+
+### COORD-01-03 五项全部完成 ⇒ **implemented-unverified**
+
+稳定重试身份（贯通公开入口）/ 执行与产物版本核对（判定 + 消费门禁）/ 交办回执释放窗口 /
+控制旁路（含派发门禁）/ 上下文准入（装配完成）。人工验收未做，故不标 done。

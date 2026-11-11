@@ -39,6 +39,10 @@ import { CoordinationWakeCoordinator } from "../orchestration/coordination-wake-
 import { CoordinationSubmissionIdentityStore } from "../orchestration/coordination-submission-identity.js";
 import { ControlBypassController } from "../orchestration/control-bypass.js";
 import {
+  ContextAdmissionController,
+  classifyContextAdmission,
+} from "../orchestration/context-admission.js";
+import {
   verifyReplyArtifactReferences,
   type ReplyArtifactVerificationResult,
 } from "../orchestration/reply-artifact-verification.js";
@@ -317,6 +321,13 @@ export interface ApplicationRuntime {
   coordinationSubmissionIdentityStore: CoordinationSubmissionIdentityStore;
   /** COORD-01-03 §2/§5：控制旁路（取消/暂停/撤权/紧急停止，立即更新本地执行门禁）。 */
   controlBypass: ControlBypassController;
+  /** COORD-01-03 §5：上下文准入（只放"确需模型处理"的内容进上下文）。 */
+  contextAdmissionController: ContextAdmissionController;
+  admitCoordinationContext: (input: { recipientId: string; messageId: string }) => Promise<{
+    outcome: "injected" | "archived-only" | "duplicate-injection-ignored" | "message-not-found";
+    isInjected: boolean;
+    isResumeRequested: false;
+  }>;
   /**
    * COORD-01-03 §3：回复产物引用与实际版本核对（版本来源由调用方注入，模型不得自证）。
    */
@@ -1165,6 +1176,46 @@ export async function createApplicationRuntime(
     nowUnixMilliseconds: () => Date.now(),
   });
   const coordinationControlBypass = new ControlBypassController();
+  const coordinationContextAdmission = new ContextAdmissionController({
+    stateDirectory: path.join(stateDirectory, "coordination", "context-admission"),
+    nowUnixMilliseconds: () => Date.now(),
+  });
+  /** COORD-01-03 §5：把已入库消息送进上下文准入；注入成功同时写 contextDeliveryState。 */
+  const admitCoordinationContext = async (input: {
+    recipientId: string;
+    messageId: string;
+  }): Promise<{
+    outcome: "injected" | "archived-only" | "duplicate-injection-ignored" | "message-not-found";
+    isInjected: boolean;
+    isResumeRequested: false;
+  }> => {
+    const document = await coordinationMailboxJournal.loadDocument(input.recipientId);
+    const message = document?.messages.find((candidate) => candidate.messageId === input.messageId);
+    if (message === undefined) {
+      return { outcome: "message-not-found", isInjected: false, isResumeRequested: false };
+    }
+    const admissionClass = classifyContextAdmission({
+      payload: message.payload as {
+        kind?: string;
+        unresolvedQuestions?: readonly string[];
+        requiresModelDecision?: boolean;
+      },
+    });
+    const admission = await coordinationContextAdmission.admit({
+      partitionKey: coordinationPartitionKey,
+      recipientIdentifier: input.recipientId,
+      messageIdentifier: input.messageId,
+      admissionClass,
+    });
+    if (admission.isInjected) {
+      await coordinationMailboxJournal.setContextDeliveryState({
+        recipientId: input.recipientId,
+        messageId: input.messageId,
+        contextDeliveryState: "delivered",
+      });
+    }
+    return admission;
+  };
   const coordinationSubmissionIdentityStore = new CoordinationSubmissionIdentityStore({
     stateDirectory: path.join(stateDirectory, "coordination", "identity"),
     nowUnixMilliseconds: () => Date.now(),
@@ -4821,6 +4872,8 @@ export async function createApplicationRuntime(
     coordinationWakeCoordinator,
     coordinationSubmissionIdentityStore,
     controlBypass: coordinationControlBypass,
+    contextAdmissionController: coordinationContextAdmission,
+    admitCoordinationContext,
     verifyCoordinationReplyArtifacts: verifyReplyArtifactReferences,
     resolveCoordinationSubmission: async (input: {
       sourceIdentifier: string;
@@ -4986,8 +5039,6 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
-
-
 
 
 
