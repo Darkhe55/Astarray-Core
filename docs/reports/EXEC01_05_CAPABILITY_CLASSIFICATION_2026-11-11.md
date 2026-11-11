@@ -67,3 +67,34 @@
 
 **保留的返修项**（仍需逐项核 ①②）：`SecondaryAgentSessionController`、`TertiaryAgentAssignmentPlanner`、
 `TertiarySingleChainExecutionGuard`、`AnthropicMessagesAdapter`/`OpenAiResponsesAdapter` 等适配器类（多为"未注册"而非"路径不存在"）。
+
+## 返修 9 项的**批量可达性结论**（2026-11-11，第 46 轮）
+
+对剩余 8 项一次性做"是否有构造点"的检查（`git grep -c "new <类名>("`）：
+
+| 项 | 构造点 | 出现文件数 | 判定 |
+|---|---|---|---|
+| `SecondaryAgentSessionController` | **0** | 1（仅定义） | 未构建 |
+| `TertiaryAgentAssignmentPlanner` | **0** | 1 | 未构建 |
+| `TertiarySingleChainExecutionGuard` | **0** | 1 | 未构建 |
+| `OpenAiResponsesAdapter` | **0** | 1 | 未构建 |
+| `OpenAiChatCompletionsAdapter` | **0** | 2（含被继承） | 未构建 |
+| `AnthropicMessagesAdapter` | **0** | 1 | 未构建 |
+| `GeminiInteractionsAdapter` | **0** | 1 | 未构建 |
+| `MetricsRegistry` | **0** | 1 | 未构建 |
+| 四级权限求交（第 44 轮） | 0 | 1 | 未构建 |
+| Provider fallback（第 45 轮） | 0 | 1 | 未构建 |
+
+### 结论：**"返修 9 项"里只有 2 项是真正的接线缺口**
+
+| 项 | 结果 |
+|---|---|
+| `HumanWorktreeObserver` | ✅ 接线完成（写端 + 触发 + 只读展示，全部有端到端证据） |
+| `TaskChainCumulativeBudgetController` | ✅ 接线完成（读取强制 + 超额拒绝 + 去重） |
+| 其余 7 项 | **不是接线问题**：全仓库 0 个构造点，属"功能从未构建" |
+
+⇒ 这批"返修"**编码部分已清空**：能做接线的都做完了，剩下的必须走**产品范围决策**
+（是否要实现四级 Agent、多 Provider fallback、三级生命周期、响应式适配器等），
+不应继续以"返修"名义消耗轮次。
+
+**同时说明**：原 17 项分诊把"有源码"当成"应已接入"，口径过宽。这条已在本文档修正。
