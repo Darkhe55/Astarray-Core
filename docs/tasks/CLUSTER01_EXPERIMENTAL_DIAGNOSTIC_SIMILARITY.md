@@ -151,3 +151,16 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：派生索引与游标持久化（`analysis/diagnostic-clusters/`）、
 `findRelated` 查询、资源上限节流与租约、工具/权限入口、SDK 导出、接线到应用装配。
+
+### 切片 5：派生索引持久化（§4）——**已交付**
+
+- `diagnostic-cluster-index.ts`：`buildDiagnosticClusterSnapshot`（schema 版本、算法版本、
+  **配置指纹**、项目 ID、`snapshotIdentifier`、生成时间、游标、`isComplete`/`partialReason`、组列表）、
+  `saveDiagnosticClusterSnapshot`、`readLatestDiagnosticClusterSnapshot`、`resolveClusterIndexDirectory`。
+- 目录固定为 `<stateDirectory>/analysis/diagnostic-clusters/<项目 ID 哈希>/`——**不落项目源码目录**；
+  项目 ID 走 SHA256 短名，杜绝 `../` 路径穿越。
+- 测试 5 条：完整快照可读回；**partial 快照不替换最后完整快照**（指针仍指向完整快照，但 partial 快照本身落盘可追溯）；
+  配置指纹稳定且随参数变化；目录不穿越；快照缺失/损坏 ⇒ 返回 null（不伪装成空结果）。
+
+**仍未做**：`findRelated` 查询、资源上限节流（每批 200 行/2,000 条/16 MiB/5,000 ms/100,000 次比较）、
+单项目写租约与幂等、工具与权限入口、SDK 导出、接线到应用装配。
