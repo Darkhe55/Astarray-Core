@@ -192,3 +192,15 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：单项目写租约与幂等、工具与权限入口、SDK 导出、**接线到应用装配**、用户纠正记录、
 "每批让出事件循环"的显式调度（当前依赖 `await` 读取）。
+
+### 切片 8a：应用级服务（开关与状态区分）——**已交付**
+
+- `diagnostic-cluster-service.ts`：`DiagnosticClusterService`（`buildSnapshot` / `readLatest` / `findRelated`）。
+- **默认关闭**：关闭时 `buildSnapshot` 直接返回 `disabled`，**不读源、不建目录、不写文件**（有用例断言 `analysis/` 目录不存在）。
+- **三种状态可区分**：`disabled`（未开启）/ `no-snapshot`（已开启但从未构建）/ `ready`。
+  卡内要求"无数据与采集未开启分别报告"，这里把它落成类型而不是靠文案。
+- 测试 4 条：关闭零副作用、开启未构建 ⇒ `no-snapshot`、开启构建后可检索且 `isRootCauseConfidence=false`、
+  `findRelated` 在无快照时返回 `no-snapshot` 而非空列表。
+
+**尚未接线（下一轮必做）**：`application-runtime` 的 `isDiagnosticClusteringEnabled` 选项与返回对象字段、
+`public-sdk` 的公开导出与门面方法、以及"从真实装配入口可达"的集成用例。
