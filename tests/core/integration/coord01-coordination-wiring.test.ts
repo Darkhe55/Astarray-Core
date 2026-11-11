@@ -54,6 +54,41 @@ describe("本地协调器装配接线", () => {
     }
   }, 60_000);
 
+  it("④ 三状态查询：应用前 pending、应用后 applied（经运行时入口）", async () => {
+    const runtime = await createRuntime();
+    try {
+      await runtime.coordinationMailboxJournal.enqueue({
+        protocolVersion: 1,
+        messageId: "message-status-1",
+        source: { sourceType: "agent", agentInstanceId: "worker-1" },
+        recipientId: "agent:main-agent-1",
+        priority: "state",
+        createdAtIso: "2026-11-11T00:00:00.000Z",
+        idempotencyKey: "message-status-1",
+        projectIdentifier: "project-alpha",
+        taskIdentifier: "T-001",
+        payload: { kind: "success", summary: "完成" },
+      } as never);
+
+      const beforeApply = await runtime.readCoordinationMessageStatus("message-status-1");
+      expect(beforeApply[0]?.applicationState.state).toBe("pending");
+      expect(beforeApply[0]?.deliveryState.isDelivered).toBe(false);
+
+      await runtime.coordinationMessageConsumer.runConsumptionStep({
+        partitionKey: runtime.coordinationPartitionKey,
+        recipientId: "agent:main-agent-1",
+        ownerInstanceIdentifier: "main-agent-1",
+        leaseTtlMilliseconds: 60_000,
+        toSnapshot: (message) => ({ appliedMessage: message.messageId }),
+      });
+
+      const afterApply = await runtime.readCoordinationMessageStatus("message-status-1");
+      expect(afterApply[0]?.applicationState.state).toBe("applied");
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 60_000);
+
   it("② 真实 journal 消息被消费步应用；③ 再消费不重复应用", async () => {
     const runtime = await createRuntime();
     try {

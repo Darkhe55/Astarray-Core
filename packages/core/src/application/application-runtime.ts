@@ -27,6 +27,7 @@ import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-ca
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
 import { MailboxJournal } from "../feedback-process/mailbox-journal.js";
+import type { MailboxMessageStatusView } from "../feedback-process/mailbox-journal.js";
 import { CoordinationMessageConsumer } from "../orchestration/coordination-message-consumer.js";
 import {
   CoordinationPartitionLeaseStore,
@@ -305,6 +306,10 @@ export interface ApplicationRuntime {
   coordinationMailboxJournal: MailboxJournal;
   coordinationMessageConsumer: CoordinationMessageConsumer;
   coordinationRetryStore: CoordinationRetryStore;
+  /** COORD-01-02 §3：三状态只读查询（delivery / application / context 分开返回）。 */
+  readCoordinationMessageStatus: (
+    messageIdentifier?: string,
+  ) => Promise<MailboxMessageStatusView[]>;
   coordinationPartitionKey: string;
   /** 已注册工具名（只读快照）：用于验证"开关关闭时工具不存在"，不改动注册表。 */
   listRegisteredToolNames: () => string[];
@@ -4741,6 +4746,11 @@ export async function createApplicationRuntime(
     coordinationMailboxJournal,
     coordinationMessageConsumer,
     coordinationRetryStore,
+    readCoordinationMessageStatus: async (messageIdentifier?: string) =>
+      await coordinationMailboxJournal.readMessageStatusView({
+        recipientId: `agent:${options.mainAgentInstanceId ?? "main-agent"}`,
+        ...(messageIdentifier === undefined ? {} : { messageId: messageIdentifier }),
+      }),
     coordinationPartitionKey,
     taskChainCumulativeBudget: taskChainCumulativeBudgetController,
     scanStartupRecovery,

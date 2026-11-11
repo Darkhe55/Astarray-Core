@@ -82,6 +82,27 @@ function priorityRank(priority: FeedbackMessage["priority"]): number {
   return MESSAGE_PRIORITY_ORDER.indexOf(priority);
 }
 
+/**
+ * COORD-01-02（卡 §3）：消息的**三状态只读视图**。
+ *
+ * 卡内明确禁止"用一个 consumed 布尔同时代表三种状态"——因此这里固定输出三个独立字段，
+ * 并且 `applicationState` 缺省为 `pending`（尚未应用），而不是与 delivered 混为一谈。
+ */
+export interface MailboxMessageStatusView {
+  readonly messageIdentifier: string;
+  readonly deliveryState: {
+    readonly isDelivered: boolean;
+    readonly deliveredAtIso: string | null;
+  };
+  readonly applicationState: {
+    readonly state: MailboxApplicationStateName;
+    readonly reason: string | null;
+    readonly targetStateVersion: number | null;
+    readonly attemptCount: number;
+  };
+  readonly contextDeliveryState: MailboxContextDeliveryStateName;
+}
+
 export class MailboxJournal {
   /**
    * 读改写串行化（2026-10-22）：`enqueue / markDelivered / ack` 都是「读文档 → 改 → 原子写回」，
@@ -319,6 +340,35 @@ export class MailboxJournal {
     return document.messages
       .filter((message) => message.applicationState?.state !== "applied")
       .sort((left, right) => left.enqueuedSequence - right.enqueuedSequence);
+  }
+
+  /**
+   * 只读查询：返回该收件人（或指定消息）的三状态。
+   * 未知收件人/消息 ⇒ 空数组（**不伪造** pending 记录）。
+   */
+  async readMessageStatusView(input: {
+    recipientId: string;
+    messageId?: string;
+  }): Promise<MailboxMessageStatusView[]> {
+    const document = await this.loadDocument(input.recipientId);
+    if (document === null) return [];
+    const matched = document.messages.filter(
+      (message) => input.messageId === undefined || message.messageId === input.messageId,
+    );
+    return matched.map((message) => ({
+      messageIdentifier: message.messageId,
+      deliveryState: {
+        isDelivered: message.delivered,
+        deliveredAtIso: message.deliveredAtIso,
+      },
+      applicationState: {
+        state: message.applicationState?.state ?? "pending",
+        reason: message.applicationState?.reason ?? null,
+        targetStateVersion: message.applicationState?.targetStateVersion ?? null,
+        attemptCount: message.applicationState?.attemptCount ?? 0,
+      },
+      contextDeliveryState: message.contextDeliveryState ?? "not-required",
+    }));
   }
 
   async countPending(recipientId: string): Promise<number> {

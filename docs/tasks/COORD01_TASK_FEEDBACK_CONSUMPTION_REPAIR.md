@@ -214,3 +214,17 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 **全量门禁**：首次跑出现 3 个失败（`provider-fake-server` 等），**隔离重跑 17 条全过**、再跑全量 **725 files / 4824 passed** ⇒ 判定为并发抖动，非本次改动引起。
 
 **COORD-01-02 仍差**：三状态查询入口、`isWakeRequested` → 真实 ready-set 重算接线。
+
+### COORD-01-02 进展（2026-11-11 目标轮 6）：三状态查询入口（§3）
+
+| 交付 | 说明 |
+|---|---|
+| `MailboxJournal.readMessageStatusView` | 同时返回 **delivery**（`isDelivered` / `deliveredAtIso`）、**application**（`state` / `reason` / `targetStateVersion` / `attemptCount`）、**context**（`not-required/pending/delivered/unknown`）三块，禁止用一个布尔合并 |
+| 缺省语义 | 未应用 ⇒ `applicationState.state = "pending"`；无上下文注入 ⇒ `not-required` |
+| 未命中 | 未知消息/收件人 ⇒ **空数组**，不伪造记录 |
+| 接线 | `runtime.readCoordinationMessageStatus(messageId?)` 经装配层可达 |
+
+**用例 4 条（视图）**：未投递未应用三态独立 / **已投递但未应用仍为 pending**（投递≠应用）/ applied 带目标版本且 blocked 带原因 / 未知消息空数组。
+**用例 1 条（装配）**：经运行时入口查询，应用前 `pending`、消费步应用后 `applied`。
+
+**COORD-01-02 只剩一项**：`isWakeRequested` → **真实 ready-set 重算**接线（卡 §4.5）。
