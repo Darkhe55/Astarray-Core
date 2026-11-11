@@ -356,3 +356,14 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：脚本化 worker **真调用**该工具的端到端用例（需要任务子集授予 `diagnosticClusters`
 并通过策略包装执行）——下一轮补；之后是 `feedback` 存储与 CLI。
+
+### 切片 9g：端到端调用（脚本化 worker）——**部分证据**
+
+`tests/core/integration/cluster01-tool-e2e.test.ts`（1 条，经 `createApplicationRuntime` + 脚本化 worker）：
+任务子集显式授予 `diagnosticClusters`，worker 发出 `{"action":"build"}` ⇒ 拿到工具结果，
+断言结果属于**权限/询问**类（`权限|询问|ask|denied`），**不是**"未知工具"，且 `analysis/` 目录未创建。
+
+**这条证据的边界（如实记录）**：
+它证明"调用被路由到该工具并进入权限判定"，**没有**证明"批准后 handler 真的执行了 build"。
+后者需要构造"允许 `diagnostic.clusters.build` 的权限裁决"，属下一轮；
+在那之前不能宣称工具执行链已完全闭环。
