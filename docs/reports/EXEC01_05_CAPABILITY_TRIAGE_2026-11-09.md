@@ -200,3 +200,29 @@
 
 **仍未做**：把该读取接到业务消费点（`gitReadonlyView` 展示或只读 CLI 子命令），
 以及 `stale-write-guard` 是否应据此拒绝覆盖（属语义决策，需确认后再做）。
+
+## 返修进展（第 34 轮）：`human-changes` 只读命令——**该项收口**
+
+`astarray human-changes [--id <identifier>]`：
+
+| 情况 | 输出 | 退出码 |
+|---|---|---|
+| 没有 journal 目录 | `{"status":"ok","observations":[]}` | 0 |
+| 有记录 | 按名排序的观察列表 | 0 |
+| `--id` 存在 | 该条完整 JSON | 0 |
+| `--id` 不存在 | `{"status":"observation-not-found"}` | **4** |
+| journal 读不出来 | `{"status":"journal-unavailable"}` | **5** |
+
+实测（构建产物）：空列表 `exit 0`；`--id nope` → `exit 4`。测试 3 条。
+
+### `HumanWorktreeObserver` 返修清单（全部完成）
+
+| 项 | 状态 |
+|---|---|
+| 生产 status 端口（porcelain 解析 + 注入式执行器） | ✅ |
+| 写端在装配层构造 | ✅ |
+| agent 记录自写前自动触发观察 | ✅ |
+| journal 可列出 / 可重放 | ✅ |
+| **只读展示入口（CLI）** | ✅ 本轮 |
+
+剩一条**需你裁决**的语义：`stale-write-guard` 是否应因"人工改动"拒绝 agent 覆盖（安全 vs 打断）。

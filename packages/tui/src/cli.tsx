@@ -3,6 +3,7 @@ import { Command } from "commander";
 
 import packageMetadata from "../../../package.json" with { type: "json" };
 import { defaultStateDirectory } from "./cli/run-command.js";
+import { runHumanChangesCommand } from "./cli/human-changes-command.js";
 import { DiagnosticClusterService } from "../../core/src/orchestration/diagnostic-cluster-service.js";
 import { DiagnosticEventStore } from "../../core/src/orchestration/diagnostic-event-store.js";
 import {
@@ -394,6 +395,22 @@ program
     process.exitCode = result.exitCode;
   });
 
+/**
+ * REPAIR（HumanWorktreeObserver）：人工改动 journal 的**只读**展示。
+ * 观察由 `AgentEditIntentGuard` 在 agent 记录自写前自动触发。
+ */
+program
+  .command("human-changes")
+  .description("查看人工工作树观察记录（只读）")
+  .option("--id <identifier>", "查看单条观察的完整记录")
+  .action(async (options: { id?: string }) => {
+    const result = await runHumanChangesCommand({
+      stateDirectory: defaultStateDirectory(),
+      ...(options.id === undefined ? {} : { observationIdentifier: options.id }),
+    });
+    process.stdout.write(result.stdout + "\n");
+    process.exitCode = result.exitCode;
+  });
 const usageCommand = program.command("usage").description("用量概览（只读；由已落盘账目复算）");usageCommand
   .command("overview")
   .description("用量最小概览：范围/明细分页/预算（只报本地账目估算，不冒充官方余额）")
