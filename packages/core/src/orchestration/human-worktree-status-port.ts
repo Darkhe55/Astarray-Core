@@ -65,3 +65,32 @@ export function createHumanWorktreeStatusPort(
     },
   };
 }
+
+/**
+ * 默认执行器（`node:child_process`）。
+ *
+ * **更正我上一轮的判断**：我曾写"核心层不 spawn 进程"，但 `orchestration/git-*`
+ * 本来就在核心层执行 git（`git-integration-coordinator` 等）。所以这里提供默认实现
+ * 不破坏既有分层；注入式签名仍保留，便于测试与替换。
+ */
+export function createDefaultGitCommandRunner(options: {
+  readonly workingDirectoryPath: string;
+}): (argumentsList: readonly string[]) => Promise<string> {
+  return async (argumentsList) => {
+    const { execFile } = await import("node:child_process");
+    return await new Promise<string>((resolve, reject) => {
+      execFile(
+        "git",
+        [...argumentsList],
+        { cwd: options.workingDirectoryPath, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+        (error, stdout) => {
+          if (error !== null) {
+            reject(new Error("git-command-failed", { cause: error }));
+            return;
+          }
+          resolve(stdout);
+        },
+      );
+    });
+  };
+}

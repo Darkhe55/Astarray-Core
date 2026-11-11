@@ -155,3 +155,23 @@
 我倾向 **B**（与 `HumanWorktreeStatusPort` 的注入设计一致，也符合"核心不 spawn"）。
 
 **本轮门禁**：`check:low-parallel` ⇒ **708 files / 4762 passed + 3 skipped，exit 0**（含上一轮的 status port）。
+
+## 返修进展（第 31 轮）：`HumanWorktreeObserver` **写端已构造**
+
+- **更正我上一轮的判断**：我曾写"核心层不 spawn 进程"——**不准确**。
+  `orchestration/git-*`（如 `git-integration-coordinator`）本来就在核心层执行 git。
+  因此新增默认执行器 `createDefaultGitCommandRunner`（`node:child_process`）**不破坏既有分层**，
+  注入式签名继续保留（测试与替换用）。
+- 装配层（`application-runtime`）现在**构造** `HumanWorktreeObserver`：
+  `journalBaseDirectory = stateDirectory`、认证用户来源取 `authenticatedUserId`、
+  status 端口用真实 git（`rev-parse` + `status --porcelain=v1 -z`）、指纹用 `Sha256FileFingerprinter`。
+- 通过 `runtime.humanWorktreeObserver` 暴露。
+
+**证据**（`tests/core/integration/human-worktree-observer-wiring.test.ts`）：
+在临时 git 仓库制造一处改动 ⇒ 观察后 `changedPaths` 含 `a.txt` ⇒
+`<stateDirectory>/human-change-journal/obs-1.json` **真的落盘**。
+
+⇒ 分诊结论里"写端从未构造 ⇒ journal 恒空"这一点**已经改变**。
+
+**仍未做**：生产流程里**主动触发**观察的检查点（目前是构造 + 可从装配入口调用，
+尚无业务路径自动调用）；以及 `gitReadonlyView` 复用同一端口的接线。

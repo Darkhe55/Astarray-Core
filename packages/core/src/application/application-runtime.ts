@@ -26,6 +26,11 @@ import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
+import {
+  createDefaultGitCommandRunner,
+  createHumanWorktreeStatusPort,
+} from "../orchestration/human-worktree-status-port.js";
+import { HumanWorktreeObserver, Sha256FileFingerprinter } from "../orchestration/human-worktree-observer.js";
 import { appendDiagnosticClusterFeedback } from "../orchestration/diagnostic-cluster-feedback.js";
 import {
   DIAGNOSTIC_CLUSTER_TOOL_NAME,
@@ -283,6 +288,8 @@ export interface ApplicationRuntime {
    * 关闭时服务本身可用但一律返回 `disabled`，不产生任何副作用。
    */
   diagnosticClusterService: DiagnosticClusterService;
+  /** REPAIR：人工工作树观察器（写端已在装配层构造；journal 落 <stateDirectory>/human-change-journal）。 */
+  humanWorktreeObserver: HumanWorktreeObserver;
   /** 已注册工具名（只读快照）：用于验证"开关关闭时工具不存在"，不改动注册表。 */
   listRegisteredToolNames: () => string[];
   missionManager: MissionManager;
@@ -3135,6 +3142,21 @@ export async function createApplicationRuntime(
   const agentEditIntentGuard = new AgentEditIntentGuard({
     baseDirectory: stateDirectory,
   });
+  /**
+   * REPAIR（17 项分诊 · HumanWorktreeObserver）：**写端终于被构造**。
+   * 此前全仓库 `new HumanWorktreeObserver` 为 0 处，journal 生产恒空。
+   * 需要真实工作区路径才能观察；缺省用进程 cwd（与既有"未指定即 cwd"一致）。
+   */
+  const humanWorktreeObserver = new HumanWorktreeObserver({
+    statusPort: createHumanWorktreeStatusPort({
+      runGitCommand: createDefaultGitCommandRunner({
+        workingDirectoryPath: options.workspaceRootPath ?? process.cwd(),
+      }),
+    }),
+    fingerprintPort: new Sha256FileFingerprinter(),
+    authenticatedUserSourceIdentifier: options.authenticatedUserId ?? "unknown",
+    journalBaseDirectory: stateDirectory,
+  });
   // T06B/ADR-0014：策略包装器（worker 任务端口与思索模式只读端口共用同一套安全端口）。
   const createPolicyWrapperForAgent = (input: {
     agentInstanceId: string;
@@ -4629,6 +4651,7 @@ export async function createApplicationRuntime(
   return {
     listRegisteredToolNames: () => registry.getFullDescriptors().map((descriptor) => descriptor.name),
     diagnosticClusterService,
+    humanWorktreeObserver,
     scanStartupRecovery,
     runStartupRecovery,
     readStartupRecoveryReport,
