@@ -292,6 +292,18 @@ export class MailboxJournal {
     });
   }
 
+  /**
+   * COORD-01-02：列出该收件人**尚未被应用**的消息（按入池序号升序）。
+   * 供协调器按序应用；已 applied 的消息不再返回，避免重复处理。
+   */
+  async listPendingApplication(recipientId: string): Promise<JournaledMessage[]> {
+    const document = await this.loadDocument(recipientId);
+    if (document === null) return [];
+    return document.messages
+      .filter((message) => message.applicationState?.state !== "applied")
+      .sort((left, right) => left.enqueuedSequence - right.enqueuedSequence);
+  }
+
   async countPending(recipientId: string): Promise<number> {
     const document = await this.loadDocument(recipientId);
     if (document === null) {
