@@ -638,3 +638,20 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 **下一步（下一轮第一步）**：确认分解 JSON 的**必填字段与校验规则**（`taskDecompositionDraftProvider`
 的返回契约），很可能是字段缺失导致整批分解被丢弃；确认后用正确形状重跑。
 **未完成前不宣称 05-3 闭环完成**。
+
+#### 05-3 收口决定（2026-11-11，第 52 轮）
+
+核对分解契约（`task-decomposition-contract.ts`）后确认：`{ nodes: [{ id, description, acceptanceCriteria, toolNames }] }`
+形状合法（必填字符串 + 可选字符串数组），**不是字段问题**；但规划器请求之后仍无 worker 请求。
+
+**不再继续在包内追这条路**，理由与结论：
+
+| 证据层 | 目标提案权限路径 |
+|---|---|
+| 应用级（`audit01-application-matrix`，9 条） | **正向已证**：已分配 + 合法授权 ⇒ 只保存待确认提案、不生成契约 |
+| 包级（`verify-anthropic-package-loop.mjs --propose-goal`） | **负向已证**：未分配 ⇒ 提案不落盘 |
+| 包级正向 | **未达成**：fake server 同时扮演规划器与 worker 时，编排器未派出 worker 任务 |
+
+⇒ 05-3 判定：**闭环①② 完成；③ 包级负向完成，正向以应用级证据覆盖，差距已声明**。
+若要补齐包级正向，需要更深的 orchestration 桩（例如暴露受控的分解注入点），**属产品 API 决策**，
+不应继续以验证脚本的方式绕行。
