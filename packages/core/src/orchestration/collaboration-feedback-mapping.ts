@@ -64,6 +64,8 @@ export function buildCollaborationFeedbackMessage(input: {
   return {
     protocolVersion: input.protocolVersion ?? FEEDBACK_PROTOCOL_VERSION,
     messageId: "collaboration:" + input.message.messageIdentifier,
+    /** COORD-01-02：把任务归属带到**信封**（不再只放在 payload 里）。 */
+    taskIdentifier: input.message.taskIdentifier,
     source: {
       sourceType: "agent",
       agentInstanceId: input.message.senderAgentInstanceId,

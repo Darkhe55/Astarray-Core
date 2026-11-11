@@ -110,3 +110,17 @@
 **仍未做（属 02 后续切片）**：① 持久状态更新与调度重评估的接线（当前只落 journal，未触发重评估）；
 ② 分区（项目 ID + 调度 Agent）与租约/fencing；③ 信封补 `projectIdentifier` / `taskIdentifier`；
 ④ `contextDeliveryState` 的写入点（上下文准入接线）。
+
+### COORD-01-02 进展（2026-11-11 巡检轮）：规范信封的**归属键**已落地
+
+按 §3 规范信封补齐两个缺失字段：
+
+| 字段 | 变更 |
+|---|---|
+| `projectIdentifier` | `FeedbackMessage` 新增可选字段（分区键之一） |
+| `taskIdentifier` | 同上；`buildCollaborationFeedbackMessage` 把任务归属写入**信封**（不再只放在 payload） |
+| 幂等比较 | 归属键不同 ⇒ 视为"同键异内容" ⇒ `operation-not-idempotent`（不静默复用） |
+
+**用例 3 条**：①归属键持久化；②同幂等键但 `taskIdentifier` 不同 ⇒ 拒绝；③旧消息缺归属键仍可入池（向后兼容）。
+
+**仍未做**：调度 Agent 个体 ID 分区、租约/fencing、状态更新→调度重评估接线、`contextDeliveryState` 写入点。

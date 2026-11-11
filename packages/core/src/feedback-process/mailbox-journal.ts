@@ -149,6 +149,9 @@ export class MailboxJournal {
         JSON.stringify(existingMessage.source) !== JSON.stringify(message.source) ||
         existingMessage.recipientId !== message.recipientId ||
         existingMessage.priority !== message.priority ||
+        /** COORD-01-02：归属键不同也算"同键异内容"，不得静默复用。 */
+        existingMessage.projectIdentifier !== message.projectIdentifier ||
+        existingMessage.taskIdentifier !== message.taskIdentifier ||
         JSON.stringify(existingMessage.payload) !== JSON.stringify(message.payload)
       ) {
         throw new DomainError(

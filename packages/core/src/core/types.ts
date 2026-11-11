@@ -516,6 +516,15 @@ export interface FeedbackMessage {
   priority: MessagePriority;
   createdAtIso: string;
   idempotencyKey: string;
+  /**
+   * COORD-01-02：分区与归属键（卡 §3 规范信封要求）。
+   *
+   * `projectIdentifier` 用于跨项目分区；`taskIdentifier` 让普通消息也能被追溯归属，
+   * 而不必依赖协作 payload 变体。两者**可选**以保持对旧消息的兼容；
+   * 新入口应按可用信息填写，缺失时由消费侧如实记 not-provided。
+   */
+  projectIdentifier?: string;
+  taskIdentifier?: string;
   payload: FeedbackMessagePayload;
 }
 
