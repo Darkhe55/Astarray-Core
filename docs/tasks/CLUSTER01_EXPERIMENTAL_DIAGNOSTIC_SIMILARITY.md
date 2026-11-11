@@ -385,3 +385,16 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **CLUSTER-01-03 判定**：工具/权限/SDK 接线与端到端闭环**均已有证据** ⇒ 转 **implemented-unverified**。
 剩余：`feedback` 存储、CLI `astarray similarity ...`。
+
+### 切片 10：纠正记录（§5 首段）——已交付
+
+- `diagnostic-cluster-feedback.ts`：`appendDiagnosticClusterFeedback` / `readDiagnosticClusterFeedback`。
+  - **只追加**到 `analysis/diagnostic-clusters/<hash>/feedback.jsonl`，**不触碰快照文件**；
+  - 每条记录带**精确来源身份**（用户 ID 或强 Agent 个体 ID），空身份直接拒绝；
+  - 返回 `isFact: false`，冲突（agree 与 disagree 并存）显式标 `hasConflict`；
+  - 意见文本走既有 `redactSensitiveText`。
+- 工具 `feedback` action 已接：未装配写入端口 ⇒ `feedback-not-assembled`；装配后写入并返回记录。
+- 测试：`cluster01-cluster-feedback`（4 条）+ `cluster01-cluster-tools`（+1 条，共 7 条）。
+
+**仍未做**：把 `appendFeedback` 从装配层真正填进工具上下文（与 9f 同一处 pass-through）、
+`inspect` 展示意见与冲突、CLI。

@@ -41,6 +41,15 @@ export interface DiagnosticClusterToolContext {
   /** 调用者是否为只读主体（主 Agent / 思索模式）。 */
   readonly isReadOnlyCaller: boolean;
   readonly nowIso: () => string;
+  /** 由装配层提供的纠正记录写入（未装配则拒绝，不假装成功）。 */
+  readonly appendFeedback?: (input: {
+    readonly groupIdentifier: string;
+    readonly verdict: "agree" | "disagree" | "note";
+    readonly sourceIdentity: string;
+    readonly sourceKind: "user" | "agent";
+    readonly noteText: string;
+    readonly recordedAtIso: string;
+  }) => Promise<unknown>;
   readonly resolveProjectIdentifier: (event: Parameters<DiagnosticClusterService["buildSnapshot"]>[0]["resolveProjectIdentifier"] extends (
     event: infer T,
   ) => string | null
@@ -119,9 +128,35 @@ export async function executeDiagnosticClusterAction(input: {
     case "feedback": {
       /**
        * 反馈只保存"用户/有权 Agent 的意见"：不改原始事件、不改算法、不自动重分组。
-       * 存储层尚未实现（卡内 CLUSTER-01-03 的后续切片），这里显式返回未实现而不是假装成功。
+       * 未装配写入端口时显式拒绝，而不是假装成功。
        */
-      return { status: "permission-denied", reason: "feedback-store-not-implemented" };
+      const appendFeedback = input.context.appendFeedback;
+      if (appendFeedback === undefined) {
+        return { status: "permission-denied", reason: "feedback-not-assembled" };
+      }
+      const feedbackArguments = argumentsRecord as unknown as {
+        readonly groupIdentifier?: string;
+        readonly verdict?: "agree" | "disagree" | "note";
+        readonly sourceIdentity?: string;
+        readonly sourceKind?: "user" | "agent";
+        readonly noteText?: string;
+      };
+      if (
+        feedbackArguments.groupIdentifier === undefined ||
+        feedbackArguments.verdict === undefined ||
+        feedbackArguments.sourceIdentity === undefined
+      ) {
+        return { status: "permission-denied", reason: "feedback-arguments-incomplete" };
+      }
+      const stored = await appendFeedback({
+        groupIdentifier: feedbackArguments.groupIdentifier,
+        verdict: feedbackArguments.verdict,
+        sourceIdentity: feedbackArguments.sourceIdentity,
+        sourceKind: feedbackArguments.sourceKind ?? "agent",
+        noteText: feedbackArguments.noteText ?? "",
+        recordedAtIso: input.context.nowIso(),
+      });
+      return { status: "ok", payload: stored };
     }
     default: {
       return { status: "permission-denied", reason: "未知 action" };

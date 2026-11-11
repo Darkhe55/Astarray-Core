@@ -99,12 +99,37 @@ describe("CLUSTER-01 工具 action 判定", () => {
     expect(listed.status).toBe("ok");
   });
 
-  it("feedback 尚未实现时必须显式拒绝（不得假装成功）", async () => {
+  it("feedback 未装配写入端口 ⇒ 显式拒绝（不得假装成功）", async () => {
     const service = buildService(true);
     const result = await executeDiagnosticClusterAction({
       action: "feedback",
       context: context(service, false),
     });
-    expect(result).toEqual({ status: "permission-denied", reason: "feedback-store-not-implemented" });
+    expect(result).toEqual({ status: "permission-denied", reason: "feedback-not-assembled" });
+  });
+
+  it("装配了写入端口 ⇒ 意见被保存（不改快照、带来源身份）", async () => {
+    const service = buildService(true);
+    const stored: unknown[] = [];
+    const result = await executeDiagnosticClusterAction({
+      action: "feedback",
+      argumentsValue: {
+        groupIdentifier: "group-1",
+        verdict: "disagree",
+        sourceIdentity: "user-1",
+        sourceKind: "user",
+        noteText: "不同意这个分组",
+      },
+      context: {
+        ...context(service, false),
+        appendFeedback: async (input) => {
+          stored.push(input);
+          return { feedbackIdentifier: "f1" };
+        },
+      },
+    });
+    expect(result.status).toBe("ok");
+    expect(stored).toHaveLength(1);
+    expect((stored[0] as { sourceIdentity: string }).sourceIdentity).toBe("user-1");
   });
 });
