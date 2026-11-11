@@ -655,3 +655,27 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 ⇒ 05-3 判定：**闭环①② 完成；③ 包级负向完成，正向以应用级证据覆盖，差距已声明**。
 若要补齐包级正向，需要更深的 orchestration 桩（例如暴露受控的分解注入点），**属产品 API 决策**，
 不应继续以验证脚本的方式绕行。
+
+### 05-4：设计—实现矩阵（2026-11-11）
+
+每项按卡内要求的五列分列；**"包验证"一列只写真实跑过的**。
+
+| 检查点 | 静态发现 | 反例复现 | 修复 | 产品入口 | 包验证 |
+|---|---|---|---|---|---|
+| **01 目标提案进统一门禁** | 存在 `proposeGoal` 绕过 `policyPort.execute` 的旁路 | `audit01-application-matrix`(9) + `goal-proposal-gate`(2)：未分配/deny/ponder/ask 均不落盘 | 删除旁路；改任务子集显式分配；`goal.propose` 能力 | ✅ `createApplicationRuntime` | ⬜ 未做（包级仅负向，见 05-3） |
+| **02 Anthropic 流严格性** | SSE 解析、工具释放时机、用量观测 | `anthropic-messages-runtime`(25) + `anthropic-tool-loop-failclosed`(7)：非法 JSON/截断/重复 ID/max_tokens/停止序列 | 运行时已符合；本批**补证据**而非改实现 | ✅ Provider 运行时 | ✅ **已跑**（`verify-anthropic-package-loop.mjs`，fake server 收到真实请求） |
+| **03 确定性磁盘缓存** | 缓存安全边界与 TTL | `cache-safety` + `cache-metrics`（28） | 组件已实现 | ⬜ **生产未接线**（本批明确不接，见 03 ⑦） | ⬜ 未做 |
+| **04 生产可达性分诊** | 21 候选逐项分类 | 逐候选"是否有构造点"核查；10 项为 0 构造点 | 2 项接线（观察器、读取预算）；7 项改判"未构建" | ✅ 观察器经 `runtime.humanWorktreeObserver`、预算经工具端口 | ⬜ 未做（不适用：非包级能力） |
+| **05 包级验收** | 源码测试不能证明包可用 | `verify-cluster01-package.mjs`(3 用例) + `verify-anthropic-package-loop.mjs`(真实请求) | 无需修复（入口可用） | ✅ 公开 SDK 门面 | ✅ **两条闭环已跑**；目标提案正向**未达成**（已声明差距） |
+
+**缓存边界（卡内要求明确区分）**：03 的缓存**组件完成、生产接线未完成**——不得据此宣称命中收益。
+
+**未接入候选后继清单**：见 `EXEC01_05_CAPABILITY_CLASSIFICATION_2026-11-11.md`（2 项已修、7 项未构建、3 类延后）。
+
+### 05-5：状态纠偏（保留历史，不抹除）
+
+- 本批期间对**我自己的两条错误结论**做了更正并保留原文：
+  1. "撤销依赖调用方传 flag ⇒ 漏传即绕过" —— 错，撤销是删除授权记录；
+  2. "未知工具应返回 `escalated-missing-tool`" —— 错，那是 `missing-capability` 请求语义。
+- 对**17 项分诊口径**做了更正：原文把"有源码"当"应已接入"，现按"是否存在已运行生产路径"重判（10 项改判为未构建）。
+- **未把任何"未审查能力"改成 done**；CLUSTER-01、AUDIT-REPAIR-01 各检查点在无人工验收前一律 implemented-unverified。
