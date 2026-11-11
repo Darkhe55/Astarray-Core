@@ -2773,8 +2773,9 @@ export async function createApplicationRuntime(
   const sendMissionInstruction = (
     missionIdentifier: string,
     instructionText: string,
+    stableMessageIdentifier?: string,
   ): void => {
-    controller.sendSchedulerInstruction(missionIdentifier, instructionText);
+    controller.sendSchedulerInstruction(missionIdentifier, instructionText, stableMessageIdentifier);
   };
   /**
    * R120（2026-11-01）：**应用写回提案**（人工批准 + revision 防护；委托控制器）。

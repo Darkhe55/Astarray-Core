@@ -4675,7 +4675,15 @@ export class MainController {
     }
     return scheduler.rewireTaskDependencies(taskId, dependsOn);
   }
-  sendSchedulerInstruction(missionId: string, instructionText: string): void {
+  /**
+   * COORD-01-03 §3：可选 `stableMessageIdentifier` 由上游（用户消息标识）提供。
+   * 提供时**沿用同一身份**（传输重试不会重复入队）；未提供则维持既有行为（每次新身份）。
+   */
+  sendSchedulerInstruction(
+    missionId: string,
+    instructionText: string,
+    stableMessageIdentifier?: string,
+  ): void {
     const activeEntry = this.activeOrchestrators.get(missionId);
     const schedulerWithInstruction = activeEntry?.scheduler as
       | { handleInstruction?: (instruction: string) => void }
@@ -4683,7 +4691,7 @@ export class MainController {
     if (typeof schedulerWithInstruction?.handleInstruction === "function") {
       schedulerWithInstruction.handleInstruction(instructionText);
     }
-    const mainInstructionMessageIdentifier = randomUUID();
+    const mainInstructionMessageIdentifier = stableMessageIdentifier ?? randomUUID();
     void this.options.feedbackTransport
       .enqueue({
         protocolVersion: 1,

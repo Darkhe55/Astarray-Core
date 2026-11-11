@@ -257,3 +257,14 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 
 **本片边界**：身份原语已接线可调用，但**上游提交入口（主控指令）尚未改为携带请求 ID** —— 那需要用户消息标识的贯通，
 属 03 后续切片，未做即不宣称 03 完成。
+
+### COORD-01-03 进展（2026-11-11 目标轮 9）：身份贯通到指令派发 + 入队去重证据
+
+| 交付 | 说明 |
+|---|---|
+| `sendSchedulerInstruction(missionId, instructionText, stableMessageIdentifier?)` | 提供稳定标识时**沿用同一身份**（重试不重复入队）；未提供则维持既有行为 |
+| 运行时 `sendMissionInstruction(..., stableMessageIdentifier?)` | 透传通道打通（当前尚无调用方传入） |
+| 证据 | `coord01-submission-enqueue`（2 条）：同一请求 ID 两次提交 → 同一 `messageIdentifier` → journal **仅 1 条**；不同请求 ID 但文本相同 → **2 条**（不按文本去重） |
+
+**仍未做**：`handleUserMessage` 目前**不接受用户消息标识**（入参只有 `message` + 选项），因此运行时的派发调用**尚未传入**
+稳定标识 ⇒ 身份贯通只到"通道就绪"，未到"生产数据流"。这是 03 的下一片，需先在输入层生成/接收用户消息标识。
