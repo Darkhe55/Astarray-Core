@@ -176,3 +176,19 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：资源上限节流（每批 200 行/2,000 条/16 MiB/5,000 ms/100,000 次比较）、
 单项目写租约与幂等、工具与权限入口、SDK 导出、接线到应用装配、用户纠正记录。
+
+### 切片 7：构建器（扫描 → 聚类 → 快照）——**已交付**
+
+- `diagnostic-cluster-build.ts`：`buildDiagnosticClusterSnapshotForProject`，
+  上限常量 `DIAGNOSTIC_CLUSTER_BUILD_LIMITS`（每批 200 行 / 2,000 条 / 16 MiB / 5,000 ms / 100,000 次比较）。
+- **归属由调用方可信判定**：`resolveProjectIdentifier(event) => string | null`，
+  返回 `null` 或与目标项目不符 ⇒ **排除并计数**（`excludedRecordCount`），不混进项目分析。
+- 命中任一上限 ⇒ `isComplete=false` 并给出**具体原因**
+  （`event-limit` / `duration-limit` / `comparison-limit`），同时保留游标可续扫。
+- 测试 4 条：完整扫描、事件上限（游标前移）、归属不可证被排除计数、时长上限。
+
+**已知近似（如实记录）**：比较次数用「事件数 × 桶数」估算，不是精确计数；
+`byte-limit` 目前由 `readEventPages` 的 `maximumTotalBytes` 内部消化，未单独映射成 partial 原因。
+
+**仍未做**：单项目写租约与幂等、工具与权限入口、SDK 导出、**接线到应用装配**、用户纠正记录、
+"每批让出事件循环"的显式调度（当前依赖 `await` 读取）。
