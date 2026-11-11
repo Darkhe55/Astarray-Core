@@ -5417,3 +5417,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `align03-independent-review-closure`(11) / `align03-artifact-precondition`(5) /
 > `align03-auto-review-appointment`(3)。状态：**implemented-unverified、不归档**；
 > 未做：真实模型审查 Worker、人工验收。
+
+> **㊳ CLUSTER-01 实验性诊断聚类：引擎、接线与端到端已交付（2026-11-11）**。
+> 有界读取（`readDiagnosticPage`/`readEventPages`，游标按字节偏移+行号）、
+> 纯算法（`diagnostic-text-v1` 规范化、码点三元组 Jaccard、严格分桶、leader 聚类 0.85、**禁止传递合并**）、
+> 派生索引（schema/算法版本/配置指纹/游标/`snapshotIdentifier`，**partial 不替换完整快照**）、
+> 相似检索（默认 5/上限 20、`isRootCauseConfidence: false`）、
+> 服务（`disabled` / `no-snapshot` / `ready` 三态可区分）、装配与公开 SDK 门面、
+> 工具（`diagnosticClusters`，action 级只读/写判定，随开关注册，主 Agent 投影排除）、
+> 纠正记录（只追加、带来源身份、标冲突、`isFact: false`）。
+> 证据：12 个测试文件（引擎/服务/装配/SDK/工具/端到端/隔离包）。
+> 端到端已证：未授权被拦、授权后 build 落盘、授权后 feedback 落盘且不生成快照。
+> 状态：**01 implemented-unverified；02 implemented-unverified（租约/取消/TTL 未做）；03 in_progress（CLI 未做）；04 in_progress（效果报告未做）**。

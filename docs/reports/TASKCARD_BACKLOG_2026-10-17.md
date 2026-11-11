@@ -2325,3 +2325,16 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 
 **历史说明**：2026-11-10 早前写的"重新打开为未完成"是当时的真实状态（当时闭环未打通），
 本条记录的是打通后的状态；两者**不是笔误**，而是同一个检查点在不同时点的状态变化。
+
+#### CLUSTER-01 进展（2026-11-11，24 轮）
+
+| 检查点 | 状态 |
+|---|---|
+| 01 契约/开关/有界读取/脱敏 | **implemented-unverified** |
+| 02 算法/索引/预算/checkpoint | **implemented-unverified（部分：租约/取消/TTL 未做）** |
+| 03 工具/权限/运行时/SDK/反馈 | **in_progress（CLI 未做）** |
+| 04 反例/隔离包/效果报告 | **in_progress（效果与资源报告未做）** |
+
+**新增能力**：`diagnosticClusters` 工具（默认关、action 级门禁、主 Agent 不可见）、
+`diagnostic.clusters.read`（allow）/`diagnostic.clusters.build`（ask）两个能力。
+**待人测**：真实项目上的聚类效果与资源占用（属 04 的效果报告，需真实数据）。

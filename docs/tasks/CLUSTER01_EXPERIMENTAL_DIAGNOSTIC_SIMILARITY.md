@@ -65,10 +65,10 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 | 检查点 | 固定交付 | 状态 |
 |---|---|---|
-| CLUSTER-01-01 | 契约/开关/作用域适配器/有界诊断读取/来源引用与脱敏 | pending |
-| CLUSTER-01-02 | 确定性算法、索引、预算、租约、取消、检查点、TTL | pending |
-| CLUSTER-01-03 | 统一工具、权限判定、运行时、SDK、CLI 真实接线及反馈存储 | pending |
-| CLUSTER-01-04 | 行为反例、隔离安装包验收、效果与资源报告 | pending |
+| CLUSTER-01-01 | 契约/开关/作用域适配器/有界诊断读取/来源引用与脱敏 | **implemented-unverified**（2026-11-11） |
+| CLUSTER-01-02 | 确定性算法、索引、预算、租约、取消、检查点、TTL | **implemented-unverified（部分）**：算法/索引/上限/partial 已交付；**租约、取消、TTL 新鲜度未做** |
+| CLUSTER-01-03 | 统一工具、权限判定、运行时、SDK、CLI 真实接线及反馈存储 | **in_progress**：工具/权限/SDK/反馈已交付；**CLI 未做** |
+| CLUSTER-01-04 | 行为反例、隔离安装包验收、效果与资源报告 | **in_progress**：反例与隔离包闭环已交付；**效果与资源报告未做** |
 
 按 01 → 02 → 03 → 04 执行，每次一个检查点，单轮超过三小时拆分。使用可读变量名与带单位的时间变量。先查看在途改动，公共装配文件有冲突时暂停对应文件，不覆盖别人修改。
 
