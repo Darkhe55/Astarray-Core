@@ -93,11 +93,11 @@ fake-server 驱动真实运行时和 ToolLoop：正常文本、正常单/多工�
 
 | 编号 | 当前状态 | 必须附带的交付证据 |
 |---|---|---|
-| 01 | pending | 应用入口权限正反例、无副作用断言 |
-| 02 | pending | fake-server 错误/截断矩阵、工具执行计数 |
-| 03 | pending | 假时钟、隔离和失效测试；生产接线边界 |
-| 04 | pending | 逐候选分诊表、两项真实入口与拔线反例 |
-| 05 | pending | 隔离包结果、哈希、状态纠偏与剩余清单 |
+| 01 | **implemented-unverified** | 应用入口权限正反例、无副作用断言 |
+| 02 | **implemented-unverified** | fake-server 错误/截断矩阵、工具执行计数 |
+| 03 | **implemented-unverified** | 假时钟、隔离和失效测试；生产接线边界 |
+| 04 | **implemented-unverified** | 逐候选分诊表、两项真实入口与拔线反例 |
+| 05 | **implemented-unverified**（2026-11-11） | 隔离包结果、哈希、状态纠偏与剩余清单（见 05-3/05-4/05-5） |
 
 ## 进度记录（2026-11-06）
 

@@ -5429,3 +5429,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 证据：12 个测试文件（引擎/服务/装配/SDK/工具/端到端/隔离包）。
 > 端到端已证：未授权被拦、授权后 build 落盘、授权后 feedback 落盘且不生成快照。
 > 状态：**01 implemented-unverified；02 implemented-unverified（租约/取消/TTL 未做）；03 in_progress（CLI 未做）；04 in_progress（效果报告未做）**。
+
+> **㊴ AUDIT-REPAIR-01：五个检查点全部收口为 implemented-unverified（2026-11-11）**。
+> 01 统一执行门禁（含"批准绑定参数"反例）、02 Anthropic 流严格性矩阵、03 缓存边界（**组件完成、生产未接线**）、
+> 04 生产可达性分诊（21 候选逐项分类；2 项接线、7 项改判未构建）、05 包级验收
+> （`verify-cluster01-package` 3 用例 + `verify-anthropic-package-loop` 真实请求）。
+> **已声明差距**：05-3 目标提案的**包级正向**未达成（需产品 API 决策），应用级正向已证。
+> 全部待人工验收；未虚报 done。
