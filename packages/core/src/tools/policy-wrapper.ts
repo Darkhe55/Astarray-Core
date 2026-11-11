@@ -50,6 +50,21 @@ export interface PolicyWrapperOptions {
   registry: ToolRegistry;
   workspaceBoundary: WorkspaceBoundary;
   temporaryDirectoryPath: string;
+  /**
+   * REPAIR（T07E-04）：任务链累计读取预算（可选）。
+   * 未注入 ⇒ 行为完全不变。
+   */
+  taskChainCumulativeBudget?: {
+    registerTaskChainSource(input: {
+      taskChainIdentifier: string;
+      agentInstanceId: string;
+      canonicalSourceIdentity: string;
+      contentBytes: number;
+      estimatedTokenCount: number;
+    }): Promise<{ cumulativeSourceFileCount: number; isBudgetExceeded: boolean }>;
+  };
+  /** 本次调用所属任务链（预算按任务链累计）。 */
+  taskChainIdentifier?: string;
   /** null 表示不限（Devolve/次级 Agent）；非空表示 Worker 的工具子集。 */
   workerAllowedToolNames: Set<string> | null;
   /**
@@ -462,6 +477,30 @@ export class PolicyWrapper implements ToolPort {
           void Promise.resolve(
             this.options.onProducedArtifacts(result.producedArtifacts),
           ).catch(() => undefined);
+        }
+        /**
+         * REPAIR（T07E-04）：**读取成功后才登记**任务链来源。
+         *
+         * 放在包装层而不是 builtin 分支里，是为了让**所有返回路径**都经过这里：
+         * 提前 return 的超大文件路径不会被绕过计数；读取失败则计入 error 分支，不计数。
+         * 未注入预算 ⇒ 行为完全不变。
+         */
+        if (
+          toolName === "readFile" &&
+          this.options.taskChainCumulativeBudget !== undefined &&
+          this.options.taskChainIdentifier !== undefined
+        ) {
+          const parsedArguments = JSON.parse(argumentsJson) as { filePath?: unknown };
+          if (typeof parsedArguments.filePath === "string") {
+            const contentBytes = Buffer.byteLength(result.outputText, "utf8");
+            await this.options.taskChainCumulativeBudget.registerTaskChainSource({
+              taskChainIdentifier: this.options.taskChainIdentifier,
+              agentInstanceId: this.options.requestingAgentInstanceId ?? "unknown-agent",
+              canonicalSourceIdentity: parsedArguments.filePath,
+              contentBytes,
+              estimatedTokenCount: Math.ceil(contentBytes / 4),
+            });
+          }
         }
         return {
           kind: "success",

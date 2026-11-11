@@ -1010,6 +1010,10 @@ export async function createApplicationRuntime(
     isEnabled: options.isDiagnosticClusteringEnabled === true,
   });
   const registry = new ToolRegistry();
+  /** REPAIR（T07E-04）：预算控制器单实例，注册/执行/读取路径共用。 */
+  const taskChainCumulativeBudgetController = new TaskChainCumulativeBudgetController({
+    stateBaseDirectory: stateDirectory,
+  });
   /**
    * CLUSTER-01 §5：工具随开关注册。关闭时**不注册** ⇒ 对模型与工具说明都不可见，
    * 而不是"注册了再拒绝"，避免暴露一个永远不可用的工具。
@@ -4658,9 +4662,7 @@ export async function createApplicationRuntime(
     listRegisteredToolNames: () => registry.getFullDescriptors().map((descriptor) => descriptor.name),
     diagnosticClusterService,
     humanWorktreeObserver,
-    taskChainCumulativeBudget: new TaskChainCumulativeBudgetController({
-      stateBaseDirectory: stateDirectory,
-    }),
+    taskChainCumulativeBudget: taskChainCumulativeBudgetController,
     scanStartupRecovery,
     runStartupRecovery,
     readStartupRecoveryReport,

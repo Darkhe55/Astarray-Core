@@ -254,3 +254,19 @@
 **下一轮第一步（精确）**：在 `readFile` 成功返回处登记（`contentBytes` 用返回文本字节数、
 `estimatedTokenCount` 按既有估算口径），超额抛 `task-sequence-permission-denied`；
 再在策略包装层把装配层的控制器与任务链标识传进上下文。
+
+## 返修进展（第 38 轮）：读取预算的**强制逻辑已写入**，注入点未接
+
+- `policy-wrapper.ts` 新增可选 `taskChainCumulativeBudget` / `taskChainIdentifier`；
+  在**内置工具执行成功**分支里，`readFile` 成功后登记来源
+  （`contentBytes` = 返回文本字节数，`estimatedTokenCount` = `ceil(bytes/4)`）。
+  **放在包装层**是为了让所有返回路径都经过它（提前 return 的超大文件不会被绕过计数），
+  读取失败走 error 分支，不计数。
+- 装配层把控制器**提升为单实例**（`taskChainCumulativeBudgetController`），
+  返回对象与后续注入共用同一实例。
+
+**未完成**：把 `taskChainCumulativeBudget` 与 `taskChainIdentifier: missionIdentifier`
+注入 `createPolicyWrapperForAgent` 的调用点（本轮定位锚点失败，未乱改），
+以及"同一文件重复读不重复计数 / 超上限被拒"的集成用例。
+
+**这一项仍不计为完成**：逻辑存在但**未注入 ⇒ 实际不生效**。
