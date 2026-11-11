@@ -136,3 +136,22 @@
 
 测试 4 条通过。**仍未完成**：把观察器在装配层构造（`stateDirectory` 的 `human-change-journal`）
 并在人工改动检查点调用 `observeWorktree`；以及 `gitReadonlyView` 复用该端口的接线。
+
+## 返修进展（第 30 轮）：接线前的一个**待决策点**
+
+要构造 `HumanWorktreeObserver`，先得给它一个 `HumanWorktreeStatusPort`；
+生产端口需要"执行 git 命令"的能力（上一轮已做成注入式）。
+
+**目前的真实约束**：`application-runtime`（装配层）内部没有现成的 git 执行器；
+它把 git 能力放在工具层（`gitReadonlyView` builtin 走工具端口）。
+
+于是有两条路，**需要你选**（我不擅自选）：
+
+| 方案 | 做法 | 代价 |
+|---|---|---|
+| A | 装配层直接 `node:child_process` 跑 `git rev-parse/status` | 简单，但让核心装配层获得"起进程"能力，与既有分层（spawn 属工具/沙箱层）冲突 |
+| B | 由工具层提供 git 执行器，再通过选项注入装配层 | 分层干净，但要新增一个端口并在 CLI/GUI 两处装配点都传 |
+
+我倾向 **B**（与 `HumanWorktreeStatusPort` 的注入设计一致，也符合"核心不 spawn"）。
+
+**本轮门禁**：`check:low-parallel` ⇒ **708 files / 4762 passed + 3 skipped，exit 0**（含上一轮的 status port）。
