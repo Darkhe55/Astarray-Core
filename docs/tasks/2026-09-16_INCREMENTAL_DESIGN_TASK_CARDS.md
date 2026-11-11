@@ -168,3 +168,18 @@ readFile 增加 shouldIncludeComments 和 shouldIncludeImports，可选且默认
 判断它是"构造但未调用"还是"调用但语义不完整"，再决定是接线还是补反例。
 
 AUTH-SCOPE 系列体量更大（按模式/范围/上级裁决授权 + 迁移旧矩阵），留待 ACCURACY 有结论后再评估。
+
+## ACCURACY-01 审计结果（2026-11-11，第 54 轮）：**链路可达，不是"未接线"**
+
+| 环节 | 证据 |
+|---|---|
+| 验证器构造 | `accuracy-policy-store.ts:552`（`new TaskAccuracyVerifier({...})`，端口齐全：任务序列 revision、验收条目、产物 revision、接收者、档位、澄清状态、幂等 journal） |
+| 验证调用 | `accuracy-policy-store.ts:568`（`verifier.verifyCompletion(...)`） |
+| **入口可达** | `public-sdk.ts:5560`（`createAccuracyCompletionGate().verifyCompletion({...})`）⇒ **经公开 SDK 可达** |
+| 调用标记 | 真实验证路径记 `isVerificationLayerInvoked: true`（L585），跳过/快速路径记 `false`（L457/493/546）——**符合语义，不是 bug** |
+
+⇒ ACCURACY 与那 7 项"0 构造点"不同：**它真的在公开入口上**。
+
+**因此 ACCURACY-01 的剩余工作不是接线，而是语义反例**（卡内原话："核查未来 revision、漏报必需节点、空证据及部分完成"）：
+需要验证这四类输入是否**被拒绝**而不是被放过。下一轮先 grep 现有测试对这些情形的覆盖，
+缺哪个补哪个（先写反例，再判断是实现缺失还是仅测试缺失）。
