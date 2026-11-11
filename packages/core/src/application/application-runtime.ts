@@ -26,7 +26,11 @@ import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
-import { buildDiagnosticClusterToolDescriptor } from "../orchestration/diagnostic-cluster-tools.js";
+import {
+  DIAGNOSTIC_CLUSTER_TOOL_NAME,
+  buildDiagnosticClusterToolDescriptor,
+  executeDiagnosticClusterAction,
+} from "../orchestration/diagnostic-cluster-tools.js";
 import { MainController } from "../orchestration/main-controller.js";
 // OBS-01／PERF-01-02（第 83 轮）：性能样本落库（此前只在生产里被构造用于"查询"）
 import { PerfEventStore } from "../orchestration/perf-event-store.js";
@@ -984,6 +988,16 @@ export async function createApplicationRuntime(
   const missionManager = new MissionManager(taskStore, stateDirectory);
   const modeMachine = new ModeMachine(options.mode);
   const sessionManager = new SessionAuthorizationManager();
+  /**
+   * CLUSTER-01：服务实例只建一次，注册、执行与返回对象共用同一实例，
+   * 避免"注册的表与服务看的表不是同一个"。
+   */
+  const diagnosticClusterService = new DiagnosticClusterService({
+    store: new DiagnosticEventStore({ baseDirectory: options.stateDirectory }),
+    stateDirectory: options.stateDirectory,
+    algorithmVersion: "diagnostic-cluster-v1",
+    isEnabled: options.isDiagnosticClusteringEnabled === true,
+  });
   const registry = new ToolRegistry();
   /**
    * CLUSTER-01 §5：工具随开关注册。关闭时**不注册** ⇒ 对模型与工具说明都不可见，
@@ -4195,6 +4209,38 @@ export async function createApplicationRuntime(
           taskIdentifier: task.id,
           customToolHandlers: new Map([
             [GOAL_PROPOSAL_TOOL_NAME, goalProposalHandler],
+            /**
+             * CLUSTER-01 §5：聚类工具走**同一套**策略包装（不新建第二套门禁）。
+             * 只有注册表登记且被允许列表放行的调用才会到达这里。
+             */
+            [
+              DIAGNOSTIC_CLUSTER_TOOL_NAME,
+              async (argumentsJson: string, callId: string) => {
+                const parsedArguments = JSON.parse(argumentsJson) as {
+                  readonly action?: string;
+                  readonly event?: never;
+                  readonly limit?: number;
+                  readonly minimumSimilarity?: number;
+                };
+                const result = await executeDiagnosticClusterAction({
+                  action: parsedArguments.action ?? "",
+                  argumentsValue: parsedArguments,
+                  context: {
+                    service: diagnosticClusterService,
+                    projectIdentifier: projectIdentifier ?? "workspace",
+                    isReadOnlyCaller: false,
+                    nowIso: () => new Date().toISOString(),
+                    resolveProjectIdentifier: () => projectIdentifier ?? "workspace",
+                  },
+                });
+                return {
+                  kind: "success" as const,
+                  callId,
+                  outputText: JSON.stringify(result),
+                  isSideEffectFree: false,
+                };
+              },
+            ],
           ]),
           /**
            * EXEC-01-04（2026-11-09）：把执行控制器与**本次归属**注入策略包装层。
@@ -4574,12 +4620,7 @@ export async function createApplicationRuntime(
 
   return {
     listRegisteredToolNames: () => registry.getFullDescriptors().map((descriptor) => descriptor.name),
-    diagnosticClusterService: new DiagnosticClusterService({
-      store: new DiagnosticEventStore({ baseDirectory: options.stateDirectory }),
-      stateDirectory: options.stateDirectory,
-      algorithmVersion: "diagnostic-cluster-v1",
-      isEnabled: options.isDiagnosticClusteringEnabled === true,
-    }),
+    diagnosticClusterService,
     scanStartupRecovery,
     runStartupRecovery,
     readStartupRecoveryReport,

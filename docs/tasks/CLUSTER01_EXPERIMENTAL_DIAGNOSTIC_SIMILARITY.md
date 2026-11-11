@@ -345,3 +345,14 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 **仍未接的一步**：把 `diagnosticClusterService` 从装配层**传进执行上下文**
 （现在只有 builtins 端支持，调用链还不会填这个字段）⇒ 下一轮补这一处 pass-through，
 再写"脚本化 worker 真调用"的集成用例。
+
+### 切片 9f：执行上下文 pass-through（§5）——**已交付**
+
+- 服务实例**只建一次**（`const diagnosticClusterService = ...`），供注册、执行与返回对象共用
+  （避免"注册的表与服务看的表不是同一个"——这正是前几轮怀疑过的坑）。
+- 在查询/执行路径的 `customToolHandlers` 中登记 `diagnosticClusters` 处理器，走**同一套策略包装**
+  （`createPolicyWrapperForAgent`），不新建第二套门禁。
+- 门禁：`typecheck` / `lint` 通过；相关 8 条用例（装配、注册、执行）全绿。
+
+**仍未做**：脚本化 worker **真调用**该工具的端到端用例（需要任务子集授予 `diagnosticClusters`
+并通过策略包装执行）——下一轮补；之后是 `feedback` 存储与 CLI。
