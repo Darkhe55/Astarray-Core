@@ -93,3 +93,17 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 - 工作流等价折叠：只提出工具化候选，权限、副作用及输入输出等价性单独验证。
 - 上下文节点检索：提供回访候选，不自动关闭节点或压缩原文。
 - 本地向量与跨项目分析：待首版效果明确后另立卡；不得借本卡自动联网、下载模型或扩大授权。
+
+## 施工进度（2026-11-11）
+
+### 切片 1：有界分页读取端口（§2 缺口）——**已交付**
+
+- 新模块 `packages/core/src/orchestration/diagnostic-event-page-reader.ts`：
+  `readDiagnosticPage` / `readAllDiagnosticPages`，游标 = `{ byteOffset, lineNumber }`。
+- 只做**纯解析**：不读文件、不做作用域过滤、不脱敏（策略留在上层）。
+- 已覆盖：多页不丢不重、偏移递增、内容 SHA256（供 §3 第 8 条引用校验）、
+  空行不计数但游标前进、CRLF 去 `\r`、末尾无换行、**超长行跳过并计数**、空文本、逐行续读一致。
+- 测试：`tests/core/unit/cluster01-diagnostic-page-reader.test.ts`（8 条）。
+
+**尚未做**（后续切片）：把该端口接进 `DiagnosticEventStore` 的磁盘读取路径、
+按 §4 的 2,000 条/16 MiB 总上限做节流、以及在 `readWithIntegrity` 上复用哈希校验。
