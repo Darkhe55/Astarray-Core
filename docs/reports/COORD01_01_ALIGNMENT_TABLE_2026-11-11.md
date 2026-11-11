@@ -43,11 +43,15 @@
 
 ## 5. EVENT 卡冲突核实
 
-- `docs/tasks/` 下**没有独立的 EVENT 任务卡**文件；
-- "EVENT" 一词出现在 4 张卡的正文：`2026-10-01_RUNTIME_USABILITY_AND_RELIABILITY_TASK_CARDS.md`、
-  `ALIGN02_SEQUENCE_AND_DISPATCH.md`、`ALIGN03_EXECUTION_REVIEW_FEEDBACK.md`、`ALIGN04_RECOVERY_AND_STATUS.md`。
-- ⇒ 卡内"核实 EVENT 卡冲突状态"当前**无可核对的独立卡**；若指的是 ALIGN-02/03/04 中的 EVENT 描述，
-  需产品侧指明是哪一处，本表不猜测。
+**产品侧确认（2026-11-11）**：EVENT 指的就是下面这 4 张卡，不是另一份独立文档。
+
+- `docs/tasks/2026-10-01_RUNTIME_USABILITY_AND_RELIABILITY_TASK_CARDS.md`
+- `docs/tasks/ALIGN02_SEQUENCE_AND_DISPATCH.md`
+- `docs/tasks/ALIGN03_EXECUTION_REVIEW_FEEDBACK.md`
+- `docs/tasks/ALIGN04_RECOVERY_AND_STATUS.md`
+
+**范围声明（双仓库纪律）**：本仓库只记录**公开仓库内**的 EVENT 描述。若 EVENT 相关材料另有存放在私有仓库中的部分，
+本文件**不引用、不复制、不指向**——避免把私有内容混入公开仓库。因此上表只以这 4 份公开文档为核对依据。
 
 ## 6. 结论与后续
 

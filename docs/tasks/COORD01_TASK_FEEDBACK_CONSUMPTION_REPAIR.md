@@ -91,3 +91,22 @@
 运行相关测试、`npm run check` 与安全专项；用可控时钟及故障注入消除真实睡眠计时脆弱。按仓库现有脚本执行 npm pack、包校验和隔离安装冒烟，再从安装后的公共应用入口验证重复消息、恢复与查询。无需真实付费模型和额外依赖。
 
 记录接收→应用、应用→调度唤醒的延迟、队列积压、重复数、stale 数、blocked 数及恢复结果；报告设备和负载，不将样例延迟宣称硬实时保证。四检查点均有生产接线与验证证据才可整卡 done；EVENT 或独立审查依赖未闭合时只关闭不受影响的检查点。
+
+### COORD-01-02 进展（2026-11-11）：**应用状态**与投递状态已分离并可幂等记录
+
+**依据**：卡 §3"可靠收到不等于应用成功"、"禁止用一个 consumed 布尔值同时代表三种状态"。
+
+**交付**：`feedback-process/mailbox-journal.ts`
+
+| 变更 | 说明 |
+|---|---|
+| `JournaledMessage.applicationState` | `{ state, reason, targetStateVersion, attemptCount, updatedAtIso }`；五态：`pending / applied / ignored-stale / blocked / rejected` |
+| `JournaledMessage.contextDeliveryState` | 四态：`not-required / pending / delivered / unknown` |
+| `recordApplicationState(...)` | 以 `messageId` 为幂等键：同版本同结论 ⇒ `idempotent-replay`（不重复计数）；目标版本更低 ⇒ `ignored-stale`（**不覆盖**已应用结论）；未入库 ⇒ `not-found` |
+
+**用例 4 条**（`tests/core/unit/coord01-application-state.test.ts`）：①首次上报 applied 且 `delivered` 仍为 false（投递/应用分离）；
+②同版本重放不重复计数；③低版本被标 stale 且已应用结论不被覆盖；④未入库消息 not-found。
+
+**仍未做（属 02 后续切片）**：① 持久状态更新与调度重评估的接线（当前只落 journal，未触发重评估）；
+② 分区（项目 ID + 调度 Agent）与租约/fencing；③ 信封补 `projectIdentifier` / `taskIdentifier`；
+④ `contextDeliveryState` 的写入点（上下文准入接线）。

@@ -19,6 +19,37 @@ export interface JournaledMessage extends FeedbackMessage {
   enqueuedSequence: number;
   delivered: boolean;
   deliveredAtIso: string | null;
+  /**
+   * COORD-01-02：**应用**状态（与投递状态分开记录）。
+   * 卡内要求"可靠收到不等于应用成功"，禁止用一个布尔同时代表两者。
+   */
+  applicationState?: MailboxApplicationStateRecord;
+  /** COORD-01-02：上下文注入状态（delivered 只代表已携带，不代表模型已理解）。 */
+  contextDeliveryState?: MailboxContextDeliveryStateName;
+}
+
+/** 应用状态取值（卡内冻结的五个）。 */
+export type MailboxApplicationStateName =
+  | "pending"
+  | "applied"
+  | "ignored-stale"
+  | "blocked"
+  | "rejected";
+
+/** 上下文注入状态取值（卡内冻结的四个）。 */
+export type MailboxContextDeliveryStateName =
+  | "not-required"
+  | "pending"
+  | "delivered"
+  | "unknown";
+
+export interface MailboxApplicationStateRecord {
+  state: MailboxApplicationStateName;
+  reason: string | null;
+  /** 本次应用针对的目标状态版本（用于识别陈旧消息）。 */
+  targetStateVersion: number | null;
+  attemptCount: number;
+  updatedAtIso: string;
 }
 
 export interface MailboxJournalDocument {
@@ -197,6 +228,65 @@ export class MailboxJournal {
     }
     document.messages = remainingMessages;
     await this.saveDocument(document);
+  }
+
+  /**
+   * COORD-01-02：记录消息的**应用**结果（与"已投递"分开）。
+   *
+   * - 幂等：同 `messageId` 同目标版本重复上报 ⇒ 不重复计数，返回 `idempotent-replay`；
+   * - 陈旧：目标版本低于已记录的目标版本 ⇒ 记 `ignored-stale`，**不改动**既有结论；
+   * - 冲突：同目标版本但结论不同 ⇒ 以新结论为准并计一次尝试（冲突由上层上报 `rejected`）。
+   */
+  async recordApplicationState(input: {
+    recipientId: string;
+    messageId: string;
+    state: MailboxApplicationStateName;
+    reason?: string | null;
+    targetStateVersion?: number | null;
+    updatedAtIso: string;
+  }): Promise<{
+    outcome: "applied" | "idempotent-replay" | "ignored-stale" | "not-found";
+  }> {
+    return this.runExclusive(async () => {
+      const document = await this.loadDocument(input.recipientId);
+      if (document === null) return { outcome: "not-found" as const };
+      const message = document.messages.find(
+        (candidate) => candidate.messageId === input.messageId,
+      );
+      if (message === undefined) return { outcome: "not-found" as const };
+
+      const nextTargetStateVersion = input.targetStateVersion ?? null;
+      const existing = message.applicationState;
+      if (existing !== undefined && existing.targetStateVersion === nextTargetStateVersion) {
+        if (existing.state === input.state) {
+          /** 同版本同结论：重复上报，不重复计数。 */
+          return { outcome: "idempotent-replay" as const };
+        }
+      }
+      if (
+        existing !== undefined &&
+        existing.targetStateVersion !== null &&
+        nextTargetStateVersion !== null &&
+        nextTargetStateVersion < existing.targetStateVersion
+      ) {
+        /** 陈旧：不覆盖已应用结论，但如实记录"曾有陈旧上报"。 */
+        existing.attemptCount += 1;
+        existing.updatedAtIso = input.updatedAtIso;
+        existing.reason = input.reason ?? existing.reason;
+        await this.saveDocument(document);
+        return { outcome: "ignored-stale" as const };
+      }
+
+      message.applicationState = {
+        state: input.state,
+        reason: input.reason ?? null,
+        targetStateVersion: nextTargetStateVersion,
+        attemptCount: (existing?.attemptCount ?? 0) + 1,
+        updatedAtIso: input.updatedAtIso,
+      };
+      await this.saveDocument(document);
+      return { outcome: "applied" as const };
+    });
   }
 
   async countPending(recipientId: string): Promise<number> {
