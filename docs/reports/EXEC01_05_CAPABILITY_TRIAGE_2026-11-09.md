@@ -187,3 +187,16 @@
 调用了观察器且标识带任务前缀；观察抛错时拒绝原因**不是** observe-boom；未注入时不因观察报错。
 
 **仍未做**：`gitReadonlyView` 复用同一 status 端口；journal 的读取/展示入口（CLI）。
+
+## 返修进展（第 33 轮）：journal **可被消费**
+
+新增 `HumanWorktreeObserver.listObservationIdentifiers()`：列出 journal 已落盘的观察标识；
+目录不存在 ⇒ 空数组（"还没观察"不是错误），其他读取失败 ⇒ 抛 `human-change-journal-unavailable`
+（不伪装成"没有变化"）。
+
+用例扩展为：观察后 `listObservationIdentifiers()` 含 `obs-1`，
+且 `readHistoricalObservation("obs-1")` 能重放回同一份记录 ⇒ **写进去的证据能被读出来**，
+不再是"写了没人看"。
+
+**仍未做**：把该读取接到业务消费点（`gitReadonlyView` 展示或只读 CLI 子命令），
+以及 `stale-write-guard` 是否应据此拒绝覆盖（属语义决策，需确认后再做）。

@@ -62,6 +62,12 @@ describe("HumanWorktreeObserver 写端接线", () => {
       });
       expect(result.observation.changedPaths).toContain("a.txt");
 
+      /** journal 可被**读取消费**（否则写了没人看等于半截）。 */
+      const identifiers = await runtime.humanWorktreeObserver.listObservationIdentifiers();
+      expect(identifiers).toContain("obs-1");
+      const replay = await runtime.humanWorktreeObserver.readHistoricalObservation("obs-1");
+      expect(replay?.observationIdentifier).toBe("obs-1");
+
       const journalPath = path.join(stateDirectory, "human-change-journal", "obs-1.json");
       const raw = await fs.readFile(journalPath, "utf8");
       expect(JSON.parse(raw).observationIdentifier).toBe("obs-1");

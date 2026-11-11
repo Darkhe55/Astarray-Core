@@ -81,6 +81,23 @@ export class HumanWorktreeObserver {
     );
   }
 
+  /**
+   * 列出 journal 里已落盘的观察标识（供只读消费：展示/诊断/CLI）。
+   * 目录不存在 ⇒ 空数组（"还没有观察"不是错误）。
+   */
+  async listObservationIdentifiers(): Promise<string[]> {
+    try {
+      const fileNames = await fs.readdir(this.journalRootDirectory);
+      return fileNames
+        .filter((fileName) => fileName.endsWith(".json"))
+        .map((fileName) => fileName.slice(0, -".json".length))
+        .sort();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw new Error("human-change-journal-unavailable", { cause: error });
+    }
+  }
+
   /** 从 journal 读取历史观察（重启可重放）。 */
   async readHistoricalObservation(
     observationIdentifier: string,
