@@ -1,3 +1,4 @@
+import type { ToolDescriptor } from "../core/types.js";
 import type { DiagnosticClusterService } from "./diagnostic-cluster-service.js";
 import type { DiagnosticClusterInput } from "./diagnostic-clusterer.js";
 
@@ -126,4 +127,31 @@ export async function executeDiagnosticClusterAction(input: {
       return { status: "permission-denied", reason: "未知 action" };
     }
   }
+}
+
+/**
+ * 工具描述符（注册用）。**不能**声明为纯只读：`build`/`feedback` 会写索引与反馈，
+ * 若声明只读就绕过了写门禁（卡内明令禁止）。action 级判定见上方副作用表。
+ */
+export function buildDiagnosticClusterToolDescriptor(): ToolDescriptor {
+  return {
+    name: DIAGNOSTIC_CLUSTER_TOOL_NAME,
+    summary: "查询实验性诊断聚类：分组、组详情、相似案例（写 action 需额外授权）",
+    category: "restricted",
+    mutationKind: "create-only",
+    backupPolicy: "automatic-preimage",
+    authorizationPolicy: "standard",
+    supportedTaskTypes: ["data"],
+    isIdempotent: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["list", "inspect", "find-related", "build", "feedback"] },
+        groupIdentifier: { type: "string" },
+        limit: { type: "number" },
+        minimumSimilarity: { type: "number" },
+      },
+      required: ["action"],
+    },
+  };
 }

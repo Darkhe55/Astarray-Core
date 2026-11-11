@@ -271,3 +271,18 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 - 注册进现有工具注册表并接入 `policyPort.execute`（这才是"接线完成"）；
 - 主 Agent 只读投影中不出现写 action 的用例；
 - `feedback` 存储（用户纠正记录）。
+
+### 切片 9b：工具注册——**代码已加，但集成验证显示未生效（进行中）**
+
+- 已在 `application-runtime.ts` 的 `new ToolRegistry()`（L987）之后按开关注册 `diagnosticClusters`（L993），
+  `isHiddenFromPreview: true`；关闭时不注册。
+- 新增运行时只读观测 `listRegisteredToolNames()`（基于 `registry.getFullDescriptors()`）。
+- 描述符：`category: "restricted"`、`mutationKind: "create-only"`、`backupPolicy: "automatic-preimage"`，
+  并在注释中写明**不能声明为纯只读**（`build`/`feedback` 会写）。
+
+**实测未通过**：启用开关时 `listRegisteredToolNames()` 仍不含该工具 ⇒ 运行期实际使用的注册表
+**可能不是这一处构造的**（或该 registry 被后续替换）。集成用例已移除（不留失败测试），
+下一步必须先定位"真正被 controller 使用的注册表"再补验证。
+
+**教训**：先用 `answerToolHelpRequest` 做观测点是错的——它对**任意**未知工具名都返回
+`known-but-not-usable`，无法区分"已注册"与"未注册"。

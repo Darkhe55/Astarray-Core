@@ -26,6 +26,7 @@ import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
+import { buildDiagnosticClusterToolDescriptor } from "../orchestration/diagnostic-cluster-tools.js";
 import { MainController } from "../orchestration/main-controller.js";
 // OBS-01／PERF-01-02（第 83 轮）：性能样本落库（此前只在生产里被构造用于"查询"）
 import { PerfEventStore } from "../orchestration/perf-event-store.js";
@@ -277,6 +278,8 @@ export interface ApplicationRuntime {
    * 关闭时服务本身可用但一律返回 `disabled`，不产生任何副作用。
    */
   diagnosticClusterService: DiagnosticClusterService;
+  /** 已注册工具名（只读快照）：用于验证"开关关闭时工具不存在"，不改动注册表。 */
+  listRegisteredToolNames: () => string[];
   missionManager: MissionManager;
   taskStore: TaskStore;
   supervisor: FeedbackProcessSupervisor | null;
@@ -982,6 +985,13 @@ export async function createApplicationRuntime(
   const modeMachine = new ModeMachine(options.mode);
   const sessionManager = new SessionAuthorizationManager();
   const registry = new ToolRegistry();
+  /**
+   * CLUSTER-01 §5：工具随开关注册。关闭时**不注册** ⇒ 对模型与工具说明都不可见，
+   * 而不是"注册了再拒绝"，避免暴露一个永远不可用的工具。
+   */
+  if (options.isDiagnosticClusteringEnabled === true) {
+    registry.register(buildDiagnosticClusterToolDescriptor(), { isHiddenFromPreview: true });
+  }
   registry.registerMany(BUILTIN_TOOL_DESCRIPTORS);
   /**
    * AUDIT-REPAIR-01：目标提议工具也走注册表（权限目录已映射 goal.propose），
@@ -4563,6 +4573,7 @@ export async function createApplicationRuntime(
     startupRecoveryReportStore.readReport();
 
   return {
+    listRegisteredToolNames: () => registry.getFullDescriptors().map((descriptor) => descriptor.name),
     diagnosticClusterService: new DiagnosticClusterService({
       store: new DiagnosticEventStore({ baseDirectory: options.stateDirectory }),
       stateDirectory: options.stateDirectory,
