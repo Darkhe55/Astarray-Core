@@ -315,3 +315,21 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 
 **仍未做**：审查/完成门禁（独立审查裁决、合并批准）尚未消费该判定；本卡只在**消费路径**设了门禁。
 另：交办回执释放窗口、控制旁路、上下文准入仍属 03 未完成项。
+
+### COORD-01-03 进展（2026-11-11 目标轮 13）：交办回执释放窗口（§5）
+
+先核实：`InstructionWindowStore` 已有**执行完成回执**释放槽位 + 补位 + 重复/乱序/缺任务关联拒绝
+（`released-with-backfill` / `stale-revision-rejected` / `duplicate-receipt-ignored` 等），
+但**没有"交办回执"这一类**——此前只有终态回执能释放。
+
+| 交付 | 说明 |
+|---|---|
+| `InstructionReceipt.receiptKind?: "dispatch" \| "completion"` | 缺省 `completion`（向后兼容）；`dispatch` = 交办回执 |
+| 新状态 `handed-off` | 交办确认后进入该终态（**区别于 `completed`**），并纳入 `TERMINAL_STATES` |
+| 交办失败 | 返回 `dispatch-failed-no-release`，**保留槽位**且不改终态（改成 failed 会让槽位统计误以为已释放却未补位） |
+| 幂等 | 回执键含 `receiptKind`；重复交办回执 ⇒ `duplicate-receipt-ignored` |
+
+**用例 4 条**：交办成功 ⇒ `handed-off` 且释放 / 交办失败 ⇒ 不释放且仍 `dispatched` /
+重复交办回执只释放一次 / 执行完成回执仍走 `completed`（两类回执分开）。
+
+**仍未做**：控制旁路、上下文准入接线（03 剩余两项）。

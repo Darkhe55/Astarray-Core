@@ -30,7 +30,9 @@ export type InstructionState =
   | "completed"
   | "failed"
   | "cancelled"
-  | "rejected";
+  | "rejected"
+  /** COORD-01-03 §5：交办回执已确认、槽位已释放（与执行完成不同）。 */
+  | "handed-off";
 
 /** 占用窗口槽位的状态（契约 §4.3）。 */
 const SLOT_OCCUPYING_STATES: ReadonlySet<InstructionState> = new Set<InstructionState>([
@@ -41,6 +43,7 @@ const SLOT_OCCUPYING_STATES: ReadonlySet<InstructionState> = new Set<Instruction
 
 /** 终态（释放槽位并触发补位）。 */
 const TERMINAL_STATES: ReadonlySet<InstructionState> = new Set<InstructionState>([
+  "handed-off",
   "completed",
   "failed",
   "cancelled",
@@ -87,6 +90,12 @@ export interface InstructionReceipt {
   instructionIdentifier: string;
   instructionRevision: number;
   receiptOutcome: "completed" | "failed" | "cancelled" | "partially-completed";
+  /**
+   * COORD-01-03 §5：回执种类。
+   * - `completion`（默认）：执行完成回执；
+   * - `dispatch`：**交办回执**——只证明"任务已持久化交办"，据此释放槽位，**不等待下级最终产物**。
+   */
+  receiptKind?: "dispatch" | "completion";
   taskIdentifiers: string[];
   evidenceReferences: string[];
   unresolvedQuestions: string[];
@@ -99,6 +108,7 @@ export type SubmitReceiptOutcome =
   | "stale-revision-rejected"
   | "missing-task-link-rejected"
   | "duplicate-receipt-ignored"
+  | "dispatch-failed-no-release"
   | "unknown-instruction-rejected";
 
 export interface SubmitReceiptResult {
@@ -414,6 +424,46 @@ export class InstructionWindowStore {
         outcome: "missing-task-link-rejected",
         detail: "回执未给出关联任务：无法核对，拒绝释放槽位",
       };
+    }
+
+    /**
+     * COORD-01-03 §5：**交办回执**单独处理。
+     * - 交办**失败** ⇒ 保留槽位，返回 `dispatch-failed-no-release`（不得伪造释放）；
+     * - 交办成功 ⇒ 进入 `handed-off` 终态并走下方统一的释放 + 补位（不等待下级最终产物）。
+     */
+    if ((receipt.receiptKind ?? "completion") === "dispatch") {
+      if (receipt.receiptOutcome === "failed") {
+        /** 不改成终态：改成 failed 会让槽位统计误以为已释放（却未补位）。 */
+        instruction.linkedTaskIdentifiers = [...receipt.taskIdentifiers];
+        instruction.unresolvedQuestions = [...receipt.unresolvedQuestions];
+        instruction.updatedAtIso = new Date().toISOString();
+        await this.enqueuePersist();
+        return {
+          outcome: "dispatch-failed-no-release",
+          detail: "交办失败：保留槽位，不得伪造释放",
+        };
+      }
+      this.processedReceiptKeys.add(receiptKey);
+      instruction.linkedTaskIdentifiers = [...receipt.taskIdentifiers];
+      instruction.evidenceReferences = [...receipt.evidenceReferences];
+      instruction.unresolvedQuestions = [...receipt.unresolvedQuestions];
+      instruction.updatedAtIso = new Date().toISOString();
+      instruction.state = "handed-off";
+      const backfilledIdentifierForDispatch = this.queuedOrder.shift() ?? null;
+      if (backfilledIdentifierForDispatch !== null) {
+        const backfilled = this.instructionsByIdentifier.get(backfilledIdentifierForDispatch);
+        if (backfilled !== undefined) {
+          backfilled.state = "dispatched";
+          backfilled.updatedAtIso = new Date().toISOString();
+        }
+      }
+      await this.enqueuePersist();
+      return backfilledIdentifierForDispatch === null
+        ? { outcome: "released-no-backfill", detail: "交办回执已确认：释放槽位（队列为空）" }
+        : {
+            outcome: "released-with-backfill",
+            detail: "交办回执已确认：释放槽位并由 " + backfilledIdentifierForDispatch + " 补位",
+          };
     }
 
     this.processedReceiptKeys.add(receiptKey);
