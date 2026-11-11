@@ -244,3 +244,19 @@ derive-ok
 必须把运行时路径授权给**项目派生 SID**（安装期 provisioning，属 EXEC-01-04）。
 
 **`CreateProcessW 5` 仍未定位**；已排除：档案不存在、结构布局、缓冲区对齐、工作目录、PATH、目标文件不可读。
+
+## 根因定位（2026-11-11）：错误 5 只在挂 `SECURITY_CAPABILITIES` 时出现
+
+新增 `--empty-attributes` 诊断开关做隔离：
+
+| 运行 | 结果 |
+|---|---|
+| 空属性列表 + `EXTENDED_STARTUPINFO_PRESENT` | ✅ 成功（`job-assigned` / `ok` / `exit 0`） |
+| 完整属性（含 AppContainer SID） | ❌ `CreateProcessW 失败: 5` |
+| `--no-appcontainer` | ✅ 成功 |
+
+⇒ 参数、`STARTUPINFOEX`、标志都对；**失败只与那条安全能力属性有关**。
+另外：非提权 `init-sandbox` 报 `profile-created` 但**磁盘档案目录不存在**，
+说明"创建成功"只代表 SID 可派生，档案未必完整物化。
+
+详见 `docs/reports/EXEC01_02_ROOT_CAUSE_ISOLATION_2026-11-11.md`（含最小权限方案与权限变更预案，均未执行）。

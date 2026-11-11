@@ -535,6 +535,8 @@ fn run_sandboxed(arguments: &[String]) {
      * 该开关让 Job Object 半区可以被独立、真实地验证（不是替代 AppContainer）。
      */
     let mut use_app_container = true;
+    /** 诊断开关：传空属性列表（仍带 EXTENDED_STARTUPINFO），用于隔离"属性内容"与"标志本身"。 */
+    let mut isEmptyAttributes = false;
     let mut index = 0;
     let mut command_start: Option<usize> = None;
     while index < arguments.len() {
@@ -564,6 +566,10 @@ fn run_sandboxed(arguments: &[String]) {
                     .and_then(|value| value.parse().ok())
                     .unwrap_or(60_000);
                 index += 2;
+            }
+            "--empty-attributes" => {
+                isEmptyAttributes = true;
+                index += 1;
             }
             "--no-appcontainer" => {
                 use_app_container = false;
@@ -610,17 +616,32 @@ fn run_sandboxed(arguments: &[String]) {
     let mut attribute_list: *mut c_void = ptr::null_mut();
     if use_app_container {
         unsafe {
-            InitializeProcThreadAttributeList(ptr::null_mut(), 1, 0, &mut attribute_size);
+            InitializeProcThreadAttributeList(
+                ptr::null_mut(),
+                if isEmptyAttributes { 0 } else { 1 },
+                0,
+                &mut attribute_size,
+            );
         }
         // 用 `usize` 分配：属性列表要求指针对齐（`Vec<u8>` 只有 1 字节对齐）。
         attribute_buffer = vec![0usize; (attribute_size + std::mem::size_of::<usize>() - 1) / std::mem::size_of::<usize>()];
         attribute_list = attribute_buffer.as_ptr() as *mut c_void;
-        if unsafe { InitializeProcThreadAttributeList(attribute_list, 1, 0, &mut attribute_size) } == 0
+        if unsafe {
+            InitializeProcThreadAttributeList(
+                attribute_list,
+                if isEmptyAttributes { 0 } else { 1 },
+                0,
+                &mut attribute_size,
+            )
+        } == 0
         {
             eprintln!("InitializeProcThreadAttributeList 失败: {}", unsafe { GetLastError() });
             std::process::exit(3);
         }
-        let update_ok = unsafe {
+        let update_ok = if isEmptyAttributes {
+            1
+        } else {
+            unsafe {
             UpdateProcThreadAttribute(
                 attribute_list,
                 0,
@@ -630,6 +651,7 @@ fn run_sandboxed(arguments: &[String]) {
                 ptr::null_mut(),
                 ptr::null_mut(),
             )
+            }
         };
         if update_ok == 0 {
             eprintln!("UpdateProcThreadAttribute 失败: {}", unsafe { GetLastError() });
