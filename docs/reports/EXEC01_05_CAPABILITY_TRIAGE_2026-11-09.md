@@ -293,3 +293,23 @@
 ⇒ 这一项转 **implemented-unverified**：装配可达、读取路径强制、超额拒绝均有自动化证据。
 
 **待人测**：真实项目规模下的预算口径是否合适（上限 10×单 Agent 默认值是否够用）。
+
+## 返修进展（第 41 轮）：权限求交族——**比原判更严重**
+
+原判（第 18 节）："`QuaternaryPermissionIntersectionGuard` 四级权限求交与其创建入口都未接"。
+本轮核对后确认**范围更大**：
+
+| 事实 | 证据 |
+|---|---|
+| 四级守卫 `QuaternaryPermissionIntersectionGuard` **无生产构造** | `git grep 'new QuaternaryPermissionIntersectionGuard'` = 0 |
+| 它依赖的三级求交 `TertiaryPermissionDelegationGuard` **只在四级守卫内部构造** | `new TertiaryPermissionDelegationGuard` 仅命中 `quaternary-boundary-guards.ts:25` |
+| `computeDelegatedDecision` **唯一调用方就是四级守卫** | 全仓库仅 2 处命中（定义 + 四级守卫调用） |
+
+⇒ **整条"子代理权限求交"链在生产线是死的**：不只是四级没接，三级的求交也只是被四级间接引用。
+
+**为什么本轮不改代码**：要接它必须决定
+①求交发生在哪一步（创建四级时 / 派发任务时 / 执行工具时）；
+②三级当前有效权限从哪里取（`main-controller` 的权限端口？profile revision？）；
+③求交结果存哪（生命周期记录？会话状态？）。
+三个都需要先读 `QuaternaryLifecycleRecord` 与派发路径，否则就是"接上去但语义错"。
+**下一轮第一步**：读 `quaternary-lifecycle-controller.ts` 的记录结构与 `main-controller` 的派发入口。
