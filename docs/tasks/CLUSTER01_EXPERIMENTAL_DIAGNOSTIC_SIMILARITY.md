@@ -408,3 +408,16 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **实测中确认的门禁行为**：未授权时该调用被拦且**不产生工具结果**（worker 拿不到结果）——
 这正是"写 action 默认 ask"的应有表现，也解释了最初那次 30 秒超时的空结果。
+
+### 切片 11：CLI 子命令处理器（§5）——**模块已交付，dispatch 未注册**
+
+- `packages/tui/src/cli/similarity-command.ts`：`runSimilarityCommand({ argv, port, projectIdentifier })`，
+  支持 `status|build|list|inspect|find-related|feedback`，稳定错误码
+  `SIMILARITY_EXIT_CODES`（ok 0 / usageError 2 / featureDisabled 3 / noSnapshot 4 / permissionDenied 5）。
+- 关闭 ⇒ `feature-disabled`（与工具/SDK 语义一致，不返回"没有错误"）；未构建 ⇒ `no-snapshot`；
+  缺参数 ⇒ 用法错误；`feedback` 的 `sourceIdentity` 由 CLI 认证上下文提供，**参数不可覆盖**。
+- 测试 6 条（`tests/core/unit/cluster01-similarity-cli.test.ts`）。
+
+**未完成（下一轮）**：**注册进 CLI dispatch**（`cli.tsx`/`commands.ts` 的实际入口尚未定位成功，
+本轮三次检索都没找到命令分派点）。所以在 `astarray similarity` 真正可用之前，
+`CLUSTER-01-03` 保持 **in_progress**，不计为完成。
