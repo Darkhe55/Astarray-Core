@@ -7,6 +7,9 @@
  * 本模块只做"参数 → 调用 → 输出"的映射，不自己开数据库、不复制算法。
  */
 
+import type { DiagnosticClusterService } from "../../../core/src/orchestration/diagnostic-cluster-service.js";
+import { appendDiagnosticClusterFeedback } from "../../../core/src/orchestration/diagnostic-cluster-feedback.js";
+
 export interface SimilarityCommandPort {
   readonly getStatus: (
     projectIdentifier: string,
@@ -54,6 +57,17 @@ export async function runSimilarityCommand(input: {
   readonly projectIdentifier: string;
 }): Promise<SimilarityCommandResult> {
   const subcommand = input.argv[0] ?? "";
+  const knownSubcommands = ["status", "build", "list", "inspect", "find-related", "feedback"];
+  /** 先判参数，再判开关：打错子命令必须得到"用法错误"，不能被 feature-disabled 掩盖。 */
+  if (!knownSubcommands.includes(subcommand)) {
+    return {
+      exitCode: SIMILARITY_EXIT_CODES.usageError,
+      stdout: emit({
+        status: "usage-error",
+        message: "用法：astarray similarity status|build|list|inspect|find-related|feedback",
+      }),
+    };
+  }
   /** 关闭时统一 `feature-disabled`，与工具/SDK 语义一致（不是"没有错误"）。 */
   const statusProbe = await input.port.getStatus(input.projectIdentifier);
   if (statusProbe.status === "disabled") {
@@ -136,4 +150,47 @@ export async function runSimilarityCommand(input: {
       };
     }
   }
+}
+
+/**
+ * 把 CLI 端口绑定到**真实服务**（与 SDK/GUI 同一个 `DiagnosticClusterService`）。
+ *
+ * 默认关闭：`isEnabled` 必须由 CLI 显式传入（对应"仅用户或可信设置路径可启用"）。
+ */
+export function createSimilarityPortFromService(service: DiagnosticClusterService): SimilarityCommandPort {
+  return {
+    getStatus: async (projectIdentifier) => {
+      const latest = await service.readLatest(projectIdentifier);
+      return latest.status === "ready"
+        ? { status: "ready", payload: latest.snapshot }
+        : { status: latest.status };
+    },
+    build: async (projectIdentifier) =>
+      await service.buildSnapshot({
+        projectIdentifier,
+        generatedAtIso: new Date().toISOString(),
+        resolveProjectIdentifier: () => projectIdentifier,
+      }),
+    findRelated: async (input) => {
+      const latest = await service.readLatest(input.projectIdentifier);
+      if (latest.status !== "ready") return { status: latest.status };
+      const group = latest.snapshot.groups.find(
+        (candidate) => candidate.groupIdentifier === input.groupIdentifier,
+      );
+      return group === undefined ? { status: "group-not-found" } : { status: "ok", payload: group };
+    },
+    feedback: async (input) => ({
+      status: "ok",
+      payload: await appendDiagnosticClusterFeedback({
+        stateDirectory: service.getStateDirectory(),
+        projectIdentifier: input.projectIdentifier,
+        groupIdentifier: input.groupIdentifier,
+        verdict: input.verdict,
+        sourceIdentity: input.sourceIdentity,
+        sourceKind: "user",
+        recordedAtIso: new Date().toISOString(),
+        noteText: input.noteText,
+      }),
+    }),
+  };
 }

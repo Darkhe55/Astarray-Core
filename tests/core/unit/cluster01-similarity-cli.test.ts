@@ -8,9 +8,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   SIMILARITY_EXIT_CODES,
+  createSimilarityPortFromService,
   runSimilarityCommand,
   type SimilarityCommandPort,
 } from "../../../packages/tui/src/cli/similarity-command.js";
+import { DiagnosticClusterService } from "../../../packages/core/src/orchestration/diagnostic-cluster-service.js";
+import { DiagnosticEventStore } from "../../../packages/core/src/orchestration/diagnostic-event-store.js";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 function buildPort(overrides: Partial<SimilarityCommandPort> = {}): SimilarityCommandPort {
   return {
@@ -32,6 +38,47 @@ function buildPort(overrides: Partial<SimilarityCommandPort> = {}): SimilarityCo
 }
 
 describe("CLUSTER-01 CLI similarity", () => {
+  it("**接到真实服务**：关闭 ⇒ 退出码 3；启用并构建后 ⇒ status ready", async () => {
+    const stateDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "cluster01-cli-"));
+    try {
+      const disabledService = new DiagnosticClusterService({
+        store: new DiagnosticEventStore({ baseDirectory: stateDirectory }),
+        stateDirectory,
+        algorithmVersion: "diagnostic-cluster-v1",
+      });
+      const disabled = await runSimilarityCommand({
+        argv: ["status"],
+        port: createSimilarityPortFromService(disabledService),
+        projectIdentifier: "project-alpha",
+      });
+      expect(disabled.exitCode).toBe(SIMILARITY_EXIT_CODES.featureDisabled);
+
+      const enabledService = new DiagnosticClusterService({
+        store: new DiagnosticEventStore({ baseDirectory: stateDirectory }),
+        stateDirectory,
+        algorithmVersion: "diagnostic-cluster-v1",
+        isEnabled: true,
+      });
+      const port = createSimilarityPortFromService(enabledService);
+      const beforeBuild = await runSimilarityCommand({
+        argv: ["list"],
+        port,
+        projectIdentifier: "project-alpha",
+      });
+      expect(beforeBuild.exitCode).toBe(SIMILARITY_EXIT_CODES.noSnapshot);
+
+      const built = await runSimilarityCommand({ argv: ["build"], port, projectIdentifier: "project-alpha" });
+      expect(built.exitCode).toBe(SIMILARITY_EXIT_CODES.ok);
+      const afterBuild = await runSimilarityCommand({
+        argv: ["status"],
+        port,
+        projectIdentifier: "project-alpha",
+      });
+      expect(JSON.parse(afterBuild.stdout).status).toBe("ready");
+    } finally {
+      await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 5 });
+    }
+  });
   it("**关闭 ⇒ feature-disabled 与稳定退出码**", async () => {
     const result = await runSimilarityCommand({
       argv: ["status"],

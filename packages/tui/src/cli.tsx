@@ -3,6 +3,12 @@ import { Command } from "commander";
 
 import packageMetadata from "../../../package.json" with { type: "json" };
 import { defaultStateDirectory } from "./cli/run-command.js";
+import { DiagnosticClusterService } from "../../core/src/orchestration/diagnostic-cluster-service.js";
+import { DiagnosticEventStore } from "../../core/src/orchestration/diagnostic-event-store.js";
+import {
+  createSimilarityPortFromService,
+  runSimilarityCommand,
+} from "./cli/similarity-command.js";
 import { executeRunCommand } from "./cli/run-command.js";
 // RELOCATE-01-04（2026-10-18）：冷启动重定位状态只读查询（命令名经用户确认=项目状态）。
 import {
@@ -351,8 +357,44 @@ function collectValues(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
 
-const usageCommand = program.command("usage").description("用量概览（只读；由已落盘账目复算）");
-usageCommand
+/**
+ * CLUSTER-01 §5：实验性诊断聚类子命令。
+ *
+ * **默认关闭**：只有显式 `--enable` 才接线（对应卡内"仅用户或可信设置路径可启用"）。
+ * 与 SDK/GUI 共用同一个 `DiagnosticClusterService`，CLI 不复制算法。
+ */
+program
+  .command("similarity")
+  .description("实验性诊断聚类（默认关闭；需 --enable）")
+  .argument("<subcommand>", "status|build|list|inspect|find-related|feedback")
+  .option("--project <identifier>", "项目标识", "workspace")
+  .option("--group <identifier>", "组标识")
+  .option("--verdict <verdict>", "agree|disagree|note", "note")
+  .option("--note <text>", "意见文本", "")
+  .option("--enable", "显式启用聚类（默认关闭）", false)
+  .action(async (subcommand: string, options: { project?: string; group?: string; verdict?: string; note?: string; enable?: boolean }) => {
+    const stateDirectory = defaultStateDirectory();
+    const service = new DiagnosticClusterService({
+      store: new DiagnosticEventStore({ baseDirectory: stateDirectory }),
+      stateDirectory,
+      algorithmVersion: "diagnostic-cluster-v1",
+      isEnabled: options.enable === true,
+    });
+    const result = await runSimilarityCommand({
+      argv: [
+        subcommand,
+        ...(options.group === undefined ? [] : ["--group", options.group]),
+        ...(options.verdict === undefined ? [] : ["--verdict", options.verdict]),
+        ...(options.note === undefined ? [] : ["--note", options.note]),
+      ],
+      port: createSimilarityPortFromService(service),
+      projectIdentifier: options.project ?? "workspace",
+    });
+    process.stdout.write(result.stdout + "\n");
+    process.exitCode = result.exitCode;
+  });
+
+const usageCommand = program.command("usage").description("用量概览（只读；由已落盘账目复算）");usageCommand
   .command("overview")
   .description("用量最小概览：范围/明细分页/预算（只报本地账目估算，不冒充官方余额）")
   .option("--mission <mission-id>", "限定可见范围（mission）")

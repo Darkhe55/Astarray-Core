@@ -53,6 +53,11 @@ export class DiagnosticClusterService {
     return this.isEnabled;
   }
 
+  /** 状态目录（CLI 适配器写纠正记录时需要；不暴露其他内部状态）。 */
+  getStateDirectory(): string {
+    return this.stateDirectory;
+  }
+
   /**
    * 构建并保存快照。关闭时**不做任何工作、不创建目录**，返回 `disabled`。
    */

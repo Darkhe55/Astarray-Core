@@ -421,3 +421,20 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 **未完成（下一轮）**：**注册进 CLI dispatch**（`cli.tsx`/`commands.ts` 的实际入口尚未定位成功，
 本轮三次检索都没找到命令分派点）。所以在 `astarray similarity` 真正可用之前，
 `CLUSTER-01-03` 保持 **in_progress**，不计为完成。
+
+### 切片 11b：CLI **真实接线**（§5）——已交付
+
+- `packages/tui/src/cli.tsx`：注册 `astarray similarity <subcommand>`（commander），
+  选项 `--project/--group/--verdict/--note/--enable`；**默认关闭**，只有显式 `--enable` 才接线。
+- 与 SDK/GUI 共用同一个 `DiagnosticClusterService`（经 `createSimilarityPortFromService`），CLI 不复制算法。
+- 顺带修正一处顺序问题：**先判子命令再判开关**——否则打错子命令会被 `feature-disabled` 掩盖。
+
+**实测（构建产物 `dist/cli.js`）**：
+
+| 命令 | 输出 | 退出码 |
+|---|---|---|
+| `similarity status`（关闭） | `{"status":"feature-disabled"}` | **3** |
+| `similarity status --enable` | `{"status":"no-snapshot"}` | 0 |
+| `similarity bogus` | `{"status":"usage-error",...}` | **2** |
+
+⇒ `CLUSTER-01-03` 转 **implemented-unverified**（剩余：02 的租约/取消/TTL、04 的效果报告、人工验收）。
