@@ -26,6 +26,8 @@ import type { ToolBackupServicePort } from "../core/types.js";
 import type { WorkspaceBoundary } from "./workspace-boundary.js";
 import type { BackupDeletionAuthorizationController } from "./backup-vault.js";
 import type { BackupVault } from "./backup-vault.js";
+import type { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
+import { executeDiagnosticClusterAction } from "../orchestration/diagnostic-cluster-tools.js";
 import type { ProtectedStoragePolicy } from "./protected-storage-policy.js";
 import type { GenericToolFileOperation } from "./protected-storage-policy.js";
 import type { TaskSequenceStatusController } from "../orchestration/task-sequence-controllers.js";
@@ -58,6 +60,13 @@ export interface BuiltinToolExecutionContext {
    * 调用 assertGenericToolAccessAllowed，列目录时过滤受保护条目。
    */
   protectedStoragePolicy: ProtectedStoragePolicy;
+  /**
+   * CLUSTER-01 §5：诊断聚类服务（**可选**；未装配时调用该工具必须显式报错，
+   * 不能伪装成"没有错误"或返回空结果）。
+   */
+  diagnosticClusterService?: DiagnosticClusterService;
+  /** 当前调用的项目范围（聚类只在该项目内检索）。 */
+  diagnosticClusterProjectIdentifier?: string;
   /**
    * T05C：任务序列状态控制面（只读工具注入；未装配时调用报错）。
    * 调用者身份由 harness 注入（requestingAgentInstanceId），模型无法填写
@@ -711,6 +720,35 @@ export async function executeBuiltinTool(
     }
     case "deleteBackup": {
       return await executeDeleteBackup(args, executionContext);
+    }
+    /** CLUSTER-01 §5：执行入口；开关关闭时由服务自身返回 feature-disabled。 */
+    case "diagnosticClusters": {
+      const clusterService = executionContext.diagnosticClusterService;
+      if (clusterService === undefined) {
+        throw new DomainError(
+          "tool-not-found",
+          "诊断聚类工具未装配（缺少服务上下文），拒绝执行。",
+        );
+      }
+      const parsedArguments = JSON.parse(argumentsJson) as {
+        readonly action?: string;
+        readonly event?: unknown;
+        readonly limit?: number;
+        readonly minimumSimilarity?: number;
+      };
+      const result = await executeDiagnosticClusterAction({
+        action: parsedArguments.action ?? "",
+        argumentsValue: parsedArguments,
+        context: {
+          service: clusterService,
+          projectIdentifier: executionContext.diagnosticClusterProjectIdentifier ?? "workspace",
+          isReadOnlyCaller: false,
+          nowIso: () => new Date().toISOString(),
+          resolveProjectIdentifier: () =>
+            executionContext.diagnosticClusterProjectIdentifier ?? "workspace",
+        },
+      });
+      return { outputText: JSON.stringify(result), isSideEffectFree: false };
     }
     case "taskSequenceStatus": {
       const sequenceId = args["sequenceId"];

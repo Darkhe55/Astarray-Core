@@ -332,3 +332,16 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 ⇒ 现在 worker 真调用 `diagnosticClusters` 会走到未知分支。
 要接它必须把 `DiagnosticClusterService` 与项目上下文传入 builtins 的执行上下文——
 这是"统一工具层"的最后一步，**未做完就不算工具接线完成**。
+
+### 切片 9e：工具执行入口（builtins dispatch）——已交付
+
+- `tools/builtins.ts`：`BuiltinToolExecutionContext` 新增可选 `diagnosticClusterService` 与
+  `diagnosticClusterProjectIdentifier`；`switch` 新增 `case DIAGNOSTIC_CLUSTER_TOOL_NAME`，
+  转发到 `executeDiagnosticClusterAction`。
+- **未装配服务 ⇒ 显式抛错**（不伪装成"没有错误"或空结果）；关闭 ⇒ `feature-disabled`。
+- 测试 `tests/core/unit/cluster01-tool-execution.test.ts`（4 条）：未装配报错、关闭 `feature-disabled` 且不建目录、
+  开启 build ⇒ `payload.status === "built"`、描述符名与 dispatch 名一致（防漂移）。
+
+**仍未接的一步**：把 `diagnosticClusterService` 从装配层**传进执行上下文**
+（现在只有 builtins 端支持，调用链还不会填这个字段）⇒ 下一轮补这一处 pass-through，
+再写"脚本化 worker 真调用"的集成用例。
