@@ -308,3 +308,15 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：主 Agent 只读投影中不出现写 action 的用例、工具执行时经 `policyPort.execute` 的集成用例、
 `feedback` 存储、CLI。
+
+### 切片 9c：主 Agent 投影——**已交付**
+
+实测结论：主 Agent 使用**固定只读白名单**（`MAIN_AGENT_READONLY_TOOL_NAMES`），
+`diagnosticClusters` 不在名单内 ⇒ 主 Agent **连只读 action 也拿不到**，比卡内要求（"主 Agent 只用只读 action"）**更严格**。
+
+测试 `tests/core/unit/cluster01-main-agent-projection.test.ts`（2 条）锁定：
+名单不含该工具；`projectTools(["diagnosticClusters","readFile"])` 只返回 `readFile`；
+且投影**只看工具名不看 action**，不存在"传 read 就放行"的路径。
+
+**仍未做**：工具执行经 `policyPort.execute` 的集成用例（未分配 ⇒ 拒绝 / ask ⇒ 询问 / 允许 ⇒ 执行）、
+`feedback` 存储、CLI。
