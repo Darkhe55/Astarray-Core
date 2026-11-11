@@ -31,6 +31,34 @@ afterEach(async () => {
   await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
 });
 
+function buildFeedbackWorkerRuntime(): AgentRuntime {
+  return {
+    async *run(runInput: AgentRunInput): AsyncIterable<AgentEvent> {
+      const messages = (runInput as unknown as { toolResultMessages?: Array<{ role?: string; content?: unknown }> })
+        .toolResultMessages;
+      if (Array.isArray(messages) && messages.length > 0) {
+        toolResultTexts.push(messages.map((message) => String(message.content ?? "")).join("\n"));
+        yield { kind: "runFinished", agentId: "worker-1", reason: "success", detail: "完成" };
+        return;
+      }
+      yield {
+        kind: "toolCallRequested",
+        callId: "call-feedback",
+        toolName: "diagnosticClusters",
+        argumentsJson: JSON.stringify({
+          action: "feedback",
+          groupIdentifier: "group-1",
+          verdict: "disagree",
+          sourceIdentity: "user-1",
+          sourceKind: "user",
+          noteText: "这个分组不一致",
+        }),
+      };
+      yield { kind: "runFinished", agentId: "worker-1", reason: "tool-calls", detail: "提交纠正意见" };
+    },
+  } as AgentRuntime;
+}
+
 function buildWorkerRuntime(): AgentRuntime {
   return {
     async *run(runInput: AgentRunInput): AsyncIterable<AgentEvent> {
@@ -54,6 +82,72 @@ function buildWorkerRuntime(): AgentRuntime {
 }
 
 describe("CLUSTER-01 端到端调用", () => {
+  it("worker 提交纠正意见 ⇒ 落盘且快照不变", async () => {
+    const runtime = await createApplicationRuntime({
+      mode: "assist",
+      stateDirectory,
+      concurrency: 1,
+      failureThreshold: 1,
+      maxLoopIterations: 4,
+      useFeedbackProcess: false,
+      authenticatedUserId: "user-1",
+      mainAgentInstanceId: "main-agent-1",
+      streamOutput: () => {},
+      isDiagnosticClusteringEnabled: true,
+      isModelTaskPlanningEnabled: true,
+      taskDecompositionDraftProvider: async () =>
+        JSON.stringify({
+          nodes: [
+            {
+              id: "T-001",
+              description: "纠正意见用例",
+              dependsOn: [],
+              acceptanceCriteria: "意见落盘",
+              toolNames: ["diagnosticClusters"],
+            },
+          ],
+        }),
+      workerRuntimeFactory: () => buildFeedbackWorkerRuntime(),
+    } as never);
+
+    try {
+      /** 写 action 默认 ask ⇒ 必须先参数级授权，否则调用被拦（这正是卡内要求的门禁）。 */
+      await runtime.controller.grantSessionAuthorization(
+        "diagnosticClusters",
+        JSON.stringify({
+          action: "feedback",
+          groupIdentifier: "group-1",
+          verdict: "disagree",
+          sourceIdentity: "user-1",
+          sourceKind: "user",
+          noteText: "这个分组不一致",
+        }),
+        Math.floor(Date.now() / 1000),
+      );
+      await runtime.controller.handleUserMessage("提交一条纠正意见", {
+        projectIdentifier: "project-alpha",
+      });
+      const deadline = Date.now() + 30_000;
+      const feedbackPath = path.join(
+        stateDirectory,
+        "analysis",
+        "diagnostic-clusters",
+      );
+      let found: string | null = null;
+      while (found === null && Date.now() < deadline) {
+        const entries = await fs.readdir(feedbackPath, { recursive: true }).catch(() => [] as string[]);
+        found = entries.map(String).find((entry) => entry.endsWith("feedback.jsonl")) ?? null;
+        if (found === null) await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(found, `工具结果：${toolResultTexts.join(" | ").slice(0, 300)}`).not.toBeNull();
+      /** 只落意见，不自动生成/改动快照。 */
+      const snapshotFiles = await fs.readdir(feedbackPath, { recursive: true }).catch(() => [] as string[]);
+      expect(snapshotFiles.map(String).some((entry) => entry.startsWith("snapshot-"))).toBe(false);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 90_000);
+
   it("**获授权后** ⇒ build 真的执行并落盘", async () => {
     const runtime = await createApplicationRuntime({
       mode: "assist",

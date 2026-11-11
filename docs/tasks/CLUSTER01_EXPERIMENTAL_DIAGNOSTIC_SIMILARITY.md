@@ -398,3 +398,13 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：把 `appendFeedback` 从装配层真正填进工具上下文（与 9f 同一处 pass-through）、
 `inspect` 展示意见与冲突、CLI。
+
+### 切片 10b：纠正记录的装配接线 + 端到端（2026-11-11）
+
+- 装配层把 `appendFeedback` 注入工具上下文（写入走 `appendDiagnosticClusterFeedback`，
+  工具层不直接碰文件系统）。
+- 端到端用例（`cluster01-tool-e2e`，第 3 条）：先参数级授权 feedback 调用 ⇒ worker 提交纠正意见 ⇒
+  `feedback.jsonl` **真的落盘**，且目录里**没有 snapshot 文件**（只落意见、不自动重分组）。
+
+**实测中确认的门禁行为**：未授权时该调用被拦且**不产生工具结果**（worker 拿不到结果）——
+这正是"写 action 默认 ask"的应有表现，也解释了最初那次 30 秒超时的空结果。

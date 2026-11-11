@@ -26,6 +26,7 @@ import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
 import { detectFileSystemCaseSensitivity } from "../tools/cross-platform-path-canonicalization.js";
 import { ScriptedRuntime } from "../runtime/scripted-runtime.js";
 import { DiagnosticClusterService } from "../orchestration/diagnostic-cluster-service.js";
+import { appendDiagnosticClusterFeedback } from "../orchestration/diagnostic-cluster-feedback.js";
 import {
   DIAGNOSTIC_CLUSTER_TOOL_NAME,
   buildDiagnosticClusterToolDescriptor,
@@ -4231,6 +4232,13 @@ export async function createApplicationRuntime(
                     isReadOnlyCaller: false,
                     nowIso: () => new Date().toISOString(),
                     resolveProjectIdentifier: () => projectIdentifier ?? "workspace",
+                    /** 纠正记录：写入由装配层注入，工具层不直接碰文件系统。 */
+                    appendFeedback: async (feedbackInput) =>
+                      await appendDiagnosticClusterFeedback({
+                        stateDirectory: options.stateDirectory,
+                        projectIdentifier: projectIdentifier ?? "workspace",
+                        ...feedbackInput,
+                      }),
                   },
                 });
                 return {
