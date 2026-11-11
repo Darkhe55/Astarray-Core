@@ -2338,3 +2338,15 @@ Provider 网络/超时类抖动（隔离复跑 30/30 通过），与本改动无
 **新增能力**：`diagnosticClusters` 工具（默认关、action 级门禁、主 Agent 不可见）、
 `diagnostic.clusters.read`（allow）/`diagnostic.clusters.build`（ask）两个能力。
 **待人测**：真实项目上的聚类效果与资源占用（属 04 的效果报告，需真实数据）。
+
+#### 跨仓库回归（2026-11-11，CLUSTER-01 之后）
+
+CLUSTER-01 改动了公开核心（`packages/core/src/orchestration/**`、`application-runtime.ts`、`tools/**`），
+因此重跑私有仓库验收：
+
+| 命令 | 结果 |
+|---|---|
+| 私有库 `npm run check` | **exit 0**，713 tests passed |
+| 私有库 `npm run build:desktop` | **exit 0**，桌面 CDP 冒烟通过（`failures: []`） |
+
+说明：公开库新增的聚类能力**没有破坏私有库的 TUI/桌面装配**。
