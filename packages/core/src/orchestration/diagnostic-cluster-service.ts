@@ -26,6 +26,7 @@ import {
 export type DiagnosticClusteringStatus =
   | { readonly status: "disabled" }
   | { readonly status: "no-snapshot" }
+  | { readonly status: "stale"; readonly snapshot: DiagnosticClusterSnapshot }
   | { readonly status: "ready"; readonly snapshot: DiagnosticClusterSnapshot };
 
 export interface DiagnosticClusterServiceOptions {
@@ -34,6 +35,9 @@ export interface DiagnosticClusterServiceOptions {
   readonly algorithmVersion: string;
   /** 缺省关：装配层必须显式传入 true。 */
   readonly isEnabled?: boolean;
+  /** 新鲜度上限（卡内默认 24 小时）。 */
+  readonly ttlMilliseconds?: number;
+  readonly nowMilliseconds?: () => number;
 }
 
 export class DiagnosticClusterService {
@@ -47,7 +51,16 @@ export class DiagnosticClusterService {
     this.stateDirectory = options.stateDirectory;
     this.algorithmVersion = options.algorithmVersion;
     this.isEnabled = options.isEnabled === true;
+    this.ttlMilliseconds = options.ttlMilliseconds ?? 24 * 60 * 60 * 1000;
+    this.nowMilliseconds = options.nowMilliseconds ?? (() => Date.now());
   }
+
+  /** 单项目写租约：同一项目并发 build ⇒ busy（不排队、不并行写）。 */
+  private readonly activeLeases = new Set<string>();
+
+  private readonly ttlMilliseconds: number;
+
+  private readonly nowMilliseconds: () => number;
 
   isDiagnosticClusteringEnabled(): boolean {
     return this.isEnabled;
@@ -66,13 +79,37 @@ export class DiagnosticClusterService {
     readonly generatedAtIso: string;
     readonly resolveProjectIdentifier: (event: DiagnosticEvent) => string | null;
     readonly cursor?: { readonly byteOffset: number; readonly lineNumber: number };
+    readonly signal?: AbortSignal;
   }): Promise<
     | { readonly status: "disabled" }
+    | { readonly status: "busy" }
     | ({ readonly status: "built" } & BuildClusterSnapshotResult & { readonly latestUpdated: boolean })
   > {
     if (!this.isEnabled) {
       return { status: "disabled" };
     }
+    /** 单项目写租约：并发 build ⇒ busy（不排队，避免两批扫描互相覆盖索引）。 */
+    if (this.activeLeases.has(input.projectIdentifier)) {
+      return { status: "busy" };
+    }
+    this.activeLeases.add(input.projectIdentifier);
+    try {
+      return await this.buildSnapshotOnce(input);
+    } finally {
+      this.activeLeases.delete(input.projectIdentifier);
+    }
+  }
+
+  private async buildSnapshotOnce(input: {
+    readonly projectIdentifier: string;
+    readonly generatedAtIso: string;
+    readonly resolveProjectIdentifier: (event: DiagnosticEvent) => string | null;
+    readonly cursor?: { readonly byteOffset: number; readonly lineNumber: number };
+    readonly signal?: AbortSignal;
+  }): Promise<
+    | { readonly status: "disabled" }
+    | ({ readonly status: "built" } & BuildClusterSnapshotResult & { readonly latestUpdated: boolean })
+  > {
     const result = await buildDiagnosticClusterSnapshotForProject({
       store: this.store,
       stateDirectory: this.stateDirectory,
@@ -81,6 +118,7 @@ export class DiagnosticClusterService {
       generatedAtIso: input.generatedAtIso,
       resolveProjectIdentifier: input.resolveProjectIdentifier,
       ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
     });
     const saved = await saveDiagnosticClusterSnapshot({
       stateDirectory: this.stateDirectory,
@@ -98,7 +136,15 @@ export class DiagnosticClusterService {
       stateDirectory: this.stateDirectory,
       projectIdentifier,
     });
-    return snapshot === null ? { status: "no-snapshot" } : { status: "ready", snapshot };
+    if (snapshot === null) {
+      return { status: "no-snapshot" };
+    }
+    /** TTL：超时返回 stale，**不静默当新结果**，也不自动删除或重建（卡内要求）。 */
+    const ageMilliseconds = this.nowMilliseconds() - Date.parse(snapshot.generatedAtIso);
+    if (Number.isFinite(ageMilliseconds) && ageMilliseconds > this.ttlMilliseconds) {
+      return { status: "stale", snapshot };
+    }
+    return { status: "ready", snapshot };
   }
 
   /** 相似案例检索：只接受已授权事件引用；无快照时返回 `no-snapshot` 而不是空结果。 */
@@ -110,6 +156,7 @@ export class DiagnosticClusterService {
   }): Promise<
     | { readonly status: "disabled" }
     | { readonly status: "no-snapshot" }
+  | { readonly status: "stale"; readonly snapshot: DiagnosticClusterSnapshot }
     | { readonly status: "ready"; readonly result: DiagnosticRelatedCasesResult }
   > {
     const latest = await this.readLatest(input.projectIdentifier);

@@ -32,7 +32,8 @@ export type DiagnosticClusterPartialReason =
   | "event-limit"
   | "byte-limit"
   | "duration-limit"
-  | "comparison-limit";
+  | "comparison-limit"
+  | "cancelled";
 
 export interface BuildClusterSnapshotInput {
   readonly store: DiagnosticEventStore;
@@ -45,6 +46,8 @@ export interface BuildClusterSnapshotInput {
   readonly resolveProjectIdentifier: (event: DiagnosticEvent) => string | null;
   readonly limits?: Partial<Record<keyof typeof DIAGNOSTIC_CLUSTER_BUILD_LIMITS, number>>;
   readonly nowMilliseconds?: () => number;
+  /** 取消信号：命中即停止扫描、保存游标，返回 partial 原因 `cancelled`。 */
+  readonly signal?: AbortSignal;
 }
 
 export interface BuildClusterSnapshotResult {
@@ -67,6 +70,10 @@ export async function buildDiagnosticClusterSnapshotForProject(
   let isComplete = false;
 
   while (!isComplete) {
+    if (input.signal?.aborted === true) {
+      partialReason = "cancelled";
+      break;
+    }
     if (now() - startedAt >= limits.maximumDurationMilliseconds) {
       partialReason = "duration-limit";
       break;

@@ -66,7 +66,7 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 | 检查点 | 固定交付 | 状态 |
 |---|---|---|
 | CLUSTER-01-01 | 契约/开关/作用域适配器/有界诊断读取/来源引用与脱敏 | **implemented-unverified**（2026-11-11） |
-| CLUSTER-01-02 | 确定性算法、索引、预算、租约、取消、检查点、TTL | **implemented-unverified（部分）**：算法/索引/上限/partial 已交付；**租约、取消、TTL 新鲜度未做** |
+| CLUSTER-01-02 | 确定性算法、索引、预算、租约、取消、检查点、TTL | **implemented-unverified**（2026-11-11 补齐租约/取消/TTL） |
 | CLUSTER-01-03 | 统一工具、权限判定、运行时、SDK、CLI 真实接线及反馈存储 | **in_progress**：工具/权限/SDK/反馈已交付；**CLI 未做** |
 | CLUSTER-01-04 | 行为反例、隔离安装包验收、效果与资源报告 | **in_progress**：反例与隔离包闭环已交付；**效果与资源报告未做** |
 
@@ -438,3 +438,15 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 | `similarity bogus` | `{"status":"usage-error",...}` | **2** |
 
 ⇒ `CLUSTER-01-03` 转 **implemented-unverified**（剩余：02 的租约/取消/TTL、04 的效果报告、人工验收）。
+
+### 切片 12：租约 / 取消 / TTL（§4）——已交付
+
+| 行为 | 实现 | 证据 |
+|---|---|---|
+| 单项目写租约 | 服务内 `activeLeases`；并发 build 第二个返回 **`busy`** | 用例断言两并发结果为 `["built","busy"]` |
+| 取消 | `buildSnapshot({signal})` ⇒ 扫描前检查 ⇒ **`partialReason: "cancelled"`** 且**保存游标** | 用例断言 `isComplete=false` + `partialReason` |
+| TTL 新鲜度 | `readLatest` 比较 `generatedAtIso + ttl`（默认 24h）⇒ **`stale`**，不删不重建 | 用例把"现在"推到 25 小时后断言 `stale`；未过期仍 `ready` |
+
+**门禁**：`check:low-parallel` ⇒ **707 files / 4758 passed + 3 skipped，exit 0**。
+
+⇒ `CLUSTER-01-02` 转 **implemented-unverified**。卡内 §6 剩余：**04 的效果与资源报告**（需真实数据，属待人测）。

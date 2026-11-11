@@ -13,7 +13,7 @@ import { appendDiagnosticClusterFeedback } from "../../../core/src/orchestration
 export interface SimilarityCommandPort {
   readonly getStatus: (
     projectIdentifier: string,
-  ) => Promise<{ readonly status: "disabled" | "no-snapshot" | "ready"; readonly payload?: unknown }>;
+  ) => Promise<{ readonly status: "disabled" | "no-snapshot" | "stale" | "ready"; readonly payload?: unknown }>;
   readonly build: (projectIdentifier: string) => Promise<{ readonly status: string; readonly payload?: unknown }>;
   readonly findRelated: (input: {
     readonly projectIdentifier: string;
@@ -161,8 +161,8 @@ export function createSimilarityPortFromService(service: DiagnosticClusterServic
   return {
     getStatus: async (projectIdentifier) => {
       const latest = await service.readLatest(projectIdentifier);
-      return latest.status === "ready"
-        ? { status: "ready", payload: latest.snapshot }
+      return latest.status === "ready" || latest.status === "stale"
+        ? { status: latest.status, payload: latest.snapshot }
         : { status: latest.status };
     },
     build: async (projectIdentifier) =>
