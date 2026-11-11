@@ -21,6 +21,14 @@ const TOKEN_PATTERN = new RegExp(
 
 /** 相对 packages/ 路径 → 允许的破坏性令牌（理由见注释/任务卡盘点表）。 */
 const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }> = {
+  /**
+   * CLUSTER-01（2026-11-11）：派生索引快照的原子写（临时文件 + 同目录 rename）。
+   * 理由：只写应用状态目录下的派生索引，不覆盖项目源码；写失败不会留下半截文件。
+   */
+  "core/src/orchestration/diagnostic-cluster-index.ts": {
+    tokens: ["writeFile", "rename"],
+    reason: "诊断聚类派生索引的临时文件→原子 rename；只写状态目录下的派生快照，不触碰项目源码",
+  },
   "core/src/infra/atomic-json.ts": {
     tokens: ["writeFile", "rm", "rename", "copyFile"],
     reason: "底层原子写/备份/陈旧临时文件清理白名单模块（atomic temp→rename、.bak copy、.tmp rm）",

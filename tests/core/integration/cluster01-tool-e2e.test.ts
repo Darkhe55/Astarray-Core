@@ -54,6 +54,57 @@ function buildWorkerRuntime(): AgentRuntime {
 }
 
 describe("CLUSTER-01 端到端调用", () => {
+  it("**获授权后** ⇒ build 真的执行并落盘", async () => {
+    const runtime = await createApplicationRuntime({
+      mode: "assist",
+      stateDirectory,
+      concurrency: 1,
+      failureThreshold: 1,
+      maxLoopIterations: 4,
+      useFeedbackProcess: false,
+      authenticatedUserId: "user-1",
+      mainAgentInstanceId: "main-agent-1",
+      streamOutput: () => {},
+      isDiagnosticClusteringEnabled: true,
+      isModelTaskPlanningEnabled: true,
+      taskDecompositionDraftProvider: async () =>
+        JSON.stringify({
+          nodes: [
+            {
+              id: "T-001",
+              description: "聚类用例",
+              dependsOn: [],
+              acceptanceCriteria: "工具结果可观测",
+              toolNames: ["diagnosticClusters"],
+            },
+          ],
+        }),
+      workerRuntimeFactory: () => buildWorkerRuntime(),
+    } as never);
+
+    try {
+      /** 参数级授权：批准"这一次 build 调用"（与 audit01 对 proposeGoal 的做法一致）。 */
+      await runtime.controller.grantSessionAuthorization(
+        "diagnosticClusters",
+        JSON.stringify({ action: "build" }),
+        Math.floor(Date.now() / 1000),
+      );
+      await runtime.controller.handleUserMessage("跑一次已授权的聚类调用", {
+        projectIdentifier: "project-alpha",
+      });
+      const deadline = Date.now() + 30_000;
+      const indexDirectory = path.join(stateDirectory, "analysis", "diagnostic-clusters");
+      let hasIndex = false;
+      while (!hasIndex && Date.now() < deadline) {
+        hasIndex = await fs.stat(indexDirectory).then(() => true).catch(() => false);
+        if (!hasIndex) await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(hasIndex, `工具结果：${toolResultTexts.join(" | ").slice(0, 300)}`).toBe(true);
+    } finally {
+      await runtime.shutdown().catch(() => undefined);
+    }
+  }, 90_000);
+
   it("脚本化 worker 调用 ⇒ 被路由到聚类工具，且未获写授权时不落盘", async () => {
     const runtime = await createApplicationRuntime({
       mode: "assist",

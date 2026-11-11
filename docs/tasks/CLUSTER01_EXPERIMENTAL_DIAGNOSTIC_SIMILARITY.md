@@ -367,3 +367,21 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 它证明"调用被路由到该工具并进入权限判定"，**没有**证明"批准后 handler 真的执行了 build"。
 后者需要构造"允许 `diagnostic.clusters.build` 的权限裁决"，属下一轮；
 在那之前不能宣称工具执行链已完全闭环。
+
+### 切片 9h：**允许后执行**闭环 + 架构守卫修复（2026-11-11）
+
+- 端到端第 2 条（同文件）：先 `grantSessionAuthorization("diagnosticClusters", {action:"build"})`，
+  再跑任务 ⇒ **索引目录真的创建**（`analysis/diagnostic-clusters`）⇒ 证明
+  "worker 调用 → 权限裁决 → 策略包装 handler → 服务 → 快照落盘"整链贯通。
+
+**全量首跑翻红 2 条，均为我的改动触发，已修**：
+
+1. `destructive-file-api-guard`：`diagnostic-cluster-index.ts` 用了 `writeFile`+`rename`
+   却不在破坏性 API 白名单里 ⇒ 已按"带理由白名单"补登记（只写状态目录派生索引，不碰源码）。
+2. `ar07-internal-enforcement-non-disclosure`：能力命名空间 `diagnostic` 不在冻结的公开清单内 ⇒
+   已加入（聚类是**产品能力**，默认关，不是内部强制执行层）。
+
+**门禁**：`check:low-parallel` ⇒ **704 files / 4742 passed + 3 skipped，exit 0**。
+
+**CLUSTER-01-03 判定**：工具/权限/SDK 接线与端到端闭环**均已有证据** ⇒ 转 **implemented-unverified**。
+剩余：`feedback` 存储、CLI `astarray similarity ...`。

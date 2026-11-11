@@ -52,6 +52,8 @@ const PUBLIC_CAPABILITY_NAMESPACES = [
   "code-repository",
   "connector",
   "database",
+  /** CLUSTER-01：诊断聚类是**产品能力**（默认关），不是内部强制执行层。 */
+  "diagnostic",
   "dependency",
   "environment",
   "extension",
