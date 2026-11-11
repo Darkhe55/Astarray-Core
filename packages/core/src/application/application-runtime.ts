@@ -3183,6 +3183,17 @@ export async function createApplicationRuntime(
     conversationIdentifier?: string;
     missionIdentifier?: string;
     taskIdentifier?: string;
+    /** REPAIR（T07E-04）：任务链累计读取预算与其链标识（可选；不传则不生效）。 */
+    taskChainCumulativeBudget?: {
+      registerTaskChainSource(input: {
+        taskChainIdentifier: string;
+        agentInstanceId: string;
+        canonicalSourceIdentity: string;
+        contentBytes: number;
+        estimatedTokenCount: number;
+      }): Promise<{ cumulativeSourceFileCount: number; isBudgetExceeded: boolean }>;
+    };
+    taskChainIdentifier?: string;
     customToolHandlers?: ReadonlyMap<
       string,
       (argumentsJson: string, callId: string) => Promise<ToolCallResult>
@@ -3271,6 +3282,13 @@ export async function createApplicationRuntime(
       workspaceBoundary: taskWorkspaceBoundary,
       temporaryDirectoryPath,
       workerAllowedToolNames: input.allowedToolNames,
+      /** REPAIR（T07E-04）：把任务链预算透传给策略包装层（未传则不生效）。 */
+      ...(input.taskChainCumulativeBudget === undefined
+        ? {}
+        : { taskChainCumulativeBudget: input.taskChainCumulativeBudget }),
+      ...(input.taskChainIdentifier === undefined
+        ? {}
+        : { taskChainIdentifier: input.taskChainIdentifier }),
       ...(input.customToolHandlers === undefined
         ? {}
         : { customToolHandlers: input.customToolHandlers }),
@@ -4240,6 +4258,12 @@ export async function createApplicationRuntime(
           useConfigurablePermissionProfileEngine: true,
           missionIdentifier: missionIdentifier ?? "unknown-mission",
           taskIdentifier: task.id,
+          /**
+           * REPAIR（T07E-04）：读取预算按**任务链**（mission）累计，不按单个任务。
+           * 未注入时不生效（与既有行为一致）。
+           */
+          taskChainCumulativeBudget: taskChainCumulativeBudgetController,
+          taskChainIdentifier: missionIdentifier ?? "unknown-mission",
           customToolHandlers: new Map([
             [GOAL_PROPOSAL_TOOL_NAME, goalProposalHandler],
             /**

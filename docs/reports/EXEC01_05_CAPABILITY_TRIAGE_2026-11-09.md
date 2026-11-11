@@ -270,3 +270,14 @@
 以及"同一文件重复读不重复计数 / 超上限被拒"的集成用例。
 
 **这一项仍不计为完成**：逻辑存在但**未注入 ⇒ 实际不生效**。
+
+## 返修进展（第 39 轮）：读取预算**真正生效**
+
+- `createPolicyWrapperForAgent`（装配层本地工厂）新增可选 `taskChainCumulativeBudget` / `taskChainIdentifier`，
+  并**透传**给 `PolicyWrapperOptions`；调用点传 `taskChainIdentifier: missionIdentifier`（按任务链累计）。
+- 端到端证据（`tests/core/integration/task-chain-budget-enforcement.test.ts`）：
+  脚本化 worker 通过工具端口读同一文件两次 ⇒ `runtime.taskChainCumulativeBudget.getBudgetSnapshot(mission)`
+  **非空且累计来源 = 1**（去重生效）。
+
+**仍未做**：把上限做成可配置（`maximumTaskChainCumulativeSourceFiles`）并验证"超额被拒、且不产生部分读取"。
+现在用的是默认上限（10 × 单 Agent 上限），所以"拒绝"路径还没被自动化覆盖。
