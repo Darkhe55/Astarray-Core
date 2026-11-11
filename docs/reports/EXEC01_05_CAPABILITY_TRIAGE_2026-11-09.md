@@ -122,3 +122,17 @@
 | 子缺口（不重复接线，但条件/语义转返修） | 2 |
 
 **本表未改代码**，仅定性；`替代`/`未来` 明确不接线。
+
+## 返修进展（2026-11-11）：`HumanWorktreeObserver` 第 1 步
+
+**问题**：`new HumanWorktreeObserver` 在全仓库 **0 处** ⇒ 写端从未构造，`human-change-journal` 生产恒空；
+唯一生产引用是 CLI 的"模块可加载"探测（`typeof HumanWorktreeObserver === "function"`）。
+
+**本轮补齐（自包含，不含接线）**：
+`packages/core/src/orchestration/human-worktree-status-port.ts`
+- `parseGitStatusPorcelainV1`：解析 `git status --porcelain=v1 -z`，
+  **重命名/复制条目两个路径都算变更**（否则观察会漏旧路径）；
+- `createHumanWorktreeStatusPort({ runGitCommand })`：**执行器由工具层注入**，核心层不 spawn 进程。
+
+测试 4 条通过。**仍未完成**：把观察器在装配层构造（`stateDirectory` 的 `human-change-journal`）
+并在人工改动检查点调用 `observeWorktree`；以及 `gitReadonlyView` 复用该端口的接线。
