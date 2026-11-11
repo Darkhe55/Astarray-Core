@@ -5405,3 +5405,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **294（RESUME-02 语义修正，2026-11-06）**：用户裁决断点续接为**断点驱动的会话内卡片**，不是实验开关；
 > 不点击则一直保留；恢复/完成/取消后转终态（选 A）。记录于
 > `docs/reports/RESUME02_BREAKPOINT_DESIGN_CORRECTION_2026-11-06.md`；卡文件待用户允许后回写。
+
+> **㊲ ALIGN-03-01 独立验收闭环：编码完成并验证（2026-11-11）**。
+> 产物前置检查（`artifact-precondition.ts`）与验收结论**分离**——产物存在不再等于 `merge-ready`；
+> 新增四态状态机（`execution-done / pending-acceptance / rework / accepted`），
+> **只有 `accepted` 允许宣称任务完成**；真实审查任务（`taskType: "review"`）由编排器在安全点注入，
+> 裁决**只**取自审查报告的 `VERDICT:`/`EVIDENCE:`，证据未命中送审产物即 `rework`；
+> 装配由 assist 与 devolve **共用**（此前 devolve 从不做独立验收），受
+> `isIndependentReviewAutoAppointmentEnabled` 控制且**默认关闭**。
+> 证据：`align03-review-loop-e2e`(6) / `align03-independent-review-task`(21) /
+> `align03-independent-review-closure`(11) / `align03-artifact-precondition`(5) /
+> `align03-auto-review-appointment`(3)。状态：**implemented-unverified、不归档**；
+> 未做：真实模型审查 Worker、人工验收。
