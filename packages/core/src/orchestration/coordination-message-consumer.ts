@@ -1,6 +1,7 @@
 import type { MailboxJournal } from "../feedback-process/mailbox-journal.js";
 import type { CoordinationPartitionLeaseStore } from "./coordination-partition-lease.js";
 import type { CoordinationStateTransactionStore } from "./coordination-state-transaction.js";
+import type { CoordinationRetryStore } from "./coordination-retry-store.js";
 
 /**
  * COORD-01-02（卡 §4.2/§4.4）：协调消费步。
@@ -27,6 +28,8 @@ export interface CoordinationMessageConsumerOptions {
   readonly journal: MailboxJournal;
   readonly leaseStore: CoordinationPartitionLeaseStore;
   readonly stateStore: CoordinationStateTransactionStore;
+  /** COORD-01-02 §4.7：可选失败退避（未提供则不退避，行为与之前一致）。 */
+  readonly retryStore?: CoordinationRetryStore;
   readonly nowUnixMilliseconds?: () => number;
 }
 
@@ -34,12 +37,14 @@ export class CoordinationMessageConsumer {
   private readonly journal: MailboxJournal;
   private readonly leaseStore: CoordinationPartitionLeaseStore;
   private readonly stateStore: CoordinationStateTransactionStore;
+  private readonly retryStore: CoordinationRetryStore | undefined;
   private readonly nowUnixMilliseconds: () => number;
 
   constructor(options: CoordinationMessageConsumerOptions) {
     this.journal = options.journal;
     this.leaseStore = options.leaseStore;
     this.stateStore = options.stateStore;
+    this.retryStore = options.retryStore;
     this.nowUnixMilliseconds = options.nowUnixMilliseconds ?? (() => Date.now());
   }
 
@@ -89,7 +94,21 @@ export class CoordinationMessageConsumer {
 
     const pendingMessages = await this.journal.listPendingApplication(input.recipientId);
     const maximumMessageCount = input.maximumMessageCount ?? 32;
-    const targets = pendingMessages.slice(0, maximumMessageCount);
+    /** §4.7：退避未到期或已 blocked 的消息本轮**不尝试**（计数由 retryStore 持久化）。 */
+    const eligibleMessages: typeof pendingMessages = [];
+    for (const candidate of pendingMessages) {
+      if (
+        this.retryStore !== undefined &&
+        !(await this.retryStore.isEligibleForAutomaticAttempt({
+          partitionKey: input.partitionKey,
+          messageIdentifier: candidate.messageId,
+        }))
+      ) {
+        continue;
+      }
+      eligibleMessages.push(candidate);
+    }
+    const targets = eligibleMessages.slice(0, maximumMessageCount);
 
     let appliedMessageCount = 0;
     let replayedMessageCount = 0;
@@ -109,6 +128,10 @@ export class CoordinationMessageConsumer {
 
       if (outcome.outcome === "applied") {
         appliedMessageCount += 1;
+        await this.retryStore?.recordSuccess({
+          partitionKey: input.partitionKey,
+          messageIdentifier: message.messageId,
+        });
         await this.journal.recordApplicationState({
           recipientId: input.recipientId,
           messageId: message.messageId,
@@ -132,6 +155,12 @@ export class CoordinationMessageConsumer {
 
       /** stale / not-owner / not-found：如实记 blocked，不臆造状态、不阻塞其它消息。 */
       blockedMessageCount += 1;
+      /** §4.7：失败计入持久退避；达上限后转 blocked，只有显式重试才重启。 */
+      await this.retryStore?.recordFailure({
+        partitionKey: input.partitionKey,
+        messageIdentifier: message.messageId,
+        reason: outcome.outcome,
+      });
       await this.journal.recordApplicationState({
         recipientId: input.recipientId,
         messageId: message.messageId,

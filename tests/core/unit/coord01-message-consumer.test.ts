@@ -19,6 +19,7 @@ import {
   buildCoordinationPartitionKey,
 } from "../../../packages/core/src/orchestration/coordination-partition-lease.js";
 import { CoordinationStateTransactionStore } from "../../../packages/core/src/orchestration/coordination-state-transaction.js";
+import { CoordinationRetryStore } from "../../../packages/core/src/orchestration/coordination-retry-store.js";
 
 let stateDirectory: string;
 let partitionKey: string;
@@ -114,6 +115,33 @@ describe("协调消费步", () => {
     expect(result.isLeaseUnavailable).toBe(true);
     expect(result.attemptedMessageCount).toBe(0);
     expect(await journal.listPendingApplication("agent-b")).toHaveLength(1);
+  });
+
+  it("⑤ 已达退避上限的消息本轮跳过（§4.7 持久计数生效）", async () => {
+    const { journal, consumer, leaseStore, stateStore } = buildHarness();
+    await enqueue(journal, "message-1");
+    const retryStore = new CoordinationRetryStore({
+      stateDirectory: path.join(stateDirectory, "retry"),
+      nowUnixMilliseconds: () => nowUnixMilliseconds,
+    });
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      await retryStore.recordFailure({
+        partitionKey,
+        messageIdentifier: "message-1",
+        reason: "stale",
+      });
+    }
+    const consumerWithRetry = new CoordinationMessageConsumer({
+      journal,
+      leaseStore,
+      stateStore,
+      retryStore,
+      nowUnixMilliseconds: () => nowUnixMilliseconds,
+    });
+    const result = await consumerWithRetry.runConsumptionStep(stepInput(partitionKey));
+    expect(result.attemptedMessageCount).toBe(0);
+    expect(result.blockedMessageCount).toBe(0);
+    void consumer;
   });
 
   it("④ 持有者死亡、租约过期 ⇒ 新消费者接手处理（恢复语义）", async () => {

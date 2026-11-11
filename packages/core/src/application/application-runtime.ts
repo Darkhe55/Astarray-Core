@@ -33,6 +33,7 @@ import {
   buildCoordinationPartitionKey,
 } from "../orchestration/coordination-partition-lease.js";
 import { CoordinationStateTransactionStore } from "../orchestration/coordination-state-transaction.js";
+import { CoordinationRetryStore } from "../orchestration/coordination-retry-store.js";
 import { TaskChainCumulativeBudgetController } from "../orchestration/task-chain-cumulative-budget.js";
 import {
   createDefaultGitCommandRunner,
@@ -303,6 +304,7 @@ export interface ApplicationRuntime {
   /** COORD-01-02：本地协调器（分区租约 + 短状态事务 + 消费步）。 */
   coordinationMailboxJournal: MailboxJournal;
   coordinationMessageConsumer: CoordinationMessageConsumer;
+  coordinationRetryStore: CoordinationRetryStore;
   coordinationPartitionKey: string;
   /** 已注册工具名（只读快照）：用于验证"开关关闭时工具不存在"，不改动注册表。 */
   listRegisteredToolNames: () => string[];
@@ -1085,10 +1087,15 @@ export async function createApplicationRuntime(
     leaseStore: coordinationLeaseStore,
     nowUnixMilliseconds: () => Date.now(),
   });
+  const coordinationRetryStore = new CoordinationRetryStore({
+    stateDirectory: path.join(stateDirectory, "coordination", "retry"),
+    nowUnixMilliseconds: () => Date.now(),
+  });
   const coordinationMessageConsumer = new CoordinationMessageConsumer({
     journal: coordinationMailboxJournal,
     leaseStore: coordinationLeaseStore,
     stateStore: coordinationStateStore,
+    retryStore: coordinationRetryStore,
     nowUnixMilliseconds: () => Date.now(),
   });
   const coordinationPartitionKey = buildCoordinationPartitionKey({
@@ -4733,6 +4740,7 @@ export async function createApplicationRuntime(
     humanWorktreeObserver,
     coordinationMailboxJournal,
     coordinationMessageConsumer,
+    coordinationRetryStore,
     coordinationPartitionKey,
     taskChainCumulativeBudget: taskChainCumulativeBudgetController,
     scanStartupRecovery,

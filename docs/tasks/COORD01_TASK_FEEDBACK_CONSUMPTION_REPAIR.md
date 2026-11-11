@@ -197,3 +197,20 @@ Windows 文件名不允许冒号，原子写 rename 抛 `EINVAL`，即**发给 `
 
 **COORD-01-02 仍差**：失败退避（1/2/4/8/16 秒、单轮最多 5 次、持久计数）、三状态查询入口、
 以及把 `isWakeRequested` 接到真实的 ready-set 重算。
+
+### COORD-01-02 进展（2026-11-11 目标轮 5）：失败退避 + 持久计数（§4.7）
+
+| 交付 | 说明 |
+|---|---|
+| `CoordinationRetryStore` | 按分区持久化每条消息的 `attemptCount` / `nextAttemptAt` / `isBlocked` / `reason` |
+| 退避曲线 | **1/2/4/8/16 秒**（`COORDINATION_BACKOFF_MILLISECONDS`），单轮自动尝试上限 **5 次** |
+| `isEligibleForAutomaticAttempt` | blocked 或退避未到期 ⇒ 本轮跳过 |
+| `recordSuccess` / `resetForExplicitRetry` | 成功清除；**只有显式重试**才让 blocked 消息恢复自动尝试 |
+| 接线 | 装配层构造并传入消费者，`runtime.coordinationRetryStore` 可达；消费步按 eligibility 过滤，失败记 `recordFailure` |
+
+**用例**：退避 4 条（首次 1 秒且当下不可试 / 第 5 次 blocked 后永不再自动试 / **重启不清零** / 成功清除 + 显式重试恢复）
+＋ 消费者集成 1 条（已达上限的消息本轮 `attemptedMessageCount = 0`）。
+
+**全量门禁**：首次跑出现 3 个失败（`provider-fake-server` 等），**隔离重跑 17 条全过**、再跑全量 **725 files / 4824 passed** ⇒ 判定为并发抖动，非本次改动引起。
+
+**COORD-01-02 仍差**：三状态查询入口、`isWakeRequested` → 真实 ready-set 重算接线。
