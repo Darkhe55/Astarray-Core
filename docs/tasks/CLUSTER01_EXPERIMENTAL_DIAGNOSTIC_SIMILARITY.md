@@ -223,3 +223,14 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：`public-sdk` 公开导出与门面方法、工具与权限入口（统一工具层）、用户纠正记录、
 "每批让出事件循环"的显式调度。
+
+### 切片 8c：SDK 导出与选项透传——**部分交付**
+
+- `public-sdk.ts`：导出 `DiagnosticClusterService` 与 `DiagnosticClusteringStatus` 类型；
+  `PublicApplicationOptions` 新增 `isDiagnosticClusteringEnabled`（缺省关），并透传给 `createApplicationRuntime`。
+- 门禁：`typecheck` / `lint` 通过；受影响用例 17 passed。
+
+**仍未做（下一轮）**：
+- `AstarrayApplicationFacade` 上的受控门面方法（`buildDiagnosticClusterSnapshot` / `findRelatedDiagnosticCases`）；
+- 用**隔离安装的包**验证一次（同时推进 AUDIT-REPAIR-01-05 的 05-3 第一条闭环）；
+- 统一工具层与权限入口、用户纠正记录。

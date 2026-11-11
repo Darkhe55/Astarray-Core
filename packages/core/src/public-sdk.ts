@@ -11,6 +11,11 @@ import { promises as fs } from "node:fs";
 import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
 import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
+export { DiagnosticClusterService } from "./orchestration/diagnostic-cluster-service.js";
+export type {
+  DiagnosticClusteringStatus,
+  DiagnosticClusteringStatus as PublicDiagnosticClusteringStatus,
+} from "./orchestration/diagnostic-cluster-service.js";
 import { redactSensitiveText } from "./orchestration/diagnostic-event-store.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
 import type { StartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
@@ -2216,6 +2221,8 @@ export interface PublicApplicationOptions {
    * 权限拒绝、工具不存在、敏感内容禁读、作用域待授权/被拒等**执行前拒绝**，以及**取消**。
    */
   isDiagnosticCollectionEnabled?: boolean;
+  /** CLUSTER-01：实验性诊断聚类（**缺省关**，与采集开关相互独立）。 */
+  isDiagnosticClusteringEnabled?: boolean;
   /** G2（第 130 轮）：活锁/循环守卫开关。**缺省 false**。 */
   isProgressGuardEnabled?: boolean;
   /** G2（第 162 轮）：任务链总调用预算（缺省 undefined ⇒ 200，**默认行为不变**）。 */
@@ -2779,6 +2786,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           : { toolDocumentationRegistry: options.toolDocumentationRegistry }),
       mode: options.mode,
       stateDirectory: options.stateDirectory,
+    ...(options.isDiagnosticClusteringEnabled === undefined
+      ? {}
+      : { isDiagnosticClusteringEnabled: options.isDiagnosticClusteringEnabled }),
       // GUI-02-03：把项目标识透传给运行时（未提供时不传字段 ⇒ 保持既有回退行为）。
       ...(options.projectIdentifier === undefined
         ? {}
@@ -2864,10 +2874,16 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           toolDocumentationRegistry: options.toolDocumentationRegistry,
       statusPollIntervalMilliseconds: options.statusPollIntervalMilliseconds ?? 25,
       stateDirectory: options.stateDirectory,
+    ...(options.isDiagnosticClusteringEnabled === undefined
+      ? {}
+      : { isDiagnosticClusteringEnabled: options.isDiagnosticClusteringEnabled }),
       // 幂等账目跨进程持久化（R4）：重启后同键同参复用，不重复执行。
       // 损坏时**默认 fail-closed**（见下），不得把"读不全"静默换成"全新开始"。
       idempotencyLedgerEntries: await resolveIdempotencyLedgerEntriesForCreate({
         stateDirectory: options.stateDirectory,
+    ...(options.isDiagnosticClusteringEnabled === undefined
+      ? {}
+      : { isDiagnosticClusteringEnabled: options.isDiagnosticClusteringEnabled }),
         allowCorruptedIdempotencyLedger: options.allowCorruptedIdempotencyLedger === true,
       }),
       /**
