@@ -248,3 +248,11 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 **仍未做**：隔离安装包验证（含 AUDIT-REPAIR-01-05 的 05-3）、统一工具层与权限入口、用户纠正记录、
 每批让出事件循环的显式调度。
+
+### 切片 8e：**隔离安装包闭环**——已交付
+
+- `scripts/verify-cluster01-package.mjs`：从 `<隔离目录>/node_modules/astarray/dist/public-sdk.js` 导入，
+  **拒绝回落仓库源码**（路径断言，命中即 exit 2），跑 3 条闭环（no-snapshot / built+isComplete / 缺省 disabled）。
+- 实测：`exit 0`，`cases=3 failures=0`（tarball SHA256 `65ED9D78…5B78B`，代码 SHA `45c749ce`）。
+
+**仍未做**：统一工具层与权限入口、用户纠正记录、"每批让出事件循环"的显式调度。

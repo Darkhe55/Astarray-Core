@@ -549,3 +549,23 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 **下一步第一条动作**：读 `createAnthropicMessagesProviderRegistration` 与
 `PublicProviderConfiguration` 的字段，然后在 `.tmp/audit05-install/audit05-loops.mjs` 里
 只 `import "astarray"` 跑第 1 条闭环。
+
+#### 05-3 第一条闭环：**隔离包内已跑通**（2026-11-11）
+
+| 项 | 值 |
+|---|---|
+| 代码 SHA | `45c749ce` |
+| tarball SHA256 | `65ED9D78127862AC2410440A686A207560E343E00B69933FC3E9B47090C5B78B` |
+| 命令 | `node scripts/verify-cluster01-package.mjs --package-dir .tmp/audit05-install` |
+| 退出码 | **0** |
+| 用例数 | **3**（0 失败） |
+
+闭环内容（全程只用 `node_modules/astarray/dist/public-sdk.js`，**不 import 仓库源码**）：
+
+1. 未构建 ⇒ `no-snapshot`（不是空结果）；
+2. `buildDiagnosticClusterSnapshot` ⇒ `built` 且 `isComplete === true`；
+3. 另一个**缺省配置**的 facade ⇒ `disabled`（开关不因包内状态自行开启）。
+
+脚本对 `entryPath` 有防回落断言：若解析到仓库目录内即 `exit 2`。
+
+**仍未做**：05-3 的第二条闭环（目标提案权限）；05-4 矩阵汇总；05-5 状态纠偏。
