@@ -94,7 +94,8 @@ describe("CLUSTER-01 租约 / 取消 / TTL", () => {
   it("超过 TTL ⇒ stale（不静默当新结果）", async () => {
     const store = new DiagnosticEventStore({ baseDirectory: stateDirectory });
     await store.append(buildEvent(1));
-    const oldService = buildService();
+    /** 固定时钟：让"未过期 ⇒ ready"与真实日期解耦（否则过期日一过测试必红）。 */
+    const oldService = buildService(() => Date.parse("2026-11-11T01:00:00.000Z"));
     await oldService.buildSnapshot({
       projectIdentifier: "project-alpha",
       generatedAtIso: "2026-11-11T00:00:00.000Z",

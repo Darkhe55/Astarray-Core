@@ -94,7 +94,8 @@ describe("CLUSTER-01 装配接线", () => {
 
       const built = await store.buildSnapshot({
         projectIdentifier: "project-alpha",
-        generatedAtIso: "2026-11-11T00:00:00.000Z",
+        /** 用当前时间：避免"写入当天才通过"的时间炸弹（TTL 24h）。 */
+      generatedAtIso: new Date().toISOString(),
         resolveProjectIdentifier: () => "project-alpha",
       });
       expect(built.status).toBe("built");

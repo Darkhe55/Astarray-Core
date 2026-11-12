@@ -61,7 +61,8 @@ describe("CLUSTER-01 服务：开关与状态区分", () => {
     expect(service.isDiagnosticClusteringEnabled()).toBe(false);
     expect(await service.buildSnapshot({
       projectIdentifier: "project-alpha",
-      generatedAtIso: "2026-11-11T00:00:00.000Z",
+      /** 用当前时间：避免"写入当天才通过"的时间炸弹（TTL 24h）。 */
+      generatedAtIso: new Date().toISOString(),
       resolveProjectIdentifier: () => "project-alpha",
     })).toEqual({ status: "disabled" });
     expect(await service.readLatest("project-alpha")).toEqual({ status: "disabled" });
@@ -93,7 +94,8 @@ describe("CLUSTER-01 服务：开关与状态区分", () => {
 
     const built = await service.buildSnapshot({
       projectIdentifier: "project-alpha",
-      generatedAtIso: "2026-11-11T00:00:00.000Z",
+      /** 用当前时间：避免"写入当天才通过"的时间炸弹（TTL 24h）。 */
+      generatedAtIso: new Date().toISOString(),
       resolveProjectIdentifier: () => "project-alpha",
     });
     expect(built.status).toBe("built");
