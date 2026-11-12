@@ -5520,3 +5520,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 每次返回新正则实例（无 `lastIndex` 污染），多次判定稳定
 >
 > 全部样本为人工构造假凭据，未使用任何真实密钥。
+
+> **㊻ 核心安全模块补测 目标轮 2（2026-11-13）：敏感扫描契约**
+>
+> `packages/core/src/tools/sensitive-content-scan-contract.ts`（SEC-02-01）此前零引用。
+> 新增 `tests/core/unit/sensitive-content-scan-contract.test.ts`（9 条，全绿）：
+>
+> - 四态：空 ⇒ `clean`；命中 ⇒ `sensitive`；**超字节上限 ⇒ `incomplete`（不是 clean）**；
+>   **超时限 ⇒ `incomplete`**（注入时钟，无真实等待）；预算非正整数 ⇒ 拒绝
+> - 计量：中文按 **UTF-8 字节**（3 字节/字）而非字符数；`unit` 恒为 `utf8-bytes`
+> - 边界：**凭据被块边界切开仍命中**（有界 carry）；干净长文本扫满全部字节
+> - 单一来源：规则集版本 = 凭据检测器目录版本
+>
+> **门禁**：首次全量 1 个失败，重跑 **5049 passed / exit 0** ⇒ 并发抖动，未改断言。
