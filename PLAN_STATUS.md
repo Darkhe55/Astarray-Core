@@ -5493,3 +5493,17 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `undefined` 跳过 / 默认白名单本身不含凭据命名 / 一致性校验挡住 `{...process.env}` 回潮 / 额外允许项生效。
 >
 > 第 ③ 条把"只记名字不记值"变成可执行断言：用真实看起来像密钥的字符串做输入，检查整个返回结构里都搜不到它。
+
+> **㊹ 巡检轮（2026-11-13 00:00）：外发门禁补测试**
+>
+> `packages/core/src/tools/outbound-content-gate.ts`（SEC-02-04）此前 `tests/` 零引用，
+> 而它是"这次外发能不能出"的唯一判定点。新增 `tests/core/unit/outbound-content-gate.test.ts`（11 条，全绿）：
+>
+> | 约束 | 覆盖 |
+> |---|---|
+> | **默认拒绝** | 匿名 / 缺来源项目 / 缺 revision / 缺目标账户 / 无授权 各自原因码 |
+> | **扫描必须干净** | 无扫描结果 / `incomplete` / `error` / `sensitive`（含命中规则名）一律阻断 |
+> | **脱敏 ≠ 原内容** | 声明脱敏但哈希未变 ⇒ `content-hash-mismatch`；脱敏后旧授权失效 ⇒ `reauthorization-required` 并给出应批准的新 revision/哈希 |
+> | **导出元数据一致** | 哈希 / revision / 目标账户 / 目标设备任一不符即阻断（"检查 A 后导出 B"） |
+> | 规则版本 | 与授权时不同 ⇒ `rule-version-mismatch` 且要求重新授权 |
+> | 放行路径 | 全满足 ⇒ `isAllowed`，返回内容哈希与扫描规则版本；纯判定、结果可复现 |
