@@ -882,3 +882,23 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 第 ⑤ 条是关键——它证明目录不是"一份没人读的常量"，而是被 `validateGoalContract` 实际执行的判定依据。
 
 **未测模块剩 10 个**，下一轮：`legacy-identity-migration`。
+
+### 目标轮 10（2026-11-12）：`legacy-identity-migration` 补测试（此前零引用）
+
+`tests/core/unit/legacy-identity-migration.test.ts`（9 条，全绿），全部围绕"**宁可保持独立也不猜归属**"：
+
+| 用例 | 断言 |
+|---|---|
+| ① | `main:ponder:` / `scheduler:`（含大写）识别为临时个体；普通个体不是 |
+| ② | **摘要声明了会话但无运行引用 ⇒ 保持独立**（声明不是证据） |
+| ③ | 单一会话引用 ⇒ 关联，证据 `single-run-reference` |
+| ④ | 声明且被引用 ⇒ 证据记为 `mission-summary-field` |
+| ⑤ | 多会话引用 ⇒ 歧义计数 +1 且保持独立 |
+| ⑥ | 无引用 ⇒ 计入未知并保持独立 |
+| ⑦ | 临时个体 ⇒ 记为 ephemeral 且**永不合并** |
+| ⑧ | agent 单会话引用 ⇒ 归属；多会话 ⇒ 不归属 |
+| ⑨ | 审计**永远** `isMigrationApplied=false`、`doesApplyNameBasedMatching=false`，摘要写明"未执行任何迁移" |
+
+**门禁**：首次全量出现 1 个失败，**重跑全量 4972 passed / exit 0** ⇒ 判为并发抖动，未改断言。
+
+**未测模块剩 9 个**，下一轮：`goal-gate-cache` 已完成，下一步 `mission-sequence-binding-store`。
