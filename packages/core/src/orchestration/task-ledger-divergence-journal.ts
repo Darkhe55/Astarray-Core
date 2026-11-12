@@ -140,7 +140,14 @@ export function buildTaskLedgerDivergenceEntry(input: {
   readonly recordedAtIso: string;
   readonly trigger: string;
 }): TaskLedgerDivergenceEntry {
+  /**
+   * 去重键必须包含**归属**（mission + sequence）：否则不同 mission 的相同漂移会被
+   * 当成"连续重复"而静默吞掉，历史查询就少了别人的分歧记录。
+   * recordedAtIso / trigger 刻意不参与——同一漂移在不同时间被观察到仍算同一条。
+   */
   const divergenceHash = JSON.stringify({
+    missionIdentifier: input.report.missionIdentifier,
+    sequenceIdentifier: input.report.sequenceId,
     sequenceRevision: input.report.sequenceRevision,
     onlySequence: [...input.report.tasksOnlyInSequence].sort(),
     onlyMission: [...input.report.tasksOnlyInMission].sort(),

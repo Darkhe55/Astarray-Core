@@ -778,3 +778,14 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 **隔离重跑 2 条全过**、再跑全量 **742 files / 4910 passed** ⇒ 判为并发抖动，未改任何断言。
 
 **未测模块剩 17 个**，下一轮：`task-ledger-divergence-journal`。
+
+### 目标轮 3（2026-11-12）：`task-ledger-divergence-journal` 补测试 + **修一个真实缺陷**
+
+`tests/core/unit/task-ledger-divergence-journal.test.ts`（7 条，全绿）：空读 / 追加与 revision / 连续相同只记一次 /
+非连续 A,B,A 各记一次 / **不同 mission 的相同漂移分别记录** / 超上限丢最旧 / 文档损坏读作空。
+
+**测试暴露的真实缺陷（已修）**：`divergenceHash` 只含 `sequenceRevision + 差异清单`，**不含 mission / sequence 归属** ⇒
+两个不同 mission 出现**相同漂移**时，第二条被当成"连续重复"**静默丢弃**，历史查询里少了一整个 mission 的分歧记录。
+修复：去重键加入 `missionIdentifier` 与 `sequenceIdentifier`；`recordedAtIso` / `trigger` 仍不参与（同一漂移在不同时间观察到仍算同一条）。
+
+**未测模块剩 16 个**，下一轮：`completion-verdict-store`。
