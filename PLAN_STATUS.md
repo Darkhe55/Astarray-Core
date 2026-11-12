@@ -5578,3 +5578,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `createRuntime` 返回 `AnthropicMessagesRuntime`
 > - **配置真的透传**：baseUrl / apiKey / model / timeout / maxTokens（漏传会在运行期才炸，注册层看起来却正常）
 > - 未给 `maxOutputTokens` 时不写 `maxTokens`；每次返回新实例；注册对象本身**不含密钥字段**
+
+> ** Ziel 轮 7（2026-11-13）：日志行安全化补测试**
+>
+> `packages/core/src/infra/log-line-safety.ts`（SEC-02 通道 14）此前零引用。
+> 新增 `tests/core/unit/log-line-safety.test.ts`（9 条，全绿）：
+>
+> - `\n` / `\r` / `\r\n` / U+2028 / U+2029 一律转义为可见字符，结果不含真实换行
+> - 换行计数精确（`\r\n` 算一次）；不改调用方原文
+> - 有界截断并标注字符数；限额 0/负数至少保留 1 字符（不产出空行）
+> - `formatDiagnosticLogLine` 整行不含换行；**伪造 `[ERROR]` 注入无法变成独立一行**
+> - **明确不是脱敏**：假密钥原样保留（钉住边界，防止被当脱敏层误用）
