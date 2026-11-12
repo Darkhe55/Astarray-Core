@@ -902,3 +902,18 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 **门禁**：首次全量出现 1 个失败，**重跑全量 4972 passed / exit 0** ⇒ 判为并发抖动，未改断言。
 
 **未测模块剩 9 个**，下一轮：`goal-gate-cache` 已完成，下一步 `mission-sequence-binding-store`。
+
+### 目标轮 11（2026-11-12）：`mission-sequence-binding-store` 补测试（此前零引用）
+
+`tests/core/unit/mission-sequence-binding-store.test.ts`（6 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① | mission / sequence / owner 任一为空 ⇒ 拒绝 |
+| ② | 首次绑定 ⇒ `didWrite=true`、revision 递增、可读回 |
+| ③ | 重复绑定同一序列 ⇒ **幂等且不覆盖既有 owner / boundAtIso** |
+| ④ | 同 mission 换序列 ⇒ `journal-corrupted`，原绑定不变 |
+| ⑤ | 未绑定 mission ⇒ `null`（**不按任务名/路径推断**） |
+| ⑥ | 文档损坏 ⇒ 读作空（宁可未知也不伪造索引） |
+
+**未测模块剩 8 个**，下一轮：`goal-gate-cache` 已完成；下一步 `remote-delivery-outbox`（**平台阻塞，跳过**），改取 `remote-evidence-export`/`remote-evidence-snapshot`（同属 remote，跳过）⇒ 实际下一项取 `work-window-transition-monitor`。
