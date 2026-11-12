@@ -760,3 +760,21 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 这类缺陷的危害是：绿色会**悄悄过期**，之后被误当成"近期改动引入的抖动"。
 
 **仍未测模块 18 个**（`remote-*` 跳过），下一轮按顺序：`main-agent-turn-budget` → `task-ledger-divergence-journal`。
+
+### 目标轮 2（2026-11-12）：`main-agent-turn-budget` 补测试（此前零引用）
+
+`tests/core/unit/align01-main-agent-turn-budget.test.ts`（6 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① | 预算 = **180 秒**，且与 `MAIN_AGENT_DISPATCH_DEADLINE_MILLISECONDS` **同源** |
+| ② | completed / timed-out / cancelled **三种 outcome 下 `isTaskDispatched` 均为 false** |
+| ③ | 超时 ⇒ 文案含"补充信息""没有派发任何任务"，**不含"已完成"**，并保留已产出字数与 elapsed |
+| ④ | 完成态明确"答复完成**不等于任务已派发**" |
+| ⑤ | 取消态明确"没有派发任何任务" |
+| ⑥ | 时钟回拨时 `elapsed` 归零、时间戳为 ISO |
+
+**门禁**：本轮首次全量出现 1 个失败（`ponder-readonly-tools-production-wiring`），
+**隔离重跑 2 条全过**、再跑全量 **742 files / 4910 passed** ⇒ 判为并发抖动，未改任何断言。
+
+**未测模块剩 17 个**，下一轮：`task-ledger-divergence-journal`。
