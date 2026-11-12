@@ -746,3 +746,17 @@ EVIDENCE: <可复核引用>
 
 **性质**：只补证据，实现未改动。**剩余未测模块 19 个**（含 `goal-gate-cache`、`main-agent-turn-budget`、
 `remote-*`（平台阻塞）、各 `*-store`），可继续按"生产路径 + 安全语义"优先级逐个补测。
+
+### 目标轮（2026-11-12）：`GoalGateCache` 补测试 + 拆掉**时间炸弹**断言
+
+**① `GoalGateCache`（此前零引用）** —— `tests/core/unit/align03-goal-gate-cache.test.ts`（7 条）：
+无绑定 ⇒ 空缓存；契约缺失 / 状态缺失 / 实验关闭 / revision 不匹配 / 快照非法 ⇒ 五种问题各自记录且**均不还原门禁**；
+`hydrate` 是**重建**而非累加（第二次仍失败时缓存为空、问题不重复堆积）。
+语义原则：**宁可还原失败，也不把半截门禁放回缓存**。
+
+**② 顺带发现并修掉 4 个"时间炸弹"断言（真实测试缺陷）**
+`cluster01` 的 4 个套件把 `generatedAtIso` 写死为 `2026-11-11T00:00:00Z`，随后用**真实时钟**读 `readLatest` 断言 `ready`——
+TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服务注入固定时钟），`ready`/`stale` 语义不变。
+这类缺陷的危害是：绿色会**悄悄过期**，之后被误当成"近期改动引入的抖动"。
+
+**仍未测模块 18 个**（`remote-*` 跳过），下一轮按顺序：`main-agent-turn-budget` → `task-ledger-divergence-journal`。
