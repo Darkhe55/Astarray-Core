@@ -5482,3 +5482,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ② 会话重开未指定主个体时每次生成新个体 ⇒ 同参数重复开启被判冲突（不幂等）。
 >
 > **状态**：全部 **implemented-unverified**（无人工验收）；未推送提交 2 个（远端连接重置）。
+
+> **㊸ 巡检轮（2026-11-12 18:00）：子进程环境允许列表补测试**
+>
+> `packages/core/src/infra/subprocess-environment-allowlist.ts` 此前 `tests/` 零引用，
+> 而它守着"**子进程不得继承宿主凭据环境**"这条安全边界（背景是实测发现 `fork/spawn` 曾用 `{...process.env}` 整体继承）。
+>
+> 新增 `tests/core/unit/subprocess-environment-allowlist.test.ts`（7 条，全绿）：
+> 白名单外不复制 / **白名单内命中凭据命名也排除并记名** / **被排除项的值绝不出现在返回值任何位置** /
+> `undefined` 跳过 / 默认白名单本身不含凭据命名 / 一致性校验挡住 `{...process.env}` 回潮 / 额外允许项生效。
+>
+> 第 ③ 条把"只记名字不记值"变成可执行断言：用真实看起来像密钥的字符串做输入，检查整个返回结构里都搜不到它。
