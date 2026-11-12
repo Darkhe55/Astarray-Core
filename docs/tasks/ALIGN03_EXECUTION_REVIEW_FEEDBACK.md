@@ -851,3 +851,17 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 | ⑦ | 文档损坏 ⇒ 读作空（不伪造绑定） |
 
 **未测模块剩 12 个**，下一轮：`task-group-insertion-contract`。
+
+### 目标轮 8（2026-11-12）：`task-group-insertion-contract` 补测试（此前零引用）
+
+`tests/core/unit/task-group-insertion-contract.test.ts`（11 条，全绿）：
+
+| 分组 | 用例 |
+|---|---|
+| 解析 | 非对象/数组拒绝；**未知字段拒绝**（`status` / `sourceKind` 不得静默注入）；`expectedGroupRevision` 非法拒绝；必填字符串为空拒绝；`anchor` 空串 ⇒ null；`dependsOn` 去空 |
+| 指纹 | `dependsOn` 顺序不影响指纹；`title` 变化影响指纹 |
+| **判定顺序** | **幂等优先**（revision 已过期但同键同内容 ⇒ `duplicate`，不误报 stale）；同键异内容 ⇒ `idempotency-conflict`；revision 不符 ⇒ `stale-revision-rejected` 且原因要求重读；锚点不存在 ⇒ `invalid-anchor-rejected`；组关闭 / 锚点后已发工具调用 ⇒ `deferred-to-next-group`；一切正常 ⇒ `insert-now` |
+
+第 ⑥ 条是本轮重点：**顺序必须"先幂等、再 revision"**，否则同一请求重放会被误判成"版本过期"，调用方会误以为要重读状态重新提交。
+
+**未测模块剩 11 个**，下一轮：`goal-pause-condition-catalog`。
