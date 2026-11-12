@@ -789,3 +789,19 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 修复：去重键加入 `missionIdentifier` 与 `sequenceIdentifier`；`recordedAtIso` / `trigger` 仍不参与（同一漂移在不同时间观察到仍算同一条）。
 
 **未测模块剩 16 个**，下一轮：`completion-verdict-store`。
+
+### 目标轮 4（2026-11-12）：`completion-verdict-store` 补测试（此前零引用）
+
+`tests/core/unit/completion-verdict-store.test.ts`（7 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① | 缺 mission / task 标识 ⇒ 拒绝 |
+| ② | 裁决者为空（匿名/角色名）⇒ 拒绝 |
+| ③ | 时间非法 ⇒ 拒绝 |
+| ④ | `rejected` **必须**给理由；`accepted` 理由可空 |
+| ⑤⑥ | 首次写入可读回；**同内容重复写入幂等**（`didWrite=false`） |
+| ⑦ | 同 mission/task **不同内容 ⇒ 拒绝覆盖**（裁决不可事后改写），原裁决保持不变 |
+| ⑧ | `listForMission` 按 task 排序；**损坏文件读回 null 且不掺入列表**；未知 mission ⇒ 空 |
+
+**未测模块剩 15 个**，下一轮：`goal-contract-store`。
