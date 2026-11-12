@@ -936,3 +936,13 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 第 ③④ 条对应卡内两个易错点：**启动基线**与**只触发一次**——若首次观测就当作"rest→working"，每次重启都会触发一次误恢复。
 
 **未测模块剩 7 个**（其中 3 个 `remote-*` 属平台阻塞），下一轮：`daily-rollup`（若存在）或 `metrics-*` 之类；将先扫描确认剩余清单。
+
+### 目标轮 13（2026-11-12）：`completion-receipt-store` 补测试（此前零引用）
+
+`tests/core/unit/completion-receipt-store.test.ts`（6 条，全绿）：不足收据拒绝落盘且不留文件 /
+缺任务标识拒绝 / 首次写入可读回 / 同内容幂等 / **不同内容 `journal-corrupted` 且原收据不变** /
+`listForMission` 按 task 排序、损坏文件跳过、未知 mission 空。
+
+**剩余未测模块 6 个**：`collaboration-status`、`context-recall-ledger-store`、
+`model-task-decomposition-planner`（可推进）+ `remote-delivery-outbox`、`remote-evidence-export`、
+`remote-evidence-snapshot`（平台阻塞，跳过）。
