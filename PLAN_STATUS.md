@@ -5533,3 +5533,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 单一来源：规则集版本 = 凭据检测器目录版本
 >
 > **门禁**：首次全量 1 个失败，重跑 **5049 passed / exit 0** ⇒ 并发抖动，未改断言。
+
+> **㊼ 核心安全模块补测 目标轮 3（2026-11-13）：读取侧扫描标注**
+>
+> `packages/core/src/tools/read-side-content-scan.ts`（SEC-02-06 通道 12）此前零引用。
+> 新增 `tests/core/unit/read-side-content-scan.test.ts`（5 条，全绿）：
+>
+> - 干净 ⇒ `clean`、`isClean=true`、`isEvaluatedAtReadTime` 恒 true、时间戳与规则版本透传
+> - 命中 ⇒ `sensitive` + 规则标识
+> - **标注不含正文**：整份标注序列化后搜不到原文与凭据值，且没有 `content` 字段
+> - 只标注不改内容：同输入同时间戳两次调用结果一致（无隐藏状态）
+> - **结论如实透传**：超字节上限时标注仍是 `incomplete` + `limitReason`，不冒充 `clean`
