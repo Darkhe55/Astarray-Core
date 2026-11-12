@@ -835,3 +835,19 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 修复：未指定主个体时**沿用既有会话已登记的个体**（仅新建时才生成）。
 
 **未测模块剩 13 个**，下一轮：`goal-mission-binding-store`。
+
+### 目标轮 7（2026-11-12）：`goal-mission-binding-store` 补测试（此前零引用）
+
+`tests/core/unit/goal-mission-binding-store.test.ts`（7 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① | 缺 mission / goal 标识 ⇒ 拒绝 |
+| ② | 首次绑定 ⇒ 落盘、revision 1、可读回 |
+| ③ | 同 mission 同 goal 重复绑定 ⇒ **幂等**（不新增、revision 不涨、`boundAtIso` 保持首次） |
+| ④ | 同 mission 换目标 ⇒ 拒绝改绑（`task-sequence-permission-denied`） |
+| ⑤ | 同一目标可被多个 mission 引用（**按 mission 判重**，记录该设计事实） |
+| ⑥ | `unbind` ⇒ true 且生效；重复 unbind ⇒ false |
+| ⑦ | 文档损坏 ⇒ 读作空（不伪造绑定） |
+
+**未测模块剩 12 个**，下一轮：`task-group-insertion-contract`。
