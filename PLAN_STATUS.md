@@ -5567,3 +5567,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **记录不含正文**（只有计数、规则标识、结论）
 >
 > 全部门禁绿：**763 files / 5067 passed + 3 skipped**。
+
+> **㊿ 核心安全模块补测 目标轮 6（2026-11-13）：anthropic-messages provider 注册**
+>
+> `packages/core/src/runtime/anthropic-messages-provider-registration.ts` 此前零引用；**未发起任何网络请求**。
+> 新增 `tests/core/unit/anthropic-messages-provider-registration.test.ts`（5 条，全绿）：
+>
+> - providerId / protocol / protocolVersion 与运行时模块**一致**（单一来源）
+> - 能力声明含 streaming / tool-calling / cancellation
+> - `createRuntime` 返回 `AnthropicMessagesRuntime`
+> - **配置真的透传**：baseUrl / apiKey / model / timeout / maxTokens（漏传会在运行期才炸，注册层看起来却正常）
+> - 未给 `maxOutputTokens` 时不写 `maxTokens`；每次返回新实例；注册对象本身**不含密钥字段**
