@@ -946,3 +946,17 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 **剩余未测模块 6 个**：`collaboration-status`、`context-recall-ledger-store`、
 `model-task-decomposition-planner`（可推进）+ `remote-delivery-outbox`、`remote-evidence-export`、
 `remote-evidence-snapshot`（平台阻塞，跳过）。
+
+### 目标轮 14（2026-11-12）：`collaboration-status` 补测试（此前零引用）
+
+`tests/core/unit/collaboration-status.test.ts`（6 条，全绿）：空状态说明"空 ≠ 不存在" /
+**状态映射**（`received⇒pending`、`delivered|processed|completed⇒delivered`、`failed⇒dropped`、未知⇒`dropped`）/
+损坏收件箱计数不掩盖 / 已回收 Agent `isActive=false` / 有数据时 notice 为"只读视图" /
+**真实目录查询不写盘**（不新建 `collaboration/inbox`、目录条目不变）。
+
+第 ② 条是核心：`failed` 必须如实表现为 `dropped`，不能被算成"已投递"，否则用户会以为消息送到了。
+
+**门禁**：本轮首次全量 1 个失败，重跑 **4998 passed / exit 0** ⇒ 并发抖动，未改断言。
+
+**剩余未测模块 5 个**：`context-recall-ledger-store`、`model-task-decomposition-planner`（可推进）
++ 3 个 `remote-*`（平台阻塞）。
