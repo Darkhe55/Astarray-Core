@@ -865,3 +865,20 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 第 ⑥ 条是本轮重点：**顺序必须"先幂等、再 revision"**，否则同一请求重放会被误判成"版本过期"，调用方会误以为要重读状态重新提交。
 
 **未测模块剩 11 个**，下一轮：`goal-pause-condition-catalog`。
+
+### 目标轮 9（2026-11-12）：`goal-pause-condition-catalog` 补测试（此前零引用）
+
+`tests/core/unit/goal-pause-condition-catalog.test.ts`（6 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① | 清单**冻结**为四个条件（`budget-exhausted` / `deadline-passed` / `stagnation` / `requires-replanning`） |
+| ② | 四个已知条件逐个识别为已知 |
+| ③ | 未知 / 大小写变体 / 带空格 / 空串 / 中文 ⇒ **均不是已知**（不得模糊匹配） |
+| ④ | 清单无重复 |
+| ⑤ | **契约校验真的使用该目录**：未知条件 ⇒ `isValid=false` 且原因含"未知的暂停条件"；合法值 ⇒ 通过 |
+| ⑥ | 端到端：未知条件的目标契约**拒绝落盘且不留文件** |
+
+第 ⑤ 条是关键——它证明目录不是"一份没人读的常量"，而是被 `validateGoalContract` 实际执行的判定依据。
+
+**未测模块剩 10 个**，下一轮：`legacy-identity-migration`。
