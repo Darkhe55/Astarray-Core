@@ -805,3 +805,19 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 | ⑧ | `listForMission` 按 task 排序；**损坏文件读回 null 且不掺入列表**；未知 mission ⇒ 空 |
 
 **未测模块剩 15 个**，下一轮：`goal-contract-store`。
+
+### 目标轮 5（2026-11-12）：`goal-contract-store` 补测试（此前零引用）
+
+`tests/core/unit/goal-contract-store.test.ts`（7 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① | 非法契约（无 requirements）⇒ 拒绝落盘，**且不留文件** |
+| ② | 合法契约 ⇒ 落盘并可读回（深相等） |
+| ③ | 未知 goal ⇒ null；缺字段/损坏 ⇒ null（不伪造契约） |
+| ④ | `saveActivated` 模型来源 ⇒ 拒绝（**目标模式不得由模型自开**） |
+| ⑤ | `saveActivated` 非显式用户请求 ⇒ 拒绝 |
+| ⑥ | 认证用户 + 显式请求 + 显式开启 ⇒ 落盘并返回激活原因 |
+| ⑦ | `list` 只返回合法契约、损坏跳过、目录不存在 ⇒ 空 |
+
+**未测模块剩 14 个**，下一轮：`conversation-identity-store`。
