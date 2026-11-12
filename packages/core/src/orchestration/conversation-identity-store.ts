@@ -479,7 +479,12 @@ export class ConversationIdentityStore {
     const mainAgentInstanceIdentifier =
       requestedMainAgentInstanceIdentifier === undefined ||
       requestedMainAgentInstanceIdentifier === ""
-        ? this.generateMainAgentInstanceIdentifier()
+        ? /**
+         * 未指定主个体时：**既有会话沿用已登记个体**。
+         * 否则"同参数重复开启"会凭空生成新个体，再把自己判成"参数不同"而抛冲突 —— 等于不幂等。
+         */
+        (existing?.mainAgentInstanceIdentifier ??
+          this.generateMainAgentInstanceIdentifier())
         : requestedMainAgentInstanceIdentifier;
     if (isDerivedProcessOrMissionIdentifier(mainAgentInstanceIdentifier)) {
       throw new DomainError(

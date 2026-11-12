@@ -821,3 +821,17 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 | ⑦ | `list` 只返回合法契约、损坏跳过、目录不存在 ⇒ 空 |
 
 **未测模块剩 14 个**，下一轮：`conversation-identity-store`。
+
+### 目标轮 6（2026-11-12）：`conversation-identity-store` 补测试 + **修一个真实缺陷**
+
+`tests/core/unit/conversation-identity-store.test.ts`（8 条，全绿）：派生标识识别（mission/pid/process/host）/
+用派生标识开会话被拒 / 新建记录字段 / **同 ID 同参数重复开启幂等** / 同 ID 换项目冲突（断言 `errorCode`）/
+已关闭不得追加运行（断言 `errorCode`）/ 同 mission 重放返回同一 run 且 `userMessageReference` 落盘 /
+重启后仍是同一会话与同一主个体。
+
+**测试暴露的真实缺陷（已修）**：`openConversation` 在**未显式指定主个体**时，每次都生成新的
+`main-agent-<uuid>`，随后与已登记个体比较 ⇒ **同一调用重复执行被判"参数不同"抛冲突**，
+与自身文档"同 ID 同参数幂等"矛盾，也意味着 UI 重复点击「开新会话」会直接报错。
+修复：未指定主个体时**沿用既有会话已登记的个体**（仅新建时才生成）。
+
+**未测模块剩 13 个**，下一轮：`goal-mission-binding-store`。
