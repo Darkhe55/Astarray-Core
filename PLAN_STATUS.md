@@ -5464,3 +5464,21 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > **待人测**：以上全部（无人工验收，一律不标 done）。
 > **未推送**：远端连续 `Connection reset`，本地提交待合并推送（不虚报已交付远端）。
+
+> **㊷ 编排层"生产路径无自动化守护"补齐（2026-11-12）**
+>
+> 起点：`packages/core/src/orchestration` 下 **20 个模块**在 `tests/` 中**零引用**。
+> 终点：**仅剩 3 个 `remote-*`（平台阻塞，需远端环境）**，其余 17 个已全部补上反例测试。
+>
+> 补测模块：`goal-gate-cache`、`main-agent-turn-budget`、`task-ledger-divergence-journal`、
+> `completion-verdict-store`、`goal-contract-store`、`conversation-identity-store`、
+> `goal-mission-binding-store`、`task-group-insertion-contract`、`goal-pause-condition-catalog`、
+> `legacy-identity-migration`、`mission-sequence-binding-store`、`work-window-transition-monitor`、
+> `completion-receipt-store`、`collaboration-status`、`context-recall-ledger-store`、
+> `model-task-decomposition-planner`、`independent-review-gate`（+ 更早的 `completion-receipt`）。
+>
+> **测试暴露并修复的真实缺陷 2 个**：
+> ① 台账分歧日志去重键缺 mission/sequence ⇒ 不同 mission 的相同漂移被静默吞掉；
+> ② 会话重开未指定主个体时每次生成新个体 ⇒ 同参数重复开启被判冲突（不幂等）。
+>
+> **状态**：全部 **implemented-unverified**（无人工验收）；未推送提交 2 个（远端连接重置）。
