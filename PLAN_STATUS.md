@@ -5555,3 +5555,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **没扫完也不可发布**：超字节上限 ⇒ `incomplete` + 限制原因
 > - **不做脱敏**：命中即拒绝（结果里既无原文也无脱敏后文本，防止"替换后放行"）
 > - 纯函数：同输入结果一致
+
+> **㊾ 核心安全模块补测 目标轮 5（2026-11-13）：模型请求出口扫描**
+>
+> `packages/core/src/runtime/provider-egress-scan.ts`（SEC-02-06 通道 13）此前零引用。
+> 新增 `tests/core/unit/provider-egress-scan.test.ts`（8 条，全绿）：
+>
+> - 三档：`off` 不扫不记；`record` 命中**只记录仍然发送**；`block` 命中**抛错不发送**
+> - **`incomplete` 在 block 模式同样阻断**（没扫完不能发）
+> - 环形缓冲有界（100）且**保留最新**；审计端口收到同一条记录
+> - **记录不含正文**（只有计数、规则标识、结论）
+>
+> 全部门禁绿：**763 files / 5067 passed + 3 skipped**。
