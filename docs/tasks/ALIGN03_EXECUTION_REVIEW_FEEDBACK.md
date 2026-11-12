@@ -960,3 +960,14 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 
 **剩余未测模块 5 个**：`context-recall-ledger-store`、`model-task-decomposition-planner`（可推进）
 + 3 个 `remote-*`（平台阻塞）。
+
+### 目标轮 15（2026-11-12）：`context-recall-ledger-store` 补测试（此前零引用）
+
+`tests/core/unit/context-recall-ledger-store.test.ts`（6 条，全绿）：未写入 ⇒ null/0（不伪造）/
+写入可读回且 entry 与 count 互不影响 / **不同调用者严格隔离** / **调用者 ID 含 `../` 不得逃出 base 目录** /
+文档损坏读作空 / 重复写入同 key 覆盖为最新。
+
+第 ④ 条是安全用例：`callerAgentInstanceId` 直接参与路径拼接，若不做清洗，`../../escape-attempt`
+就能把账本写到状态目录之外。
+
+**剩余未测模块 4 个**：`model-task-decomposition-planner`（可推进）+ 3 个 `remote-*`（平台阻塞）。
