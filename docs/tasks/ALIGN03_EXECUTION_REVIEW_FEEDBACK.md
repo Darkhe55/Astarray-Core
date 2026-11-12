@@ -917,3 +917,22 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 | ⑥ | 文档损坏 ⇒ 读作空（宁可未知也不伪造索引） |
 
 **未测模块剩 8 个**，下一轮：`goal-gate-cache` 已完成；下一步 `remote-delivery-outbox`（**平台阻塞，跳过**），改取 `remote-evidence-export`/`remote-evidence-snapshot`（同属 remote，跳过）⇒ 实际下一项取 `work-window-transition-monitor`。
+
+### 目标轮 12（2026-11-12）：`work-window-transition-monitor` 补测试（此前零引用）
+
+`tests/core/unit/work-window-transition-monitor.test.ts`（8 条，全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① | **默认关闭** ⇒ `not-started` 且**不排定时器** |
+| ② | 间隔 < 60 秒 ⇒ 创建即拒绝（不静默改值）；默认间隔 ≥ 下限 |
+| ③ | 首次观测只建基线，**不触发恢复**（启动时已在 working 也不误触发） |
+| ④ | `rest→working` **恰好触发一次**；后续 `no-change` 不再触发 |
+| ⑤ | `working→resting` 只记录，不触发恢复 |
+| ⑥ | 读取失败 ⇒ `read-failed`、计数 +1、保持上次状态、**循环不中断** |
+| ⑦ | 单飞：慢读期间再次观测 ⇒ 跳过且不改状态 |
+| ⑧ | `start` 幂等（只有一个定时器）、`stop` 清理、tick 随回调递增、重复 stop ⇒ `not-running` |
+
+第 ③④ 条对应卡内两个易错点：**启动基线**与**只触发一次**——若首次观测就当作"rest→working"，每次重启都会触发一次误恢复。
+
+**未测模块剩 7 个**（其中 3 个 `remote-*` 属平台阻塞），下一轮：`daily-rollup`（若存在）或 `metrics-*` 之类；将先扫描确认剩余清单。
