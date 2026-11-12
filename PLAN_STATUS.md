@@ -5600,3 +5600,21 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 返回值原样透传（含 `undefined` 与对象引用）
 > - FIFO 顺序；两个独立实例可并行
 > - **已知限制被记录**：同一实例在临界区内再次加锁会互相等待（50ms 内拿不到 ⇒ 证明锁生效）
+
+> ** Ziel 轮 9（2026-11-13）：读取视图扫描器补测试**
+>
+> `packages/core/src/tools/read-format/read-format-scanner.ts` 此前零引用。
+> 新增 `tests/core/unit/read-format-scanner.test.ts`（8 条，全绿）：
+>
+> - 不过滤 ⇒ 原样返回、`not-filtered`、lineMap 覆盖全部行
+> - 过滤注释 ⇒ **行数不变（空行补位）**、`filtered`、如实记录省略行与范围
+> - **字符串里的 `//` 不被误删**（`"http://example.com/x"` 仍在）
+> - **未闭合块注释 ⇒ `parse-error` 并原样返回全文**（不输出半截视图）
+> - 原语：`consumeBlockComment`（闭合/未闭合/嵌套）、`consumeQuotedString`（闭合/跨行/转义）、
+>   `computeSourceHash`（稳定、区分内容）、`extensionOf`（小写化、无扩展名、隐藏文件）
+>
+> **另：捕获到全量抖动的直接证据**。本轮全量 1 个失败落在既有集成用例
+> `graph-change-deterministic-drill`（`requiresReplanning` 期望 true 实得 false），
+> 而同段日志密集出现 **`反馈进程故障 - 反馈进程异常退出（SIGKILL）`**。
+> 隔离重跑该文件 3 条全过（2.2s）。⇒ 抖动源指向**高并行下子进程被 SIGKILL**，
+> 不是断言或逻辑问题，也与我本轮新增的纯函数测试无关。
