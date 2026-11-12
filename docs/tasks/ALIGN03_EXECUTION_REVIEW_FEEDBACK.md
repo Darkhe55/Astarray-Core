@@ -971,3 +971,21 @@ TTL 24h，日期一过**必红**。已改为：写入用当前时间（或给服
 就能把账本写到状态目录之外。
 
 **剩余未测模块 4 个**：`model-task-decomposition-planner`（可推进）+ 3 个 `remote-*`（平台阻塞）。
+
+### 目标轮 16（2026-11-12）：`model-task-decomposition-planner` 补测试（此前零引用，**不调用真实模型**）
+
+`tests/core/unit/model-task-decomposition-planner.test.ts`（8 条，全绿）：空文本 ⇒ 失败 /
+无 JSON 对象 ⇒ 失败 / 有花括号但非法 ⇒ 解析失败 / 带废话仍能抽出对象 /
+正常路径（提示词含任务原文、工具清单为空写「（无）」、无摘要写"不要臆测"、单轮）/
+模型无输出 ⇒ 失败 / **超预算 ⇒ 放弃且说明"不编造分解"** / 占位节点不进任务链。
+
+第 ⑦ 条用 `budgetMilliseconds: 1` + 延迟抛错的假 runtime 模拟超时，**不产生真实模型调用**。
+
+### 可推进模块清单已清零
+
+| 剩余未测模块 | 处置 |
+|---|---|
+| `remote-delivery-outbox`、`remote-evidence-export`、`remote-evidence-snapshot` | **平台阻塞**（需远端环境），按既定口径跳过并记录 |
+
+⇒ 本目标（补齐 `packages/core/src/orchestration` 下"生产路径无自动化守护"的模块）**可推进部分已完成**：
+20 → 3（全部为平台阻塞项）。
