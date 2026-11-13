@@ -5786,3 +5786,19 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **仍未做（下一轮断点）**：supervisor 目前把"心跳失联退出"与"真实崩溃"都记成同一句
 > `反馈进程故障`——这正是最初误判"OS 杀了子进程"的根因。区分二者需要子进程在退出前通过 IPC 自报原因
 > （新增 `selfTermination` 消息类型），属于协议改动，留作单独一轮。
+
+> **子进程终止分类（2026-11-13，目标轮 4）**
+>
+> 这是"日志误导诊断"问题的修复：supervisor 过去把所有终止都记成同一句 `反馈进程故障`，
+> 于是"心跳失联自我退出"与"真实崩溃"在日志上无法区分。
+>
+> 新增 `feedback-process/child-termination-classification.ts`：
+> `classifyChildTermination({exitCode, exitSignal, reportedReason})` 输出
+> `heartbeat-lost | parent-disconnected | shutdown-completed | killed-by-signal | crashed | clean-exit-unexpected | unknown`；
+> **自报原因优先于退出码推断**；只有 `shutdown-completed` 不算故障。
+> 已接入 supervisor 的退出日志：现在会打印 `反馈进程异常退出[crashed]（code=1, signal=null）` 这类带类别的行。
+>
+> 验证：新增 4 条单测 + `feedback-process` 集成 11 条，全部通过；typecheck/lint 通过。
+>
+> **仍待接线（下一轮断点）**：让子进程在退出前通过 IPC 自报 `heartbeat-lost` / `parent-disconnected`，
+> 把 `reportedReason` 填进来。目前分类只到"按退出形态推断"这一层。

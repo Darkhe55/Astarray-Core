@@ -14,6 +14,7 @@ import {
   DEFAULT_RESTART_BACKOFF_JITTER_RATIO,
   computeRestartDelayMilliseconds,
 } from "./restart-backoff.js";
+import { classifyChildTermination } from "./child-termination-classification.js";
 import { formatDiagnosticLogLine } from "../infra/log-line-safety.js";
 import type { FeedbackIpcMessage } from "./ipc-protocol.js";
 import type { FeedbackMessage } from "../core/types.js";
@@ -191,9 +192,18 @@ export class FeedbackProcessSupervisor {
     if (this.isShuttingDown) {
       return;
     }
+    /**
+     * 分类后再记日志：信号杀 / 非零退出 / 零退出三类不再混成同一句话。
+     * （自报原因待 IPC 接线后填入；在此之前按退出形态推断。）
+     */
+    const terminationCategory = classifyChildTermination({
+      exitCode,
+      exitSignal,
+      reportedReason: null,
+    });
     this.handleChildProcessFailure(
       new Error(
-        `反馈进程异常退出（code=${exitCode ?? "null"}, signal=${exitSignal ?? "null"}）`,
+        `反馈进程异常退出[${terminationCategory}]（code=${exitCode ?? "null"}, signal=${exitSignal ?? "null"}）`,
       ),
     );
   }
