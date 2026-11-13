@@ -44,6 +44,8 @@ export class FeedbackProcessSupervisor {
   private client: ForkFeedbackClient | null = null;
   private isShuttingDown = false;
   private restartAttemptCount = 0;
+  /** 子进程最近一次通过 IPC 自报的退出原因（供终止分类使用）。 */
+  private lastSelfTerminationReason: "heartbeat-lost" | "parent-disconnected" | null = null;
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly modulePath: string;
@@ -166,6 +168,13 @@ export class FeedbackProcessSupervisor {
     }
 
     childProcess.on("message", (message: FeedbackIpcMessage) => {
+      /**
+       * 子进程退出前的自报原因：比父侧的退出码推断更可信，记下来供分类使用。
+       * 不往上层转发（它不是业务消息）。
+       */
+      if (message.type === "selfTermination") {
+        this.lastSelfTerminationReason = message.reason;
+      }
       client.handleInboundMessage(message);
     });
     childProcess.on("error", (error) => {
@@ -199,8 +208,9 @@ export class FeedbackProcessSupervisor {
     const terminationCategory = classifyChildTermination({
       exitCode,
       exitSignal,
-      reportedReason: null,
+      reportedReason: this.lastSelfTerminationReason,
     });
+    this.lastSelfTerminationReason = null;
     this.handleChildProcessFailure(
       new Error(
         `反馈进程异常退出[${terminationCategory}]（code=${exitCode ?? "null"}, signal=${exitSignal ?? "null"}）`,

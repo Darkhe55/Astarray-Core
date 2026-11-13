@@ -78,6 +78,11 @@ export type FeedbackIpcMessage =
       requestId: string;
     }
   | {
+      type: "selfTermination";
+      /** 子进程自报的退出原因（退出前通过 IPC 发送）。 */
+      reason: "heartbeat-lost" | "parent-disconnected";
+    }
+  | {
       type: "protocolError";
       requestId: string | null;
       errorCode: string;

@@ -79,6 +79,7 @@ export function runFeedbackProcessEntry(
         refreshHeartbeatWatchdog();
         return;
       }
+      sendToParent({ type: "selfTermination", reason: "heartbeat-lost" });
       writeStderr(
         "astarray: 反馈进程未收到主进程心跳，判定主进程失联，自行退出\n",
       );

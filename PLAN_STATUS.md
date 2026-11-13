@@ -5802,3 +5802,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > **仍待接线（下一轮断点）**：让子进程在退出前通过 IPC 自报 `heartbeat-lost` / `parent-disconnected`，
 > 把 `reportedReason` 填进来。目前分类只到"按退出形态推断"这一层。
+
+> **子进程自报退出原因（2026-11-13，目标轮 5）**
+>
+> 补上上一轮断点：`ipc-protocol` 新增 `selfTermination` 消息（`reason: heartbeat-lost | parent-disconnected`）；
+> 子进程在**心跳失联自退前**通过 IPC 自报原因；supervisor 收到后记入 `lastSelfTerminationReason`，
+> 并把它作为 `classifyChildTermination` 的 `reportedReason`（分类时**自报优先于退出码推断**），用后即清。
+>
+> 这样日志从 `反馈进程异常退出（code=1）` 变成 `反馈进程异常退出[heartbeat-lost]（code=1, signal=null）`——
+> 终于能区分"心跳失联自退"与"真实崩溃"，不再把诊断引向"操作系统在杀进程"。
+>
+> 验证：`child-termination-classification` 4 条 + `feedback-process` 与 `feedback-process-default-path` 集成共 17 条全部通过；typecheck/lint 通过。
