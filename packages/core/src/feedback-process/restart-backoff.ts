@@ -21,7 +21,12 @@ export interface RestartBackoffInput {
   readonly random: () => number;
 }
 
-export const DEFAULT_RESTART_BACKOFF_JITTER_RATIO = 0.25;
+/**
+ * 默认抖动比例为 **0**：supervisor 的重启延迟必须对测试时钟保持确定性，
+ * 否则"推进固定时间就看到重启"的用例会失效。要开启抖动，需同时把随机源
+ * 注入测试时钟（见 PLAN_STATUS 的待接线项）。
+ */
+export const DEFAULT_RESTART_BACKOFF_JITTER_RATIO = 0;
 
 export function computeRestartDelayMilliseconds(input: RestartBackoffInput): number {
   if (!Number.isInteger(input.attempt) || input.attempt < 1) {

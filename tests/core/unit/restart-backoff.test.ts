@@ -42,7 +42,7 @@ describe("重启退避抖动", () => {
     expect(() => compute({ jitterRatio: 1.5 })).toThrow(/\[0,1\]/u);
   });
 
-  it("⑤ 默认抖动比例为 0.25", () => {
-    expect(DEFAULT_RESTART_BACKOFF_JITTER_RATIO).toBe(0.25);
+  it("⑤ 默认抖动比例为 0（对测试时钟保持确定性，开启需注入随机源）", () => {
+    expect(DEFAULT_RESTART_BACKOFF_JITTER_RATIO).toBe(0);
   });
 });

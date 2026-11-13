@@ -5813,3 +5813,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 终于能区分"心跳失联自退"与"真实崩溃"，不再把诊断引向"操作系统在杀进程"。
 >
 > 验证：`child-termination-classification` 4 条 + `feedback-process` 与 `feedback-process-default-path` 集成共 17 条全部通过；typecheck/lint 通过。
+
+> **回归修复：默认抖动归零（2026-11-13，目标轮 6）**
+>
+> 全量门禁抓到**真实回归**：`ar07-module-gaps-6` 两条 supervisor 分支用例失败
+> （`expected 1 to be greater than 1`、过期子进程未触发重启）。根因是重启退避默认抖动 0.25
+> 让"推进固定时长即重启"的测试时钟失去确定性。
+>
+> 处置：`DEFAULT_RESTART_BACKOFF_JITTER_RATIO` 改为 **0**（保持既有确定性），
+> 抖动能力与 5 条单测保留；要开启需同时把随机源注入测试时钟（待接线）。
+> 定向复跑：`ar07-module-gaps-6` 15 条 + `restart-backoff` 5 条全过。
+>
+> **教训记录**：这是"定向绿 ≠ 全量绿"的实例——我只跑了 feedback 相关测试，没跑 supervisor 分支用例，
+> 是门禁把它抓出来的。
