@@ -170,10 +170,22 @@ describe("HISTORY-01-02 端到端：真实任务产生运行历史", () => {
     }
     expect(historyFiles.length).toBeGreaterThan(0);
 
-    const historyContent = await fs.readFile(
-      path.join(runHistoryDirectory, historyFiles[0] as string),
-      "utf8",
-    );
+    /**
+     * 负载容忍：**文件出现 ≠ 事件已写完**。此前只等文件、随后只读一次内容，
+     * 在并行负载下会读到"文件已建但 tool-call 还没落"的中间态而假失败。
+     * 这里改为轮询到内容包含该事件（或超时）再断言；断言本身不变。
+     */
+    let historyContent = "";
+    const contentDeadline = Date.now() + 10_000;
+    while (Date.now() < contentDeadline) {
+      historyContent = await fs
+        .readFile(path.join(runHistoryDirectory, historyFiles[0] as string), "utf8")
+        .catch(() => "");
+      if (historyContent.includes("tool-call")) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     expect(historyContent).toContain("tool-call");
     expect(historyContent).toContain("factVerification");
   });
