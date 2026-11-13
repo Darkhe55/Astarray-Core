@@ -71,7 +71,19 @@ export class CredentialBroker {
     readonly operation: string;
   }): Promise<string> {
     assertCredentialReferenceUsable(input);
-    const secret = await this.resolutionPort.resolveSecret(input.reference);
+    /**
+     * 刻意丢弃解析端口的原始异常：适配器的错误消息可能带凭据库路径，
+     * 实现失误时甚至可能带秘密值。这里只报引用标识，细节走本地诊断通道。
+     */
+    let secret: string;
+    try {
+      secret = await this.resolutionPort.resolveSecret(input.reference);
+    } catch {
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        `凭据解析失败（原始异常已丢弃，避免路径/秘密进入日志）: ${input.reference.credentialIdentifier}`,
+      );
+    }
     if (secret.trim() === "") {
       throw new DomainError(
         "task-sequence-permission-denied",
