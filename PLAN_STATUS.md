@@ -5641,3 +5641,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 干净摘要 ⇒ 可发布；含凭据 ⇒ 不可落盘 + 规则标识；超长（`incomplete`）⇒ 同样不可落盘
 > - **与通用实现完全等价**：对同一批输入，摘要侧与通用侧结果必须逐字段相同（防止出现第二套规则导致两处漂移）
 > - 结果不含摘要正文（判定结果不成为新的泄漏面）
+
+> **目标轮 12（2026-11-13）：摘要资源观测补测试**
+>
+> `packages/core/src/summarization/summary-resource-metrics.ts` 此前零引用。
+> 新增 `tests/core/unit/summary-resource-metrics.test.ts`（6 条，全绿）：
+>
+> - 指标逐字段来自 `extract` 与清单读取（不猜、不改写）
+> - **清单字节来自真实读取函数**（每次调用重新读，第二次读到 200 而不是缓存的 100）
+> - 耗时是真实测量（慢操作 ⇒ 更长的 `wallMilliseconds`）
+> - `sourceAccessCount` / `isReturnBounded` **原样透传**（不因返回量小而改写判定）
+> - **操作抛错 ⇒ 整体 reject**，不返回一份"看起来成功"的指标
