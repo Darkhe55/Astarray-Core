@@ -5663,3 +5663,17 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **未知 schema 版本 ⇒ null**（不猜、不擅自迁移）
 > - 损坏文件 ⇒ null（不抛错）
 > - 决策表原样往返（不丢字段、不改内容）
+
+> **目标轮 14（2026-11-13）：凭据检测夹具补元测试 + **修一个真实缺陷****
+>
+> `packages/core/src/testing/credential-detection-fixtures.ts`（SEC-02-05）此前零引用。
+> 新增 `tests/core/unit/credential-detection-fixtures.test.ts`（7 条，全绿）：
+>
+> - 结构：ID 唯一、字段齐备、`pos`/`neg` 前缀与 `isPositive` **不得写反**
+> - 卫生：每条正例必须是**明显假值**（含 `FAKE`/占位标记）；导出是纯数据（无函数）
+> - 一致性：**每条正例至少被一条规则命中**；**每条反例零命中**；正例覆盖 ≥5 个类别
+>
+> **测试暴露的真实缺陷（已修）**：`cloud-aws-access-key-pos-1` 的内容是
+> `AKIAFAKE0000000000` —— `AKIA` 之后只有 **14** 位，而规则要求 **16** 位，
+> 于是这条"正例"**从未被任何规则命中**。覆盖表按它声明"AWS 访问标识可识别"，
+> 实际上这个夹具证明不了任何事。已补足为 16 位（`AKIAFAKE000000000000`），仍保留 `FAKE` 标记。

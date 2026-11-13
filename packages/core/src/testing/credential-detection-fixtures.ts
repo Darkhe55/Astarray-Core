@@ -88,7 +88,7 @@ export const CREDENTIAL_DETECTION_FIXTURES: readonly CredentialDetectionFixture[
     fixtureIdentifier: "cloud-aws-access-key-pos-1",
     category: "cloud-credential",
     isPositive: true,
-    content: "aws_access_key_id = AKIAFAKE0000000000",
+    content: "aws_access_key_id = AKIAFAKE000000000000",
     note: "AWS 访问标识（AKIA + 16 位大写）",
   },
   {
