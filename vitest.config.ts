@@ -23,6 +23,13 @@ export default defineConfig({
       "UI 测试（已迁出）/integration/gui02-04-package-entry.test.ts",
     ],
     environment: "node",
+    /**
+     * 测试临时目录卫生：**开跑前**清扫超过 24h 的历史残骸，**跑完**回收本次运行新建、
+     * 却因用例没写清理 / 断言失败 / worker 被 SIGKILL 而留下的目录。
+     *
+     * 只处理 `os.tmpdir()` 下 `astarray-` 前缀的目录；基线内与其它目录一概不动。
+     */
+    globalSetup: ["tests/global-setup/index.ts"],
     coverage: {
       provider: "v8",
       include: ["packages/core/src/**/*.ts", "packages/tui/src/**/*.ts", "packages/tui/src/**/*.tsx"],
