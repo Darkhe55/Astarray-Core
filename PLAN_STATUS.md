@@ -5579,7 +5579,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **配置真的透传**：baseUrl / apiKey / model / timeout / maxTokens（漏传会在运行期才炸，注册层看起来却正常）
 > - 未给 `maxOutputTokens` 时不写 `maxTokens`；每次返回新实例；注册对象本身**不含密钥字段**
 
-> ** Ziel 轮 7（2026-11-13）：日志行安全化补测试**
+> ** 目标轮 7（2026-11-13）：日志行安全化补测试**
 >
 > `packages/core/src/infra/log-line-safety.ts`（SEC-02 通道 14）此前零引用。
 > 新增 `tests/core/unit/log-line-safety.test.ts`（9 条，全绿）：
@@ -5590,7 +5590,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `formatDiagnosticLogLine` 整行不含换行；**伪造 `[ERROR]` 注入无法变成独立一行**
 > - **明确不是脱敏**：假密钥原样保留（钉住边界，防止被当脱敏层误用）
 
-> ** Ziel 轮 8（2026-11-13）：AsyncMutex 补测试**
+> ** 目标轮 8（2026-11-13）：AsyncMutex 补测试**
 >
 > `packages/core/src/infra/async-mutex.ts` 此前零引用，而它是**几十个存储模块**依赖的底层件。
 > 新增 `tests/core/unit/async-mutex.test.ts`（7 条，全绿）：
@@ -5601,7 +5601,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - FIFO 顺序；两个独立实例可并行
 > - **已知限制被记录**：同一实例在临界区内再次加锁会互相等待（50ms 内拿不到 ⇒ 证明锁生效）
 
-> ** Ziel 轮 9（2026-11-13）：读取视图扫描器补测试**
+> ** 目标轮 9（2026-11-13）：读取视图扫描器补测试**
 >
 > `packages/core/src/tools/read-format/read-format-scanner.ts` 此前零引用。
 > 新增 `tests/core/unit/read-format-scanner.test.ts`（8 条，全绿）：
@@ -5619,7 +5619,7 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 隔离重跑该文件 3 条全过（2.2s）。⇒ 抖动源指向**高并行下子进程被 SIGKILL**，
 > 不是断言或逻辑问题，也与我本轮新增的纯函数测试无关。
 
-> ** Ziel 轮 10（2026-11-13）：配置/文档读取策略补测试**
+> ** 目标轮 10（2026-11-13）：配置/文档读取策略补测试**
 >
 > `packages/core/src/tools/read-format/read-format-config-documents.ts` 此前零引用。
 > 新增 `tests/core/unit/read-format-config-documents.test.ts`（9 条，全绿）：
