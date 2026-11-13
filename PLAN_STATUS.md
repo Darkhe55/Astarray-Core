@@ -5618,3 +5618,17 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 而同段日志密集出现 **`反馈进程故障 - 反馈进程异常退出（SIGKILL）`**。
 > 隔离重跑该文件 3 条全过（2.2s）。⇒ 抖动源指向**高并行下子进程被 SIGKILL**，
 > 不是断言或逻辑问题，也与我本轮新增的纯函数测试无关。
+
+> ** Ziel 轮 10（2026-11-13）：配置/文档读取策略补测试**
+>
+> `packages/core/src/tools/read-format/read-format-config-documents.ts` 此前零引用。
+> 新增 `tests/core/unit/read-format-config-documents.test.ts`（9 条，全绿）：
+>
+> - JSONC 过滤注释 ⇒ 注释消失、**行数不变**、标 `filtered`
+> - **纯 JSON 如实标注 `comments-unsupported`**（不虚报"已过滤"）
+> - 导入能力不支持 ⇒ `imports-unsupported`（不适用 ≠ 失败）
+> - YAML：行首/空白后的 `#` 被过滤，**URL 片段里的 `#frag` 不误删**
+> - TOML 同样按 `#` 过滤
+> - Markdown：**围栏代码块内的 `<!-- -->` 整体保留**，块外注释被过滤且行号对齐
+> - 未闭合 `<!--` ⇒ `parse-error` 并原样返回全文
+> - 纯文本原样返回 + `comments-unsupported` 提示；导入提示只在需要时追加
