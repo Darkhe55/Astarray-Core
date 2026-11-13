@@ -5773,3 +5773,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **parent disconnect 决策（本轮记录、不改代码）**：`parent.on("disconnect") → processExit(1)` **保持立即退出**。
 > 主进程真的消失时立刻退出是对的；对它做容错会留下孤儿反馈进程（继续占端口/内存），
 > 与"负载抖动"是两件事，不能混为一谈。
+
+> **重启退避抖动（2026-11-13，目标轮 3）**
+>
+> 原实现线性退避 `base × attempt`、**无抖动**：多个 supervisor 同时崩溃会在同一时刻一起重启，形成同步撞车。
+> 新增 `feedback-process/restart-backoff.ts`：`computeRestartDelayMilliseconds` 在有界区间
+> `[linear×(1-jitter), linear×(1+jitter)]` 内取值，随机源注入以便确定性测试；参数非法直接拒绝。
+> 已接入 `process-supervisor` 的重启路径（默认抖动 0.25）。
+>
+> 验证：新增 5 条单测 + `heartbeat-miss-tolerance` 4 条 + 4 个 feedback 相关集成文件 18 条，全部通过。
+>
+> **仍未做（下一轮断点）**：supervisor 目前把"心跳失联退出"与"真实崩溃"都记成同一句
+> `反馈进程故障`——这正是最初误判"OS 杀了子进程"的根因。区分二者需要子进程在退出前通过 IPC 自报原因
+> （新增 `selfTermination` 消息类型），属于协议改动，留作单独一轮。

@@ -10,6 +10,10 @@ import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
 import { buildRestrictedSubprocessEnvironment } from "../infra/subprocess-environment-allowlist.js";
+import {
+  DEFAULT_RESTART_BACKOFF_JITTER_RATIO,
+  computeRestartDelayMilliseconds,
+} from "./restart-backoff.js";
 import { formatDiagnosticLogLine } from "../infra/log-line-safety.js";
 import type { FeedbackIpcMessage } from "./ipc-protocol.js";
 import type { FeedbackMessage } from "../core/types.js";
@@ -219,8 +223,16 @@ export class FeedbackProcessSupervisor {
       this.stopHeartbeatLoop();
       return;
     }
-    const backoffMilliseconds =
-      this.restartBackoffMilliseconds * this.restartAttemptCount;
+    /**
+     * 叠加有界抖动：多个 supervisor 同时崩溃时不再"同一时刻"一起重启，
+     * 避免重启风暴自我放大（线性退避本身不解决同步撞车）。
+     */
+    const backoffMilliseconds = computeRestartDelayMilliseconds({
+      attempt: this.restartAttemptCount,
+      baseMilliseconds: this.restartBackoffMilliseconds,
+      jitterRatio: DEFAULT_RESTART_BACKOFF_JITTER_RATIO,
+      random: Math.random,
+    });
     setTimeout(() => {
       if (this.isShuttingDown) {
         return;
