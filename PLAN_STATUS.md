@@ -5858,3 +5858,20 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 唯一权威是检查点表与卡内「进展」小节；施工前必须三步核实（检查点表 → 进展小节 → `git grep` 源码）。
 > 并记录本 session 两次误判（COORD01、E2E01）作为依据，要求卡内区分 `pending` 的两种含义
 > （未开工 / implemented-unverified）。
+
+> **远端投递 outbox 补测试（2026-11-13，目标轮 1）**
+>
+> `packages/core/src/orchestration/remote-delivery-outbox.ts`（409 行）此前零测试引用。
+> **不接真实远端**：`RemoteDeliveryTransportPort` 是端口，测试用假实现驱动，只验证纯逻辑契约。
+> 新增 `tests/core/unit/remote-delivery-outbox.test.ts`（16 条，全绿）：
+>
+> - 完整性校验：缺标识/目标账户/revision/contentHash 格式/设备空串/账户过长 ⇒ 各自拒绝（纯函数，不读盘不发网）
+> - 入队：不完整拒绝且不落盘；首次 `pending`；**同 id 同内容幂等**；**同 id 不同内容/目标/修订 ⇒ 拒绝**（不静默改发）
+> - 状态：不存在的 operation ⇒ `mission-not-found`；更新保留既有回执标识
+> - 目标守卫：**拒绝自动换目标**（需新 operation 与新授权）
+> - 投递：未入队 ⇒ refused；已 sent ⇒ 不重发；先读回执已确认 ⇒ `already-sent` 且**不发送**；
+>   端口拒绝 ⇒ `refused` 并记录原因；**端口受理但无回执 ⇒ `unknown`（不当已送达）**，
+>   再次尝试无显式重发 ⇒ `requires-explicit-resend` 且**不调用 send**
+>
+> 全量门禁：**779 files / 5175 passed + 3 skipped，exit 0**。
+> 性质：**仅纯逻辑层已验证**，真实远端投递仍属 implemented-unverified（平台阻塞）。
