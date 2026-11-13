@@ -5652,3 +5652,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 耗时是真实测量（慢操作 ⇒ 更长的 `wallMilliseconds`）
 > - `sourceAccessCount` / `isReturnBounded` **原样透传**（不因返回量小而改写判定）
 > - **操作抛错 ⇒ 整体 reject**，不返回一份"看起来成功"的指标
+
+> **目标轮 13（2026-11-13）：指导变更意图日志补测试**
+>
+> `packages/core/src/runtime-guidance/guidance-change-intent-journal.ts` 此前零引用。
+> 新增 `tests/core/unit/guidance-change-intent-journal.test.ts`（6 条，全绿）：
+>
+> - 从未写入 ⇒ **null**（不伪造空状态）
+> - 写入后可读回（深相等）；写入是**整体替换**而非追加，且自动创建目录
+> - **未知 schema 版本 ⇒ null**（不猜、不擅自迁移）
+> - 损坏文件 ⇒ null（不抛错）
+> - 决策表原样往返（不丢字段、不改内容）
