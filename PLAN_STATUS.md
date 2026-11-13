@@ -5838,3 +5838,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **仍属待办（非本轮范围）**：① 抖动要真正启用需把随机源注入 supervisor 测试时钟；
 > ② `parent.on("disconnect")` 仍立即退出（刻意保留，避免孤儿进程）；
 > ③ 剩余 2 个 TEMP 目录将在下次运行超过 24h 后自动清扫。
+
+> **卡状态核对与卡头修正（2026-11-13）**
+>
+> 核对发现三张卡的**卡头状态与卡内表格矛盾**（按卡头施工会误判为"未开工"）：
+>
+> | 卡 | 原卡头 | 实际（以表格为准） |
+> |---|---|---|
+> | COORD01 | `状态：pending` | 01 已交付；02–04 implemented-unverified |
+> | CLUSTER01 | `状态：pending` | 01–03 已交付；04 implemented-unverified（待人测） |
+> | EXEC01 | `状态：pending` | 主体 6 项已交付；2 项 implemented-unverified；B1–B4 待产品决策 |
+>
+> 已按上表修正卡头。其余卡核对结果：`E2E01` 确为未开工（正文无检查点表）、`OCT28` 属索引文件、
+> `COMM01` 剩 1 项语义决策、`WB00`/GUI 系列属 UI 私有库边界。
