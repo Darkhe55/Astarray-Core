@@ -16,6 +16,10 @@ import {
   isProtocolVersionSupported,
 } from "./ipc-protocol.js";
 import { MailboxJournal } from "./mailbox-journal.js";
+import {
+  DEFAULT_HEARTBEAT_MISS_TOLERANCE_COUNT,
+  createHeartbeatMissTolerance,
+} from "./heartbeat-miss-tolerance.js";
 import type { JournaledMessage } from "./mailbox-journal.js";
 
 export interface ChildProcessLike {
@@ -51,6 +55,10 @@ export function runFeedbackProcessEntry(
   const recipientDeliveryTimers = new Map<string, NodeJS.Timeout>();
   let baseDirectory = options.defaultBaseDirectory;
   let heartbeatTimeoutMilliseconds = 30_000;
+  /** 连续错过 2 次才判定主进程失联：单次负载抖动不应杀掉子进程。 */
+  const heartbeatMissTolerance = createHeartbeatMissTolerance({
+    toleranceCount: DEFAULT_HEARTBEAT_MISS_TOLERANCE_COUNT,
+  });
 
   function sendToParent(message: FeedbackIpcMessage): void {
     if (parent.connected) {
@@ -63,6 +71,14 @@ export function runFeedbackProcessEntry(
       clearTimeout(heartbeatWatchdog);
     }
     heartbeatWatchdog = setTimeout(() => {
+      const consecutiveMissCount = heartbeatMissTolerance.recordMiss();
+      if (!heartbeatMissTolerance.shouldExit()) {
+        writeStderr(
+          `astarray: 反馈进程连续 ${String(consecutiveMissCount)} 次未收到主进程心跳，继续等待\n`,
+        );
+        refreshHeartbeatWatchdog();
+        return;
+      }
       writeStderr(
         "astarray: 反馈进程未收到主进程心跳，判定主进程失联，自行退出\n",
       );
@@ -300,6 +316,7 @@ export function runFeedbackProcessEntry(
         handleShutdown(message.requestId);
         break;
       case "heartbeat":
+        heartbeatMissTolerance.recordHeartbeat();
         refreshHeartbeatWatchdog();
         break;
       default:

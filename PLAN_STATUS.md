@@ -5745,3 +5745,19 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **如实说明的局限**：3 次全绿不足以证明抖动根除；`ponder-readonly-tools-production-wiring`
 > 曾失败一次且隔离即过、其文件内**没有**紧轮询窗口，属尚未定位的偶发（与子进程杀灭同源的可能性最高）。
 > 若后续再现，下一步应抓 `--reporter=verbose` + 进程退出码日志，而不是继续加等待时间。
+
+> **反馈子进程心跳容错（2026-11-13）**
+>
+> 机制：子进程原本"**一次**没收到主进程心跳就 `processExit(1)`"，高并行负载下主进程事件循环被挤压
+> 超过一个心跳周期即被误判失联 ⇒ 父侧记 `反馈进程故障`、SIGKILL 并重启 ⇒ 依赖反馈投递的 e2e 抖动。
+>
+> 改动：新增 `feedback-process/heartbeat-miss-tolerance.ts`（纯计数：`recordHeartbeat` 清零 /
+> `recordMiss` / `shouldExit`，默认连续 **2** 次才退出，容忍度 1 等价旧行为），并接入 `entrypoint` 看门狗；
+> 未达标时打印"连续 N 次未收到心跳，继续等待"并重新计时。
+>
+> 证据：`tests/core/unit/heartbeat-miss-tolerance.test.ts` 4 条 + `child-bootstrap` 6 条全绿。
+> 全量门禁本轮出现 1 个失败（`history01-run-history-e2e` 期望 run-history 含 `tool-call`），
+> **隔离重跑该文件 1 条全过（443ms）** ⇒ 判为同类负载抖动，与本改动无因果关系证据。
+>
+> **下一轮断点**：该 e2e 用固定等待等反馈落盘，应改为"轮询到事件出现或超时"（断言不变）；
+> 另需评估 `parent.on("disconnect")` 直接 `processExit(1)` 是否也应走容错计数。
