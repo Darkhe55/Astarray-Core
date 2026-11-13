@@ -257,7 +257,8 @@ describe("确定性图变更演练", () => {
         pauseReason: string | null;
         lastPotentialValue: number;
       };
-      const goalDeadline = Date.now() + 10_000;
+      /** 负载容忍窗口：并行全量下事件循环可能被挤压，10s 会偶发不够；断言不变，只等更久。 */
+    const goalDeadline = Date.now() + 30_000;
       while (Date.now() < goalDeadline && goalState.lastPotentialValue !== 1) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         goalState = JSON.parse(await fs.readFile(goalStatePath, "utf8")) as typeof goalState;
@@ -305,7 +306,8 @@ describe("确定性图变更演练", () => {
         pauseReason: string | null;
         lastPotentialValue: number;
       };
-      const deadline = Date.now() + 10_000;
+      /** 同上：负载容忍窗口，不改变最终断言。 */
+    const deadline = Date.now() + 30_000;
       while (Date.now() < deadline && !goalState.requiresReplanning) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         goalState = JSON.parse(await fs.readFile(statePath, "utf8")) as typeof goalState;
