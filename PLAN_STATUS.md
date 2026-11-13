@@ -5875,3 +5875,21 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > 全量门禁：**779 files / 5175 passed + 3 skipped，exit 0**。
 > 性质：**仅纯逻辑层已验证**，真实远端投递仍属 implemented-unverified（平台阻塞）。
+
+> **远端证据导出补测试（2026-11-13，目标轮 2）**
+>
+> `packages/core/src/orchestration/remote-evidence-export.ts`（567 行）此前零测试引用。
+> **不接真实远端**：投递与证据来源都是端口，用假实现驱动。
+> 新增 `tests/core/unit/remote-evidence-export.test.ts`（14 条，全绿）：
+>
+> - 绑定存储：新增可查回；**同 id upsert 是替换而非追加**（授权范围变更走同一 id）；损坏文档读作空
+> - 范围判定（纯函数）：**已撤销优先于一切** ⇒ denied；过期/当前时间非法 ⇒ denied；
+>   项目或记录类别越授权 ⇒ **requires-independent-approval（既不放行也不自动拒绝）**；
+>   目标账户非绑定账户/认证用户 ⇒ 需独立批准；绑定设备非 null 时设备不符 ⇒ 需独立批准；
+>   全部符合 ⇒ within-preauthorization
+> - 服务：绑定不存在 ⇒ `mission-not-found`；**越范围 ⇒ `tool-permission-denied`（不能自批）且不取证据**；
+>   撤销 ⇒ `task-sequence-permission-denied`；投递时绑定已删 ⇒ `refused` 且不调用端口；
+>   **端口失败 ⇒ 结果不得是 sent/already-sent**（不冒充成功）
+>
+> 全量门禁：**780 files / 5189 passed + 3 skipped，exit 0**。
+> 性质：**仅纯逻辑层已验证**；真实远端导出仍属 implemented-unverified（平台阻塞）。
