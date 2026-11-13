@@ -5677,3 +5677,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `AKIAFAKE0000000000` —— `AKIA` 之后只有 **14** 位，而规则要求 **16** 位，
 > 于是这条"正例"**从未被任何规则命中**。覆盖表按它声明"AWS 访问标识可识别"，
 > 实际上这个夹具证明不了任何事。已补足为 16 位（`AKIAFAKE000000000000`），仍保留 `FAKE` 标记。
+
+> **目标轮 15（2026-11-13）：宿主用户上下文补测试**
+>
+> `packages/core/src/core/host-user-context.ts` 此前零引用。
+> 新增 `tests/core/unit/host-user-context.test.ts`（6 条，全绿）：
+>
+> - 正常环境 ⇒ 返回**真实登录用户名**（trim 后非空）
+> - **绝不返回固定伪造身份**（`user`/`anonymous`/`local`/`guest`… 黑名单断言）
+> - `os.userInfo()` 抛错 ⇒ **null**（不抛、不猜）
+> - 用户名为空白 / 非字符串 ⇒ null（空串不是身份）
+> - **不从环境变量猜身份**：把 `USERNAME` 改成伪造值后结果不变
