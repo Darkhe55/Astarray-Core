@@ -5632,3 +5632,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - Markdown：**围栏代码块内的 `<!-- -->` 整体保留**，块外注释被过滤且行号对齐
 > - 未闭合 `<!--` ⇒ `parse-error` 并原样返回全文
 > - 纯文本原样返回 + `comments-unsupported` 提示；导入提示只在需要时追加
+
+> **目标轮 11（2026-11-13）：摘要可发布性补测试**
+>
+> `packages/core/src/summarization/summary-publishability.ts` 此前零引用（`tools/content-publishability` 的摘要侧薄封装）。
+> 新增 `tests/core/unit/summary-publishability.test.ts`（5 条，全绿）：
+>
+> - 干净摘要 ⇒ 可发布；含凭据 ⇒ 不可落盘 + 规则标识；超长（`incomplete`）⇒ 同样不可落盘
+> - **与通用实现完全等价**：对同一批输入，摘要侧与通用侧结果必须逐字段相同（防止出现第二套规则导致两处漂移）
+> - 结果不含摘要正文（判定结果不成为新的泄漏面）
