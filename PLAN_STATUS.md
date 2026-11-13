@@ -5688,3 +5688,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `os.userInfo()` 抛错 ⇒ **null**（不抛、不猜）
 > - 用户名为空白 / 非字符串 ⇒ null（空串不是身份）
 > - **不从环境变量猜身份**：把 `USERNAME` 改成伪造值后结果不变
+
+> **目标轮 16（2026-11-13）：反馈子进程引导补测试**
+>
+> `packages/core/src/feedback-process/child-bootstrap.ts` 此前零引用（模块级副作用：导入即可能启动入口）。
+> 新增 `tests/core/unit/child-bootstrap.test.ts`（6 条，全绿）：
+>
+> - 三条闸门（Node 进程 + `ASTARRAY_FEEDBACK_CHILD=1` + `process.send` 存在）**同时满足**才启动，且默认目录 `.astarray`
+> - `ASTARRAY_STATE_DIRECTORY` 生效
+> - 缺标志 / 标志不是 `1` / 无 `process.send` / 非 Node 进程 ⇒ **一律不启动**
+>
+> 用 `vi.mock` 替换 `entrypoint`、`vi.resetModules` 重新导入，**不真正 fork 子进程**。
