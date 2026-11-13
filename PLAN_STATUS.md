@@ -5893,3 +5893,21 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > 全量门禁：**780 files / 5189 passed + 3 skipped，exit 0**。
 > 性质：**仅纯逻辑层已验证**；真实远端导出仍属 implemented-unverified（平台阻塞）。
+
+> **证据快照补测试（2026-11-13，目标轮 3）+ **零测试模块清零****
+>
+> `packages/core/src/orchestration/remote-evidence-snapshot.ts`（293 行）此前零测试引用。
+> 新增 `tests/core/unit/remote-evidence-snapshot.test.ts`（10 条，全绿）：
+>
+> - 前提：缺 requestIdentifier/projectIdentifier/无 mission ⇒ 拒绝构造
+> - **确定性**：同输入同哈希、乱序输入仍稳定排序（时间升序 + 标识升序）
+> - **遗漏必须记账**：超长截断（600 字符，计数+理由码）、脱敏计数、区间外排除计数、区间非法拒绝
+> - `lastObservedAtIso` 取**数据中最晚时间**（不是抓取时间），空快照回退；`isRealtime` 恒 false
+> - 来源集合去重排序、mission 排序、额外理由码去重合并
+> - 摘要派生条目必须自带覆盖条目数；非摘要恒 null
+> - **完整性校验**：原快照通过；改文本/改 revision/改 omissions 任一即失败；哈希不含自身
+>
+> **里程碑**：至此 `packages/core/src` **零测试引用模块 = 0**（此前 20 个，逐个补齐）。
+>
+> 门禁说明：本轮全量出现 1 个失败（`e2e01-provider-write-probe` 的 devolve 写入用例），
+> **隔离重跑该文件 4 条全过（1.6s）** ⇒ 判为同类负载抖动，未改断言。
