@@ -1,0 +1,47 @@
+{
+  "checkPoint": "EXEC-01-06",
+  "recordedAtIso": "2026-11-14T12:33:13.415Z",
+  "headCommit": "0281f9bc4617f2d9611416b1435fc46df4066a17",
+  "packageDirectory": "C:\\Users\\MerchRev\\AppData\\Local\\Temp\\astarray-exec01-06\\node_modules\\astarray",
+  "tarballSha256": "498a0c49a4d29a35e974f4ab33eaf3124062a848b822824c3efe45b3948420d5",
+  "checks": [
+    {
+      "name": "打包产物入口存在",
+      "isPassed": true,
+      "detail": "..\\..\\..\\AppData\\Local\\Temp\\astarray-exec01-06\\node_modules\\astarray\\dist\\public-sdk.js"
+    },
+    {
+      "name": "公开入口导出 buildSandboxSelfCheckReport",
+      "isPassed": true,
+      "detail": "已导出"
+    },
+    {
+      "name": "平台不支持 ⇒ unsupported 且禁止执行",
+      "isPassed": true,
+      "detail": "status=unsupported isExecutionAllowed=false"
+    },
+    {
+      "name": "清单失败 ⇒ 即使后端自称可用也不放行",
+      "isPassed": true,
+      "detail": "status=repair-required isExecutionAllowed=false"
+    },
+    {
+      "name": "隔离安装包的 CLI 入口跑通只读闭环",
+      "isPassed": true,
+      "detail": "exit=0 stdoutIsSingleJsonObject=true status=done"
+    },
+    {
+      "name": "打包产物含执行事件开关",
+      "isPassed": true,
+      "detail": "--emit-execution-events=true --no-emit-execution-events=true"
+    }
+  ],
+  "blockedByEnvironment": [
+    "真实沙箱后端（AppContainer/bubblewrap 等真实适配）",
+    "固定版本 Node 运行时与离线夹具",
+    "干净设备安装自检与断网执行",
+    "Windows/Linux/macOS 多平台证据"
+  ],
+  "isPassed": true,
+  "failures": []
+}

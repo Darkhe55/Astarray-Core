@@ -47,6 +47,7 @@
     "verify:observability-entry-package": "node scripts/verify-observability-entry-package.mjs",
     "verify:instruction-entry-package": "node scripts/verify-instruction-entry-package.mjs",
     "verify:toolkit-package": "node scripts/verify-toolkit-package.mjs",
+    "verify:exec01-06-package": "node scripts/verify-exec01-06-package.mjs",
     "verify:u2-flash-probe": "node scripts/verify-u2-flash-continuous-reception.mjs --probe-only",
     "verify:u2-flash-continuous-reception": "node scripts/verify-u2-flash-continuous-reception.mjs",
     "test:scripts": "node --test \"scripts/lib/*.test.mjs\"",

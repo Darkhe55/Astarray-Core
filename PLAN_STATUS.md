@@ -5969,3 +5969,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `--emit-execution-events` 切 stdout、`--no-emit-execution-events` 关闭。
 > stderr 路径经 `json-output.writeStructuredDiagnosticLine()`（SEC-02 通道 14 漏斗），
 > 本轮先裸写被架构守卫拦下 —— 守卫有效，未绕过。全量门禁 784 files / 5227 passed，exit 0。
+
+> **EXEC-01-06 包级验收（2026-11-14，本地可验证部分）**
+>
+> `npm pack`（正常 prepack）→ tarball SHA256 `498a0c49a4d29a35e974f4ab33eaf3124062a848b822824c3efe45b3948420d5`，HEAD `0281f9bc`；
+> 隔离安装到**仓库外**临时项目后，经公开入口跑通 6 项检查全 PASS（入口解析、自检导出、平台不支持拒绝、
+> 清单失败不放行、CLI 只读闭环 exit 0、事件开关被打包），证据
+> `docs/reports/EXEC01_06_PACKAGE_EVIDENCE_2026-11-14.json`，脚本 `npm run verify:exec01-06-package`。
+>
+> **显式 blocked**：真实沙箱后端、固定版本 Node 运行时与离线夹具、干净设备断网执行、多平台证据。
+>
+> **事故与教训**：首次在仓库内子目录直接 npm install，npm 向上找到根 package.json，
+> 把 tarball 装成根依赖并 prune 掉 186 个 devDependencies。已 restore + 重装复原；
+> 隔离安装必须放在仓库外或先 `npm init` 的独立目录。

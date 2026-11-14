@@ -98,7 +98,7 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 | 03 生命周期 | **部分交付（2026-11-14 核实更新）**：持久化、输出游标/截断、重启对账已交付；**取消/超时分类已确认实现**（`execution-contract` 枚举含 `cancelled`/`timed-out`；`process-execution-controller` 处理终态；`bubblewrap-sandbox-backend` 分别置位）；**敏感扫描闸仍未接线**（`process-execution-output-buffer.readAllTextForScanning()` 只有测试调用，无生产调用方） |
 | 04 生产接线与异步内部执行 | implemented-unverified（2026-11-09，提交待推送）：可达性与去阻塞已证；SDK/CLI 事件面未接 |
 | 05 开发闭环及分诊 | 部分交付（2026-11-09，`96fc126e`+`783b971a`）：分诊报告与应用级 allow/deny 矩阵已交付；**闭环本身阻塞**（需真实沙箱后端） |
-| 06 包级与安全验收 | pending |
+| 06 包级与安全验收 | **本地可验证部分完成（2026-11-14）**：`npm pack` 经正常 prepack 产出 tarball（SHA256 `498a0c49…`，HEAD `0281f9bc`），隔离安装到临时项目后经**公开入口**跑通 6 项检查（见 `docs/reports/EXEC01_06_PACKAGE_EVIDENCE_2026-11-14.json`）；**真实隔离与多平台仍 blocked** |
 
 本文件作为关联补充入口及状态补丁，未改原卡已完成范围。隔离闭环、权限和包验收全部具备证据前不得标整卡 done。
 
@@ -707,3 +707,31 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 
 验证：单测 11 条（含去向解析 3 条）+ 守卫 2 条；真实冒烟 `run --json --runtime mock`
 → stdout 仍是单个 JSON 对象（无事件行）；全量门禁 **784 files / 5227 passed，exit 0**。
+
+### 06 包级验收（2026-11-14，本地可验证部分）
+
+新增脚本 `scripts/verify-exec01-06-package.mjs`（`npm run verify:exec01-06-package`）与证据文件
+`docs/reports/EXEC01_06_PACKAGE_EVIDENCE_2026-11-14.json`。
+
+执行链路（全部记录命令、退出码、SHA256、HEAD）：
+
+1. `npm pack`（**正常 prepack**：typecheck + lint + build + test:serial）⇒ `astarray-0.1.0.tgz`；
+2. 安装到**仓库外**的临时项目（`%TEMP%/astarray-exec01-06`，避免污染仓库 node_modules）；
+3. 经**公开入口**跑 6 项检查，全部 PASS：
+
+| # | 检查 | 结果 |
+|---|---|---|
+| ① | 打包产物入口存在（按 `exports["."]` 解析，不猜文件名） | PASS |
+| ② | 公开入口导出 `buildSandboxSelfCheckReport` | PASS |
+| ③ | 平台未交付 ⇒ `unsupported` 且 `isExecutionAllowed=false` | PASS |
+| ④ | 清单失败但后端**自称可用** ⇒ 仍不放行（`repair-required`） | PASS |
+| ⑤ | 隔离安装包的 CLI 入口跑通只读闭环（exit 0，stdout 为单个 JSON） | PASS |
+| ⑥ | 打包产物含 `--emit-execution-events` / `--no-emit-execution-events` | PASS |
+
+**显式 blocked（脚本内 `blockedByEnvironment` 字段，不冒充通过）**：真实沙箱后端、固定版本 Node 运行时与离线夹具、
+干净设备安装自检与断网执行、Windows/Linux/macOS 多平台证据。
+
+**施工事故记录（需如实保留）**：首次隔离安装时在仓库内子目录直接 `npm install`，
+npm 向上找到了仓库根 `package.json`，把 tarball 装成根依赖并 prune 掉 186 个 devDependencies
+（`vitest`/`tsup` 消失）。已用 `git restore package.json package-lock.json` + `npm install` 复原，
+并把隔离安装改到**仓库外**临时目录。教训：**tarball 安装必须在仓库外或先 `npm init` 的独立目录进行**。
