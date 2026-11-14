@@ -6011,3 +6011,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `execution/**` 禁止出现日志写入调用（执行输出只能经 readOutput 交出）。
 > **实测验证**：临时放入含 `console.log` 的探针文件 ⇒ 守卫立即报红并点名，删除后恢复。
 > 全量门禁 **788 files / 5244 passed + 3 skipped，exit 0**。
+
+> **COMM-01 重放持久化（2026-11-14）**
+>
+> 新增 `orchestration/comm-delivered-message-store.ts`：重放去重结果落盘（原子写+备份恢复+互斥），
+> **重启后同一条消息仍判为重复**并返回首次结果与次数；存档损坏时 fail-closed 拒绝记录。
+> 反例 6 条；全量门禁 **789 files / 5250 passed + 3 skipped，exit 0**。
+> 过程中被 `destructive-file-api-guard` 拦下（初版含 `fs.rm` 的测试用 `clear()`），已删除该方法、未加白名单。
