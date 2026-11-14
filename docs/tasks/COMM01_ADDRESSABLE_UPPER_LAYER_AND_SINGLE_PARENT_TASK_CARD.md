@@ -638,3 +638,25 @@ COMM-01-02 目前已完成并可交付的部分：
 **剩余（诚实列出）**：装配层（`application-runtime`）尚未注入真实守卫实现，
 即当前生产路径对"带回复标记的消息"是**拒绝**状态——这是刻意的保守默认，不是已完成。
 注入时需要提供「任务标识 → 派发者」查询。
+
+### 项目内回复守卫：默认实现（2026-11-15）
+
+关键发现：**"任务 → 派发者"早已存在**，不必新建映射。
+
+| 已有能力 | 位置 |
+|---|---|
+| 任务记录发布者信箱 `publishedByRecipientId` | `core/types.ts`（`TaskDependencyNode`，COMM-01-02 落地） |
+| 从任务解析反馈去向 + 回退原因 | `orchestration/task-publisher-feedback-route.ts` → `resolveFeedbackRecipient` |
+
+新增 `orchestration/in-project-reply-routing-guard.ts`：把 A 与 B 接成可注入 `MailboxJournal` 的守卫。
+
+**与普通反馈刻意不同的一条**：普通反馈在"任务未记录发布者"时可以**回退**到默认调度信箱并如实说明；
+**回复不接受回退** —— 回退本质就是"按默认对象推断去向"，正是用户裁决否掉的做法。
+因此 `publishedByRecipientId === null` ⇒ 回复按 `task-dispatcher-unknown` 拒绝。
+
+反例 6 条：`tests/core/unit/in-project-reply-routing-guard.test.ts`
+（放行、未记录发布者拒绝、任务不存在拒绝、原消息缺失拒绝、改投拒绝、非回复不触发）。
+
+**剩余（诚实列出）**：守卫尚未在装配层注入——`application-runtime.ts:1150` 构造
+`MailboxJournal` 时需提供 `resolveTask`（读任务链）+ `defaultSchedulerRecipientId`。
+在此之前，带 `replyToMessageIdentifier` 的消息在项目内仍为**拒绝**态。

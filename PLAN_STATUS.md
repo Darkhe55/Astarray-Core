@@ -6040,3 +6040,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 入库前校验、**未装配守卫时 fail-closed 拒绝**、守卫拒绝则不落盘。反例 5 条；
 > 全量门禁 **792 files / 5267 passed + 3 skipped，exit 0**。
 > 剩余：装配层尚未注入真实守卫（需「任务 → 派发者」查询），当前生产路径对带回复标记的消息为拒绝态。
+
+> **COMM-01 项目内回复守卫实现（2026-11-15）**
+>
+> 发现"任务 → 派发者"已存在（`publishedByRecipientId` + `resolveFeedbackRecipient`），无需新建映射。
+> 新增 `in-project-reply-routing-guard.ts`（6 条反例）：A+B 合成可注入守卫，
+> **回复不接受回退**（未记录发布者即拒绝，与普通反馈的回退语义刻意不同）。
+> 全量门禁 1 个无关失败（`anthropic-messages-runtime` 24 条隔离重跑全过）⇒ 负载抖动。
+> 剩余：装配层注入（`application-runtime.ts:1150` 需提供 `resolveTask` 与默认调度信箱）。
