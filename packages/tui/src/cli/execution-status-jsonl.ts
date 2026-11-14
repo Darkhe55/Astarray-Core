@@ -111,3 +111,24 @@ export function subscribeExecutionStatusJsonLines(input: {
     },
   };
 }
+
+/**
+ * 事件输出去向（2026-11-14 用户决策 C）：**默认写 stderr**。
+ *
+ * 理由：`--json` 的 stdout 契约是"一个结果对象"，多行事件混进去会打断
+ * `JSON.parse(stdout)` 这类既有消费者；写 stderr 则"默认可用"且不破坏契约。
+ * 需要单流时显式选择 stdout。
+ */
+export type ExecutionEventOutputTarget = "stderr" | "stdout" | "off";
+
+export function resolveExecutionEventOutputTarget(
+  explicitChoice: boolean | undefined,
+): ExecutionEventOutputTarget {
+  if (explicitChoice === true) {
+    return "stdout";
+  }
+  if (explicitChoice === false) {
+    return "off";
+  }
+  return "stderr";
+}

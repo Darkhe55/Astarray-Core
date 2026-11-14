@@ -689,3 +689,21 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 
 **仍属实现边界（如实标注）**：默认关闭意味着"开箱即用不打印事件"；是否改为默认开启属产品决策，
 本卡不代为决定。SDK 面（查询/取消/脱敏事件）此前已交付并有用例。
+
+### 04 事件输出去向（用户决策 C，2026-11-14 第三轮）
+
+默认改为"**写 stderr**"，因此不需要任何开关就能消费事件，且 **`--json` 的 stdout 契约不变**。
+
+| 选择 | 去向 |
+|---|---|
+| 缺省（不传参数） | **stderr**（JSONL 一行一条） |
+| `--emit-execution-events` | stdout（显式选择单流） |
+| `--no-emit-execution-events` | 完全关闭 |
+
+**为什么不能直接 `process.stderr.write`**：本轮先按直觉直接写 stderr，被
+`tests/architecture/sec02-diagnostic-funnel-guard.test.ts`（SEC-02 通道 14）**判定违规**——
+`packages/tui/src/cli/**` 除漏斗外禁止裸写 stderr（否则绕开脱敏与换行转义）。
+已改为经 `json-output.ts` 新增的 `writeStructuredDiagnosticLine()` 出门，仍是唯一漏斗。
+
+验证：单测 11 条（含去向解析 3 条）+ 守卫 2 条；真实冒烟 `run --json --runtime mock`
+→ stdout 仍是单个 JSON 对象（无事件行）；全量门禁 **784 files / 5227 passed，exit 0**。

@@ -57,3 +57,16 @@ export function failWith(
   logToStderr(error.message);
   process.exit(exitCode);
 }
+
+/**
+ * EXEC-01-04（2026-11-14）：**结构化诊断行**（JSONL）的唯一出口。
+ *
+ * 为什么必须放这里：SEC-02 通道 14 的静态守卫禁止 `cli/**` 里出现裸 `process.stderr.write(`，
+ * 否则新增输出会绕开脱敏与换行转义。执行状态事件行走本函数 ⇒ 仍然只有这一个漏斗。
+ *
+ * 约定：`lineText` 必须是**已脱敏、且不含换行**的单行 JSON（由
+ * `execution-status-jsonl.ts` 保证）；本函数只负责补一个换行并写出。
+ */
+export function writeStructuredDiagnosticLine(lineText: string): void {
+  process.stderr.write(`${lineText}` + "\n");
+}

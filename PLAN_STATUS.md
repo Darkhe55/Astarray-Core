@@ -5962,3 +5962,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `run-command` 的既有 `try/finally` 里接入执行状态事件订阅（finally 首行退订 ⇒ 全路径覆盖），
 > 新增 CLI 开关 `--emit-execution-events`（默认关闭，避免改变 `--json` 输出契约）。
 > 单测 9 条；`run --help` 冒烟通过。全量门禁 1 个无关失败（图变更演练 32s / 隔离 4.5s 通过）⇒ 负载抖动。
+
+> **EXEC-01-04 事件默认写 stderr（2026-11-14，用户决策 C）**
+>
+> 默认无需开关即可消费执行状态事件，且不改变 `--json` 的 stdout 契约；
+> `--emit-execution-events` 切 stdout、`--no-emit-execution-events` 关闭。
+> stderr 路径经 `json-output.writeStructuredDiagnosticLine()`（SEC-02 通道 14 漏斗），
+> 本轮先裸写被架构守卫拦下 —— 守卫有效，未绕过。全量门禁 784 files / 5227 passed，exit 0。

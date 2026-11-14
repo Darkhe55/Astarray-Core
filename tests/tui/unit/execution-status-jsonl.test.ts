@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXECUTION_STATUS_LINE_TYPE,
   formatExecutionStatusJsonLine,
+  resolveExecutionEventOutputTarget,
   subscribeExecutionStatusJsonLines,
 } from "../../../packages/tui/src/cli/execution-status-jsonl.js";
 import type { PublicAstarrayEvent } from "../../../packages/core/src/public-sdk.js";
@@ -158,5 +159,16 @@ describe("执行状态事件订阅", () => {
     expect(() => source.emit(executionStatusEvent())).not.toThrow();
     expect(subscription.getWrittenLineCount()).toBe(0);
     subscription.unsubscribe();
+  });
+});
+
+describe("事件输出去向（用户决策 C）", () => {
+  it("缺省（未显式选择）⇒ stderr：不改变 --json 的 stdout 契约", () => {
+    expect(resolveExecutionEventOutputTarget(undefined)).toBe("stderr");
+  });
+
+  it("显式 true ⇒ stdout（单流）；显式 false ⇒ 关闭", () => {
+    expect(resolveExecutionEventOutputTarget(true)).toBe("stdout");
+    expect(resolveExecutionEventOutputTarget(false)).toBe("off");
   });
 });

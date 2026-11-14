@@ -11,7 +11,14 @@ import {
   prepareRunPerfCollection,
 } from "../../../core/src/public-sdk.js";
 import { runConfigSchema } from "../../../core/src/core/schemas.js";
-import { writeDiagnosticText, EXIT_CODES, failWith, logToStderr, printJson } from "./json-output.js";
+import {
+  writeDiagnosticText,
+  writeStructuredDiagnosticLine,
+  EXIT_CODES,
+  failWith,
+  logToStderr,
+  printJson,
+} from "./json-output.js";
 import {
   InteractivePermissionAskDecisionPort,
   buildPermissionAskFromEscalation,
@@ -20,7 +27,10 @@ import {
   type PreviousApprovalRecord,
 } from "./permission-ask-adjudication.js";
 import { waitForPermissionAsk } from "./permission-ask-wait.js";
-import { subscribeExecutionStatusJsonLines } from "./execution-status-jsonl.js";
+import {
+  resolveExecutionEventOutputTarget,
+  subscribeExecutionStatusJsonLines,
+} from "./execution-status-jsonl.js";
 import { PermissionAskDecisionEntryService } from "../../../core/src/orchestration/permission-ask-decision-entry.js";
 import { PermissionAskRequestStore } from "../../../core/src/orchestration/permission-ask-request-store.js";
 
@@ -65,8 +75,9 @@ export interface RunCommandOptions {
    */
   isPerfCollectionEnabled?: boolean;
   /**
-   * EXEC-01-04：是否向 stdout 追加执行状态事件行（JSONL）。缺省关闭——
-   * 打开会改变 `--json` 的既有输出契约（多行事件 + 一行结果），需显式选择。
+   * EXEC-01-04：执行状态事件（JSONL）去向。
+   * `undefined` ⇒ **stderr（默认）**，不改变 stdout 的既有契约；
+   * `true` ⇒ stdout（显式选择单流）；`false` ⇒ 完全关闭。
    */
   isExecutionEventEmissionEnabled?: boolean;
   /** 对话模式：无工具/产物时不要求完成控制事件（缺省 false，保持严格）。 */
@@ -278,15 +289,23 @@ const application = await AstarrayApplicationFacade.create({
   if (runPerfCollector !== null) {
     runPerfCollector.start();
   }
+  const executionEventOutputTarget = resolveExecutionEventOutputTarget(
+    options.isExecutionEventEmissionEnabled,
+  );
   const executionStatusSubscription =
-  options.isExecutionEventEmissionEnabled === true
-    ? subscribeExecutionStatusJsonLines({
-        eventSource: application,
-        writeLine: (lineText) => {
-          process.stdout.write(`${lineText}` + "\n");
-        },
-      })
-    : null;
+    executionEventOutputTarget === "off"
+      ? null
+      : subscribeExecutionStatusJsonLines({
+          eventSource: application,
+          writeLine: (lineText) => {
+            if (executionEventOutputTarget === "stdout") {
+              process.stdout.write(`${lineText}` + "\n");
+              return;
+            }
+            /** SEC-02 通道 14：stderr 只能经漏斗写出（事件行同样不例外）。 */
+            writeStructuredDiagnosticLine(lineText);
+          },
+        });
 try {
     application.createSession({ sessionId: "cli-run", mode: runConfig.mode });
     if (runConfig.mode === "ponder") {
@@ -598,7 +617,6 @@ export async function waitForTaskTerminal(
 export function defaultStateDirectory(): string {
   return astarrayStateDirectory();
 }
-
 
 
 
