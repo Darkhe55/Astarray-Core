@@ -5922,3 +5922,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > 全量门禁：**782 files / 5207 passed + 3 skipped，exit 0**。
 > 卡内 02 仍为**阻塞**（真实后端、工具链、干净设备验收未交付），本轮成果标 implemented-unverified（仅本地可验证部分）。
+
+> **EXEC-01-03 缺口核实（2026-11-14）**
+>
+> 按用户提示核实两处"未接"：**取消/超时分类已实现**（状态枚举 + 控制器终态分支 + bubblewrap 置位），
+> 原记录过时；**敏感扫描闸仍是真缺口**——`process-execution-output-buffer.readAllTextForScanning()` 只有测试调用，
+> 生产路径无接线。已更新卡内 §03 行并记录下一轮编码动作（把扫描接到 readOutput/日志/模型历史之前，fail-closed）。

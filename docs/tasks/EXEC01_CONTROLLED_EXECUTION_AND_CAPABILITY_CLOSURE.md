@@ -95,7 +95,7 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 |---|---|
 | 01 契约 | implemented-unverified（2026-11-09，`8657d10e`+`6d6e2b99`） |
 | 02 自带沙箱、基础工具链与安装自检 | **阻塞**：清单已提交（`fd16a4ee`）、探测已编码；真实后端/工具链/干净设备验收未交付，见 §02 阻塞项 |
-| 03 生命周期 | 部分交付（2026-11-09，`04e2b371`）：持久化、输出游标/截断、重启对账已交付；敏感扫描闸、取消/超时分类未接 |
+| 03 生命周期 | **部分交付（2026-11-14 核实更新）**：持久化、输出游标/截断、重启对账已交付；**取消/超时分类已确认实现**（`execution-contract` 枚举含 `cancelled`/`timed-out`；`process-execution-controller` 处理终态；`bubblewrap-sandbox-backend` 分别置位）；**敏感扫描闸仍未接线**（`process-execution-output-buffer.readAllTextForScanning()` 只有测试调用，无生产调用方） |
 | 04 生产接线与异步内部执行 | implemented-unverified（2026-11-09，提交待推送）：可达性与去阻塞已证；SDK/CLI 事件面未接 |
 | 05 开发闭环及分诊 | 部分交付（2026-11-09，`96fc126e`+`783b971a`）：分诊报告与应用级 allow/deny 矩阵已交付；**闭环本身阻塞**（需真实沙箱后端） |
 | 06 包级与安全验收 | pending |
@@ -602,3 +602,15 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 
 **仍未交付（保持阻塞）**：真实沙箱后端、固定版本 Node 运行时与离线夹具、干净设备安装自检与断网执行验收。
 本卡 02 仍为 **阻塞**；本轮仅把"自检判定与阻断语义"补到可自动化验证（implemented-unverified，仅本地可验证部分）。
+
+### 03 缺口核实与状态更新（2026-11-14）
+
+用户提示"两处缺口可能过时"，按约定做三步核实（检查点表 → 进展小节 → 源码）：
+
+| 原缺口 | 核实结论 | 证据 |
+|---|---|---|
+| 取消/超时分类未接 | **已实现，原记录过时** | `execution-contract.ts` 状态枚举含 `cancelled` / `timed-out`；`process-execution-controller.ts:591-621` 按终态分支处理；`bubblewrap-sandbox-backend.ts:254,304` 分别置位；`exec02` 相关集成用例覆盖 |
+| 敏感扫描闸未接 | **仍为真实缺口（但已有半成品）** | `process-execution-output-buffer.ts:99` 提供 `readAllTextForScanning()`，但 `git grep` 显示**唯一调用方是测试**（`tests/core/integration/exec01-03-output-buffer.test.ts:83`），生产路径无接线 |
+
+**下一轮编码动作（已排队）**：把 `readAllTextForScanning()` 接到读取/注入路径上——在 `readOutput` 返回模型前与写入日志/历史前执行四态扫描，
+"未扫描的原始输出不进入普通日志或模型历史"；`incomplete`/`error`/`sensitive` 一律按不可读处理（fail-closed），并保留"先扫描后发送、不得先发送秘密片段再补扫描"的顺序。
