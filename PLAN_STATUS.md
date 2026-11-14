@@ -6004,3 +6004,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `assembleContextPrompt` 新增可选 `coordinationMessages`：缺省不注入（旧行为不变）；
 > 提供时按"同任务 + 同序列"分块，**不依赖相邻性**；未确认同一事实的消息单列不合并。
 > 反例 3 条；全量门禁 **787 files / 5241 passed + 3 skipped，exit 0**。
+
+> **EXEC-01-03 静态守卫（2026-11-14）**
+>
+> 新增 `tests/architecture/exec01-03-output-scan-guard.test.ts`：`readAllTextForScanning()` 只许扫描门禁自己调用；
+> `execution/**` 禁止出现日志写入调用（执行输出只能经 readOutput 交出）。
+> **实测验证**：临时放入含 `console.log` 的探针文件 ⇒ 守卫立即报红并点名，删除后恢复。
+> 全量门禁 **788 files / 5244 passed + 3 skipped，exit 0**。

@@ -754,3 +754,20 @@ npm 向上找到了仓库根 `package.json`，把 tarball 装成根依赖并 pru
 **本轮修掉的真实缺陷**：`cancel()` 之前的守卫把"未装配后端"与"排队中无句柄"混在一起判，
 导致「取消排队中的执行」直接抛错。反例见 `tests/core/integration/exec01-03-cancel-queued.test.ts`（2 条），
 含"排队项取消不得调用后端 cancel"与"权限撤销要与调用方取消区分"。
+
+### 03 静态守卫：未扫描输出不得进日志（2026-11-14 第三轮）
+
+上一轮核实结论是"当前没有泄漏，但也没有守卫"。本轮补上守卫：
+
+`tests/architecture/exec01-03-output-scan-guard.test.ts`（3 条）
+
+| 规则 | 内容 |
+|---|---|
+| ① | `readAllTextForScanning()` **只允许**在扫描门禁自身（`sensitive-output-scan-gate.ts` / `process-execution-output-buffer.ts`）里调用——该函数返回全量未脱敏文本，被日志拿去用即直接泄漏 |
+| ② | `packages/core/src/execution/**` 内**不得出现**日志写入调用（`writeDiagnosticText` / `logToStderr` / `console.*`）——执行模块的输出只能经 `readOutput`（已带跨块敏感扫描）交出 |
+| ③ | 守卫自身有效性：对已知违规样本必须报红，注释行不得误报 |
+
+**守卫经过实测验证**（不是空转）：临时创建 `execution/__guard-probe.ts`（内含 `console.log`）⇒ 规则②立即报红并点名该文件，
+删除后恢复绿色。测试文件与守卫逻辑均未为此放宽。
+
+同时说明：注释里提到这些函数名**不算违规**（只扫代码行），避免文档更新把守卫搞红。
