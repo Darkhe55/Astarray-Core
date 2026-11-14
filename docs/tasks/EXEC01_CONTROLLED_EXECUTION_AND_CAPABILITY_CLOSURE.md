@@ -614,3 +614,23 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 
 **下一轮编码动作（已排队）**：把 `readAllTextForScanning()` 接到读取/注入路径上——在 `readOutput` 返回模型前与写入日志/历史前执行四态扫描，
 "未扫描的原始输出不进入普通日志或模型历史"；`incomplete`/`error`/`sensitive` 一律按不可读处理（fail-closed），并保留"先扫描后发送、不得先发送秘密片段再补扫描"的顺序。
+
+### 03 跨块敏感扫描（2026-11-14 本轮编码）
+
+已接线的部分：
+
+| 内容 | 位置 |
+|---|---|
+| 跨块扫描与边界暂扣（纯函数） | `packages/core/src/execution/sensitive-output-scan-gate.ts` |
+| 控制器读取路径接线（可选，缺省 0 = 关闭） | `process-execution-controller.ts` 的 `outputScanBoundaryCarryCharacters` + `readOutput` |
+| 反例 6 条 + 控制器级 1 条 | `tests/core/unit/sensitive-output-scan-gate.test.ts`、`tests/core/integration/exec01-03-output-sensitive-scan.test.ts` |
+
+**本轮实测发现（重要，已写进缺口）**：默认"按块扫描"**确实会泄漏被切开的秘密**。
+反例过程：把 `sk-zzz…` 放在 10 字节的块边界上，两次读取各拿到片段（均不足 8 位，正则不命中），
+拼接后秘密完整可见。开启暂扣（`outputScanBoundaryCarryCharacters = 32`）后该泄漏消失（用例验证）。
+
+**因此当前状态**：能力已具备但**默认关闭**；把它设为默认还需一个前置设计——
+只在"尾部出现可疑秘密前缀"时暂扣（否则短输出会被整体延迟，破坏"普通输出原样返回"的既有约束）。
+该设计已列为下一轮编码动作，**在此之前不得声称跨块已受保护**。
+
+**真实后端**：按用户指示本轮只记录不做（后续单独安排）。

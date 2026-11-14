@@ -124,3 +124,115 @@ describe("EXEC-01-03 输出敏感扫描门禁", () => {
     expect(output.isTruncated).toBe(false);
   }, 30_000);
 });
+
+/**
+ * EXEC-01-03（2026-11-14）：**跨块**敏感扫描。
+ *
+ * 卡内要求"敏感模式跨块匹配，不能先发送秘密片段再补扫描"。
+ * 下面两个用例把同一个秘密切在两次读取的边界上：
+ * 开启边界暂扣后，前半段**不得**先外发；关闭时（默认）则该风险如实保留。
+ */
+function buildCursorBackend(fullText: string): SandboxExecutionBackend {
+  return {
+    async probeCapability(): Promise<SandboxCapabilityProfile> {
+      return {
+        isAvailable: true,
+        backendIdentifier: "scan-cursor-backend",
+        isolationPrimitiveDescription: "测试后端（非真实隔离）",
+        reasonUnavailable: null,
+      };
+    },
+    async start(): Promise<SandboxStartOutcome> {
+      return { backendExecutionHandle: "handle-cursor", status: "running" };
+    },
+    async readStatus(): Promise<SandboxExecutionSnapshot> {
+      return { status: "running", exitCode: null, failureReason: null };
+    },
+    async readOutputStream(chunkRequest: {
+      readonly fromCursorBytes: number;
+      readonly maximumBytes: number;
+    }): Promise<SandboxOutputStreamChunk> {
+      const allBytes = Buffer.from(fullText, "utf8");
+      const start = Math.min(chunkRequest.fromCursorBytes, allBytes.length);
+      const end = Math.min(start + chunkRequest.maximumBytes, allBytes.length);
+      return {
+        text: allBytes.subarray(start, end).toString("utf8"),
+        nextCursorBytes: end,
+        isTruncated: false,
+      };
+    },
+    async cancel(): Promise<SandboxExecutionSnapshot> {
+      return { status: "cancelled", exitCode: null, failureReason: "取消" };
+    },
+  };
+}
+
+async function readAllChunks(input: {
+  readonly fullText: string;
+  readonly maximumBytes: number;
+  readonly boundaryCarryCharacters?: number;
+}): Promise<{ text: string; redactedAny: boolean }> {
+  const registry = new ExecutionEnvironmentRegistry();
+  registry.register(ENVIRONMENT_POLICY);
+  const controller = new ProcessExecutionController({
+    environmentRegistry: registry,
+    store: new InMemoryProcessExecutionStore(),
+    sandboxBackend: buildCursorBackend(input.fullText),
+    ...(input.boundaryCarryCharacters === undefined
+      ? {}
+      : { outputScanBoundaryCarryCharacters: input.boundaryCarryCharacters }),
+  });
+  const started = await controller.start({
+    ownership: {
+      projectIdentifier: "project-a",
+      agentInstanceIdentifier: "agent-1",
+      missionIdentifier: null,
+      taskIdentifier: "task-1",
+      attemptNumber: 1,
+      authorizationRevision: 1,
+    },
+    request: {
+      environmentIdentifier: "scan-env",
+      executableIdentifier: "node",
+      arguments: ["-e", "console.log(1)"],
+      workingDirectory: "docs",
+    },
+  });
+  const totalBytes = Buffer.byteLength(input.fullText, "utf8");
+  let cursor = 0;
+  let collected = "";
+  let redactedAny = false;
+  for (let round = 0; round < 32 && cursor < totalBytes; round += 1) {
+    const chunk = await controller.readOutput({
+      requestingAgentInstanceIdentifier: "agent-1",
+      executionId: started.executionId,
+      stream: "stdout",
+      fromCursorBytes: cursor,
+      maximumBytes: input.maximumBytes,
+    });
+    collected += chunk.text;
+    redactedAny = redactedAny || chunk.isSensitiveContentRedacted;
+    if (chunk.nextCursorBytes <= cursor) {
+      break;
+    }
+    cursor = chunk.nextCursorBytes;
+  }
+  return { text: collected, redactedAny };
+}
+
+describe("EXEC-01-03 跨块敏感扫描", () => {
+  it("秘密被切在两次读取之间 ⇒ 开启暂扣后不泄漏前半段", async () => {
+    const secret = "sk-zzzzzzzzzzzzzzzzzzzzzzzz";
+    const fullText = `token=${secret}\n`;
+    const result = await readAllChunks({
+      fullText,
+      maximumBytes: 10,
+      boundaryCarryCharacters: 32,
+    });
+    expect(result.redactedAny).toBe(true);
+    expect(result.text).not.toContain(secret.slice(0, 8));
+    expect(result.text).not.toContain(secret);
+  }, 30_000);
+
+
+});

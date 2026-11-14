@@ -8,7 +8,7 @@
  * - 首版非交互（stdin 关闭）、有限时长、网络禁止。
  */
 import { DomainError } from "../core/errors.js";
-import { redactSensitiveText } from "../orchestration/diagnostic-event-store.js";
+import { scanOutputChunkAcrossBoundaries } from "./sensitive-output-scan-gate.js";
 import type {
   ExecutionEnvironmentRegistry,
   ProcessExecutionIdentity,
@@ -155,6 +155,11 @@ export interface ProcessExecutionControllerOptions {
   /** 缺省 null ⇒ 一律 `execution-backend-unsupported`（不静默降级到宿主执行）。 */
   readonly sandboxBackend?: SandboxExecutionBackend | null;
   /**
+   * EXEC-01-03：跨块扫描的边界暂扣窗口（字符数）。缺省 0 ⇒ 关闭（保持既有按块行为）。
+   * 开启后读取路径会暂扣末尾窗口，秘密被切块时前半段不会先外发。
+   */
+  readonly outputScanBoundaryCarryCharacters?: number;
+  /**
    * 上级可管理判定（"明确授权的上级"）。
    * 缺省 null ⇒ 只有**同一主体**能查询/读取/取消自己的执行。
    */
@@ -204,6 +209,13 @@ export class ProcessExecutionController {
   private readonly environmentRegistry: ExecutionEnvironmentRegistry;
   private readonly store: ProcessExecutionStore;
   private readonly sandboxBackend: SandboxExecutionBackend | null;
+  /**
+   * EXEC-01-03：跨块扫描的边界暂扣窗口（字符数）。0 ⇒ 关闭（保持既有按块行为）。
+   * 开启后读取路径会暂扣末尾窗口，避免秘密被切块时前半段泄漏。
+   */
+  private readonly outputScanBoundaryCarryCharacters: number;
+  /** 每个（执行 × 流）保留的未判定尾巴。 */
+  private readonly outputScanCarry = new Map<string, string>();
   private readonly isSuperiorAgentAuthorizedToManage:
     | ProcessExecutionControllerOptions["isSuperiorAgentAuthorizedToManage"]
     | null;
@@ -217,6 +229,10 @@ export class ProcessExecutionController {
     this.isSuperiorAgentAuthorizedToManage =
       options.isSuperiorAgentAuthorizedToManage ?? null;
     this.nowIso = options.nowIso ?? (() => new Date().toISOString());
+    this.outputScanBoundaryCarryCharacters = Math.max(
+      0,
+      Math.trunc(options.outputScanBoundaryCarryCharacters ?? 0),
+    );
     this.generateExecutionId = options.generateExecutionId;
   }
 
@@ -460,8 +476,27 @@ export class ProcessExecutionController {
      * 曾"先落盘再在展示层遮挡"）。这里统一在**离开控制器之前**扫描并替换，
      * 同时如实回报"是否发生了替换"，供诊断区分"没有敏感内容"与"已遮挡"。
      */
-    const redactedText = redactSensitiveText(chunk.text);
-    const isSensitiveContentRedacted = redactedText !== chunk.text;
+    /**
+     * EXEC-01-03（2026-11-14）：跨块扫描。默认 `boundaryCarryCharacters = 0` 保持既有行为；
+     * 装配时开启后，末尾不足一个窗口的内容会**暂扣**（等下一块拼齐再判定），
+     * 从而避免"秘密的前半段先发出去、后半段才命中"——卡内明确禁止的顺序。
+     */
+    const boundaryCarryCharacters = this.outputScanBoundaryCarryCharacters;
+    const carryKey = `${record.identity.executionId}:${input.stream}`;
+    const scannedChunk = scanOutputChunkAcrossBoundaries({
+      chunkText: chunk.text,
+      previousCarryText: this.outputScanCarry.get(carryKey) ?? "",
+      carryCharacters: boundaryCarryCharacters,
+    });
+    if (boundaryCarryCharacters > 0) {
+      if (scannedChunk.carryText === "") {
+        this.outputScanCarry.delete(carryKey);
+      } else {
+        this.outputScanCarry.set(carryKey, scannedChunk.carryText);
+      }
+    }
+    const redactedText = scannedChunk.textToEmit;
+    const isSensitiveContentRedacted = scannedChunk.isRedacted;
     return {
       executionId: record.identity.executionId,
       stream: input.stream,

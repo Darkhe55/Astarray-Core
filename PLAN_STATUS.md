@@ -5928,3 +5928,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 按用户提示核实两处"未接"：**取消/超时分类已实现**（状态枚举 + 控制器终态分支 + bubblewrap 置位），
 > 原记录过时；**敏感扫描闸仍是真缺口**——`process-execution-output-buffer.readAllTextForScanning()` 只有测试调用，
 > 生产路径无接线。已更新卡内 §03 行并记录下一轮编码动作（把扫描接到 readOutput/日志/模型历史之前，fail-closed）。
+
+> **EXEC-01-03 跨块敏感扫描（2026-11-14）**
+>
+> 新增 `execution/sensitive-output-scan-gate.ts`（纯函数：跨块拼接扫描 + 边界暂扣）并在控制器 `readOutput`
+> 接线（选项 `outputScanBoundaryCarryCharacters`，缺省 0 = 关闭）。
+>
+> **实测发现**：默认按块扫描会把被切开的秘密泄漏出去（10 字节块边界 + `sk-…` 片段，拼接后完整可见）；
+> 开启暂扣后消失。故能力已达但默认关闭，改成默认需先做"仅可疑前缀才暂扣"的设计，
+> 否则会延迟普通输出、破坏既有"普通输出原样返回"的约束。
+>
+> 反例：新增 6 条单测 + 1 条控制器级用例。全量门禁出现 1 个无关失败
+> （`anthropic-tool-loop-failclosed` 非法 JSON 用例），**隔离重跑 7 条全过** ⇒ 判为负载抖动。
