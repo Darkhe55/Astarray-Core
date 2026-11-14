@@ -668,3 +668,24 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 订阅 `application.subscribe(...)` 后写 stdout，并在**所有退出路径**退订。
 卡点已确认：该函数是长函数、多个 `return`，直接插入 `try/finally` 需要先做"单一出口"重构
 （把主体抽成内部函数再包一层），否则会出现"某些分支漏退订"的隐患。这一步单独做、单独提交。
+
+### 04 CLI 事件面：接线完成（2026-11-14 第二轮）
+
+| 内容 | 位置 |
+|---|---|
+| 事件 → JSONL 行（纯函数，字段白名单、失败原因再脱敏） | `packages/tui/src/cli/execution-status-jsonl.ts` |
+| 订阅封装（只转发执行状态、写失败不影响任务、显式退订） | 同文件 `subscribeExecutionStatusJsonLines` |
+| `run` 命令接线 | `packages/tui/src/cli/run-command.ts`（订阅置于既有 `try/finally` 之前，`finally` 首行退订） |
+| CLI 开关 | `--emit-execution-events`（**默认关闭**，避免改变既有 `--json` 输出契约） |
+
+设计要点：
+
+- **默认关闭**是刻意的：打开后 stdout 会同时有事件行与最终结果行，属输出契约变更，必须显式选择；
+- 退订点放在既有 `try/finally` 的 `finally` 首行 ⇒ **所有退出路径**（含 `return EXIT_CODES.*`）都会退订，无需给长函数做单一出口重构；
+- 事件行带 `type: "execution-status"`，消费方可按该字段与结果对象分流。
+
+验证：单测 9 条（6 格式化 + 3 订阅）；`run --help` 实测出现该开关；全量门禁出现 1 个无关失败
+（`graph-change-deterministic-drill`，32s vs 隔离 4.5s）**隔离重跑 3 条全过** ⇒ 负载抖动。
+
+**仍属实现边界（如实标注）**：默认关闭意味着"开箱即用不打印事件"；是否改为默认开启属产品决策，
+本卡不代为决定。SDK 面（查询/取消/脱敏事件）此前已交付并有用例。

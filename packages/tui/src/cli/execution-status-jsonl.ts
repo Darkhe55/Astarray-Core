@@ -67,3 +67,47 @@ export function formatExecutionStatusJsonLine(event: PublicAstarrayEvent): strin
   };
   return JSON.stringify(line);
 }
+
+/** 可订阅的最小接口（便于测试注入；真实实现是 facade）。 */
+export interface ExecutionStatusEventSource {
+  subscribe(listener: (event: PublicAstarrayEvent) => void): { unsubscribe(): void };
+}
+
+export interface ExecutionStatusSubscription {
+  /** 收到并成功输出的行数（诊断/测试用；不参与业务判定）。 */
+  getWrittenLineCount(): number;
+  unsubscribe(): void;
+}
+
+/**
+ * 订阅执行状态事件并逐行写出。
+ *
+ * 纪律：
+ * - 只写能格式化的行（非执行状态事件一律忽略，不写空行、不抛错打断运行）；
+ * - 写失败（例如 stdout 已关闭）**不得**让任务失败——记录后继续（CLI 仍要跑完任务）；
+ * - 退订必须由调用方在**所有退出路径**执行（本函数不自带生命周期魔法）。
+ */
+export function subscribeExecutionStatusJsonLines(input: {
+  readonly eventSource: ExecutionStatusEventSource;
+  readonly writeLine: (lineText: string) => void;
+}): ExecutionStatusSubscription {
+  let writtenLineCount = 0;
+  const subscription = input.eventSource.subscribe((event) => {
+    const lineText = formatExecutionStatusJsonLine(event);
+    if (lineText === null) {
+      return;
+    }
+    try {
+      input.writeLine(lineText);
+      writtenLineCount += 1;
+    } catch {
+      /** 输出通道故障不得影响任务本身。 */
+    }
+  });
+  return {
+    getWrittenLineCount: () => writtenLineCount,
+    unsubscribe: () => {
+      subscription.unsubscribe();
+    },
+  };
+}

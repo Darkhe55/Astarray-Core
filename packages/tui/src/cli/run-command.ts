@@ -20,6 +20,7 @@ import {
   type PreviousApprovalRecord,
 } from "./permission-ask-adjudication.js";
 import { waitForPermissionAsk } from "./permission-ask-wait.js";
+import { subscribeExecutionStatusJsonLines } from "./execution-status-jsonl.js";
 import { PermissionAskDecisionEntryService } from "../../../core/src/orchestration/permission-ask-decision-entry.js";
 import { PermissionAskRequestStore } from "../../../core/src/orchestration/permission-ask-request-store.js";
 
@@ -63,6 +64,11 @@ export interface RunCommandOptions {
    * 未开启 ⇒ 不创建采集器（不建目录、不排定时器）。
    */
   isPerfCollectionEnabled?: boolean;
+  /**
+   * EXEC-01-04：是否向 stdout 追加执行状态事件行（JSONL）。缺省关闭——
+   * 打开会改变 `--json` 的既有输出契约（多行事件 + 一行结果），需显式选择。
+   */
+  isExecutionEventEmissionEnabled?: boolean;
   /** 对话模式：无工具/产物时不要求完成控制事件（缺省 false，保持严格）。 */
   isConversationMode?: boolean;
   /** T07D-R2-03：等待上限秒数；缺省不设固定上限（等待任务终态）。 */
@@ -272,7 +278,16 @@ const application = await AstarrayApplicationFacade.create({
   if (runPerfCollector !== null) {
     runPerfCollector.start();
   }
-  try {
+  const executionStatusSubscription =
+  options.isExecutionEventEmissionEnabled === true
+    ? subscribeExecutionStatusJsonLines({
+        eventSource: application,
+        writeLine: (lineText) => {
+          process.stdout.write(`${lineText}` + "\n");
+        },
+      })
+    : null;
+try {
     application.createSession({ sessionId: "cli-run", mode: runConfig.mode });
     if (runConfig.mode === "ponder") {
       // Ponder 为本地只读问答（ADR-0014）：不产生 mission，直接返回回答；
@@ -512,6 +527,7 @@ const application = await AstarrayApplicationFacade.create({
      * OBS 收口（R73）：**先停采集**（stop 内部按保留策略整理一次），再关应用。
      * 采集收口失败只降级（写 stderr），**不影响任务结果**。
      */
+    executionStatusSubscription?.unsubscribe();
     if (runPerfCollector !== null) {
       try {
         await runPerfCollector.stop();

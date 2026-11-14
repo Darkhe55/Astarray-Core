@@ -5956,3 +5956,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 失败原因再脱敏）+ 6 条反例。全量门禁 **784 files / 5222 passed + 3 skipped，exit 0**。
 >
 > 剩余：接线到 `executeRunCommand` 并在所有退出路径退订；需先做单一出口重构（已记录）。
+
+> **EXEC-01-04 CLI 事件面接线（2026-11-14）**
+>
+> `run-command` 的既有 `try/finally` 里接入执行状态事件订阅（finally 首行退订 ⇒ 全路径覆盖），
+> 新增 CLI 开关 `--emit-execution-events`（默认关闭，避免改变 `--json` 输出契约）。
+> 单测 9 条；`run --help` 冒烟通过。全量门禁 1 个无关失败（图变更演练 32s / 隔离 4.5s 通过）⇒ 负载抖动。

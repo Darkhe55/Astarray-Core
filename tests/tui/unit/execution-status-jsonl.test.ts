@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXECUTION_STATUS_LINE_TYPE,
   formatExecutionStatusJsonLine,
+  subscribeExecutionStatusJsonLines,
 } from "../../../packages/tui/src/cli/execution-status-jsonl.js";
 import type { PublicAstarrayEvent } from "../../../packages/core/src/public-sdk.js";
 
@@ -86,5 +87,76 @@ describe("执行状态事件 JSONL", () => {
     const line = formatExecutionStatusJsonLine(executionStatusEvent({ exitCode: 1.5 }));
     const parsed = JSON.parse(line as string) as Record<string, unknown>;
     expect(parsed["exitCode"]).toBeNull();
+  });
+});
+
+describe("执行状态事件订阅", () => {
+  function buildEventSource() {
+    const listeners = new Set<(event: PublicAstarrayEvent) => void>();
+    const unsubscribeCalls: number[] = [];
+    return {
+      eventSource: {
+        subscribe(listener: (event: PublicAstarrayEvent) => void) {
+          listeners.add(listener);
+          return {
+            unsubscribe: () => {
+              listeners.delete(listener);
+              unsubscribeCalls.push(1);
+            },
+          };
+        },
+      },
+      emit: (event: PublicAstarrayEvent) => {
+        for (const listener of listeners) {
+          listener(event);
+        }
+      },
+      listenerCount: () => listeners.size,
+      unsubscribeCallCount: () => unsubscribeCalls.length,
+    };
+  }
+
+  it("只转发执行状态事件，其它事件被忽略（不写空行）", () => {
+    const source = buildEventSource();
+    const written: string[] = [];
+    const subscription = subscribeExecutionStatusJsonLines({
+      eventSource: source.eventSource,
+      writeLine: (lineText) => written.push(lineText),
+    });
+
+    source.emit(executionStatusEvent());
+    source.emit({ eventType: "permission-ask", requestIdentifier: "r-1" } as unknown as PublicAstarrayEvent);
+
+    expect(written).toHaveLength(1);
+    expect(JSON.parse(written[0] as string)["type"]).toBe(EXECUTION_STATUS_LINE_TYPE);
+    expect(subscription.getWrittenLineCount()).toBe(1);
+    subscription.unsubscribe();
+  });
+
+  it("退订后不再收到事件（不残留监听）", () => {
+    const source = buildEventSource();
+    const written: string[] = [];
+    const subscription = subscribeExecutionStatusJsonLines({
+      eventSource: source.eventSource,
+      writeLine: (lineText) => written.push(lineText),
+    });
+    subscription.unsubscribe();
+    source.emit(executionStatusEvent());
+    expect(written).toHaveLength(0);
+    expect(source.listenerCount()).toBe(0);
+    expect(source.unsubscribeCallCount()).toBe(1);
+  });
+
+  it("输出通道写失败不影响任务（不抛错、不计入行数）", () => {
+    const source = buildEventSource();
+    const subscription = subscribeExecutionStatusJsonLines({
+      eventSource: source.eventSource,
+      writeLine: () => {
+        throw new Error("stdout closed");
+      },
+    });
+    expect(() => source.emit(executionStatusEvent())).not.toThrow();
+    expect(subscription.getWrittenLineCount()).toBe(0);
+    subscription.unsubscribe();
   });
 });

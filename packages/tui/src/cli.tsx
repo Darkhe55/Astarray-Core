@@ -222,6 +222,10 @@ program
     "Provider 单次请求超时秒数（缺省 30；长任务需放宽）",
   )
   .option("--perf-collect", "采集本进程性能样本（默认关闭；仅 run 命令，R73）")
+  .option(
+    "--emit-execution-events",
+    "向 stdout 追加执行状态事件行（JSONL；默认关闭，避免改变既有 --json 输出契约）",
+  )
   .option("--goal <goal-id>", "把本次 mission 绑定到该目标（创建时绑定；需已存在目标契约）")
   .option("--goal-enforce", "强制模式：目标门禁不通过 ⇒ 阻断派发/停止调度（缺省只观察）")
   .option("--goal-require-completion", "完成耦合：目标证据不齐 ⇒ 不判 done")
@@ -246,6 +250,7 @@ program
         providerProtocol?: string;
         providerRequestTimeoutSeconds?: string;
         perfCollect?: boolean;
+        emitExecutionEvents?: boolean;
         conversation?: boolean;
         goal?: string;
         goalEnforce?: boolean;
@@ -291,6 +296,7 @@ program
         isJsonOutput: options.json === true,
         stateDirectory: defaultStateDirectory(),
         isPerfCollectionEnabled: options.perfCollect === true,
+        isExecutionEventEmissionEnabled: options.emitExecutionEvents === true,
   isConversationMode: options.conversation === true,
         ...(options.goal === undefined ? {} : { goalIdentifier: options.goal }),
         ...(options.goalEnforce === true ? { isGoalEnforcementEnabled: true } : {}),
