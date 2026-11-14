@@ -18,6 +18,46 @@ import { redactSensitiveText } from "../orchestration/diagnostic-event-store.js"
  */
 export const DEFAULT_BOUNDARY_CARRY_CHARACTERS = 128;
 
+/**
+ * 判断尾部是否"看起来像秘密的开头"，返回需要暂扣的字符数（0 表示不需要）。
+ *
+ * 判据刻意保守：宁可多扫一轮，也不把普通输出整体延迟。
+ */
+export const SUSPICIOUS_TAIL_PATTERNS: readonly RegExp[] = [
+  /(?:sk-|ghp_|gho_|ghu_|ghs_|ghr_|xox[abposr]-|AKIA|ASIA|Bearer\\s)[A-Za-z0-9._-]*$/u,
+  /[A-Za-z0-9]{8,}$/u,
+];
+
+export function findSuspiciousTailLength(text: string, carryCharacters: number): number {
+  if (carryCharacters <= 0 || text === "") {
+    return 0;
+  }
+  const windowStart = Math.max(0, text.length - carryCharacters);
+  const windowText = text.slice(windowStart);
+  let bestStart = -1;
+  for (const pattern of SUSPICIOUS_TAIL_PATTERNS) {
+    const match = pattern.exec(windowText);
+    if (match !== null && match.index >= 0) {
+      const absoluteStart = windowStart + match.index;
+      if (bestStart === -1 || absoluteStart < bestStart) {
+        bestStart = absoluteStart;
+      }
+    }
+  }
+  if (bestStart === -1) {
+    return 0;
+  }
+  const tailText = text.slice(bestStart);
+  /**
+   * 尾部若是**完整**秘密（已能被脱敏规则整体命中）⇒ 不暂扣，直接交给脱敏。
+   * 否则"完整秘密 + 不带尾随字符"也会被延迟一次，破坏单次读取即可用的语义。
+   */
+  if (redactSensitiveText(tailText) !== tailText) {
+    return 0;
+  }
+  return text.length - bestStart;
+}
+
 export type SensitiveOutputScanScope = "per-chunk" | "whole-stream";
 
 export interface SensitiveOutputScanResult {
@@ -61,10 +101,14 @@ export function scanOutputChunkAcrossBoundaries(input: {
     };
   }
 
-  /** 末尾窗口暂扣：长度不足一个窗口时什么都不发，等下一块。 */
-  const withheldCount = Math.min(carryCharacters, combinedText.length);
+  /**
+   * **只在可疑时暂扣**（2026-11-14 第二轮）：
+   * 无脑暂扣末尾窗口会把普通短输出整体延迟，破坏"普通输出原样返回"的既有约束。
+   * 因此先判断尾部是否可能是某个秘密的**开头**，只有可能才暂扣。
+   */
+  const withheldCount = findSuspiciousTailLength(combinedText, carryCharacters);
   const emittableText = combinedText.slice(0, combinedText.length - withheldCount);
-  const carryText = combinedText.slice(combinedText.length - withheldCount);
+  const carryText = withheldCount === 0 ? "" : combinedText.slice(combinedText.length - withheldCount);
   const redactedEmittable = redactSensitiveText(emittableText);
   /**
    * 尾巴本身也要脱敏后再保留：否则下一块把它拼回来时，秘密会以明文形式

@@ -8,7 +8,10 @@
  * - 首版非交互（stdin 关闭）、有限时长、网络禁止。
  */
 import { DomainError } from "../core/errors.js";
-import { scanOutputChunkAcrossBoundaries } from "./sensitive-output-scan-gate.js";
+import {
+  DEFAULT_BOUNDARY_CARRY_CHARACTERS,
+  scanOutputChunkAcrossBoundaries,
+} from "./sensitive-output-scan-gate.js";
 import type {
   ExecutionEnvironmentRegistry,
   ProcessExecutionIdentity,
@@ -231,7 +234,10 @@ export class ProcessExecutionController {
     this.nowIso = options.nowIso ?? (() => new Date().toISOString());
     this.outputScanBoundaryCarryCharacters = Math.max(
       0,
-      Math.trunc(options.outputScanBoundaryCarryCharacters ?? 0),
+      Math.trunc(
+        options.outputScanBoundaryCarryCharacters ??
+          DEFAULT_BOUNDARY_CARRY_CHARACTERS,
+      ),
     );
     this.generateExecutionId = options.generateExecutionId;
   }
