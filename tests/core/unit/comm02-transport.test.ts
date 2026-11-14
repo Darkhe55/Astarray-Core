@@ -180,13 +180,54 @@ describe("COMM-01-02 跨项目真实传输", () => {
 
   it("⑦ 关联回复保留 correlation 与 replyTo 字段（经信封），且类型须在授权范围", async () => {
     const { baseDirectory, journal } = await createWorkspace();
+    /**
+     * COMM-01（2026-11-14 用户裁决第 1 条）：**回复必须沿原请求路径返回**。
+     * 因此必须先有一条真实投递过的原请求（b→a 方向），回复才能对回它的发起者。
+     * 旧用例直接发一条"回复"而没有原请求 —— 那正是新规则要拒绝的形态。
+     */
+    const reverseAuthorizationOutcome = issueCrossProjectAuthorization({
+      authorizationIdentifier: "auth-reverse",
+      sourceProjectIdentifier: "project-b",
+      targetProjectIdentifier: "project-a",
+      requestingAgentInstanceId: "agent-b1",
+      grantor: { kind: "authenticated-user", userId: "user-1" },
+      scope: { kind: "specific-agent", agentInstanceId: "agent-a1" },
+      allowedMessageKinds: ["status-query", "suggestion", "correlated-reply"],
+      purpose: "只读查询（反向）",
+      issuedAtIso: "2026-10-22T10:00:00.000Z",
+      expiresAtIso: "2026-10-23T10:00:00.000Z",
+      revision: 1,
+    });
+    if (reverseAuthorizationOutcome.kind !== "granted") {
+      throw new Error("反向夹具授权应成功");
+    }
+    const originalMessageIdentifier = randomUUID();
+    const original = await sendCrossProjectMessage({
+      baseDirectory,
+      journal,
+      envelope: envelope({
+        messageIdentifier: originalMessageIdentifier,
+        idempotencyKey: "idem-original",
+        senderAgentInstanceId: "agent-b1",
+        recipientAgentInstanceId: "agent-a1",
+        sourceProjectIdentifier: "project-b",
+        targetProjectIdentifier: "project-a",
+        authorizationRevision: 1,
+        messageKind: "status-query",
+      }),
+      authorization: reverseAuthorizationOutcome.authorization,
+      nowIso,
+    });
+    expect(original.kind).toBe("queued");
+
     const reply = await sendCrossProjectMessage({
       baseDirectory,
       journal,
       envelope: envelope({
+        idempotencyKey: "idem-reply",
         messageKind: "correlated-reply",
         correlationIdentifier: "corr-1",
-        replyToMessageIdentifier: "message-original",
+        replyToMessageIdentifier: originalMessageIdentifier,
       }),
       authorization: authorization(),
       nowIso,

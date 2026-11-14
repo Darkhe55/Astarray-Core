@@ -532,3 +532,29 @@ COMM-01-02 目前已完成并可交付的部分：
 **过程记录（架构守卫抓到我一次）**：初版带了一个测试用的 `clear()`（内部 `fs.rm`），
 被 `tests/architecture/destructive-file-api-guard.test.ts` 判红（"不在白名单却使用破坏性 API rm"）。
 已删除该方法——测试用临时目录清理，不需要生产代码提供破坏性入口。**没有给守卫加白名单**。
+
+### 回复路由接线（2026-11-14，投递通道勘察 + 强制）
+
+**发送路径勘察结果**（本机可证的全部出口）：
+
+| 出口 | 位置 | 是否已强制原路径 |
+|---|---|---|
+| 跨项目投递判定 | `cross-project-collaboration.ts` → `evaluateCrossProjectDelivery` | ✅ 本轮已加规则 |
+| 跨项目实际发送（写账本 + 信箱） | `cross-project-transport.ts` → `sendCrossProjectMessage` | ✅ 本轮接线（先取账本再判定） |
+| 同项目邮箱追加 | `main-controller.ts:3764`（`journal.append`） | ⏳ 未接（同一项目内的路径，语义不同） |
+| 回复产物核对 | `reply-artifact-verification.ts`（被消费步调用） | ✅ 已有版本核对，非路径问题 |
+
+**新增规则（放在授权检查之前）**：
+
+- `correlated-reply` 必须带 `replyToMessageIdentifier`，且该消息必须存在于本机账本；
+- 回复的收件人必须是**原请求发起者**（沿原路返回）；
+- 任一不成立 ⇒ `reply-without-original` / `reply-target-mismatch` 拒绝，**不写信箱**。
+
+**账本扩展**：投递记录新增 `senderAgentInstanceId`（证明"谁是原请求发起者"）。
+旧账本没有该字段 ⇒ 回复会被**保守拒绝**（宁可拒，不猜）。
+
+**测试修正说明**：`comm02-transport.test.ts` 用例⑦原来直接发一条"关联回复"却没有原请求——
+那正是新规则要拒绝的形态。已改为**先投递原请求（b→a 方向，含反向授权），再发回复**，
+断言仍是"回复被排队且保留 correlation/replyTo"。
+
+反例 5 条：`tests/core/unit/cross-project-reply-routing.test.ts`。

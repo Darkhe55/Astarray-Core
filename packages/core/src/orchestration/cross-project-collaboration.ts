@@ -236,7 +236,9 @@ export type CrossProjectDeliveryOutcome =
         | "message-kind-not-allowed"
         | "write-action-forbidden"
         | "receiver-unavailable"
-        | "envelope-incomplete";
+        | "envelope-incomplete"
+      | "reply-without-original"
+      | "reply-target-mismatch";
       readonly reason: string;
     };
 
@@ -251,6 +253,16 @@ export function evaluateCrossProjectDelivery(input: {
   readonly nowIso: string;
   readonly targetLifecycle?: CrossProjectTargetLifecycle;
   readonly targetRoleIdentifiers?: ReadonlyArray<string>;
+  /**
+   * COMM-01（2026-11-14 用户裁决第 1 条）：**原请求的投递记录**。
+   *
+   * 回复必须沿这条已投递的原路径返回；查不到就拒绝，绝不按"当前通信对象/最近会话"推断收件人。
+   */
+  readonly originalDeliveredMessage?: {
+    readonly messageIdentifier: string;
+    readonly senderAgentInstanceId: string;
+    readonly recipientAgentInstanceId: string;
+  } | null;
 }): CrossProjectDeliveryOutcome {
   const envelope = input.envelope;
   const missingFields = [
@@ -267,6 +279,54 @@ export function evaluateCrossProjectDelivery(input: {
       reasonCode: "envelope-incomplete",
       reason: "信封缺少必要地址字段：不允许用模型自由文本补齐地址。",
     };
+  }
+
+  /**
+   * COMM-01（2026-11-14 用户裁决第 1 条）：**回复必须沿原请求路径返回**。
+   *
+   * 这段刻意放在授权检查之前：即便授权齐全，只要"回的不是原路"就必须拒绝——
+   * 否则"按当前通信对象/最近会话推断收件人"的行为会从授权合法这条缝里复活。
+   */
+  if (envelope.messageKind === "correlated-reply") {
+    const replyToMessageIdentifier = envelope.replyToMessageIdentifier;
+    if (
+      replyToMessageIdentifier === null ||
+      replyToMessageIdentifier.trim() === ""
+    ) {
+      return {
+        kind: "rejected",
+        reasonCode: "reply-without-original",
+        reason:
+          "回复未指明原请求（replyToMessageIdentifier 为空）：拒绝按当前通信对象推断收件人。",
+      };
+    }
+    const originalDeliveredMessage = input.originalDeliveredMessage ?? null;
+    if (
+      originalDeliveredMessage === null ||
+      originalDeliveredMessage.messageIdentifier !== replyToMessageIdentifier
+    ) {
+      return {
+        kind: "rejected",
+        reasonCode: "reply-without-original",
+        reason:
+          "找不到原请求的投递记录：不得按当前通信对象或最近会话推断收件人。",
+      };
+    }
+    if (
+      envelope.recipientAgentInstanceId !==
+      originalDeliveredMessage.senderAgentInstanceId
+    ) {
+      return {
+        kind: "rejected",
+        reasonCode: "reply-target-mismatch",
+        reason:
+          "回复收件人 " +
+          envelope.recipientAgentInstanceId +
+          " 不是原请求发起者 " +
+          originalDeliveredMessage.senderAgentInstanceId +
+          "：不得改投。",
+      };
+    }
   }
 
   if (input.authorization === null) {

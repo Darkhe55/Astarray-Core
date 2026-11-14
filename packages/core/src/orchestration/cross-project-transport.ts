@@ -29,6 +29,8 @@ interface CrossProjectDeliveryLedgerDocument {
   readonly entries: ReadonlyArray<{
     readonly idempotencyKey: string;
     readonly messageIdentifier: string;
+    /** COMM-01：原请求发起者，用于证明"回复沿原路返回"。旧账本无此字段 ⇒ 回复被保守拒绝。 */
+    readonly senderAgentInstanceId: string;
     readonly recipientAgentInstanceId: string;
     readonly mailboxSequence: number;
     readonly recordedAtIso: string;
@@ -62,7 +64,9 @@ export type CrossProjectSendOutcome =
         | "write-action-forbidden"
         | "receiver-unavailable"
         | "envelope-incomplete"
-        | "ledger-unavailable";
+        | "reply-without-original"
+      | "reply-target-mismatch"
+      | "ledger-unavailable";
       readonly reason: string;
       readonly didWriteMailbox: false;
     };
@@ -104,24 +108,13 @@ export async function sendCrossProjectMessage(input: {
   readonly targetLifecycle?: CrossProjectTargetLifecycle;
   readonly targetRoleIdentifiers?: ReadonlyArray<string>;
 }): Promise<CrossProjectSendOutcome> {
-  const decision = evaluateCrossProjectDelivery({
-    envelope: input.envelope,
-    authorization: input.authorization,
-    nowIso: input.nowIso,
-    ...(input.targetLifecycle === undefined ? {} : { targetLifecycle: input.targetLifecycle }),
-    ...(input.targetRoleIdentifiers === undefined
-      ? {}
-      : { targetRoleIdentifiers: input.targetRoleIdentifiers }),
-  });
-  if (decision.kind === "rejected") {
-    return {
-      kind: "rejected",
-      reasonCode: decision.reasonCode,
-      reason: decision.reason,
-      didWriteMailbox: false,
-    };
-  }
-
+  /**
+   * COMM-01（2026-11-14 用户裁决第 1 条）：**先取账本，再判定**。
+   *
+   * 回复是否"沿原路返回"只能靠本机账本证明（原请求的发起者是谁）；
+   * 因此账本必须先读到，判定时才能带上 `originalDeliveredMessage`。
+   * 账本不可用 ⇒ 保守拒绝（原实现亦如此）。
+   */
   let ledger: CrossProjectDeliveryLedgerDocument;
   try {
     ledger = await loadLedger(input.baseDirectory);
@@ -133,6 +126,41 @@ export async function sendCrossProjectMessage(input: {
         "本机跨项目账本不可用：" +
         (error instanceof Error ? error.message : String(error)) +
         "；保守拒绝，避免重复投递。",
+      didWriteMailbox: false,
+    };
+  }
+
+  const replyToMessageIdentifier = input.envelope.replyToMessageIdentifier;
+  const originalLedgerEntry =
+    replyToMessageIdentifier === null
+      ? undefined
+      : ledger.entries.find(
+          (entry) => entry.messageIdentifier === replyToMessageIdentifier,
+        );
+  const originalDeliveredMessage =
+    originalLedgerEntry === undefined
+      ? null
+      : {
+          messageIdentifier: originalLedgerEntry.messageIdentifier,
+          senderAgentInstanceId: originalLedgerEntry.senderAgentInstanceId,
+          recipientAgentInstanceId: originalLedgerEntry.recipientAgentInstanceId,
+        };
+
+  const decision = evaluateCrossProjectDelivery({
+    envelope: input.envelope,
+    authorization: input.authorization,
+    nowIso: input.nowIso,
+    originalDeliveredMessage,
+    ...(input.targetLifecycle === undefined ? {} : { targetLifecycle: input.targetLifecycle }),
+    ...(input.targetRoleIdentifiers === undefined
+      ? {}
+      : { targetRoleIdentifiers: input.targetRoleIdentifiers }),
+  });
+  if (decision.kind === "rejected") {
+    return {
+      kind: "rejected",
+      reasonCode: decision.reasonCode,
+      reason: decision.reason,
       didWriteMailbox: false,
     };
   }
@@ -182,6 +210,7 @@ export async function sendCrossProjectMessage(input: {
       {
         idempotencyKey: input.envelope.idempotencyKey,
         messageIdentifier: input.envelope.messageIdentifier,
+        senderAgentInstanceId: input.envelope.senderAgentInstanceId,
         recipientAgentInstanceId: input.envelope.recipientAgentInstanceId,
         mailboxSequence,
         recordedAtIso: input.nowIso,

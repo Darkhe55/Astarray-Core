@@ -6018,3 +6018,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **重启后同一条消息仍判为重复**并返回首次结果与次数；存档损坏时 fail-closed 拒绝记录。
 > 反例 6 条；全量门禁 **789 files / 5250 passed + 3 skipped，exit 0**。
 > 过程中被 `destructive-file-api-guard` 拦下（初版含 `fs.rm` 的测试用 `clear()`），已删除该方法、未加白名单。
+
+> **COMM-01 回复路由接线（2026-11-14）**
+>
+> 勘察出本机全部发送出口后，在 `evaluateCrossProjectDelivery` 加规则并在 `sendCrossProjectMessage` 接线：
+> **关联回复必须能证明原请求存在且收件人是原发起者**，否则 `reply-without-original` / `reply-target-mismatch` 拒绝且不写信箱。
+> 账本新增 `senderAgentInstanceId`；旧账本缺该字段 ⇒ 回复保守拒绝。
+> 反例 5 条；`comm02-transport` 用例⑦已改为"先投递原请求再回复"。
+> 全量门禁 1 个已知抖动（`ponder-readonly-tools-production-wiring`，隔离重跑 2 条全过）。
