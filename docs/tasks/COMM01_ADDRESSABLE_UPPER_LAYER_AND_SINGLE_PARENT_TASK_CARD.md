@@ -586,3 +586,27 @@ COMM-01-02 目前已完成并可交付的部分：
 
 **建议：A + B 合用** —— A 决定"是哪条任务的路径"，B 提供"可验证的关联"，
 避免任何一方靠推断。C 不建议（正是被否掉的做法）。
+
+### 项目内回复路由：A+B 判定层（2026-11-14，用户认可推荐方案）
+
+`packages/core/src/orchestration/in-project-reply-routing.ts` + 7 条反例。
+
+判定顺序（刻意固定：先证"回的是哪条消息"，再证"该走哪条任务路径"）：
+
+| 步骤 | 规则 | 拒绝码 |
+|---|---|---|
+| B1 | 回复必须带 `replyToMessageIdentifier` | `reply-without-original` |
+| B2 | 该原消息必须存在于投递记录 | `reply-without-original` |
+| B3 | 收件人必须是**原消息发起者** | `reply-target-mismatch` |
+| A1 | 回复必须标记 `taskIdentifier`（可选字段不能成为后门） | `reply-without-task` |
+| A2 | 声明的任务必须与原消息任务一致 | `reply-original-mismatch` |
+| A3 | 任务派发者必须已知 | `task-dispatcher-unknown` |
+| A4 | 收件人必须是**任务派发者** | `task-dispatcher-mismatch` |
+
+通过时返回 `pathIdentifier = "<taskId>-><dispatcherId>"`，便于日志与诊断核对"走的确实是原路"。
+
+**尚未接线（下一轮唯一动作）**：`MailboxJournal.enqueue` 是项目内唯一写入点，
+需要在入库前调用 `assertInProjectReplyRouting`；还需：
+① 给 `FeedbackMessage` 增加 `replyToMessageIdentifier` 字段；
+② 提供"任务 → 派发者"查询（来自任务链存储）；
+③ 原消息查找（同一收件人文档内的 `messageId`）。

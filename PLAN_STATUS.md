@@ -6026,3 +6026,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 账本新增 `senderAgentInstanceId`；旧账本缺该字段 ⇒ 回复保守拒绝。
 > 反例 5 条；`comm02-transport` 用例⑦已改为"先投递原请求再回复"。
 > 全量门禁 1 个已知抖动（`ponder-readonly-tools-production-wiring`，隔离重跑 2 条全过）。
+
+> **COMM-01 项目内回复路由判定层（2026-11-14）**
+>
+> 按用户认可的 A+B：新增 `in-project-reply-routing.ts`（7 条反例）。规则依次拒绝
+> 无原消息、原消息不存在、收件人非原发起者、未标记任务、任务与原消息不一致、派发者未知、收件人非派发者；
+> 通过时给出 `<taskId>-><dispatcherId>` 路径标识。全量门禁 **791 files / 5262 passed，exit 0**。
+> 接线（`MailboxJournal.enqueue` + `FeedbackMessage` 新字段 + 任务→派发者查询）列为下一轮动作。
