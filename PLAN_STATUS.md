@@ -5982,3 +5982,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **事故与教训**：首次在仓库内子目录直接 npm install，npm 向上找到根 package.json，
 > 把 tarball 装成根依赖并 prune 掉 186 个 devDependencies。已 restore + 重装复原；
 > 隔离安装必须放在仓库外或先 `npm init` 的独立目录。
+
+> **COMM-01 语义裁决 + 判定层（2026-11-14，用户给定）**
+>
+> 三条口径已定：①任务期间回复走该任务的原路径（不按通信对象猜）；②重放静默去重并带重复次数；
+> ③上下文装配只合并"确实同一事实"的内容（分组不依赖相邻性）。
+> 已实现判定层 `orchestration/comm-message-routing-decisions.ts` + 9 条反例（含"重复不得覆盖首次结果"、
+> "未登记原路径必须拒绝"、"被打断的同序列仍聚合、未确认事实不合并"）。
+> 全量门禁 **785 files / 5236 passed + 3 skipped，exit 0**。投递通道与持久化尚未接线。
