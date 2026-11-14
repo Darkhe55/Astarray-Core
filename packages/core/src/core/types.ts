@@ -527,6 +527,13 @@ export interface FeedbackMessage {
    */
   projectIdentifier?: string;
   taskIdentifier?: string;
+  /**
+   * COMM-01（2026-11-14 用户裁决第 1 条）：**回复指向的原消息**。
+   *
+   * 缺省表示"这不是一条回复"。带值时，投递方必须能证明原消息真实存在、
+   * 且收件人是原消息发起者（见 `in-project-reply-routing.ts`）；不得按当前通信对象推断。
+   */
+  replyToMessageIdentifier?: string;
   payload: FeedbackMessagePayload;
 }
 

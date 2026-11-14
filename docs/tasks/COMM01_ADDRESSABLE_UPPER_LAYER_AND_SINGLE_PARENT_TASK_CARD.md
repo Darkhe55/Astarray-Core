@@ -610,3 +610,31 @@ COMM-01-02 目前已完成并可交付的部分：
 ① 给 `FeedbackMessage` 增加 `replyToMessageIdentifier` 字段；
 ② 提供"任务 → 派发者"查询（来自任务链存储）；
 ③ 原消息查找（同一收件人文档内的 `messageId`）。
+
+### 项目内回复路由：接线完成（2026-11-14）
+
+| 改动 | 位置 |
+|---|---|
+| 消息新增 `replyToMessageIdentifier?` | `packages/core/src/core/types.ts`（`FeedbackMessage`） |
+| 邮箱守卫（可选注入）+ 入库前校验 + 原消息查询 | `packages/core/src/feedback-process/mailbox-journal.ts` |
+| 反例 5 条 | `tests/core/unit/mailbox-reply-routing-wiring.test.ts` |
+
+行为：
+
+| 场景 | 结果 |
+|---|---|
+| 带 `replyToMessageIdentifier` 但**未装配守卫** | **拒绝**（fail-closed，"没人管就放行"不成立） |
+| 装配守卫且判定通过 | 正常入库 |
+| 守卫判定拒绝 | **不落盘**（不会先写入再报错） |
+| 不带 `replyToMessageIdentifier` | 完全不变（旧行为零影响） |
+
+设计要点：
+
+- 校验放在**幂等判断之前**：一条路径不合规的回复，不能因为"同幂等键已入库"而被当成已受理；
+- 原消息只在**回复方自己的邮箱文档**里查（它当初是收件人），不做跨收件人扫描——
+  那样既慢，又会把别人的消息误当原消息；
+- 守卫是**注入式**的：邮箱不知道"任务派发者"从哪来，装配层用任务链存储接上即可。
+
+**剩余（诚实列出）**：装配层（`application-runtime`）尚未注入真实守卫实现，
+即当前生产路径对"带回复标记的消息"是**拒绝**状态——这是刻意的保守默认，不是已完成。
+注入时需要提供「任务标识 → 派发者」查询。

@@ -6033,3 +6033,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 无原消息、原消息不存在、收件人非原发起者、未标记任务、任务与原消息不一致、派发者未知、收件人非派发者；
 > 通过时给出 `<taskId>-><dispatcherId>` 路径标识。全量门禁 **791 files / 5262 passed，exit 0**。
 > 接线（`MailboxJournal.enqueue` + `FeedbackMessage` 新字段 + 任务→派发者查询）列为下一轮动作。
+
+> **COMM-01 项目内回复路由接线（2026-11-14）**
+>
+> `FeedbackMessage` 新增 `replyToMessageIdentifier`；`MailboxJournal` 增加可注入回复守卫 + 原消息查询，
+> 入库前校验、**未装配守卫时 fail-closed 拒绝**、守卫拒绝则不落盘。反例 5 条；
+> 全量门禁 **792 files / 5267 passed + 3 skipped，exit 0**。
+> 剩余：装配层尚未注入真实守卫（需「任务 → 派发者」查询），当前生产路径对带回复标记的消息为拒绝态。

@@ -121,9 +121,35 @@ export class MailboxJournal {
   }
 
   private readonly journalDirectoryPath: string;
+  /**
+   * COMM-01（2026-11-14）：**项目内回复路由守卫**（可选注入）。
+   *
+   * 邮箱是项目内唯一的消息写入点，因此把守卫挂在这里，避免"某个新入口忘了校验"。
+   * 未注入时，带 `replyToMessageIdentifier` 的消息一律拒绝（fail-closed），
+   * 而不是"没人管就放行"。
+   */
+  private readonly replyRoutingGuard:
+    | ((input: {
+        readonly message: FeedbackMessage;
+        readonly findDeliveredMessage: (
+          messageIdentifier: string,
+        ) => Promise<JournaledMessage | null>;
+      }) => Promise<void>)
+    | undefined;
 
-  constructor(baseDirectory: string) {
+  constructor(
+    baseDirectory: string,
+    options: {
+      readonly replyRoutingGuard?: (input: {
+        readonly message: FeedbackMessage;
+        readonly findDeliveredMessage: (
+          messageIdentifier: string,
+        ) => Promise<JournaledMessage | null>;
+      }) => Promise<void>;
+    } = {},
+  ) {
     this.journalDirectoryPath = path.join(baseDirectory, "feedback", "mailboxes");
+    this.replyRoutingGuard = options.replyRoutingGuard;
   }
 
   private journalFilePath(recipientId: string): string {
@@ -172,6 +198,33 @@ export class MailboxJournal {
    * 只比较来源、目标、优先级与 payload —— 那才是"同一条消息"的实质。
    */
   private async enqueueExclusive(message: FeedbackMessage): Promise<number> {
+    /**
+     * COMM-01（2026-11-14）：**回复必须先过路由守卫**（fail-closed）。
+     *
+     * 顺序刻意在幂等判断之前：即便同幂等键已入库，也不能让一条"路径不合规"的回复
+     * 因为去重而被当成已受理。
+     */
+    if (message.replyToMessageIdentifier !== undefined) {
+      if (this.replyRoutingGuard === undefined) {
+        throw new DomainError(
+          "task-sequence-permission-denied",
+          "项目内回复需要回复路由守卫：未装配时拒绝按通信对象推断收件人",
+        );
+      }
+      /**
+       * 原消息落在**回复方自己的邮箱**里（它当初是收件人）；
+       * 因此按回复方的身份推导邮箱键：agent 取实例标识，其它来源取 sourceIdentifier。
+       */
+      const replierMailboxIdentifier =
+        message.source.sourceType === "agent"
+          ? message.source.agentInstanceId
+          : message.source.sourceIdentifier;
+      await this.replyRoutingGuard({
+        message,
+        findDeliveredMessage: async (messageIdentifier: string) =>
+          await this.findMessageByIdentifier(replierMailboxIdentifier, messageIdentifier),
+      });
+    }
     const recipientId = message.recipientId;
     const document = (await this.loadDocument(recipientId)) ?? {
       schemaVersion: MAILBOX_JOURNAL_SCHEMA_VERSION,
@@ -217,6 +270,26 @@ export class MailboxJournal {
    * 2) 从未投递的消息。
    * 各自内部按（优先级, 入池序号）排序：优先级高者在前，同优先级 FIFO。
    */
+  /**
+   * COMM-01：按消息标识查一条**已入库**消息（用于回复路由校验）。
+   *
+   * 只看指定收件人的文档：一条消息只会落在它自己的收件人邮箱里，
+   * 跨收件人扫描既慢又会把"别人的消息"当成原消息。
+   */
+  async findMessageByIdentifier(
+    recipientId: string,
+    messageIdentifier: string,
+  ): Promise<JournaledMessage | null> {
+    if (recipientId.trim() === "" || messageIdentifier.trim() === "") {
+      return null;
+    }
+    const document = await this.loadDocument(recipientId);
+    if (document === null) {
+      return null;
+    }
+    return document.messages.find((message) => message.messageId === messageIdentifier) ?? null;
+  }
+
   async peekNext(recipientId: string): Promise<JournaledMessage | null> {
     const document = await this.loadDocument(recipientId);
     if (document === null) {
