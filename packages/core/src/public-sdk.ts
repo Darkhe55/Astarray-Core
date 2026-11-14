@@ -363,6 +363,14 @@ export {
   type SandboxCapabilityProfile,
 } from "./toolkit/program-tool-isolation-gate.js";
 
+// ─── EXEC-01-02：沙箱安装自检（只读聚合；不启动进程、不写盘、可重复） ───
+export {
+  buildSandboxSelfCheckReport,
+  type SandboxSelfCheckComponent,
+  type SandboxSelfCheckReport,
+  type SandboxSelfCheckStatus,
+} from "./execution/sandbox-installation-self-check.js";
+
 // ─── TOOLKIT-01-05：真实可运行的确定性转换器与受控执行入口 ───
 // 卡内检查点 05 要求"先实现一个无外部副作用转换器"；该转换器只吃显式输入、只产出值。
 export {
@@ -8085,7 +8093,6 @@ export {
   relocateProjectRegistration,
   type RelocateProjectOutcome,
 } from "./orchestration/project-relocation-service.js";
-
 
 
 
