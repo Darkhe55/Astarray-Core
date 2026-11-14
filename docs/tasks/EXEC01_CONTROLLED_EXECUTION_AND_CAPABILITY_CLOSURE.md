@@ -647,3 +647,24 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 需要关闭时显式传 `outputScanBoundaryCarryCharacters: 0`。
 
 反例：单测 8 条（含"秘密切块不泄漏前半段"、"完整秘密单次返回"、"普通输出立即返回"）+ 控制器级 1 条。
+
+### 04 CLI 事件面：第一步（2026-11-14）
+
+**先纠正一条我自己的误判**：上一轮我以为 `AstarrayApplicationFacade` 没有 `subscribe`，
+实际 `subscribe(listener) → { unsubscribe }` **就在 facade 上**（`public-sdk.ts:6721`，`listeners` 在 3109）。
+因此"CLI 消费同一事件"不需要给 facade 新开订阅口，直接接即可。
+
+本轮已交付（可单测的一步）：
+
+| 内容 | 位置 |
+|---|---|
+| 执行状态事件 → JSONL 行（纯函数、字段白名单、失败原因再脱敏） | `packages/tui/src/cli/execution-status-jsonl.ts` |
+| 反例 6 条 | `tests/tui/unit/execution-status-jsonl.test.ts` |
+
+为什么是 JSONL：`run` 命令**强制 `--json`**（人类可读走 TUI），所以"消费事件"＝向 stdout 追加
+可解析行，行内带 `type: "execution-status"` 与最终结果区分。字段白名单排除后端句柄、原始命令、stdin。
+
+**剩余（下一轮唯一动作）**：把该格式化器接到 `executeRunCommand`——
+订阅 `application.subscribe(...)` 后写 stdout，并在**所有退出路径**退订。
+卡点已确认：该函数是长函数、多个 `return`，直接插入 `try/finally` 需要先做"单一出口"重构
+（把主体抽成内部函数再包一层），否则会出现"某些分支漏退订"的隐患。这一步单独做、单独提交。

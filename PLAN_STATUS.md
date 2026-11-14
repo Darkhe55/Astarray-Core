@@ -5948,3 +5948,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > 门禁：本轮全量出现 1 个无关失败（`g3-high-rigor-evidence` 低严谨用例），**隔离重跑 3 条全过** ⇒ 负载抖动。
 > `EXEC-01-03` 至此**本地可验证部分已齐**；真实后端按用户指示留待后续（本轮未动）。
+
+> **EXEC-01-04 CLI 事件面第一步（2026-11-14）**
+>
+> 纠正误判：`AstarrayApplicationFacade` **本来就有** `subscribe`（`public-sdk.ts:6721`）。
+> 新增 `tui/src/cli/execution-status-jsonl.ts`（纯格式化：字段白名单、不含句柄/原始命令/stdin、
+> 失败原因再脱敏）+ 6 条反例。全量门禁 **784 files / 5222 passed + 3 skipped，exit 0**。
+>
+> 剩余：接线到 `executeRunCommand` 并在所有退出路径退订；需先做单一出口重构（已记录）。
