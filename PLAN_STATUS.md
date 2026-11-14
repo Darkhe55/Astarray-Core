@@ -5911,3 +5911,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > 门禁说明：本轮全量出现 1 个失败（`e2e01-provider-write-probe` 的 devolve 写入用例），
 > **隔离重跑该文件 4 条全过（1.6s）** ⇒ 判为同类负载抖动，未改断言。
+
+> **EXEC-01-02 本地可验证部分（2026-11-14）**
+>
+> 按用户裁决（选项 A）只推进不依赖真实后端/干净设备的部分：新增
+> `execution/sandbox-installation-self-check.ts`（纯聚合、无副作用）+ 8 条反例。
+> 语义：只有 `ready` 允许执行；平台未交付 ⇒ `unsupported`；组件损坏 ⇒ `repair-required`；
+> 清单空/组件缺失/版本未固定 ⇒ `failed`；后端不可用 ⇒ `failed` 且明确**不回退宿主**；
+> **清单结论优先于后端结论**。
+>
+> 全量门禁：**782 files / 5207 passed + 3 skipped，exit 0**。
+> 卡内 02 仍为**阻塞**（真实后端、工具链、干净设备验收未交付），本轮成果标 implemented-unverified（仅本地可验证部分）。
