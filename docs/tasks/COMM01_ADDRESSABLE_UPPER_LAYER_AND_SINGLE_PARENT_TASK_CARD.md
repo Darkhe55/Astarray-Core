@@ -541,7 +541,8 @@ COMM-01-02 目前已完成并可交付的部分：
 |---|---|---|
 | 跨项目投递判定 | `cross-project-collaboration.ts` → `evaluateCrossProjectDelivery` | ✅ 本轮已加规则 |
 | 跨项目实际发送（写账本 + 信箱） | `cross-project-transport.ts` → `sendCrossProjectMessage` | ✅ 本轮接线（先取账本再判定） |
-| 同项目邮箱追加 | `main-controller.ts:3764`（`journal.append`） | ⏳ 未接（同一项目内的路径，语义不同） |
+| ~~同项目邮箱追加~~ | ~~`main-controller.ts:3764`~~ | ❌ **勘察更正：那不是消息通道**，而是任务账本差异诊断日志（`taskLedgerDivergenceJournal`），与回复路由无关 |
+| 同项目（项目内）消息入队 | `feedback-process/entrypoint.ts:138` → `MailboxJournal.enqueue(FeedbackMessage)` | ⏳ 未接：`FeedbackMessage` 目前**没有** `replyToMessageIdentifier`，详见下方勘察 |
 | 回复产物核对 | `reply-artifact-verification.ts`（被消费步调用） | ✅ 已有版本核对，非路径问题 |
 
 **新增规则（放在授权检查之前）**：
@@ -558,3 +559,30 @@ COMM-01-02 目前已完成并可交付的部分：
 断言仍是"回复被排队且保留 correlation/replyTo"。
 
 反例 5 条：`tests/core/unit/cross-project-reply-routing.test.ts`。
+
+### 同项目消息通道勘察（2026-11-14）
+
+**先更正上一轮我自己写错的一条**：`main-controller.ts:3764` 的 `journal.append` 是**任务账本差异诊断日志**
+（`taskLedgerDivergenceJournal`），**不是**消息通道。上一轮把它列为"未接的消息出口"是错的。
+
+真实的消息写入点只有两处：
+
+| 写入点 | 场景 | 是否已强制原路径 |
+|---|---|---|
+| `cross-project-transport.ts:181` | 跨项目投递 | ✅ 已强制（回复必须指向已投递原请求且发给原发起者） |
+| `feedback-process/entrypoint.ts:138` | **项目内**消息入队（反馈子进程） | ❌ 未接 |
+
+`FeedbackMessage` 现有字段：`messageId` / `source` / `recipientId` / `priority` / `createdAtIso` / `idempotencyKey` /
+可选 `projectIdentifier`、`taskIdentifier` / `payload`。
+**没有** `replyToMessageIdentifier`、也没有 `correlationIdentifier`（后者仅存在于跨项目信封）。
+
+### 三个可选口径（需用户选定其一）
+
+| 方案 | 做法 | 优点 | 代价 |
+|---|---|---|---|
+| **A. 任务 id 绑定** | 执行任务 T 期间发出的消息必带 `taskIdentifier = T`；回复收件人 = **T 的派发者**（须先把"任务→派发者"落盘） | 与用户裁决原话最贴合（"用该任务 id 对应的原路径"） | 需新增任务→派发者映射与持久化 |
+| **B. 消息级关联** | 给 `FeedbackMessage` 加 `replyToMessageIdentifier`；回复必须指向已投递消息且收件人是其 `source` | 与跨项目规则对称，可用邮箱日志本地验证 | 改消息 schema；旧消息无该字段 ⇒ 回复只能拒绝 |
+| **C. 来源通道绑定** | 回复发回触发消息的 `source`（邮箱已记录） | 无需生产者改动 | "通道"≠"任务原路径"，容易退回"最近交互对象"的老问题（用户已明确否掉） |
+
+**建议：A + B 合用** —— A 决定"是哪条任务的路径"，B 提供"可验证的关联"，
+避免任何一方靠推断。C 不建议（正是被否掉的做法）。
