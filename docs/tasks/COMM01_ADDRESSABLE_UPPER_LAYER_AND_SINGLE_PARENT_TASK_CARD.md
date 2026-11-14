@@ -660,3 +660,23 @@ COMM-01-02 目前已完成并可交付的部分：
 **剩余（诚实列出）**：守卫尚未在装配层注入——`application-runtime.ts:1150` 构造
 `MailboxJournal` 时需提供 `resolveTask`（读任务链）+ `defaultSchedulerRecipientId`。
 在此之前，带 `replyToMessageIdentifier` 的消息在项目内仍为**拒绝**态。
+
+### 回复路由：补上 mission 归属（2026-11-15）
+
+接线时发现一处**必须先解决的缺口**：任务链按 mission 存放
+（`.astarray/missions/<missionId>/task-chain.json`），而 `FeedbackMessage` 只有可选的
+`taskIdentifier`——**只有任务标识无法定位任务链**，也就无法解析发布者。
+
+处置：
+
+| 改动 | 位置 |
+|---|---|
+| `FeedbackMessage` 新增 `missionIdentifier?` | `core/types.ts`（与既有 `projectIdentifier`/`taskIdentifier` 同族可选键） |
+| 守卫要求 mission + task 才能解析任务 | `in-project-reply-routing-guard.ts` |
+| 新增反例"缺 mission ⇒ 拒绝" | `tests/core/unit/in-project-reply-routing-guard.test.ts`（共 7 条） |
+
+拒绝文案写明原因："无法定位任务链，拒绝推断收件人"——缺 mission 时**不扫全库猜**。
+
+**剩余断点（下一轮第一件事）**：`application-runtime.ts:1150` 注入守卫，`resolveTask` 用
+`taskStore.readTaskChain(missionIdentifier)` 取任务再按 `taskIdentifier` 定位；
+`defaultSchedulerRecipientId` 仅用于判定回退，不作回复去向。

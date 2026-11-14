@@ -526,6 +526,13 @@ export interface FeedbackMessage {
    * 新入口应按可用信息填写，缺失时由消费侧如实记 not-provided。
    */
   projectIdentifier?: string;
+  /**
+   * COMM-01（2026-11-15）：**消息所属 mission**。
+   *
+   * 回复路由需要"任务 → 发布者"，而任务链按 mission 存放（`missions/<missionId>/task-chain.json`），
+   * 只有任务标识无法定位任务链。缺省表示发送方未提供（回复会被保守拒绝）。
+   */
+  missionIdentifier?: string;
   taskIdentifier?: string;
   /**
    * COMM-01（2026-11-14 用户裁决第 1 条）：**回复指向的原消息**。

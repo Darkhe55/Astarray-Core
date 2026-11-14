@@ -6048,3 +6048,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **回复不接受回退**（未记录发布者即拒绝，与普通反馈的回退语义刻意不同）。
 > 全量门禁 1 个无关失败（`anthropic-messages-runtime` 24 条隔离重跑全过）⇒ 负载抖动。
 > 剩余：装配层注入（`application-runtime.ts:1150` 需提供 `resolveTask` 与默认调度信箱）。
+
+> **COMM-01 回复路由补 mission 归属（2026-11-15）**
+>
+> 任务链按 mission 存放而消息只有 taskIdentifier ⇒ 补齐 `FeedbackMessage.missionIdentifier`，
+> 守卫要求 mission+task 才能解析发布者，缺 mission 直接拒绝（不扫全库猜）。
+> 反例增至 7 条；全量门禁 **793 files / 5274 passed + 3 skipped，exit 0**。
+> 剩余：`application-runtime.ts:1150` 注入守卫（用 `taskStore.readTaskChain`）。

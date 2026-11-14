@@ -42,9 +42,10 @@ function readSourceIdentifier(message: DeliveredMessageLookupView): string {
  * 判断"是否发生了回退"，**不会**被当作回复去向。
  */
 export function createInProjectReplyRoutingGuard(input: {
-  readonly resolveTask: (
-    taskIdentifier: string,
-  ) => Promise<Pick<TaskDependencyNode, "publishedByRecipientId"> | null>;
+  readonly resolveTask: (input: {
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+  }) => Promise<Pick<TaskDependencyNode, "publishedByRecipientId"> | null>;
   readonly defaultSchedulerRecipientId: string;
 }): (guardInput: {
   readonly message: FeedbackMessage;
@@ -67,7 +68,19 @@ export function createInProjectReplyRoutingGuard(input: {
       );
     }
 
-    const task = await input.resolveTask(taskIdentifier);
+    const missionIdentifier = guardInput.message.missionIdentifier ?? null;
+    if (missionIdentifier === null || missionIdentifier.trim() === "") {
+      /**
+       * 任务链按 mission 存放；没有 mission 就无法定位任务链，
+       * 也就无法证明"发布者是谁" ⇒ 拒绝（不猜）。
+       */
+      throw new DomainError(
+        "task-sequence-permission-denied",
+        "项目内回复缺少 mission 标识：无法定位任务链，拒绝推断收件人",
+      );
+    }
+
+    const task = await input.resolveTask({ missionIdentifier, taskIdentifier });
     if (task === null) {
       throw new DomainError(
         "task-sequence-permission-denied",

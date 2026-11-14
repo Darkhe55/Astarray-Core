@@ -21,6 +21,7 @@ function buildMessage(overrides: Record<string, unknown> = {}): FeedbackMessage 
     priority: "normal",
     createdAtIso: "2026-11-14T00:00:00.000Z",
     idempotencyKey: "idem-reply-1",
+    missionIdentifier: "mission-1",
     taskIdentifier: "task-1",
     replyToMessageIdentifier: "original-1",
     payload: { kind: "status-update", summary: "进展" },
@@ -92,7 +93,20 @@ describe("项目内回复守卫默认实现", () => {
     ).rejects.toThrow(/reply-target-mismatch/u);
   });
 
-  it("⑥ 非回复消息不归本守卫管（直接返回，不查任务）", async () => {
+  it("⑥ 缺少 mission 标识 ⇒ 拒绝（无法定位任务链）", async () => {
+    const guard = createInProjectReplyRoutingGuard({
+      resolveTask: async () => ({ publishedByRecipientId: "dispatcher-1" }),
+      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+    });
+    await expect(
+      guard({
+        message: buildMessage({ missionIdentifier: undefined }),
+        findDeliveredMessage: async () => originalMessage(),
+      }),
+    ).rejects.toThrow(/缺少 mission/u);
+  });
+
+  it("⑦ 非回复消息不归本守卫管（直接返回，不查任务）", async () => {
     const resolveTask = vi.fn(async () => ({ publishedByRecipientId: "dispatcher-1" }));
     const guard = createInProjectReplyRoutingGuard({
       resolveTask,
