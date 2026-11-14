@@ -29,6 +29,11 @@ export const APPLICATION_CONTEXT_SYSTEM_RULES = [
   "完成必须给出当前仓库合法的版本化完成控制事件，由本地门禁结案。",
 ].join("\n");
 
+import {
+  type PendingAssemblyMessage,
+  groupMessagesForAssembly,
+} from "./comm-message-routing-decisions.js";
+
 export interface NecessaryContextCondition {
   conditionIdentifier: string;
   description: string;
@@ -73,6 +78,14 @@ export interface AssembleContextPromptInput {
     readonly sourceRevision: number;
     readonly text: string;
   }>;
+  /**
+   * COMM-01（2026-11-14 用户裁决第 3 条）：**协调消息分区**。
+   *
+   * 同一 agent 会收到分属不同任务意图的消息序列，序列可能被其它内容打断。
+   * 装配时按"同任务 + 同序列"分块；未确认同一事实的消息单列，**不并入合并块**。
+   * 缺省不注入该区块 ⇒ 旧行为不变。
+   */
+  coordinationMessages?: ReadonlyArray<PendingAssemblyMessage>;
 }
 
 export interface AssembledContextPrompt {
@@ -90,6 +103,10 @@ export interface AssembledContextPrompt {
   injectedContextPackIdentifiers?: string[];
   /** ALIGN-04-05：实际注入的回访节点标识（缺省区块不注入 ⇒ 空数组）。 */
   injectedRecalledContextNodeIdentifiers?: string[];
+  /** COMM-01：实际注入协调消息的标识（按装配顺序；缺省区块不注入 ⇒ 空数组）。 */
+  injectedCoordinationMessageIdentifiers?: string[];
+  /** COMM-01：未确认同一事实、单独列出的协调消息标识。 */
+  unmergedCoordinationMessageIdentifiers?: string[];
 }
 
 export function assembleContextPrompt(
@@ -185,6 +202,45 @@ export function assembleContextPrompt(
     }
   }
 
+  /**
+   * COMM-01（2026-11-14 用户裁决第 3 条）：**协调消息分区渲染**。
+   *
+   * 分组依据"同任务 + 同序列"，**不依赖相邻性**（序列可被其它内容打断）；
+   * 未确认同一事实的消息单列在「[未确认同一事实]」下，绝不并入合并块。
+   */
+  const injectedCoordinationMessageIdentifiers: string[] = [];
+  const unmergedCoordinationMessageIdentifiers: string[] = [];
+  if (
+    input.coordinationMessages !== undefined &&
+    input.coordinationMessages.length > 0
+  ) {
+    const assembly = groupMessagesForAssembly(input.coordinationMessages);
+    lines.push("", "[协调消息]");
+    for (const group of assembly.groups) {
+      lines.push(
+        `- [任务 ${group.sourceTaskIdentifier} / 序列 ${group.sequenceIdentifier}]`,
+      );
+      for (const messageIdentifier of group.messageIdentifiers) {
+        injectedCoordinationMessageIdentifiers.push(messageIdentifier);
+      }
+      for (const messageText of group.combinedText.split("\n")) {
+        lines.push(`  - ${messageText}`);
+      }
+    }
+    if (assembly.unmergedMessageIdentifiers.length > 0) {
+      lines.push("", "[未确认同一事实]");
+      for (const message of input.coordinationMessages) {
+        if (!assembly.unmergedMessageIdentifiers.includes(message.messageIdentifier)) {
+          continue;
+        }
+        unmergedCoordinationMessageIdentifiers.push(message.messageIdentifier);
+        lines.push(
+          `- [任务 ${message.sourceTaskIdentifier} / 序列 ${message.sequenceIdentifier}] ${message.text}`,
+        );
+      }
+    }
+  }
+
   const promptText = lines.join("\n");
   return {
     promptText,
@@ -200,6 +256,8 @@ export function assembleContextPrompt(
     unsatisfiedNecessaryConditionIdentifiers,
     injectedContextPackIdentifiers: renderedPacks.injectedPackIdentifiers.slice(),
     injectedRecalledContextNodeIdentifiers,
+    injectedCoordinationMessageIdentifiers,
+    unmergedCoordinationMessageIdentifiers,
   };
 }
 
@@ -402,5 +460,4 @@ export function createContextPromptProvider(
     return assembled;
   };
 }
-
 

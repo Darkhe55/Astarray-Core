@@ -5998,3 +5998,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **发现并修复一处真实缺陷**：`cancel()` 在"排队中（无后端句柄）"时抛 `execution-backend-unsupported`，
 > 使「任务取消后不启动排队进程」形同虚设；现改为直接落 `cancelled` 终态、不调用后端。
 > 新增反例 2 条；全量门禁 **786 files / 5238 passed + 3 skipped，exit 0**。
+
+> **COMM-01 装配调用点接线（2026-11-14）**
+>
+> `assembleContextPrompt` 新增可选 `coordinationMessages`：缺省不注入（旧行为不变）；
+> 提供时按"同任务 + 同序列"分块，**不依赖相邻性**；未确认同一事实的消息单列不合并。
+> 反例 3 条；全量门禁 **787 files / 5241 passed + 3 skipped，exit 0**。
