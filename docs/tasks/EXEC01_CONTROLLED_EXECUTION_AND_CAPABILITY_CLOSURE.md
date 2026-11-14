@@ -735,3 +735,22 @@ Windows 侧本已由辅助程序 `--timeout-ms` + `TerminateJobObject` 承担（
 npm 向上找到了仓库根 `package.json`，把 tarball 装成根依赖并 prune 掉 186 个 devDependencies
 （`vitest`/`tsup` 消失）。已用 `git restore package.json package-lock.json` + `npm install` 复原，
 并把隔离安装改到**仓库外**临时目录。教训：**tarball 安装必须在仓库外或先 `npm init` 的独立目录进行**。
+
+### 03 逐条核实结果（2026-11-14 第二轮，含一处真实缺陷修复）
+
+| §03 要求 | 核实结论 | 证据 |
+|---|---|---|
+| start 异步返回执行 ID；8 状态持久化 | ✅ 已实现 | `PROCESS_EXECUTION_STATUSES`：queued/running/succeeded/failed/cancelled/timed-out/unknown/rejected |
+| 退出码 0 仅代表进程成功，不自动判验收 | ✅ 设计如此 | 执行模块只回报状态；验收由上层完成控制事件决定，本模块无自动验收逻辑 |
+| stdout/stderr 分流 + 字节游标 + 单次有界（32 KiB / 上限 128 KiB） | ✅ 已实现 | `PROCESS_EXECUTION_DEFAULT_OUTPUT_READ_BYTES = 32*1024`、`MAXIMUM = 128*1024` |
+| 单流存储上限 8 MiB，超限标记截断，**不把截断当成功** | ✅ 已实现 | `DEFAULT_STREAM_STORAGE_LIMIT_BYTES = 8*1024*1024`；缓冲注释与实现明确"截断≠成功" |
+| UTF-8 跨块 / ANSI 清理 | ✅ 已实现并有用例 | `process-execution-output-buffer.ts` + `exec01-03-output-buffer.test.ts`（7 条） |
+| 敏感模式**跨块**匹配，不得先发片段 | ✅ 本轮已补 | `sensitive-output-scan-gate.ts`（可疑尾部暂扣）+ 控制器接线，默认启用 |
+| 取消/超时作用于整个单元；**用户取消、超时、权限撤销分别记录** | ✅ 分类已实现 | `PROCESS_EXECUTION_TERMINATION_KINDS`：caller-cancelled / timed-out / authorization-revoked / backend-failed |
+| **任务取消后不启动排队进程** | ❌→✅ **本轮修复** | 原 `cancel()` 在无后端句柄时抛 `execution-backend-unsupported`，**排队项取消不了**；现改为落 `cancelled` 终态且不调用后端 |
+| 重启按执行 ID 对账、禁止自动重跑、不确定保持 unknown、幂等键毒化 | ✅ 已实现 | `reconcileProcessExecutionsAfterRestart()`（`process-execution-store.ts:251`） |
+| 预算/游标/状态可恢复 | ✅ 已实现 | 记录持久化含游标与预算字段（store 持久层） |
+
+**本轮修掉的真实缺陷**：`cancel()` 之前的守卫把"未装配后端"与"排队中无句柄"混在一起判，
+导致「取消排队中的执行」直接抛错。反例见 `tests/core/integration/exec01-03-cancel-queued.test.ts`（2 条），
+含"排队项取消不得调用后端 cancel"与"权限撤销要与调用方取消区分"。

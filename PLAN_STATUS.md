@@ -5990,3 +5990,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 已实现判定层 `orchestration/comm-message-routing-decisions.ts` + 9 条反例（含"重复不得覆盖首次结果"、
 > "未登记原路径必须拒绝"、"被打断的同序列仍聚合、未确认事实不合并"）。
 > 全量门禁 **785 files / 5236 passed + 3 skipped，exit 0**。投递通道与持久化尚未接线。
+
+> **EXEC-01-03 逐条核实 + 缺陷修复（2026-11-14）**
+>
+> 按 §03 十条要求逐条核实：8 状态、32KiB/128KiB/8MiB 限额、截断≠成功、UTF-8/ANSI、
+> 跨块敏感扫描、四类终止原因、重启对账与幂等键毒化 —— 均已实现。
+> **发现并修复一处真实缺陷**：`cancel()` 在"排队中（无后端句柄）"时抛 `execution-backend-unsupported`，
+> 使「任务取消后不启动排队进程」形同虚设；现改为直接落 `cancelled` 终态、不调用后端。
+> 新增反例 2 条；全量门禁 **786 files / 5238 passed + 3 skipped，exit 0**。

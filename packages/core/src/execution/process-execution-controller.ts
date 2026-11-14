@@ -527,7 +527,37 @@ export class ProcessExecutionController {
     readonly terminationKind?: ProcessExecutionTerminationKind;
   }): Promise<ProcessExecutionStatusResult> {
     const record = await this.requireAccessibleRecord(input);
-    if (this.sandboxBackend === null || record.backendExecutionHandle === null) {
+    /**
+     * EXEC-01-03（2026-11-14 核实修复）：**排队中的执行也必须能取消**。
+     *
+     * 原实现只要 `backendExecutionHandle === null` 就抛 `execution-backend-unsupported`，
+     * 于是"取消"只能作用于已经跑起来的进程；排队项随后仍会被启动，
+     * 「任务取消后不启动排队进程」形同虚设。这里改为：无句柄 ⇒ 直接落 cancelled 终态，
+     * 不调用后端（它没有可停止的单元），并保留终止原因分类。
+     */
+    if (record.backendExecutionHandle === null) {
+      const queuedCancelledRecord: ProcessExecutionRecord = {
+        ...record,
+        status: "cancelled",
+        exitCode: null,
+        failureReason: input.reason,
+        terminationKind: input.terminationKind ?? "caller-cancelled",
+        finishedAtIso: this.nowIso(),
+      };
+      await this.store.write(queuedCancelledRecord);
+      return {
+        executionId: queuedCancelledRecord.identity.executionId,
+        status: queuedCancelledRecord.status,
+        exitCode: queuedCancelledRecord.exitCode,
+        failureReason: queuedCancelledRecord.failureReason,
+        environmentIdentifier: queuedCancelledRecord.identity.environmentIdentifier,
+        queuedAtIso: queuedCancelledRecord.queuedAtIso,
+        startedAtIso: queuedCancelledRecord.startedAtIso,
+        finishedAtIso: queuedCancelledRecord.finishedAtIso,
+        terminationKind: queuedCancelledRecord.terminationKind ?? null,
+      };
+    }
+    if (this.sandboxBackend === null) {
       throw new DomainError(
         "execution-backend-unsupported",
         "未装配沙箱执行后端：无法取消",
