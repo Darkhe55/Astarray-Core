@@ -10,6 +10,8 @@ import {
 import type { AgentStatus, FeedbackMessage, TransportHealth } from "../core/types.js";
 import { feedbackMessageSchema } from "../core/schemas.js";
 import { DeliveryWorker } from "./delivery-worker.js";
+import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
+import { TaskStore } from "../infra/task-store.js";
 import type { FeedbackIpcMessage } from "./ipc-protocol.js";
 import {
   FEEDBACK_PROTOCOL_VERSION,
@@ -54,6 +56,8 @@ export function runFeedbackProcessEntry(
   let heartbeatWatchdog: NodeJS.Timeout | null = null;
   const recipientDeliveryTimers = new Map<string, NodeJS.Timeout>();
   let baseDirectory = options.defaultBaseDirectory;
+  /** COMM-01（2026-11-15）：子进程侧读任务链（与主进程共用 stateDirectory）。 */
+  let feedbackTaskStore: TaskStore | null = null;
   let heartbeatTimeoutMilliseconds = 30_000;
   /** 连续错过 2 次才判定主进程失联：单次负载抖动不应杀掉子进程。 */
   const heartbeatMissTolerance = createHeartbeatMissTolerance({
@@ -236,7 +240,28 @@ export function runFeedbackProcessEntry(
     baseDirectory = message.baseDirectory;
     heartbeatTimeoutMilliseconds = message.heartbeatTimeoutMilliseconds;
     try {
-      journal = new MailboxJournal(baseDirectory);
+      /**
+       * COMM-01（2026-11-15 用户裁决第 1 条）：**子进程侧同样注入回复路由守卫**。
+       *
+       * 反馈子进程是项目内消息的另一个真实入队点（`handleEnqueueMessage`），
+       * 若这里不注入，带回复标记的消息就会从这条路径绕过校验——等于规则只在一半路径上成立。
+       * 任务链存储与主进程共用同一个 stateDirectory，因此子进程也能解析"任务 → 发布者"。
+       */
+      feedbackTaskStore = new TaskStore({ baseDirectory });
+      journal = new MailboxJournal(baseDirectory, {
+        replyRoutingGuard: createInProjectReplyRoutingGuard({
+          resolveTask: async ({ missionIdentifier, taskIdentifier }) => {
+            if (feedbackTaskStore === null) {
+              return null;
+            }
+            const taskChain = await feedbackTaskStore.readTaskChain(missionIdentifier);
+            const task = taskChain?.tasks.find((candidate) => candidate.id === taskIdentifier);
+            return task === undefined ? null : task;
+          },
+          defaultSchedulerRecipientIdentifierForMission: (missionIdentifier) =>
+            `scheduler:${missionIdentifier}`,
+        }),
+      });
       deliveryWorker = new DeliveryWorker(
         {
           journal,

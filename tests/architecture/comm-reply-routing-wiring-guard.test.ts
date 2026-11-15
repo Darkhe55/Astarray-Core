@@ -52,3 +52,25 @@ describe("COMM-01 回复路由装配守卫", () => {
     expect(content).toContain("resolveFeedbackRecipient(");
   }, 30_000);
 });
+
+describe("COMM-01 回复路由：反馈子进程同样必须注入", () => {
+  it("③ 子进程邮箱构造也必须带守卫（否则消息从这条路径绕过校验）", async () => {
+    const entrypointFilePath = path.join(
+      process.cwd(),
+      "packages",
+      "core",
+      "src",
+      "feedback-process",
+      "entrypoint.ts",
+    );
+    const content = await fs.readFile(entrypointFilePath, "utf8");
+    const codeLines = content
+      .split(/\r?\n/u)
+      .filter((line) => !line.trimStart().startsWith("*") && !line.trimStart().startsWith("//"));
+    const code = codeLines.join("\n");
+
+    expect(code).toContain("new MailboxJournal(baseDirectory, {");
+    expect(code).toContain("replyRoutingGuard: createInProjectReplyRoutingGuard({");
+    expect(code).toContain("readTaskChain(missionIdentifier)");
+  }, 30_000);
+});

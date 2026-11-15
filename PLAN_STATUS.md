@@ -6062,3 +6062,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 回退信箱 `scheduler:<missionId>`），并新增装配静态守卫 2 条防止"为让它能用而删守卫"。
 > 全量门禁首轮出现同文件 3 个失败（`obs01-diag-production-collection`），**隔离重跑 5 条全过、再跑全量全绿**
 > ⇒ 判为抖动。最终 **794 files / 5276 passed + 3 skipped，exit 0**。
+
+> **COMM-01 回复路由子进程注入（2026-11-15 收口）**
+>
+> 核实发现反馈子进程对每条消息都 `journal.enqueue`，不注入守卫则会绕过校验 ⇒ 必须注入。
+> 已在 `entrypoint.ts` 注入（`TaskStore` 读任务链，共用 stateDirectory），装配守卫扩至 3 条覆盖两处入队点。
+> 全量门禁 5,276 passed；1 个无关抖动（`g4-tool-documentation-e2e`，隔离重跑全过）。
+> **COMM-01 裁决第 1 条至此两个入队点均受约束。**

@@ -706,3 +706,23 @@ COMM-01-02 目前已完成并可交付的部分：
 
 **仍属边界**：反馈子进程（`feedback-process/entrypoint.ts:239`）自己的 `MailboxJournal` 未注入守卫
 ⇒ 子进程侧带回复标记的消息仍为拒绝态。是否要在子进程也注入，取决于子进程能否读到任务链（需评估）。
+
+### 回复路由：反馈子进程注入（2026-11-15 收口）
+
+上一轮遗留的边界已闭合。核实发现这不是"要不要做"的问题，而是**必须做**：
+
+> `feedback-process/entrypoint.ts` 的 `handleEnqueueMessage` 会对**每一条**经由反馈进程的消息调用
+> `journal.enqueue(...)`。若子进程不注入守卫，带 `replyToMessageIdentifier` 的消息就从这条路径
+> **绕过校验**——规则只在一半路径上成立。
+
+| 改动 | 位置 |
+|---|---|
+| 子进程邮箱注入守卫 | `feedback-process/entrypoint.ts`（`new MailboxJournal(baseDirectory, { replyRoutingGuard })`） |
+| 子进程读任务链 | `new TaskStore({ baseDirectory })`（与主进程共用 stateDirectory） |
+| 装配守卫扩到子进程 | `tests/architecture/comm-reply-routing-wiring-guard.test.ts`（增至 3 条） |
+
+至此项目内消息的两个真实入队点（运行时邮箱、反馈子进程邮箱）**都**带校验，
+装配静态守卫同时覆盖两处，防止任一处被删。
+
+验证：`feedback-process` 相关 13 条 + 装配守卫 3 条通过；全量门禁 5,276 passed
+（1 个无关抖动 `g4-tool-documentation-e2e`，隔离重跑 2 条全过）。
