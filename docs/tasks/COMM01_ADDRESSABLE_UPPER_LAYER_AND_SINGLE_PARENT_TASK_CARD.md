@@ -745,3 +745,22 @@ COMM-01-02 目前已完成并可交付的部分：
 （`git grep 'inbox.enqueue('` 无命中，可能通过 store 层间接调用），
 需要确认后把 `CrossProjectEnvelope.missionIdentifier` / `.replyToMessageIdentifier`
 传进入箱，否则发送端仍不会真正带上这两项。
+
+### 功能侧：outbox 落盘不再丢字段（2026-11-15）
+
+上一轮遗留断点的实际根因**不是"没有生产者"**，而是**生产者写出时把字段丢了**：
+
+`collaboration-outbox-transport.ts` 的 `send()` 只写固定几个字段
+（message/correlation/recipient/sender/task/summary/authorizationEpoch/时间），
+`missionIdentifier` 与 `replyToMessageIdentifier` **被静默丢弃**——
+消息对象上明明带着标记，落盘后没了，接收方回复必然失败。
+
+| 改动 | 位置 |
+|---|---|
+| 落盘包含 mission 与回复指向（缺省不写，保持旧文件形状） | `orchestration/collaboration-outbox-transport.ts` |
+| 反例 4 条（含幂等未回归） | `tests/core/unit/collaboration-outbox-transport-fields.test.ts` |
+
+**仍未完成（需在消费侧确认）**：outbox 文件的**读取方不在公开仓库**
+（`git grep COLLABORATION_OUTBOX_SCHEMA_VERSION` 只有写入侧）。因此：
+写入侧已保证字段落盘，读取侧（若存在）必须把这两个字段解析并透传，否则标记仍会在消费时丢失。
+下一轮动作：在消费侧（私有 UI 仓库或后续接入的读取实现）核对解析字段列表。

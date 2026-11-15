@@ -57,6 +57,19 @@ export class CollaborationOutboxTransport implements CollaborationInboxTransport
       recipientAgentInstanceId: message.recipientAgentInstanceId,
       senderAgentInstanceId: message.senderAgentInstanceId,
       taskIdentifier: message.taskIdentifier,
+      /**
+       * COMM-01（2026-11-15 用户裁决第 1 条）：**mission 与回复指向必须落盘**。
+       *
+       * 此前这里只写固定几个字段，`missionIdentifier` / `replyToMessageIdentifier`
+       * 会被**静默丢弃**——消息带上了标记，写出时却没了，接收方回复必然失败。
+       */
+      ...(message.missionIdentifier === undefined || message.missionIdentifier === null
+        ? {}
+        : { missionIdentifier: message.missionIdentifier }),
+      ...(message.replyToMessageIdentifier === undefined ||
+      message.replyToMessageIdentifier === null
+        ? {}
+        : { replyToMessageIdentifier: message.replyToMessageIdentifier }),
       summary: message.summary,
       authorizationEpoch: message.authorizationEpoch,
       enqueuedAtIso: message.receivedAtIso,

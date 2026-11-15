@@ -6076,3 +6076,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 现 `CollaborationInboxMessage` 与反馈信封均支持并透传这两项（未提供则保持缺省）。
 > 反例 4 条；全量门禁 **795 files / 5281 passed + 3 skipped，exit 0**。
 > 剩余：入箱生产者调用点未定位（`inbox.enqueue(` 无命中），需确认后从信封传入。
+
+> **COMM-01 outbox 落盘修复（2026-11-15）**
+>
+> 定位到真正的丢字段点：`collaboration-outbox-transport.send()` 只写固定字段，
+> `missionIdentifier`/`replyToMessageIdentifier` 被静默丢弃 ⇒ 回复必然失败。
+> 已修复（缺省不写，旧文件形状不变）+ 反例 4 条；全量门禁 **796 files / 5285 passed + 3 skipped，exit 0**。
+> 剩余：outbox 读取方不在公开仓库，需在消费侧核对解析字段列表。
