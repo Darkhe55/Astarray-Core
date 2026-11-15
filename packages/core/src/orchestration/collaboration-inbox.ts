@@ -36,6 +36,18 @@ export interface CollaborationInboxMessage {
   readonly isRelayedRequest: boolean;
   readonly taskIdentifier: string;
   /**
+   * COMM-01（2026-11-15）：**消息所属 mission**。
+   *
+   * 任务链按 mission 存放，回复路由要靠它定位"任务 → 发布者"；缺省表示发送方未提供。
+   */
+  readonly missionIdentifier?: string | null;
+  /**
+   * COMM-01：**本消息回复的是哪一条原消息**（非回复消息为 null/缺省）。
+   *
+   * 回复必须能指回已投递的原请求，否则校验侧会拒绝（见 `in-project-reply-routing.ts`）。
+   */
+  readonly replyToMessageIdentifier?: string | null;
+  /**
    * COMM-01-02 修正：**回复所依据的原任务产物**（可选）。
    * 无产物的回复（口头确认）仍然合法。
    */
@@ -122,6 +134,18 @@ export class CollaborationInbox {
     readonly recipientAgentInstanceId: string;
     readonly senderAgentInstanceId: string;
     readonly taskIdentifier: string;
+  /**
+   * COMM-01（2026-11-15）：**消息所属 mission**。
+   *
+   * 任务链按 mission 存放，回复路由要靠它定位"任务 → 发布者"；缺省表示发送方未提供。
+   */
+  readonly missionIdentifier?: string | null;
+  /**
+   * COMM-01：**本消息回复的是哪一条原消息**（非回复消息为 null/缺省）。
+   *
+   * 回复必须能指回已投递的原请求，否则校验侧会拒绝（见 `in-project-reply-routing.ts`）。
+   */
+  readonly replyToMessageIdentifier?: string | null;
     readonly summary: string;
     readonly receivedAtIso: string;
     readonly originalSourceAgentInstanceId?: string;
@@ -238,6 +262,14 @@ export class CollaborationInbox {
       originalSourceAgentInstanceId: input.originalSourceAgentInstanceId ?? input.senderAgentInstanceId,
       isRelayedRequest: input.isRelayedRequest ?? false,
       taskIdentifier: input.taskIdentifier,
+      /** COMM-01（2026-11-15）：mission 与回复指向随消息入库，供回复路由校验使用。 */
+      ...(input.missionIdentifier === undefined || input.missionIdentifier === null
+        ? {}
+        : { missionIdentifier: input.missionIdentifier }),
+      ...(input.replyToMessageIdentifier === undefined ||
+      input.replyToMessageIdentifier === null
+        ? {}
+        : { replyToMessageIdentifier: input.replyToMessageIdentifier }),
       ...(input.artifactReferences === undefined
         ? {}
         : { artifactReferences: input.artifactReferences }),

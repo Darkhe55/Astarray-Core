@@ -66,6 +66,19 @@ export function buildCollaborationFeedbackMessage(input: {
     messageId: "collaboration:" + input.message.messageIdentifier,
     /** COORD-01-02：把任务归属带到**信封**（不再只放在 payload 里）。 */
     taskIdentifier: input.message.taskIdentifier,
+    /**
+     * COMM-01（2026-11-15 用户裁决第 1 条）：把 **mission 与回复指向**带到信封。
+     *
+     * 缺这两项时，接收方回复会因"无法定位任务链/无法证明原路径"被拒绝——
+     * 也就是说：不在这里标记，规则就无法实际使用（不是可选优化）。
+     */
+    ...(input.message.missionIdentifier === undefined || input.message.missionIdentifier === null
+      ? {}
+      : { missionIdentifier: input.message.missionIdentifier }),
+    ...(input.message.replyToMessageIdentifier === undefined ||
+    input.message.replyToMessageIdentifier === null
+      ? {}
+      : { replyToMessageIdentifier: input.message.replyToMessageIdentifier }),
     source: {
       sourceType: "agent",
       agentInstanceId: input.message.senderAgentInstanceId,

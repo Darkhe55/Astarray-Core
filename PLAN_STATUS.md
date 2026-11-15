@@ -6069,3 +6069,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 已在 `entrypoint.ts` 注入（`TaskStore` 读任务链，共用 stateDirectory），装配守卫扩至 3 条覆盖两处入队点。
 > 全量门禁 5,276 passed；1 个无关抖动（`g4-tool-documentation-e2e`，隔离重跑全过）。
 > **COMM-01 裁决第 1 条至此两个入队点均受约束。**
+
+> **COMM-01 功能侧信封标记（2026-11-15）**
+>
+> 补齐"规则不可用"的根因：此前无任何发送端标记 mission/回复指向 ⇒ 回复必被拒。
+> 现 `CollaborationInboxMessage` 与反馈信封均支持并透传这两项（未提供则保持缺省）。
+> 反例 4 条；全量门禁 **795 files / 5281 passed + 3 skipped，exit 0**。
+> 剩余：入箱生产者调用点未定位（`inbox.enqueue(` 无命中），需确认后从信封传入。

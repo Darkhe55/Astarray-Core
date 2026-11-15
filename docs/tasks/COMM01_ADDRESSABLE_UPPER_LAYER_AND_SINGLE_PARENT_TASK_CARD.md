@@ -726,3 +726,22 @@ COMM-01-02 目前已完成并可交付的部分：
 
 验证：`feedback-process` 相关 13 条 + 装配守卫 3 条通过；全量门禁 5,276 passed
 （1 个无关抖动 `g4-tool-documentation-e2e`，隔离重跑 2 条全过）。
+
+### 功能侧：发送端标记 mission 与回复指向（2026-11-15）
+
+前面的接线下，**没有任何发送端会带 `missionIdentifier` / `replyToMessageIdentifier`**，
+因此回复永远无法通过校验——规则"安全但不可用"。本轮补功能侧：
+
+| 改动 | 位置 |
+|---|---|
+| 协作消息携带 mission 与回复指向 | `orchestration/collaboration-inbox.ts`（入箱信封与消息结构） |
+| 转成反馈消息时写入信封 | `orchestration/collaboration-feedback-mapping.ts` |
+| 反例 4 条 | `tests/core/unit/collaboration-feedback-mapping.test.ts` |
+
+语义：**未提供时保持缺省**（不塞 `null` 冒充已标记），旧消息形状不变。
+显式 `null` 与缺省等价处理——避免把"没标记"和"标记为空"混为一谈。
+
+**剩余（下一轮第一件事）**：尚未找到 `CollaborationInbox.enqueue` 的生产者调用点
+（`git grep 'inbox.enqueue('` 无命中，可能通过 store 层间接调用），
+需要确认后把 `CrossProjectEnvelope.missionIdentifier` / `.replyToMessageIdentifier`
+传进入箱，否则发送端仍不会真正带上这两项。
