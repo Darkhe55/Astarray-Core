@@ -136,6 +136,32 @@ export class MailboxJournal {
         ) => Promise<JournaledMessage | null>;
       }) => Promise<void>)
     | undefined;
+  /**
+   * COMM-01（2026-11-16 用户裁决第 2 条）：**重放去重端口**（可选注入）。
+   *
+   * 与 `idempotencyKey` 幂等的分工（刻意不同，别混用）：
+   * - `idempotencyKey`：**同一次业务意图**的重发（补送/重连），同键同内容 ⇒ 复用序号；同键异内容 ⇒ 拒绝；
+   * - `messageId`（本端口）：**同一条消息实体**的重放，静默去重并累加出现次数，跨重启有效。
+   *
+   * 判定顺序见 `enqueueExclusive`：**先 messageId（重放）、后 idempotencyKey（幂等）**。
+   */
+  private readonly replayDedupeStore:
+    | {
+        findDelivered(messageIdentifier: string): Promise<{
+          readonly originalResult: unknown;
+          readonly occurrenceCount: number;
+        } | null>;
+        recordDelivery(input: {
+          readonly messageIdentifier: string;
+          readonly incomingResult: unknown;
+          readonly deliveredAtIso: string;
+        }): Promise<{
+          readonly isDuplicate: boolean;
+          readonly result: unknown;
+          readonly occurrenceCount: number;
+        }>;
+      }
+    | undefined;
 
   constructor(
     baseDirectory: string,
@@ -146,10 +172,26 @@ export class MailboxJournal {
           messageIdentifier: string,
         ) => Promise<JournaledMessage | null>;
       }) => Promise<void>;
+      readonly replayDedupeStore?: {
+        findDelivered(messageIdentifier: string): Promise<{
+          readonly originalResult: unknown;
+          readonly occurrenceCount: number;
+        } | null>;
+        recordDelivery(input: {
+          readonly messageIdentifier: string;
+          readonly incomingResult: unknown;
+          readonly deliveredAtIso: string;
+        }): Promise<{
+          readonly isDuplicate: boolean;
+          readonly result: unknown;
+          readonly occurrenceCount: number;
+        }>;
+      };
     } = {},
   ) {
     this.journalDirectoryPath = path.join(baseDirectory, "feedback", "mailboxes");
     this.replyRoutingGuard = options.replyRoutingGuard;
+    this.replayDedupeStore = options.replayDedupeStore;
   }
 
   private journalFilePath(recipientId: string): string {
@@ -232,6 +274,52 @@ export class MailboxJournal {
       nextSequence: 1,
       messages: [],
     };
+    /**
+     * COMM-01（2026-11-16）：**重放去重先判**（messageId 身份优先于 idempotencyKey 意图）。
+     *
+     * 为什么这个顺序：
+     * - 裁决要求"带重复次数"⇒ 同一 messageId 的每次重发都要**计到数**；
+     *   若让 idempotencyKey 先判，普通重发（同键同内容）会走幂等短路、根本不经过计数，
+     *   `occurrenceCount` 就永远是 1，裁决形同未实现；
+     * - 反过来，**同 messageId 不同内容**必须**拒绝**而不是静默去重——
+     *   否则"同一个消息标识装着两份不同内容"会被悄悄吞掉一份，那比报错危险。
+     */
+    const replayContentDigest = JSON.stringify({
+      source: message.source,
+      recipientId: message.recipientId,
+      priority: message.priority,
+      projectIdentifier: message.projectIdentifier ?? null,
+      missionIdentifier: message.missionIdentifier ?? null,
+      taskIdentifier: message.taskIdentifier ?? null,
+      replyToMessageIdentifier: message.replyToMessageIdentifier ?? null,
+      payload: message.payload,
+    });
+    if (this.replayDedupeStore !== undefined) {
+      const priorDelivery = await this.replayDedupeStore.findDelivered(message.messageId);
+      if (priorDelivery !== null) {
+        if (priorDelivery.originalResult !== replayContentDigest) {
+          throw new DomainError(
+            "operation-not-idempotent",
+            `同一 messageId 出现不同内容，拒绝静默去重: ${message.messageId}`,
+          );
+        }
+        await this.replayDedupeStore.recordDelivery({
+          messageIdentifier: message.messageId,
+          incomingResult: replayContentDigest,
+          deliveredAtIso: message.createdAtIso,
+        });
+        const existingByMessageIdentifier = document.messages.find(
+          (candidate) => candidate.messageId === message.messageId,
+        );
+        if (existingByMessageIdentifier === undefined) {
+          throw new DomainError(
+            "operation-not-idempotent",
+            `存在重放记录但邮箱内找不到该消息（状态不一致）: ${message.messageId}`,
+          );
+        }
+        return existingByMessageIdentifier.enqueuedSequence;
+      }
+    }
     const existingMessage = document.messages.find(
       (candidate) => candidate.idempotencyKey === message.idempotencyKey,
     );
@@ -261,6 +349,17 @@ export class MailboxJournal {
     document.messages.push(journaledMessage);
     document.nextSequence += 1;
     await this.saveDocument(document);
+    /**
+     * 首次入库成功后才登记重放记录：邮箱是事实来源，
+     * 先登记再写盘会在写盘失败时留下"已投递但邮箱没有"的幽灵记录。
+     */
+    if (this.replayDedupeStore !== undefined) {
+      await this.replayDedupeStore.recordDelivery({
+        messageIdentifier: message.messageId,
+        incomingResult: replayContentDigest,
+        deliveredAtIso: message.createdAtIso,
+      });
+    }
     return journaledMessage.enqueuedSequence;
   }
 

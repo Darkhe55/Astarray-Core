@@ -6097,3 +6097,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 本地文件实现（outbox，跨进程交付边界，消费者在仓外）。CLI 已有 `inbox list` / `inbox deliver`。
 > 并对照核对字段往返：收件箱用 `...message` 展开不丢字段；唯一丢字段点是 outbox 写入（已修）。
 > 此前"读取侧需同步解析"的表述已作废。
+
+> **COMM-01 重放去重接线（2026-11-16）**
+>
+> 修正"已做但生产不可达"：`CommDeliveredMessageStore` 此前仅测试引用（分诊脚本实跑 生产提及=0）。
+> 现接入 `MailboxJournal.enqueue`（主进程 + 反馈子进程两处装配），并加装配守卫。
+> **先判顺序**：messageId（重放，静默去重+次数）**先于** idempotencyKey（幂等，同键异内容拒绝）——
+> 反过来会让普通重发被幂等短路、次数恒为 1，裁决失效。同 id 异内容按内容摘要拒绝。
+> 反例 5 条 + 装配守卫 1 条；全量门禁 **797 files / 5291 passed + 3 skipped，exit 0**。

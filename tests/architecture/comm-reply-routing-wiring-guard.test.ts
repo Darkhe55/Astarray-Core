@@ -74,3 +74,20 @@ describe("COMM-01 回复路由：反馈子进程同样必须注入", () => {
     expect(code).toContain("readTaskChain(missionIdentifier)");
   }, 30_000);
 });
+
+describe("COMM-01 重放去重：装配必须注入", () => {
+  it("④ 运行时与子进程都必须注入 replayDedupeStore（否则持久化去重不可达）", async () => {
+    const runtimeContent = await fs.readFile(RUNTIME_FILE_PATH, "utf8");
+    const entrypointContent = await fs.readFile(
+      path.join(process.cwd(), "packages", "core", "src", "feedback-process", "entrypoint.ts"),
+      "utf8",
+    );
+    for (const content of [runtimeContent, entrypointContent]) {
+      const code = content
+        .split(/\r?\n/u)
+        .filter((line) => !line.trimStart().startsWith("*") && !line.trimStart().startsWith("//"))
+        .join("\n");
+      expect(code).toContain("replayDedupeStore: new CommDeliveredMessageStore(");
+    }
+  }, 30_000);
+});

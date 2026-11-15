@@ -11,6 +11,7 @@ import type { AgentStatus, FeedbackMessage, TransportHealth } from "../core/type
 import { feedbackMessageSchema } from "../core/schemas.js";
 import { DeliveryWorker } from "./delivery-worker.js";
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
+import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { TaskStore } from "../infra/task-store.js";
 import type { FeedbackIpcMessage } from "./ipc-protocol.js";
 import {
@@ -261,6 +262,8 @@ export function runFeedbackProcessEntry(
           defaultSchedulerRecipientIdentifierForMission: (missionIdentifier) =>
             `scheduler:${missionIdentifier}`,
         }),
+        /** COMM-01（2026-11-16）：子进程侧同样启用重放去重（与主进程共用状态目录）。 */
+        replayDedupeStore: new CommDeliveredMessageStore({ baseDirectory }),
       });
       deliveryWorker = new DeliveryWorker(
         {

@@ -821,3 +821,43 @@ CLI 侧已接通两条命令（`packages/tui/src/cli/inbox-command.ts`）：
 | outbox 读取 | 仓内不存在（消费方实现） | 不适用；消费方需解析这两字段 |
 
 结论：仓内唯一的丢字段缺陷在 outbox 写入侧，已修复并有反例；收件箱侧不存在同类问题。
+
+### 重放去重：接线与"先判顺序"（2026-11-16，用户裁决 A）
+
+**先承认问题**：`CommDeliveredMessageStore` 此前只有测试调用、生产零引用
+（`scripts/audit-product-reachability.mjs` 实跑：生产提及 0、测试构造 7）——
+裁决第 2 条在生产上**并未生效**，卡内"已做"是夸大。本轮接线修正。
+
+| 改动 | 位置 |
+|---|---|
+| 邮箱入库接入重放去重端口 | `feedback-process/mailbox-journal.ts`（`replayDedupeStore` 选项） |
+| 主进程装配 | `application-runtime.ts`（`new CommDeliveredMessageStore({ baseDirectory: stateDirectory })`） |
+| 子进程装配 | `feedback-process/entrypoint.ts` |
+| 反例 5 条 + 装配守卫 1 条 | `tests/core/unit/mailbox-replay-dedupe-wiring.test.ts`、`tests/architecture/comm-reply-routing-wiring-guard.test.ts` |
+
+### 为什么 messageId（重放）必须**先于** idempotencyKey（幂等）
+
+两者是**不同维度**，不能混用：
+
+| 键 | 含义 | 语义 |
+|---|---|---|
+| `messageId` | **消息实体**身份 | 同一条消息重发 ⇒ **静默去重 + 次数累加**，跨重启有效 |
+| `idempotencyKey` | **业务意图**身份 | 同一次意图重发 ⇒ 同键同内容复用序号；同键异内容 ⇒ 拒绝 |
+
+**顺序差异的实际后果**：
+
+| 场景 | 先判 messageId（本轮实现） | 先判 idempotencyKey（若反过来） |
+|---|---|---|
+| 同 messageId + 同 idempotencyKey（普通重发） | 命中重放 ⇒ **次数 +1** | 命中幂等 ⇒ 直接返回序号，**次数不增** |
+| 同 messageId + 换 idempotencyKey | 命中重放 ⇒ 去重 + 次数 +1 | 不命中幂等 ⇒ 继续入库 ⇒ **重复入队** |
+| 同 idempotencyKey + 换 messageId | 不命中 ⇒ 走幂等 ⇒ 同内容复用/异内容拒绝（保持既有） | 同左 |
+| 同 messageId + 同 idempotencyKey + **内容不同** | 命中重放且内容摘要不同 ⇒ **拒绝** `operation-not-idempotent` | 命中幂等 ⇒ 拒绝（同样拒绝，但**计数值不涨**） |
+
+**结论**：把幂等放前面，"带重复次数"永远只能得到 1（普通重发全被幂等短路），
+裁决等于没实现；而且换 key 重发会真重复入队。因此**必须先判 messageId**。
+
+**风险控制**：先判 messageId 的固有风险是"同 id 不同内容被静默吞掉一份"，
+所以实现里对**内容摘要**做了比较（source/recipient/priority/project/mission/task/replyTo/payload），
+不一致即 `operation-not-idempotent` 拒绝——静默只对"真正同一条消息"生效。
+
+**写入顺序**：重放记录在**邮箱写盘成功之后**登记，避免写盘失败时留下"已投递但邮箱无此消息"的幽灵记录。

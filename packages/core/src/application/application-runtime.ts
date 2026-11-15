@@ -131,6 +131,7 @@ import {
 } from "../execution/execution-contract.js";
 import { createPlatformSandboxExecutionBackend } from "../execution/platform-sandbox-backend.js";
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
+import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -1165,6 +1166,12 @@ export async function createApplicationRuntime(
       defaultSchedulerRecipientIdentifierForMission: (missionIdentifier) =>
         `scheduler:${missionIdentifier}`,
     }),
+    /**
+     * COMM-01（2026-11-16 用户裁决第 2 条）：**重放去重持久化端口**。
+     *
+     * 与 `idempotencyKey` 幂等分工不同：这条按 `messageId` 静默去重并累加出现次数，跨重启有效。
+     */
+    replayDedupeStore: new CommDeliveredMessageStore({ baseDirectory: stateDirectory }),
   });
   const coordinationLeaseStore = new CoordinationPartitionLeaseStore({
     stateDirectory: path.join(stateDirectory, "coordination", "leases"),
