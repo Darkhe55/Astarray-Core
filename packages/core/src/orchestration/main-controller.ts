@@ -5,6 +5,7 @@
  * 权限询问转达用户并记录会话授权。
  */
 import { createHash, randomUUID } from "node:crypto";
+import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
 import { buildToolPublicDocumentation } from "../tools/tool-public-documentation-registry.js";
@@ -350,6 +351,8 @@ export interface MainControllerOptions {
   artifactWorkspaceRootPath?: string;
   /** T09A-R1-01：上下文提示词装配提供者。 */
   contextPromptProvider?: ContextPromptProvider;
+  /** COORD-01-03 §5（审查报告 P1 第二步）：协调上下文投递端口（缺省不携带）。 */
+  coordinationContextDeliveryPort?: CoordinationContextDeliveryPort;
   /** GUIDE-01-04：运行中指导控制队列（主 Agent 只读不变；指导由安全点消费）。 */
   guidanceControlQueue?: GuidanceControlQueue;
   /** T09A-R1-03：任务完成后的上下文节点收口。 */
@@ -5094,6 +5097,9 @@ export class MainController {
       artifactWorkspaceRootPath:
         this.missionWorkspaceRootPaths.get(missionId) ?? this.options.artifactWorkspaceRootPath,
       contextPromptProvider: this.options.contextPromptProvider,
+      ...(this.options.coordinationContextDeliveryPort === undefined
+        ? {}
+        : { coordinationContextDeliveryPort: this.options.coordinationContextDeliveryPort }),
       guidanceControlQueue: this.options.guidanceControlQueue,
       contextNodeLifecycle: this.options.contextNodeLifecycle ?? null,
       contextLifecycleModeKey: "assist",
@@ -5383,6 +5389,9 @@ export class MainController {
       artifactWorkspaceRootPath:
         this.missionWorkspaceRootPaths.get(missionId) ?? this.options.artifactWorkspaceRootPath,
       contextPromptProvider: this.options.contextPromptProvider,
+      ...(this.options.coordinationContextDeliveryPort === undefined
+        ? {}
+        : { coordinationContextDeliveryPort: this.options.coordinationContextDeliveryPort }),
       guidanceControlQueue: this.options.guidanceControlQueue,
       contextNodeLifecycle: this.options.contextNodeLifecycle ?? null,
       contextLifecycleModeKey: "devolve",

@@ -57,3 +57,8 @@ main-controller 的思索路径仍以当前 message 为 userPrompt，未见在�
 | P2 主 Agent 与节点上下文装配未统一 | **未开始** | —— | —— |
 
 > 说明：本表只记录**已核实的实际代码状态**；不以提交数量或测试全绿代替接线证据。
+
+> **2026-11-16 更新**：P1「上下文回执把准入当投递」**两步均已完成**——
+> 第一步拆开准入/投递（提交 `7ac03c9a`），第二步把准入消息接入 Worker 的真实模型请求，
+> 请求提交后才记 delivered（提交见下一条）。证据：`orchestration/coordination-context-delivery.ts`、
+> `tests/core/integration/coord01-context-delivery-wiring.test.ts`（捕获 systemPrompt 断言正文/来源/任务）。

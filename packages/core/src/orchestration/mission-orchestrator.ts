@@ -5,6 +5,7 @@
  * 直到 complete-mission 或取消。全程不阻塞主 Agent 输入循环。
  */
 import { createHash, randomUUID } from "node:crypto";
+import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 // G4（第 282 轮）：公开用法生产者 + 完整用法构造 + 注入器类型。
 import { buildToolPublicDocumentation } from "../tools/tool-public-documentation-registry.js";
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
@@ -339,6 +340,8 @@ export interface MissionOrchestratorOptions {
   artifactWorkspaceRootPath?: string;
   /** T09A-R1-01：上下文提示词装配提供者。 */
   contextPromptProvider?: ContextPromptProvider;
+  /** COORD-01-03 §5（审查报告 P1 第二步）：协调上下文投递端口（缺省不携带）。 */
+  coordinationContextDeliveryPort?: CoordinationContextDeliveryPort;
   /** GUIDE-01-04：运行中指导控制队列（每个任务构造独立安全点端口）。 */
   guidanceControlQueue?: GuidanceControlQueue;
   /** T09A-R1-03：任务完成后的上下文节点收口。 */
@@ -1322,6 +1325,9 @@ export class MissionOrchestrator {
         ? {}
         : { artifactWorkspaceRootPath: this.options.artifactWorkspaceRootPath }),
       contextPromptProvider: this.options.contextPromptProvider,
+      ...(this.options.coordinationContextDeliveryPort === undefined
+        ? {}
+        : { coordinationContextDeliveryPort: this.options.coordinationContextDeliveryPort }),
       guidanceSafePointPort:
         this.options.guidanceControlQueue === undefined
           ? undefined

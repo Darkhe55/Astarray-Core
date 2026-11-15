@@ -6113,3 +6113,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例 10 条 + 两处集成断言纠正（原先写死 delivered 等于把缺陷当契约）。
 > 全量门禁 **797 files / 5296 passed + 3 skipped，exit 0**。
 > **第二步未做**：把准入消息接入实际模型请求装配，请求携带正文后才记 delivered。
+
+> **COORD 上下文投递第二步（2026-11-16）**
+>
+> 新增 `orchestration/coordination-context-delivery.ts`（端口：取 pending → 拼区块 → 请求提交后标记），
+> 经 application-runtime → MainController → MissionOrchestrator → WorkerAgent 全链路接线。
+> 反例 3 条**捕获真实 systemPrompt**，断言正文/来源/任务/待处理标注；delivered 以 `worker-turn:` 请求标识留证。
+> 全量门禁 **798 files / 5299 passed + 3 skipped，exit 0**。

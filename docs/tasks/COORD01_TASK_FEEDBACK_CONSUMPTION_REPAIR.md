@@ -459,3 +459,43 @@ tarball（`npm pack --ignore-scripts`）→ 隔离目录 `npm install` → 只 i
 - 请求成功后调用 `recordDelivered({requestIdentifier})` 并写 `delivered`；
 - 反例需**捕获实际模型请求**，断言正文、来源、目标个体与版本，而非只断言状态字段；
 - 在完成前，`contextDeliveryState` 对需要模型处理的消息会停在 `pending`——这是**如实状态**，不是回归。
+
+## 审查报告 P1 修正（2026-11-16）：准入 ≠ 投递（第二步：真实请求携带）
+
+### 调用链（真实生产路径）
+
+```text
+application-runtime
+  └─ createCoordinationContextDeliveryPort({ journal, admissionController, partitionKey })
+      └─ 传入 MainController options.coordinationContextDeliveryPort
+          └─ MainController → MissionOrchestrator options
+              └─ MissionOrchestrator → new WorkerAgent({ coordinationContextDeliveryPort })
+                  ├─ collectPending({ recipientId: "agent:<agentInstanceId>" })
+                  │     ⇒ 只取 contextDeliveryState === "pending"
+                  ├─ formatCoordinationContextBlock(...) 拼进 systemPrompt
+                  └─ 首个模型事件到达（请求已提交）后 markDelivered({ requestIdentifier })
+                        ⇒ journal 写 "delivered" + 准入回执写 deliveredAtIso/deliveryRequestIdentifier
+```
+
+### 关键语义
+
+| 项 | 处理 |
+|---|---|
+| 准入 | 只写 `pending`，不算投递（第一步已修） |
+| 请求携带 | 区块带**消息标识 / 来源个体 / 任务标识 / 正文**，并声明"不是已完成的事实、不是用户发言" |
+| delivered 时机 | **首个模型事件到达之后**（请求确已提交并开始返回），不是请求前、也不是装配时 |
+| delivered 含义 | 只表示"这次提交的请求携带了该内容"，**不表示模型理解或任务完成** |
+| 无 pending 消息 | 不注入任何区块（测试③） |
+
+### 验证
+
+`tests/core/integration/coord01-context-delivery-wiring.test.ts`（3 条）
+**实际捕获模型请求的 `systemPrompt`**，断言正文、来源、任务、待处理标注均在其中；
+并断言 journal 状态与准入回执同步变为 delivered、请求标识以 `worker-turn:` 开头。
+
+全量门禁：**798 files / 5299 passed + 3 skipped，exit 0**。
+
+### 仍未完成
+
+- 主 Agent（非 Worker）路径的上下文装配统一（审查报告 P2 项，属检查点 4）；
+- COORD 消费器生产调用（检查点 2）。

@@ -132,6 +132,7 @@ import {
 import { createPlatformSandboxExecutionBackend } from "../execution/platform-sandbox-backend.js";
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
+import { createCoordinationContextDeliveryPort } from "../orchestration/coordination-context-delivery.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -3891,7 +3892,16 @@ export async function createApplicationRuntime(
    * 用 holder 对象而不是 `let`，避免闭包内被窄化成 never。
    */
   const controllerHolder: { current: MainController | null } = { current: null };
-  const controller = new MainController({
+  /**
+ * COORD-01-03 §5（审查报告 P1 第二步）：构造协调上下文投递端口。
+ * 只有真正被装配进 MainController ⇒ WorkerAgent 的请求才会携带 pending 消息正文。
+ */
+const coordinationContextDeliveryPort = createCoordinationContextDeliveryPort({
+  journal: coordinationMailboxJournal,
+  admissionController: coordinationContextAdmission,
+  partitionKey: coordinationPartitionKey,
+});
+const controller = new MainController({
     /** R93（②）：独立验收门禁需要裁决存储，否则裁决只校验、不落盘（身份目录在下方已传）。 */
     completionVerdictStore,
     /** COORD-01-03 §2/§5：控制旁路接入派发门禁。 */
@@ -4622,6 +4632,8 @@ export async function createApplicationRuntime(
     // 产物对账必须使用与工具写入一致的工作区根（2026-10-02）。
     artifactWorkspaceRootPath: registeredProjectRoots[0]?.rootPath ?? process.cwd(),
     contextPromptProvider,
+    /** 审查报告 P1 第二步：协调上下文投递端口（WorkerAgent 请求携带 pending 正文）。 */
+    coordinationContextDeliveryPort,
     guidanceControlQueue,
     contextNodeLifecycle,
     streamOutput: options.streamOutput,

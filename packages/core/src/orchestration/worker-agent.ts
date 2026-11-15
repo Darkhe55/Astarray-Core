@@ -23,6 +23,8 @@ import {
 import { DomainError } from "../core/errors.js";
 // ALIGN-03-03（2026-10-28）：完成收据（真实工具调用数/落盘产物/完成事件校验结果）。
 import { buildCompletionReceipt } from "./completion-receipt.js";
+import { formatCoordinationContextBlock } from "./coordination-context-delivery.js";
+import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 import type { CompletionReceipt } from "./completion-receipt.js";
 // COMM-01-02（2026-10-25）：反馈默认走**任务发布者的反向通道**（不再按上下级/硬编码推断）。
 import { resolveFeedbackRecipient } from "./task-publisher-feedback-route.js";
@@ -130,6 +132,13 @@ export interface WorkerAgentOptions {
   artifactWorkspaceRootPath?: string;
   /** T09A-R1-01：上下文提示词装配（全局相关选择 + 局部活跃前沿）。 */
   contextPromptProvider?: ContextPromptProvider;
+  /**
+   * COORD-01-03 §5（审查报告 P1 第二步）：**协调上下文投递端口**。
+   *
+   * 提供时，本轮请求会携带"已准入但未投递"的协调消息正文；
+   * 请求提交后才把它们标成 delivered（缺省不携带、不标记）。
+   */
+  coordinationContextDeliveryPort?: CoordinationContextDeliveryPort;
   /** GUIDE-01-04：运行中指导安全点端口（缺省表示该 worker 不接受运行中指导）。 */
   guidanceSafePointPort?: GuidanceSafePointPort;
   /** T09A-R1-03：任务完成后的上下文节点收口（建立/验证/关闭/胶囊/核验任务）。 */
@@ -527,6 +536,31 @@ export class WorkerAgent {
       systemPrompt = assembledContext.promptText + "\n\n" + systemPrompt;
     }
 
+    /**
+     * COORD-01-03 §5（审查报告 P1 第二步）：把**已准入但未投递**的协调消息正文放进本轮回合。
+     *
+     * - 只取该个体自己的邮箱里 `contextDeliveryState === "pending"` 的消息；
+     * - 区块带来源/任务/消息标识，并明确标注"待处理"而不是"已完成事实"；
+     * - 投递标记在**请求提交之后**才写（见下方 `markDelivered`）。
+     */
+    const coordinationContextDeliveryPort = this.options.coordinationContextDeliveryPort;
+    const coordinationRecipientId = `agent:${this.options.agentInstanceId}`;
+    let deliveredCoordinationMessageIdentifiers: readonly string[] = [];
+    if (coordinationContextDeliveryPort !== undefined) {
+      const pendingCoordinationEntries = await coordinationContextDeliveryPort.collectPending({
+        recipientId: coordinationRecipientId,
+      });
+      if (pendingCoordinationEntries.length > 0) {
+        const coordinationBlock = formatCoordinationContextBlock(pendingCoordinationEntries);
+        if (coordinationBlock !== "") {
+          systemPrompt = coordinationBlock + "\n\n" + systemPrompt;
+          deliveredCoordinationMessageIdentifiers = pendingCoordinationEntries.map(
+            (entry) => entry.messageIdentifier,
+          );
+        }
+      }
+    }
+
     const events = await runToolLoop(
       {
         missionId: this.options.missionId,
@@ -610,7 +644,25 @@ export class WorkerAgent {
             }),
       },
     );
+    /**
+     * 首个事件到来 ⇒ 说明这一轮模型请求**已提交并开始返回**，
+     * 此时才把本轮携带的协调消息标成 `delivered`（内容确已随请求发出）。
+     */
+    const coordinationRequestIdentifier = `worker-turn:${this.options.task.id}:${randomUUID()}`;
+    let hasMarkedCoordinationContextDelivered = false;
     for await (const event of events) {
+      if (
+        !hasMarkedCoordinationContextDelivered &&
+        deliveredCoordinationMessageIdentifiers.length > 0 &&
+        coordinationContextDeliveryPort !== undefined
+      ) {
+        hasMarkedCoordinationContextDelivered = true;
+        await coordinationContextDeliveryPort.markDelivered({
+          recipientId: coordinationRecipientId,
+          messageIdentifiers: deliveredCoordinationMessageIdentifiers,
+          requestIdentifier: coordinationRequestIdentifier,
+        });
+      }
       switch (event.kind) {
         case "textDelta":
           this.outputTextChunks.push(event.deltaText);
