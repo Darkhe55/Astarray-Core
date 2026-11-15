@@ -23,6 +23,13 @@ export interface CoordinationConsumptionStepResult {
   readonly isWakeRequested: boolean;
   /** 未取得租约（他人持有）时为 true，此时**一条都不处理**。 */
   readonly isLeaseUnavailable: boolean;
+  /**
+   * 本次**真正应用**（含 idempotent-replay）的消息标识。
+   *
+   * 存在的唯一理由：调用方需要据此推进**权威任务状态**与 ready set；
+   * 只给出计数无法定位是哪条消息，也就无法在业务侧做可核对的状态迁移。
+   */
+  readonly appliedMessageIdentifiers: readonly string[];
 }
 
 export interface CoordinationMessageConsumerOptions {
@@ -103,6 +110,7 @@ export class CoordinationMessageConsumer {
         blockedMessageCount: 0,
         isWakeRequested: false,
         isLeaseUnavailable: true,
+        appliedMessageIdentifiers: [],
       };
     }
     if (lease.outcome !== "acquired") {
@@ -113,6 +121,7 @@ export class CoordinationMessageConsumer {
         blockedMessageCount: 0,
         isWakeRequested: false,
         isLeaseUnavailable: true,
+        appliedMessageIdentifiers: [],
       };
     }
 
@@ -137,6 +146,8 @@ export class CoordinationMessageConsumer {
     let appliedMessageCount = 0;
     let replayedMessageCount = 0;
     let blockedMessageCount = 0;
+    /** 本次真正应用（含幂等重放）的消息标识：供调用方推进权威任务状态。 */
+    const appliedMessageIdentifiers: string[] = [];
 
     for (const message of targets) {
       /**
@@ -188,6 +199,7 @@ export class CoordinationMessageConsumer {
 
       if (outcome.outcome === "applied") {
         appliedMessageCount += 1;
+        appliedMessageIdentifiers.push(message.messageId);
         await this.retryStore?.recordSuccess({
           partitionKey: input.partitionKey,
           messageIdentifier: message.messageId,
@@ -203,6 +215,7 @@ export class CoordinationMessageConsumer {
       }
       if (outcome.outcome === "idempotent-replay") {
         replayedMessageCount += 1;
+        appliedMessageIdentifiers.push(message.messageId);
         await this.journal.recordApplicationState({
           recipientId: input.recipientId,
           messageId: message.messageId,
@@ -238,6 +251,7 @@ export class CoordinationMessageConsumer {
       blockedMessageCount,
       isWakeRequested: appliedMessageCount > 0 || replayedMessageCount > 0,
       isLeaseUnavailable: false,
+      appliedMessageIdentifiers,
     };
   }
 }

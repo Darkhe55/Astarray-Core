@@ -499,3 +499,38 @@ application-runtime
 
 - 主 Agent（非 Worker）路径的上下文装配统一（审查报告 P2 项，属检查点 4）；
 - COORD 消费器生产调用（检查点 2）。
+
+## 审查报告 P1 第三项：消费入口（2026-11-16，第一步）
+
+### 核实结论（不是照抄报告）
+
+```text
+git grep 'runConsumptionStep' packages/core/src → 只有 coordination-message-consumer.ts 内的方法定义
+```
+
+确认：**生产代码没有任何调用方**。消费步只作用于协调器状态（`stateStore.applyMessage`），
+而**权威任务状态**（任务链）由 `MissionOrchestrator` 在自己的执行循环内推进——
+两者之间**不存在现成 API**，所以"消费 → 权威状态更新 → ready 重算 → 派发"这条链必须新建接缝。
+
+### 已交付：可调用入口 + 应用标识
+
+| 改动 | 位置 |
+|---|---|
+| `runConsumptionStep` 结果新增 `appliedMessageIdentifiers`（只给计数无法定位消息，也就无法核对状态迁移） | `orchestration/coordination-message-consumer.ts` |
+| 新增 `runCoordinationConsumptionOnce()`：跑一次消费步，并把应用标识交给调用方 `onAppliedMessages` | `orchestration/coordination-consumption-runner.ts` |
+| 反例 4 条：无消息不调用钩子 / 有消息交标识 / 租约被占一条不应用 / 钩子抛错须向上抛 | `tests/core/integration/coord01-consumption-runner.test.ts` |
+
+设计约束（写死在模块注释里）：
+
+- 本模块**不自行修改任务状态**，也不持有第二套任务真相；
+- 只有 `appliedMessageIdentifiers.length > 0` 才调用钩子；
+- 钩子抛错**向上抛出**，不静默吞掉"状态没推进"；
+- 消费步只在执行期间持锁（长模型调用/工具执行不得占锁），测试③即按此前提构造。
+
+### 仍未完成（检查点 2 的主体）
+
+- **生产触发**：尚未接到反馈入库通知与启动恢复；
+- **权威任务状态更新**：需要 `MissionOrchestrator` 侧开放"按任务标识推进状态 + 重算 ready set + 触发派发"的钩子（当前不存在）；
+- 崩溃窗口、重复投递、旧执行反馈、跨进程竞争、重复唤醒的端到端验证。
+
+**因此检查点 2 不能标完成**：现在只是把"可调用入口"和"应用标识"准备好，链路仍缺两段。

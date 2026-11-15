@@ -6120,3 +6120,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 经 application-runtime → MainController → MissionOrchestrator → WorkerAgent 全链路接线。
 > 反例 3 条**捕获真实 systemPrompt**，断言正文/来源/任务/待处理标注；delivered 以 `worker-turn:` 请求标识留证。
 > 全量门禁 **798 files / 5299 passed + 3 skipped，exit 0**。
+
+> **COORD 消费入口（2026-11-16，检查点 2 第一步）**
+>
+> 核实：`runConsumptionStep` 仍无生产调用方；消费只改协调器状态，与权威任务链之间无现成 API。
+> 已交付 `runCoordinationConsumptionOnce()` + 消费结果新增 `appliedMessageIdentifiers`，
+> 反例 4 条（含"租约被占一条不应用""钩子抛错向上抛"）。全量门禁 **799 files / 5303 passed，exit 0**。
+> **检查点 2 未完成**：生产触发（入库通知/启动恢复）与权威任务状态更新钩子仍缺。
