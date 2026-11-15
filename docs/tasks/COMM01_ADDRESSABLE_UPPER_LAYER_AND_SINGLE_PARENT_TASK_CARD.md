@@ -680,3 +680,29 @@ COMM-01-02 目前已完成并可交付的部分：
 **剩余断点（下一轮第一件事）**：`application-runtime.ts:1150` 注入守卫，`resolveTask` 用
 `taskStore.readTaskChain(missionIdentifier)` 取任务再按 `taskIdentifier` 定位；
 `defaultSchedulerRecipientId` 仅用于判定回退，不作回复去向。
+
+### 回复路由：装配层注入完成（2026-11-15）
+
+装配顺序核实结果：`taskStore` 在 `application-runtime.ts:1086` 构造，**早于** 邮箱（1150）⇒ 可直接引用，
+不需要惰性闭包（上一轮担心的构造顺序问题不存在）。
+
+| 改动 | 位置 |
+|---|---|
+| 邮箱构造注入守卫 | `application-runtime.ts:1150`（`new MailboxJournal(stateDirectory, { replyRoutingGuard })`） |
+| 任务解析 | `taskStore.readTaskChain(missionIdentifier)` + 按 `taskIdentifier` 定位 |
+| 回退信箱约定 | `scheduler:<missionId>`（与 `worker-agent.ts:913` 现有约定一致） |
+| 装配守卫（防回退） | `tests/architecture/comm-reply-routing-wiring-guard.test.ts`（2 条） |
+
+守卫内容（静态断言，防止以后有人为了"让它能用"把守卫删掉）：
+
+1. 运行时必须以 `new MailboxJournal(stateDirectory, { ... })` 形式构造，且包含
+   `replyRoutingGuard: createInProjectReplyRoutingGuard({`；
+2. 解析任务必须走 `readTaskChain(missionIdentifier)`，**不得**扫全库或按默认对象推断；
+3. 回退信箱按 mission 计算；
+4. 守卫实现自身仍导出且仍调用判定函数与路由解析（防改名胜空转）。
+
+至此 COMM-01 裁决第 1 条（回复走任务原路径）**端到端接通**：
+判定层 → 守卫实现 → 邮箱入库校验 → 装配注入 → 静态守卫。
+
+**仍属边界**：反馈子进程（`feedback-process/entrypoint.ts:239`）自己的 `MailboxJournal` 未注入守卫
+⇒ 子进程侧带回复标记的消息仍为拒绝态。是否要在子进程也注入，取决于子进程能否读到任务链（需评估）。

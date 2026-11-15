@@ -130,6 +130,7 @@ import {
   type ProcessExecutionOwnership,
 } from "../execution/execution-contract.js";
 import { createPlatformSandboxExecutionBackend } from "../execution/platform-sandbox-backend.js";
+import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -1147,7 +1148,24 @@ export async function createApplicationRuntime(
    * 反馈 journal 与反馈子进程共用 `stateDirectory`（子进程以 baseDirectory 初始化），
    * 因此本地协调器读的是同一个 journal；分区键 = 项目 ID + 责任调度 Agent 个体 ID。
    */
-  const coordinationMailboxJournal = new MailboxJournal(stateDirectory);
+  /**
+   * COMM-01（2026-11-15 用户裁决第 1 条）：**项目内回复必须沿原路径返回**。
+   *
+   * 守卫在这里注入：邮箱是项目内唯一写入点，放在这里就不会有"新入口忘记校验"的缝。
+   * `resolveTask` 用任务链存储（按 mission 读，再按 task id 定位）；
+   * `publishedByRecipientId` 缺失 ⇒ 回退判定成立 ⇒ 回复被拒绝（不按默认对象推断）。
+   */
+  const coordinationMailboxJournal = new MailboxJournal(stateDirectory, {
+    replyRoutingGuard: createInProjectReplyRoutingGuard({
+      resolveTask: async ({ missionIdentifier, taskIdentifier }) => {
+        const taskChain = await taskStore.readTaskChain(missionIdentifier);
+        const task = taskChain?.tasks.find((candidate) => candidate.id === taskIdentifier);
+        return task === undefined ? null : task;
+      },
+      defaultSchedulerRecipientIdentifierForMission: (missionIdentifier) =>
+        `scheduler:${missionIdentifier}`,
+    }),
+  });
   const coordinationLeaseStore = new CoordinationPartitionLeaseStore({
     stateDirectory: path.join(stateDirectory, "coordination", "leases"),
     nowUnixMilliseconds: () => Date.now(),

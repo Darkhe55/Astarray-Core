@@ -6055,3 +6055,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 守卫要求 mission+task 才能解析发布者，缺 mission 直接拒绝（不扫全库猜）。
 > 反例增至 7 条；全量门禁 **793 files / 5274 passed + 3 skipped，exit 0**。
 > 剩余：`application-runtime.ts:1150` 注入守卫（用 `taskStore.readTaskChain`）。
+
+> **COMM-01 回复路由装配注入（2026-11-15）**
+>
+> `application-runtime` 已在邮箱构造处注入 `createInProjectReplyRoutingGuard`（`taskStore.readTaskChain` 解析发布者，
+> 回退信箱 `scheduler:<missionId>`），并新增装配静态守卫 2 条防止"为让它能用而删守卫"。
+> 全量门禁首轮出现同文件 3 个失败（`obs01-diag-production-collection`），**隔离重跑 5 条全过、再跑全量全绿**
+> ⇒ 判为抖动。最终 **794 files / 5276 passed + 3 skipped，exit 0**。

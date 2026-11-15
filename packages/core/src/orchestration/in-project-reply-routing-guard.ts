@@ -46,7 +46,13 @@ export function createInProjectReplyRoutingGuard(input: {
     readonly missionIdentifier: string;
     readonly taskIdentifier: string;
   }) => Promise<Pick<TaskDependencyNode, "publishedByRecipientId"> | null>;
-  readonly defaultSchedulerRecipientId: string;
+  /**
+   * 回退信箱**按 mission 计算**（既有约定：`scheduler:<missionId>`）。
+   *
+   * 仅用于 `resolveFeedbackRecipient` 判定"是否发生了回退"；
+   * 回复一旦走到回退就拒绝，因此这个值不会成为回复去向。
+   */
+  readonly defaultSchedulerRecipientIdentifierForMission: (missionIdentifier: string) => string;
 }): (guardInput: {
   readonly message: FeedbackMessage;
   readonly findDeliveredMessage: (
@@ -91,7 +97,8 @@ export function createInProjectReplyRoutingGuard(input: {
     const route = resolveFeedbackRecipient({
       /** 只需发布者字段；其余字段不参与"反馈去向"判定。 */
       task: task as unknown as TaskDependencyNode,
-      defaultSchedulerRecipientId: input.defaultSchedulerRecipientId,
+      defaultSchedulerRecipientId:
+        input.defaultSchedulerRecipientIdentifierForMission(missionIdentifier),
     });
     /**
      * 回复**不接受回退**：回退意味着"任务没记发布者，就投给默认对象"，

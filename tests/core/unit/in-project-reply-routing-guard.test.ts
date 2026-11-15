@@ -43,7 +43,7 @@ describe("项目内回复守卫默认实现", () => {
   it("① 任务记录了发布者 + 收件人即发布者 ⇒ 放行", async () => {
     const guard = createInProjectReplyRoutingGuard({
       resolveTask: async () => ({ publishedByRecipientId: "dispatcher-1" }),
-      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+      defaultSchedulerRecipientIdentifierForMission: () => DEFAULT_SCHEDULER,
     });
     await expect(
       guard({ message: buildMessage(), findDeliveredMessage: async () => originalMessage() }),
@@ -53,7 +53,7 @@ describe("项目内回复守卫默认实现", () => {
   it("② 任务未记录发布者 ⇒ **拒绝**（回退对回复不成立）", async () => {
     const guard = createInProjectReplyRoutingGuard({
       resolveTask: async () => ({ publishedByRecipientId: null }),
-      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+      defaultSchedulerRecipientIdentifierForMission: () => DEFAULT_SCHEDULER,
     });
     await expect(
       guard({ message: buildMessage(), findDeliveredMessage: async () => originalMessage() }),
@@ -63,7 +63,7 @@ describe("项目内回复守卫默认实现", () => {
   it("③ 找不到任务 ⇒ 拒绝", async () => {
     const guard = createInProjectReplyRoutingGuard({
       resolveTask: async () => null,
-      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+      defaultSchedulerRecipientIdentifierForMission: () => DEFAULT_SCHEDULER,
     });
     await expect(
       guard({ message: buildMessage(), findDeliveredMessage: async () => originalMessage() }),
@@ -73,7 +73,7 @@ describe("项目内回复守卫默认实现", () => {
   it("④ 原消息不存在 ⇒ 拒绝", async () => {
     const guard = createInProjectReplyRoutingGuard({
       resolveTask: async () => ({ publishedByRecipientId: "dispatcher-1" }),
-      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+      defaultSchedulerRecipientIdentifierForMission: () => DEFAULT_SCHEDULER,
     });
     await expect(
       guard({ message: buildMessage(), findDeliveredMessage: async () => null }),
@@ -83,7 +83,7 @@ describe("项目内回复守卫默认实现", () => {
   it("⑤ 收件人不是原消息发起者 ⇒ 拒绝（不得改投）", async () => {
     const guard = createInProjectReplyRoutingGuard({
       resolveTask: async () => ({ publishedByRecipientId: "dispatcher-1" }),
-      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+      defaultSchedulerRecipientIdentifierForMission: () => DEFAULT_SCHEDULER,
     });
     await expect(
       guard({
@@ -96,7 +96,7 @@ describe("项目内回复守卫默认实现", () => {
   it("⑥ 缺少 mission 标识 ⇒ 拒绝（无法定位任务链）", async () => {
     const guard = createInProjectReplyRoutingGuard({
       resolveTask: async () => ({ publishedByRecipientId: "dispatcher-1" }),
-      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+      defaultSchedulerRecipientIdentifierForMission: () => DEFAULT_SCHEDULER,
     });
     await expect(
       guard({
@@ -110,7 +110,7 @@ describe("项目内回复守卫默认实现", () => {
     const resolveTask = vi.fn(async () => ({ publishedByRecipientId: "dispatcher-1" }));
     const guard = createInProjectReplyRoutingGuard({
       resolveTask,
-      defaultSchedulerRecipientId: DEFAULT_SCHEDULER,
+      defaultSchedulerRecipientIdentifierForMission: () => DEFAULT_SCHEDULER,
     });
     await guard({
       message: buildMessage({ replyToMessageIdentifier: undefined }),
