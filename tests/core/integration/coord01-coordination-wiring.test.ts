@@ -91,20 +91,22 @@ describe("本地协调器装配接线", () => {
         recipientId: "agent:main-agent-1",
         messageId: "message-context-1",
       });
+      /** 审查报告 P1：准入**不等于**投递；这里不得声称 delivered。 */
       expect(injected).toMatchObject({
-        outcome: "injected",
-        isInjected: true,
+        outcome: "admitted",
+        isAdmitted: true,
+        isDelivered: false,
         isResumeRequested: false,
       });
       const [injectedView] = await runtime.readCoordinationMessageStatus("message-context-1");
-      expect(injectedView?.contextDeliveryState).toBe("delivered");
+      expect(injectedView?.contextDeliveryState).toBe("pending");
       expect(injectedView?.applicationState.state).toBe("pending");
 
       const archived = await runtime.admitCoordinationContext({
         recipientId: "agent:main-agent-1",
         messageId: "message-context-2",
       });
-      expect(archived).toMatchObject({ outcome: "archived-only", isInjected: false });
+      expect(archived).toMatchObject({ outcome: "archive-only", isAdmitted: false });
       const [archivedView] = await runtime.readCoordinationMessageStatus("message-context-2");
       expect(archivedView?.contextDeliveryState).toBe("not-required");
     } finally {

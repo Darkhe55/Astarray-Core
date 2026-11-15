@@ -60,7 +60,13 @@ describe("上下文准入", () => {
       messageIdentifier: "message-1",
       admissionClass: "requires-model-decision",
     });
-    expect(first).toMatchObject({ outcome: "injected", isInjected: true, isResumeRequested: false });
+    /** 审查报告 P1：准入只记 admitted，**恒不声称已投递**。 */
+    expect(first).toMatchObject({
+      outcome: "admitted",
+      isAdmitted: true,
+      isDelivered: false,
+      isResumeRequested: false,
+    });
 
     const second = await controller.admit({
       partitionKey,
@@ -68,8 +74,8 @@ describe("上下文准入", () => {
       messageIdentifier: "message-1",
       admissionClass: "requires-model-decision",
     });
-    expect(second.outcome).toBe("duplicate-injection-ignored");
-    expect(second.isInjected).toBe(false);
+    expect(second.outcome).toBe("duplicate-admission-ignored");
+    expect(second.isAdmitted).toBe(false);
   });
 
   it("④ archive-only ⇒ 不注入、不请求续跑", async () => {
@@ -80,7 +86,12 @@ describe("上下文准入", () => {
       messageIdentifier: "message-2",
       admissionClass: "archive-only",
     });
-    expect(result).toMatchObject({ outcome: "archived-only", isInjected: false, isResumeRequested: false });
+    expect(result).toMatchObject({
+      outcome: "archive-only",
+      isAdmitted: false,
+      isDelivered: false,
+      isResumeRequested: false,
+    });
     expect(
       await controller.readInjectionReceipt({ partitionKey, messageIdentifier: "message-2" }),
     ).toBeNull();
@@ -116,5 +127,93 @@ describe("上下文准入", () => {
       (await controller.readInjectionReceipt({ partitionKey, messageIdentifier: "message-3" }))
         ?.messageIdentifier,
     ).toBe("message-3");
+  });
+});
+
+describe("准入 ≠ 投递（审查报告 P1 修正，2026-11-16）", () => {
+  it("⑥ 准入后回执 deliveredAtIso 为 null（不得凭准入声称已投递）", async () => {
+    const controller = buildController();
+    await controller.admit({
+      partitionKey,
+      recipientIdentifier: "agent:main",
+      messageIdentifier: "message-delivery-1",
+      admissionClass: "requires-model-decision",
+    });
+    const receipt = await controller.readInjectionReceipt({
+      partitionKey,
+      messageIdentifier: "message-delivery-1",
+    });
+    expect(receipt?.deliveredAtIso).toBeNull();
+    expect(receipt?.deliveryRequestIdentifier).toBeNull();
+    expect(receipt?.admissionClass).toBe("requires-model-decision");
+  });
+
+  it("⑦ 未准入就记录投递 ⇒ not-admitted（不能凭空产生投递回执）", async () => {
+    const controller = buildController();
+    const result = await controller.recordDelivered({
+      partitionKey,
+      messageIdentifier: "never-admitted",
+      requestIdentifier: "request-1",
+    });
+    expect(result.outcome).toBe("not-admitted");
+    expect(result.receipt).toBeNull();
+  });
+
+  it("⑧ 真实请求携带后才记 delivered，并保存请求标识作为证据", async () => {
+    const controller = buildController();
+    await controller.admit({
+      partitionKey,
+      recipientIdentifier: "agent:main",
+      messageIdentifier: "message-delivery-2",
+      admissionClass: "requires-model-decision",
+    });
+    const delivered = await controller.recordDelivered({
+      partitionKey,
+      messageIdentifier: "message-delivery-2",
+      requestIdentifier: "request-42",
+      deliveredAtIso: "2026-11-16T01:00:00.000Z",
+    });
+    expect(delivered.outcome).toBe("delivered");
+    expect(delivered.receipt?.deliveredAtIso).toBe("2026-11-16T01:00:00.000Z");
+    expect(delivered.receipt?.deliveryRequestIdentifier).toBe("request-42");
+  });
+
+  it("⑨ 缺 requestIdentifier ⇒ 抛错（投递证据不可缺失）", async () => {
+    const controller = buildController();
+    await controller.admit({
+      partitionKey,
+      recipientIdentifier: "agent:main",
+      messageIdentifier: "message-delivery-3",
+      admissionClass: "requires-model-decision",
+    });
+    await expect(
+      controller.recordDelivered({
+        partitionKey,
+        messageIdentifier: "message-delivery-3",
+        requestIdentifier: "   ",
+      }),
+    ).rejects.toThrow(/requestIdentifier/u);
+  });
+
+  it("⑩ 重复记录投递 ⇒ already-delivered，且保留首次证据（不覆盖）", async () => {
+    const controller = buildController();
+    await controller.admit({
+      partitionKey,
+      recipientIdentifier: "agent:main",
+      messageIdentifier: "message-delivery-4",
+      admissionClass: "requires-model-decision",
+    });
+    await controller.recordDelivered({
+      partitionKey,
+      messageIdentifier: "message-delivery-4",
+      requestIdentifier: "request-first",
+    });
+    const second = await controller.recordDelivered({
+      partitionKey,
+      messageIdentifier: "message-delivery-4",
+      requestIdentifier: "request-second",
+    });
+    expect(second.outcome).toBe("already-delivered");
+    expect(second.receipt?.deliveryRequestIdentifier).toBe("request-first");
   });
 });

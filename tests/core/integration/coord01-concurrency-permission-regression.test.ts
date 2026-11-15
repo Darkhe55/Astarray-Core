@@ -195,6 +195,11 @@ describe("权限回归", () => {
       messageIdentifier: "message-info",
       admissionClass: "archive-only",
     });
-    expect(result).toMatchObject({ outcome: "archived-only", isInjected: false, isResumeRequested: false });
+    expect(result).toMatchObject({
+      outcome: "archive-only",
+      isAdmitted: false,
+      isDelivered: false,
+      isResumeRequested: false,
+    });
   });
 });

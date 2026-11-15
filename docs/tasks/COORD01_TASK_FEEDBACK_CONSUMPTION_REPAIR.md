@@ -434,3 +434,28 @@ tarball（`npm pack --ignore-scripts`）→ 隔离目录 `npm install` → 只 i
 | tarball 隔离验证 | ✅ `coord01-package: ok` |
 
 ⇒ COORD-01-04 **implemented-unverified**（无人工验收）。COORD-01 四个检查点至此全部有生产接线与自动化证据。
+
+## 审查报告 P1 修正（2026-11-16）：准入 ≠ 投递（第一步）
+
+审查报告 `docs/reports/ARCHIVE_AND_WIRING_REVIEW_2026-11-16.md` 指出：
+`context-admission.admit` 只写消息 ID/接收者/时间就返回 `injected`，
+`application-runtime.admitCoordinationContext` 据此把 journal 写成 `contextDeliveryState = delivered`，
+但消息正文从未进入任何模型请求——"已投递"是假的。
+
+### 已修（本步）
+
+| 改动 | 位置 |
+|---|---|
+| `admit()` 改为**只记准入**，恒返回 `isDelivered: false`，不再声称注入 | `orchestration/context-admission.ts` |
+| 新增 `recordDelivered()`：必须有 `requestIdentifier` 证据，且准入回执存在 | 同上 |
+| 回执结构新增 `admissionClass` / `deliveredAtIso` / `deliveryRequestIdentifier` | 同上 |
+| 运行时准入只写 `contextDeliveryState = "pending"`（不再写 delivered） | `application/application-runtime.ts` |
+| 反例 10 条（含"准入后 deliveredAtIso 为 null""未准入不得记录投递""缺证据抛错""重复投递保留首次证据"） | `tests/core/unit/coord01-context-admission.test.ts` |
+| 集成断言改为 `pending`（原断言写死 delivered，属把缺陷当契约） | `tests/core/integration/coord01-coordination-wiring.test.ts`、`coord01-concurrency-permission-regression.test.ts` |
+
+### 仍未完成（本检查点第二步）
+
+- **把准入消息接进既有上下文装配/安全点投递路径**，使真实模型请求携带其正文；
+- 请求成功后调用 `recordDelivered({requestIdentifier})` 并写 `delivered`；
+- 反例需**捕获实际模型请求**，断言正文、来源、目标个体与版本，而非只断言状态字段；
+- 在完成前，`contextDeliveryState` 对需要模型处理的消息会停在 `pending`——这是**如实状态**，不是回归。

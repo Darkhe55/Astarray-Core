@@ -4,9 +4,16 @@
  * 卡内要点：
  * - 控制器只把**确需模型处理**的内容放入既有安全点/上下文准入接口，**不整包复制**反馈日志；
  * - 普通报告（information 类）只归档，**不隐式启动续跑**、不自动唤醒主 Agent；
- * - 幂等应用状态与**上下文注入回执分开维护**（本模块只记注入回执，绝不写应用状态）。
+ * - 幂等应用状态与**上下文注入回执分开维护**（本模块只记准入/投递回执，绝不写应用状态）。
+ *
+ * 2026-11-16 修正（审查报告 P1）：**准入 ≠ 投递**。
+ * 旧实现 `admit()` 只写消息 ID/接收者/时间就返回 `injected`，调用方据此把 journal 写成 `delivered`，
+ * 但消息正文从未进入任何模型请求——"已投递"是假的。
+ * 现在拆成两个动作：
+ * 1. `admit()`：只记**准入**（这一类消息需要模型处理），**恒不声称已投递**；
+ * 2. `recordDelivered()`：只有在**某次真实模型请求已携带该消息正文**之后才能调用，
+ *    并必须给出 `requestIdentifier` 作为证据。
  */
-
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -17,9 +24,14 @@ export type ContextAdmissionClass = "requires-model-decision" | "archive-only";
 export interface ContextInjectionReceipt {
   readonly messageIdentifier: string;
   readonly recipientIdentifier: string;
+  readonly admissionClass: ContextAdmissionClass;
   readonly admittedAtIso: string;
   /** 注入**不等于**要求模型续跑：此处固定 false，续跑必须由调度决定。 */
   readonly isResumeRequested: false;
+  /** 实际投递时间（模型请求携带该内容之后才非 null）。 */
+  readonly deliveredAtIso: string | null;
+  /** 携带该内容的请求标识（投递证据；未投递为 null）。 */
+  readonly deliveryRequestIdentifier: string | null;
 }
 
 interface ContextInjectionDocument {
@@ -54,7 +66,7 @@ export interface ContextAdmissionControllerOptions {
 }
 
 function sanitizeFileName(partitionKey: string): string {
-  return partitionKey.replace(/[^a-zA-Z0-9._-]/gu, "_");
+  return partitionKey.replace(/[^A-Za-z0-9._-]/gu, "_");
 }
 
 export class ContextAdmissionController {
@@ -83,10 +95,10 @@ export class ContextAdmissionController {
   }
 
   /**
-   * 尝试把消息放进模型上下文。
+   * 记录**准入**（不改口头承诺"已投递"）。
    *
-   * - `archive-only` ⇒ 不进上下文、**不请求续跑**；
-   * - 需要模型决策 ⇒ 注入一次并记回执；重复注入 ⇒ `duplicate-injection-ignored`。
+   * - `archive-only` ⇒ 只归档（不进入任何上下文队列）；
+   * - 需要模型决策 ⇒ 记一条准入回执；重复准入只记一次。
    */
   async admit(input: {
     partitionKey: string;
@@ -94,18 +106,26 @@ export class ContextAdmissionController {
     messageIdentifier: string;
     admissionClass: ContextAdmissionClass;
   }): Promise<{
-    outcome: "injected" | "archived-only" | "duplicate-injection-ignored";
-    isInjected: boolean;
+    outcome: "admitted" | "archive-only" | "duplicate-admission-ignored";
+    isAdmitted: boolean;
+    /** 准入阶段恒为 false：投递要等真实模型请求携带该内容。 */
+    isDelivered: false;
     isResumeRequested: false;
   }> {
     if (input.admissionClass === "archive-only") {
-      return { outcome: "archived-only", isInjected: false, isResumeRequested: false };
+      return {
+        outcome: "archive-only",
+        isAdmitted: false,
+        isDelivered: false,
+        isResumeRequested: false,
+      };
     }
     const document = await this.loadDocument(input.partitionKey);
     if (document.receipts.some((receipt) => receipt.messageIdentifier === input.messageIdentifier)) {
       return {
-        outcome: "duplicate-injection-ignored",
-        isInjected: false,
+        outcome: "duplicate-admission-ignored",
+        isAdmitted: false,
+        isDelivered: false,
         isResumeRequested: false,
       };
     }
@@ -116,15 +136,64 @@ export class ContextAdmissionController {
         {
           messageIdentifier: input.messageIdentifier,
           recipientIdentifier: input.recipientIdentifier,
+          admissionClass: input.admissionClass,
           admittedAtIso: new Date(this.nowUnixMilliseconds()).toISOString(),
           isResumeRequested: false,
+          deliveredAtIso: null,
+          deliveryRequestIdentifier: null,
         },
       ],
     });
-    return { outcome: "injected", isInjected: true, isResumeRequested: false };
+    return {
+      outcome: "admitted",
+      isAdmitted: true,
+      isDelivered: false,
+      isResumeRequested: false,
+    };
   }
 
-  /** 只读查询：该消息是否已注入过上下文（与 journal 的应用状态互相独立）。 */
+  /**
+   * 记录**实际投递**：必须在某次模型请求确实携带该消息正文之后调用。
+   *
+   * `requestIdentifier` 是证据：没有它就无法区分"真的带上了"与"只是记了账"。
+   */
+  async recordDelivered(input: {
+    partitionKey: string;
+    messageIdentifier: string;
+    requestIdentifier: string;
+    deliveredAtIso?: string;
+  }): Promise<{
+    outcome: "delivered" | "not-admitted" | "already-delivered";
+    receipt: ContextInjectionReceipt | null;
+  }> {
+    if (input.requestIdentifier.trim() === "") {
+      throw new Error("记录投递必须给出 requestIdentifier（投递证据不可缺失）");
+    }
+    const document = await this.loadDocument(input.partitionKey);
+    const target = document.receipts.find(
+      (receipt) => receipt.messageIdentifier === input.messageIdentifier,
+    );
+    if (target === undefined) {
+      return { outcome: "not-admitted", receipt: null };
+    }
+    if (target.deliveredAtIso !== null) {
+      return { outcome: "already-delivered", receipt: target };
+    }
+    const deliveredReceipt: ContextInjectionReceipt = {
+      ...target,
+      deliveredAtIso: input.deliveredAtIso ?? new Date(this.nowUnixMilliseconds()).toISOString(),
+      deliveryRequestIdentifier: input.requestIdentifier,
+    };
+    await this.saveDocument({
+      ...document,
+      receipts: document.receipts.map((receipt) =>
+        receipt.messageIdentifier === input.messageIdentifier ? deliveredReceipt : receipt,
+      ),
+    });
+    return { outcome: "delivered", receipt: deliveredReceipt };
+  }
+
+  /** 只读查询：该消息的准入/投递回执（与 journal 的应用状态互相独立）。 */
   async readInjectionReceipt(input: {
     partitionKey: string;
     messageIdentifier: string;

@@ -6105,3 +6105,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **先判顺序**：messageId（重放，静默去重+次数）**先于** idempotencyKey（幂等，同键异内容拒绝）——
 > 反过来会让普通重发被幂等短路、次数恒为 1，裁决失效。同 id 异内容按内容摘要拒绝。
 > 反例 5 条 + 装配守卫 1 条；全量门禁 **797 files / 5291 passed + 3 skipped，exit 0**。
+
+> **COORD 上下文投递语义修正第一步（2026-11-16，审查报告 P1）**
+>
+> `admit()` 不再声称注入：只记准入（`isDelivered: false`），新增 `recordDelivered()` 需带 `requestIdentifier` 证据；
+> 运行时准入写 `contextDeliveryState = "pending"` 而不再写 `delivered`。
+> 反例 10 条 + 两处集成断言纠正（原先写死 delivered 等于把缺陷当契约）。
+> 全量门禁 **797 files / 5296 passed + 3 skipped，exit 0**。
+> **第二步未做**：把准入消息接入实际模型请求装配，请求携带正文后才记 delivered。

@@ -326,8 +326,10 @@ export interface ApplicationRuntime {
   /** COORD-01-03 §5：上下文准入（只放"确需模型处理"的内容进上下文）。 */
   contextAdmissionController: ContextAdmissionController;
   admitCoordinationContext: (input: { recipientId: string; messageId: string }) => Promise<{
-    outcome: "injected" | "archived-only" | "duplicate-injection-ignored" | "message-not-found";
-    isInjected: boolean;
+    outcome: "admitted" | "archive-only" | "duplicate-admission-ignored" | "message-not-found";
+    isAdmitted: boolean;
+    /** 准入阶段恒为 false：真实投递需由"请求确实携带正文"确认（审查报告 P1）。 */
+    isDelivered: false;
     isResumeRequested: false;
   }>;
   /**
@@ -1210,14 +1212,21 @@ export async function createApplicationRuntime(
     recipientId: string;
     messageId: string;
   }): Promise<{
-    outcome: "injected" | "archived-only" | "duplicate-injection-ignored" | "message-not-found";
-    isInjected: boolean;
+    outcome: "admitted" | "archive-only" | "duplicate-admission-ignored" | "message-not-found";
+    isAdmitted: boolean;
+    /** 准入阶段恒为 false：真实投递要等某次模型请求确实携带该消息正文（见审查报告 P1 修正）。 */
+    isDelivered: false;
     isResumeRequested: false;
   }> => {
     const document = await coordinationMailboxJournal.loadDocument(input.recipientId);
     const message = document?.messages.find((candidate) => candidate.messageId === input.messageId);
     if (message === undefined) {
-      return { outcome: "message-not-found", isInjected: false, isResumeRequested: false };
+      return {
+        outcome: "message-not-found",
+        isAdmitted: false,
+        isDelivered: false,
+        isResumeRequested: false,
+      };
     }
     const admissionClass = classifyContextAdmission({
       payload: message.payload as {
@@ -1232,11 +1241,16 @@ export async function createApplicationRuntime(
       messageIdentifier: input.messageId,
       admissionClass,
     });
-    if (admission.isInjected) {
+    if (admission.isAdmitted) {
+      /**
+       * 审查报告 P1：**准入只记 `pending`**。
+       * `delivered` 必须由"某次真实模型请求携带该正文"之后确认；
+       * 只写消息 ID/接收者/时间不能算投递。
+       */
       await coordinationMailboxJournal.setContextDeliveryState({
         recipientId: input.recipientId,
         messageId: input.messageId,
-        contextDeliveryState: "delivered",
+        contextDeliveryState: "pending",
       });
     }
     return admission;
