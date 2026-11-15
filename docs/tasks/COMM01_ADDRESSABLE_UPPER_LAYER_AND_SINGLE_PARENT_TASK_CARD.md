@@ -760,10 +760,9 @@ COMM-01-02 目前已完成并可交付的部分：
 | 落盘包含 mission 与回复指向（缺省不写，保持旧文件形状） | `orchestration/collaboration-outbox-transport.ts` |
 | 反例 4 条（含幂等未回归） | `tests/core/unit/collaboration-outbox-transport-fields.test.ts` |
 
-**仍未完成（需在消费侧确认）**：outbox 文件的**读取方不在公开仓库**
-（`git grep COLLABORATION_OUTBOX_SCHEMA_VERSION` 只有写入侧）。因此：
-写入侧已保证字段落盘，读取侧（若存在）必须把这两个字段解析并透传，否则标记仍会在消费时丢失。
-下一轮动作：在消费侧（私有 UI 仓库或后续接入的读取实现）核对解析字段列表。
+**已澄清（2026-11-16 复核，见下节「接口分层」）**：outbox 文件是**跨进程交付产物**，
+仓内没有读取方是设计而非缺口；落盘修复保证了任何消费方都能拿到这两个字段。
+此前"读取侧需同步解析"的表述已作废——那不是待办，而是消费方实现时的责任。
 
 ### outbox 读取方核对结果（2026-11-16）
 
@@ -784,3 +783,41 @@ COMM-01-02 目前已完成并可交付的部分：
 
 **下一轮建议（若继续此线）**：要么为 outbox 增加带字段解析的读取入口并补往返用例（会引入暂无生产消费者的 API，需先确认是否值得），
 要么把这条链标记为"写侧已闭合、读侧待消费者出现时再核对"，转去其它可编码项。
+
+### 接口分层：协作消息链（2026-11-16，避免把端口实现当"孤儿接口"）
+
+有同事（或未来的模型）看到 `CollaborationOutboxTransport` 只有 `send()`、仓内没有读取方，
+容易判断成"孤立的半成品接口"。实际是**四层分工**，每一层都有对应接口：
+
+| 层 | 接口/类 | 位置 | 职责 |
+|---|---|---|---|
+| 收件箱（读侧） | `CollaborationInbox` / `CollaborationInboxStore` | `orchestration/collaboration-inbox.ts`、`collaboration-inbox-store.ts` | 持久化消息队列；`enqueue` 入箱，`markDelivered/Processed/Completed` 迁移状态 |
+| 投递编排 | `CollaborationInboxDeliveryService` | `orchestration/collaboration-inbox-delivery.ts` | 取 pending → 调传输端口 → 按结果更新状态与重试 |
+| **传输端口（契约）** | `CollaborationInboxTransportPort` | 同上文件 | 只有 `send()`：端口的职责是"交出去"，**不负责读回** |
+| 传输实现（本地文件） | `CollaborationOutboxTransport` | `orchestration/collaboration-outbox-transport.ts` | 写 `<base>/collaboration/outbox/<recipient>/<id>.json`（原子写、幂等） |
+
+CLI 侧已接通两条命令（`packages/tui/src/cli/inbox-command.ts`）：
+
+- `inbox list`：读收件箱（状态过滤）；
+- `inbox deliver`：从收件箱取该收件人的 pending 消息，经 outbox 写出（**入队 ≠ 收件人已处理**）。
+
+### 为什么 outbox "只写不读"是设计
+
+`collaboration-outbox-transport.ts` 头注释原文：
+
+> 本地文件队列投递适配器（用户允许新增 `inbox deliver`）。
+> 用途：在没有真实 IPC 的开发/演示环境里，端到端验证投递语义……
+> 写入成功 = `delivered`（**交给下游消费者读取后删除**）。
+
+即：**那是跨进程交付边界**，消费者在进程外（另一个 agent 运行时或后续接入）。仓库内没有它，不是遗漏。
+
+### 字段往返核对（与 outbox 丢字段事故对照）
+
+| 路径 | 处理方式 | 会否丢新字段 |
+|---|---|---|
+| 收件箱快照还原 | `collaboration-inbox-store.ts:251` 用 `...message` 展开后归一旧字段 | **不会**（未知字段随展开保留） |
+| 收件箱入箱构造 | `collaboration-inbox.ts` 显式写入 mission/回复指向 | 已补 |
+| **outbox 落盘** | 原先**固定字段列表** | **会丢** → 2026-11-15 已修 |
+| outbox 读取 | 仓内不存在（消费方实现） | 不适用；消费方需解析这两字段 |
+
+结论：仓内唯一的丢字段缺陷在 outbox 写入侧，已修复并有反例；收件箱侧不存在同类问题。

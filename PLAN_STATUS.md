@@ -6089,3 +6089,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 核对结论：协作 outbox **没有任何读取方**（公开库只有写入侧；私有库无命中）。
 > 因此上一轮落盘修复已闭合写侧，读侧"无对象可改"；outbox→消费方往返仍无测试覆盖（因无消费者）。
 > 上一轮因网络失败的提交已于本轮推送成功（`ahead=0`）。
+
+> **COMM-01 接口分层写入卡内（2026-11-16）**
+>
+> 澄清 `CollaborationOutboxTransport` 不是孤儿接口：收件箱（`CollaborationInbox`/Store）→
+> 投递编排（`CollaborationInboxDeliveryService`）→ 传输端口（`CollaborationInboxTransportPort.send`）→
+> 本地文件实现（outbox，跨进程交付边界，消费者在仓外）。CLI 已有 `inbox list` / `inbox deliver`。
+> 并对照核对字段往返：收件箱用 `...message` 展开不丢字段；唯一丢字段点是 outbox 写入（已修）。
+> 此前"读取侧需同步解析"的表述已作废。
