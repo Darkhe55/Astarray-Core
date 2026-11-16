@@ -139,7 +139,10 @@ import {
 } from "../orchestration/coordination-consumption-runner.js";
 import { CoordinationTaskApplicationLedger } from "../orchestration/coordination-task-application-ledger.js";
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
-import { evaluateCoordinationCompletion } from "../orchestration/coordination-completion-gate.js";
+import {
+  evaluateCoordinationCompletion,
+  resolveReviewStateForCoordination,
+} from "../orchestration/coordination-completion-gate.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -4932,6 +4935,10 @@ const controller = new MainController({
       const missionSummary = await missionManager
         .readSummary(input.missionIdentifier)
         .catch(() => null);
+      /** P1-2：审查状态取**权威裁决存储**，不靠任务类型猜测。 */
+      const storedCompletionVerdict = await completionVerdictStore
+        .read(input.missionIdentifier, coordinationTaskIdentifier)
+        .catch(() => null);
       const completionDecision = evaluateCoordinationCompletion({
         outcome: coordinationTaskStatus,
         sourceAgentInstanceIdentifier:
@@ -4956,7 +4963,10 @@ const controller = new MainController({
          * 注意（如实记录）：这里**尚未**读取完成裁决存储，
          * 因此"已有返修/通过结论"的覆盖保护只在裁决接入后完全生效。
          */
-        reviewState: coordinationTask?.taskType === "review" ? "pending" : "none",
+        reviewState: resolveReviewStateForCoordination({
+          verdict: storedCompletionVerdict?.verdict ?? null,
+          taskType: coordinationTask?.taskType ?? null,
+        }),
       });
       if (!completionDecision.isAccepted) {
         /**

@@ -805,3 +805,22 @@ runStartupRecovery
 3. 因此本步只做到"**堵住绕过**"，没有做到"两条路径共用一套门禁"。
 
 全量门禁：**807 files / 5341 passed + 3 skipped，exit 0**（`graph-change-deterministic-drill` 抖动一次，隔离重跑 3/3）。
+
+### P1-2 补强（2026-11-17 第二轮）：审查状态改为读权威裁决
+
+上一轮遗留的缺口之一：审查状态只按 `taskType === "review"` 猜，**没读完成裁决存储**，
+导致"已有返修/通过结论被协调 success 覆盖"的保护形同虚设。
+
+| 改动 | 位置 |
+|---|---|
+| 新增 `resolveReviewStateForCoordination`：`accepted` ⇒ accepted，`rejected` ⇒ rework，无裁决 ⇒ 审查型 pending / 其它 none | `orchestration/coordination-completion-gate.ts` |
+| 运行时在门禁前读取 `completionVerdictStore.read(mission, task)` | `application/application-runtime.ts` |
+| 补例 3 条（裁决映射、无裁决默认、已返修仍被拒） | `tests/core/unit/coordination-completion-gate.test.ts` |
+
+现状：协调入口**不会**把已返修/已通过的任务改判；返修中的任务收到 success 仍被拒。
+
+**仍未完成（不虚报）**：Worker 收口路径与协调入口**仍是两套校验**
+（Worker 走 `evaluateCompletionReceipt`，协调入口走本门禁）。
+"同一套权威完成校验"这一条要求尚未达成。
+
+全量门禁：**807 files / 5344 passed + 3 skipped，exit 0**。

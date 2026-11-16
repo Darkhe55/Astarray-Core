@@ -94,3 +94,33 @@ describe("协调完成门禁", () => {
     expect(decision.isAccepted).toBe(true);
   });
 });
+
+describe("审查状态解析（读权威裁决）", () => {
+  it("⑩ 已通过 ⇒ accepted；已拒绝 ⇒ rework（协调入口不得覆盖）", async () => {
+    const { resolveReviewStateForCoordination } = await import(
+      "../../../packages/core/src/orchestration/coordination-completion-gate.js"
+    );
+    expect(resolveReviewStateForCoordination({ verdict: "accepted", taskType: "data" })).toBe(
+      "accepted",
+    );
+    expect(resolveReviewStateForCoordination({ verdict: "rejected", taskType: "data" })).toBe(
+      "rework",
+    );
+  });
+
+  it("⑪ 无裁决：审查型任务 => pending；普通任务 => none", async () => {
+    const { resolveReviewStateForCoordination } = await import(
+      "../../../packages/core/src/orchestration/coordination-completion-gate.js"
+    );
+    expect(resolveReviewStateForCoordination({ verdict: null, taskType: "review" })).toBe("pending");
+    expect(resolveReviewStateForCoordination({ verdict: null, taskType: "data" })).toBe("none");
+  });
+
+  it("⑫ 已拒绝的任务，再来协调 success ⇒ 仍被拒（返修不得被覆盖）", async () => {
+    const decision = evaluateCoordinationCompletion(
+      buildInput({ reviewState: "rework", completionReceiptIdentifier: "receipt-1" }),
+    );
+    expect(decision.isAccepted).toBe(false);
+    expect(decision.code).toBe("review-already-decided");
+  });
+});

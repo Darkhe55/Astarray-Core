@@ -6214,3 +6214,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 任务 running、审查状态、必须带完成收据），拒绝时记 blocked 并抛 `coordination-completion-rejected`。
 > 反例 9 条；全量门禁 **807 files / 5341 passed，exit 0**。
 > 未完成：审查状态尚未读裁决存储；与 Worker 路径的"同一套校验"未合并。
+
+> **P1-2 补强（2026-11-17）**
+>
+> 审查状态改读权威裁决存储（accepted/rejected），协调入口不再可能覆盖已返修/已通过的任务。
+> 补例 3 条；全量门禁 **807 files / 5344 passed，exit 0**。
+> 仍未完成：Worker 路径与协调入口尚未共用同一套完成校验。

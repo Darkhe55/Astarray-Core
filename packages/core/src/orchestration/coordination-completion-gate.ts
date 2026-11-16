@@ -102,6 +102,26 @@ export function evaluateCoordinationCompletion(input: {
   return accept("带完成收据且受派来源一致：允许推进执行状态（验收仍由独立审查决定）");
 }
 
+/**
+ * 审查状态解析（P1-2 补充，2026-11-17）。
+ *
+ * 必须读**权威裁决存储**，不能只看任务类型：
+ * - 已记录 `accepted` ⇒ 通过；`rejected` ⇒ 返修；
+ * - 无裁决：审查型任务视为"审查中"，其它任务视为"未进入审查"。
+ */
+export function resolveReviewStateForCoordination(input: {
+  readonly verdict: "accepted" | "rejected" | null;
+  readonly taskType: string | null | undefined;
+}): "none" | "pending" | "rework" | "accepted" {
+  if (input.verdict === "accepted") {
+    return "accepted";
+  }
+  if (input.verdict === "rejected") {
+    return "rework";
+  }
+  return input.taskType === "review" ? "pending" : "none";
+}
+
 function reject(code: CoordinationCompletionCode, reason: string): CoordinationCompletionDecision {
   return { code, isAccepted: false, reason };
 }
