@@ -6155,3 +6155,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 因此新增 `MissionOrchestrator.completeTaskByTaskIdentifier`，运行时按"运行中 ⇒ 打调度器；未运行 ⇒ 写任务链"路由。
 > 同时修正：反馈载荷**不存在** `kind: "blocked"`，阻塞由 `blockTaskForHumanDecision` 判定，死分支已删并加守卫。
 > 全量门禁 **801 files / 5317 passed，exit 0**。
+
+> **COORD 检查点 2 收尾（2026-11-16）**
+>
+> 并发反例抓到真实缺陷：`tryAcquire` 是"读→判断→写"的 TOCTOU，两个实例可同时抢到租约并重复应用。
+> 修复：租约写入后回读校验（+5ms 让出）；应用前复查阅应用状态；幂等重放不再触发下游。
+> 反例 3 条连续 8 次全绿；全量门禁 **802 files / 5320 passed，exit 0**。
+> 局限已写入卡内：5ms 是缓解非证明；真进程用例未做。

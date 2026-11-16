@@ -129,6 +129,31 @@ export class CoordinationPartitionLeaseStore {
       fencingToken,
       expiresAtUnixMilliseconds,
     });
+    /**
+     * 2026-11-16（并发反例暴露）：**写入后回读校验**。
+     *
+     * "读 → 判断无主 → 写" 不是原子操作：两个进程可能同时读到无主并各自写入，
+     * 随后都认为自己是持有者（真实用例里表现为同一条消息被应用两次）。
+     * 这里以**最终落盘者**为准：回读发现持有者或 token 不是自己 ⇒ 判 `held-by-other`。
+     */
+    /**
+     * 让并发写者的落盘有机会完成：写→读之间若另一个进程正在写，
+     * 单次回读可能仍读到自己那次写入。这里做**短暂让出后再回读**，
+     * 把"两个进程同时抢到租约"的窗口压到可忽略。
+     */
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const persisted = await this.readLease(input.partitionKey);
+    if (
+      persisted === null ||
+      persisted.ownerInstanceIdentifier !== input.ownerInstanceIdentifier ||
+      persisted.fencingToken !== fencingToken
+    ) {
+      return {
+        outcome: "held-by-other",
+        expiresAtUnixMilliseconds:
+          persisted?.expiresAtUnixMilliseconds ?? expiresAtUnixMilliseconds,
+      };
+    }
     return { outcome: "acquired", fencingToken, expiresAtUnixMilliseconds };
   }
 

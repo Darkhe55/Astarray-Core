@@ -151,6 +151,20 @@ export class CoordinationMessageConsumer {
 
     for (const message of targets) {
       /**
+       * 2026-11-16（并发反例暴露）：**应用前再确认一次应用状态**。
+       *
+       * 两个实例在租约交接的瞬间都可能读到同一批 pending（读到→释放→另一个读到），
+       * 仅靠租约不足以保证"同一条消息只应用一次"。这里以**已落盘的应用状态**为准，
+       * 已 applied 的直接跳过，避免重复产生下游副作用。
+       */
+      const existingApplication = await this.journal.readMessageStatusView({
+        recipientId: input.recipientId,
+        messageId: message.messageId,
+      });
+      if (existingApplication[0]?.applicationState.state === "applied") {
+        continue;
+      }
+      /**
        * COORD-01-03 §3：**要求产物证明的消息**先在本地核对引用版本；
        * 不合格 ⇒ 记 blocked、不应用（不靠模型自述或字段缺失放行）。
        */
@@ -215,7 +229,10 @@ export class CoordinationMessageConsumer {
       }
       if (outcome.outcome === "idempotent-replay") {
         replayedMessageCount += 1;
-        appliedMessageIdentifiers.push(message.messageId);
+        /**
+         * **幂等重放不计入 `appliedMessageIdentifiers`**：
+         * 那一列用于触发下游权威状态更新，重放再触发一次会造成重复副作用。
+         */
         await this.journal.recordApplicationState({
           recipientId: input.recipientId,
           messageId: message.messageId,
