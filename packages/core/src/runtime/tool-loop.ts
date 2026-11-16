@@ -84,6 +84,15 @@ export interface ToolLoopOptions {
    */
   diagnosticEventSink?: ToolLoopDiagnosticFailureSink;
   /**
+   * P1-3（2026-11-17）：**请求已提交**回调。
+   *
+   * 只在"门禁通过且 `runtime.run(...)` 已发起"时调用一次/迭代；
+   * 本地门禁拒绝、请求前取消、构造失败都不会触发（那些不属于"已提交"）。
+   */
+  onRequestSubmitted?: (input: {
+    readonly iterationIndex: number;
+  }) => void | Promise<void>;
+  /**
    * G2（2026-11-08，第 130 轮）：**活锁/循环守卫端口**（可选）。
    *
    * ## 为什么需要它
@@ -437,10 +446,21 @@ export async function runToolLoop(
       ...agentRunInput,
       toolResultMessages: [...conversationMessages],
     };
-    for await (const event of reportProviderFailures(
-      options,
-      options.runtime.run(iterationInput, options.cancellationSignal),
-    )) {
+    /**
+     * P1-3（2026-11-17）：**请求提交证据**。
+     *
+     * 门禁全部通过后才走到这里；`runtime.run(...)` 未同步抛错 ⇒ 请求已发起。
+     * 调用方据此记录"已提交"，而**不是**拿"收到任意首个事件"当提交证据
+     * （本地门禁拒绝时根本不该有事件，事件也可能来自缓存/重放）。
+     */
+    /** 请求前已取消 ⇒ 不构成"已提交"，回调不得触发。 */
+    /** 兼容缺省取消信号（既有调用方可能未传）。 */
+    const isCancelledBeforeRequest = options.cancellationSignal?.aborted === true;
+    const providerEventStream = options.runtime.run(iterationInput, options.cancellationSignal);
+    if (!isCancelledBeforeRequest) {
+      await options.onRequestSubmitted?.({ iterationIndex: iterationCount });
+    }
+    for await (const event of reportProviderFailures(options, providerEventStream)) {
       if (event.kind === "textDelta") {
         assistantTextBuffer.push(event.deltaText);
         push(event);

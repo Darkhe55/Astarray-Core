@@ -68,13 +68,19 @@ function buildWorker(input: {
   journal: MailboxJournal;
   admission: ContextAdmissionController;
   capturedPrompts: string[];
+  /** P1-3：可注入的运行期门禁/自定义 runtime/取消信号，用于"未提交"反例。 */
+  workWindowGate?: (gateInput: { gatePoint: "model" | "tool-execution" }) =>
+    | { kind: "allow"; reason: string }
+    | { kind: "deny"; reason: string };
+  runtime?: unknown;
+  cancellationSignal?: AbortSignal;
 }) {
   const port = createCoordinationContextDeliveryPort({
     journal: input.journal,
     admissionController: input.admission,
     partitionKey: "partition-1",
   });
-  return new WorkerAgent({
+  const workerOptions: Record<string, unknown> = {
     agentInstanceId: "worker-1",
     missionId: "mission-1",
     task: {
@@ -86,23 +92,29 @@ function buildWorker(input: {
       status: "running",
       assignedAgentId: "worker-1",
       resultLocation: null,
-    } as never,
-    runtime: {
-      async *run(runInput: { systemPrompt: string }) {
-        input.capturedPrompts.push(runInput.systemPrompt);
-        yield{ kind: "textDelta", deltaText: "已收到" };
+    },
+    runtime:
+      input.runtime ??
+      {
+        async *run(runInput: { systemPrompt: string }) {
+          input.capturedPrompts.push(runInput.systemPrompt);
+          yield { kind: "textDelta", deltaText: "已收到" };
+        },
       },
-    } as never,
-    toolPort: { execute: async () => ({ kind: "success", callId: "c-1", outputText: "" }) } as never,
-    failureCounter: { recordFailure: () => false, recordSuccess: () => {} } as never,
-    feedbackTransport: {
-      setAgentStatus: () => {},
-      enqueue: async () => 1,
-    } as never,
+    toolPort: { execute: async () => ({ kind: "success", callId: "c-1", outputText: "" }) },
+    failureCounter: { recordFailure: () => false, recordSuccess: () => {} },
+    feedbackTransport: { setAgentStatus: () => {}, enqueue: async () => 1 },
     maxLoopIterations: 2,
     buildPermissionExplanation: () => "why",
     coordinationContextDeliveryPort: port,
-  });
+  };
+  if (input.workWindowGate !== undefined) {
+    workerOptions["workWindowGate"] = input.workWindowGate;
+  }
+  if (input.cancellationSignal !== undefined) {
+    workerOptions["cancellationSignal"] = input.cancellationSignal;
+  }
+  return new WorkerAgent(workerOptions as never);
 }
 
 describe("协调上下文投递（真实请求携带）", () => {
@@ -155,5 +167,68 @@ describe("协调上下文投递（真实请求携带）", () => {
     const worker = buildWorker({ journal, admission, capturedPrompts });
     await worker.run();
     expect(capturedPrompts[0] ?? "").not.toContain("[待处理的协调消息]");
+  });
+});
+describe("P1-3：未提交不得标 delivered", () => {
+  it("④ 工作时段门禁在模型调用前拒绝 ⇒ 保持 pending（不得标 delivered）", async () => {
+    const journal = new MailboxJournal(baseDirectory);
+    const admission = new ContextAdmissionController({ stateDirectory: baseDirectory });
+    await seedAdmittedMessage(journal, admission);
+
+    const worker = buildWorker({
+      journal,
+      admission,
+      capturedPrompts: [],
+      workWindowGate: () => ({ kind: "deny", reason: "工作时段已关闭" }),
+    });
+    await worker.run().catch(() => undefined);
+
+    const [view] = await journal.readMessageStatusView({
+      recipientId: RECIPIENT,
+      messageId: "coord-message-1",
+    });
+    expect(view?.contextDeliveryState).toBe("pending");
+  });
+
+  it("⑤ 请求发起即失败（未收到任何事件）⇒ 记 unknown，不冒充 delivered", async () => {
+    const journal = new MailboxJournal(baseDirectory);
+    const admission = new ContextAdmissionController({ stateDirectory: baseDirectory });
+    await seedAdmittedMessage(journal, admission);
+
+    const worker = buildWorker({
+      journal,
+      admission,
+      capturedPrompts: [],
+      runtime: {
+        // eslint-disable-next-line require-yield
+        async *run() {
+          throw new Error("连接中断：结果未知");
+        },
+      },
+    });
+    await worker.run().catch(() => undefined);
+
+    const [view] = await journal.readMessageStatusView({
+      recipientId: RECIPIENT,
+      messageId: "coord-message-1",
+    });
+    expect(view?.contextDeliveryState).toBe("unknown");
+  });
+
+  it("⑥ 请求前取消 ⇒ 保持 pending", async () => {
+    const journal = new MailboxJournal(baseDirectory);
+    const admission = new ContextAdmissionController({ stateDirectory: baseDirectory });
+    await seedAdmittedMessage(journal, admission);
+
+    const worker = buildWorker({ journal, admission, capturedPrompts: [] });
+    /** 请求前取消：worker 自己的取消信号已置位，工具循环不得触发"已提交"回调。 */
+    worker.cancel();
+    await worker.run().catch(() => undefined);
+
+    const [view] = await journal.readMessageStatusView({
+      recipientId: RECIPIENT,
+      messageId: "coord-message-1",
+    });
+    expect(view?.contextDeliveryState).toBe("pending");
   });
 });

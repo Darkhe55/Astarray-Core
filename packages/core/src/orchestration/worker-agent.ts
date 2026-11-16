@@ -561,6 +561,11 @@ export class WorkerAgent {
       }
     }
 
+    const coordinationRequestIdentifier = `worker-turn:${this.options.task.id}:${randomUUID()}`;
+    /** P1-3：这两个标志必须在调用工具循环**之前**声明（提交回调会在循环内部触发）。 */
+    let hasSubmittedCoordinationRequest = false;
+    let hasReceivedProviderEvent = false;
+    try {
     const events = await runToolLoop(
       {
         missionId: this.options.missionId,
@@ -642,21 +647,42 @@ export class WorkerAgent {
               progressGuardPort: this.options.progressGuardPort,
               progressGuardTaskExecutionId: this.options.task.id,
             }),
+        /**
+         * P1-3：**请求提交证据**。门禁已过且 `runtime.run` 已发起 ⇒ 才算投递；
+         * 本地门禁拒绝、请求前取消、构造失败都不会走到这里。
+         */
+        ...(deliveredCoordinationMessageIdentifiers.length === 0 ||
+        coordinationContextDeliveryPort === undefined
+          ? {}
+          : {
+              onRequestSubmitted: async () => {
+                /** 只记录"请求已发起"；真正的 delivered 要等确认开始返回（见下方循环）。 */
+                hasSubmittedCoordinationRequest = true;
+              },
+            }),
       },
     );
     /**
-     * 首个事件到来 ⇒ 说明这一轮模型请求**已提交并开始返回**，
-     * 此时才把本轮携带的协调消息标成 `delivered`（内容确已随请求发出）。
+     * P1-3（2026-11-17）：**不再用"首个事件"当投递证据**。
+     *
+     * 投递标记改由工具循环的 `onRequestSubmitted` 触发：那才是"门禁通过且请求已发起"。
+     * 这里仍负责：请求发起后抛错（网络未知）⇒ 记 `unknown`，不冒充 delivered。
      */
-    const coordinationRequestIdentifier = `worker-turn:${this.options.task.id}:${randomUUID()}`;
-    let hasMarkedCoordinationContextDelivered = false;
-    for await (const event of events) {
+    /**
+     * 是否已收到**任何**事件：用来区分"请求已提交且确实开始返回"与"提交后连接失败"。
+     * 后者按 P1-3 要求记 `unknown`（不冒充 delivered，也不断言未发送）。
+     */
+      for await (const event of events) {
+      hasReceivedProviderEvent = true;
+      /**
+       * P1-3：**提交证据 + 确实开始返回** 才记 delivered。
+       * 仅"请求已发起"不够（连接可能立刻失败），所以两者都要。
+       */
       if (
-        !hasMarkedCoordinationContextDelivered &&
+        hasSubmittedCoordinationRequest &&
         deliveredCoordinationMessageIdentifiers.length > 0 &&
         coordinationContextDeliveryPort !== undefined
       ) {
-        hasMarkedCoordinationContextDelivered = true;
         await coordinationContextDeliveryPort.markDelivered({
           recipientId: coordinationRecipientId,
           messageIdentifiers: deliveredCoordinationMessageIdentifiers,
@@ -898,6 +924,27 @@ export class WorkerAgent {
     await this.reportOutcome(finalReason);
     feedbackTransport.setAgentStatus(this.options.agentInstanceId, "idle");
     return finalReason;
+    } catch (error) {
+      /** P1-3：请求发起后失败（网络/超时）⇒ 结果未知，记 unknown 而非 delivered。 */
+      if (
+        !hasReceivedProviderEvent &&
+        deliveredCoordinationMessageIdentifiers.length > 0 &&
+        coordinationContextDeliveryPort !== undefined
+      ) {
+        /**
+         * 已收到事件仍失败 ⇒ 请求确实提交过且部分返回，保留 delivered（内容已随请求发出）；
+         * 未收到任何事件 ⇒ 结果未知，记 `unknown`。
+         */
+        await coordinationContextDeliveryPort
+          .markUnknown({
+            recipientId: coordinationRecipientId,
+            messageIdentifiers: deliveredCoordinationMessageIdentifiers,
+            reason: error instanceof Error ? error.message : String(error),
+          })
+          .catch(() => undefined);
+      }
+      throw error;
+    }
   }
 
   private async appendArchiveEntry(
@@ -1061,4 +1108,3 @@ function summarize(outputTextChunks: string[]): string {
   const joined = outputTextChunks.join("").trim();
   return joined.length === 0 ? "（无文本输出）" : joined.slice(0, 300);
 }
-

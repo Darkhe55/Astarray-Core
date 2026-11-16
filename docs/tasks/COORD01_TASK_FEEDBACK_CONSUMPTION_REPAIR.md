@@ -824,3 +824,49 @@ runStartupRecovery
 "同一套权威完成校验"这一条要求尚未达成。
 
 全量门禁：**807 files / 5344 passed + 3 skipped，exit 0**。
+
+## P1-3 返修（2026-11-17）：「首个事件 = 请求已投递」的错误判定
+
+### 原缺陷
+
+`worker-agent` 在收到**任意首个 AgentEvent** 时就把协调消息标成 `delivered`。
+但本地门禁拒绝、请求前取消、构造失败都不会有事件；反过来"有事件"也不等于"请求确实提交"。
+`delivered` 因此可能是假的。
+
+### 修复后的判定链
+
+```text
+runToolLoop
+  ├─ 工作时段门禁 / 预算 / 取消 先判 ⇒ 拒绝时不发起请求（不触发提交回调）
+  ├─ providerEventStream = runtime.run(...)
+  └─ 仅在**未在请求前取消**时触发 onRequestSubmitted（提交证据）
+
+WorkerAgent
+  ├─ onRequestSubmitted ⇒ 记 hasSubmittedCoordinationRequest = true
+  ├─ 收到首个事件 且 已提交 ⇒ markDelivered(recipient, ids, requestIdentifier)
+  ├─ 已提交但一个事件都没有就失败 ⇒ markUnknown（结果未知，不冒充成功/未发送）
+  └─ 未提交（门禁拒绝/取消/构造失败）⇒ 保持 pending，不批量确认
+```
+
+| 改动 | 位置 |
+|---|---|
+| 新增 `onRequestSubmitted` 生命周期钩子（门禁之后、取消则不触发） | `runtime/tool-loop.ts` |
+| 投递判定改为「提交证据 + 确实开始返回」；失败未收到事件 ⇒ `unknown` | `orchestration/worker-agent.ts` |
+| 端口新增 `markUnknown`（journal 写 `unknown`） | `orchestration/coordination-context-delivery.ts` |
+| 反例 3 条（门禁拒绝 ⇒ pending；发起即失败 ⇒ unknown；请求前取消 ⇒ pending） | `tests/core/integration/coord01-context-delivery-wiring.test.ts` |
+
+### 语义
+
+- `delivered` = **该请求确实携带了这些消息正文并已开始返回**；不代表模型理解、也不代表任务完成；
+- `unknown` = 请求已发起但无法确认结果（网络中断等）；
+- `pending` = 尚未进入任何请求（门禁拒绝/取消/构造失败都留在这里）。
+
+### 仍未完成（如实）
+
+- **要求 7（只把已授权/版本适用/预算内的消息放进请求，未进入的继续等待）未实现**：
+  当前仍是一次性取该个体全部 `pending` 消息，没有按预算/版本做**部分携带**；
+- `worker-agent` 侧首次事件仍参与判定（但必须伴以显式提交证据），不是纯"提交即确认"。
+
+全量门禁：**807 files / 5347 passed + 3 skipped，exit 0**。
+（首轮门禁红在 `e2e01-provider-write-probe` / `obs01-diag-production-collection`，
+原因是我的 `options.cancellationSignal.aborted` 未做空值保护——**真实回归**，已修并复跑绿。）

@@ -30,6 +30,17 @@ export interface CoordinationContextDeliveryPort {
     readonly messageIdentifiers: readonly string[];
     readonly requestIdentifier: string;
   }): Promise<void>;
+  /**
+   * P1-3：**结果未知**。
+   *
+   * 请求已发起但无法确认是否送达（网络中断、超时后状态不明）时用；
+   * 记 `unknown` 而不是 delivered，也不是"确定未发送"。
+   */
+  markUnknown(input: {
+    readonly recipientId: string;
+    readonly messageIdentifiers: readonly string[];
+    readonly reason: string;
+  }): Promise<void>;
 }
 
 /**
@@ -105,6 +116,15 @@ export function createCoordinationContextDeliveryPort(input: {
           summaryText: readSummaryText(message.payload),
           enqueuedSequence: message.enqueuedSequence,
         }));
+    },
+    async markUnknown(markInput) {
+      for (const messageIdentifier of markInput.messageIdentifiers) {
+        await input.journal.setContextDeliveryState({
+          recipientId: markInput.recipientId,
+          messageId: messageIdentifier,
+          contextDeliveryState: "unknown",
+        });
+      }
     },
     async markDelivered(markInput) {
       for (const messageIdentifier of markInput.messageIdentifiers) {
