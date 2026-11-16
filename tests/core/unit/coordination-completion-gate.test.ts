@@ -180,3 +180,17 @@ describe("权威完成校验（两入口共用同一函数）", () => {
     expect(decision.code).toBe("completion-receipt-insufficient");
   });
 });
+
+describe("畸形收据不得抛异常（健壮性）", () => {
+  it("⑮ 缺 missionIdentifier 的收据 ⇒ 返回「收据不足」，不是 TypeError", async () => {
+    const { evaluateCompletionReceipt } = await import(
+      "../../../packages/core/src/orchestration/completion-receipt.js"
+    );
+    const evaluation = evaluateCompletionReceipt({
+      receipt: { taskIdentifier: "T-001", toolCallCount: 1, artifactPaths: [] } as never,
+      requiresCompletionControlEvent: false,
+    });
+    expect(evaluation.isSufficient).toBe(false);
+    expect(evaluation.reasons.join("；")).toContain("mission");
+  });
+});

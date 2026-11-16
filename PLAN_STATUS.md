@@ -6233,3 +6233,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 抽出 `evaluateAuthoritativeCompletion`（收据 + 协调门禁，按 entryKind 区分消息自证），协调入口已接入。
 > 补例 2 条；全量门禁 **807 files / 5349 passed，exit 0**。
 > 仍未完成：Worker 收口尚未改为调用该函数；另记录 `evaluateCompletionReceipt` 对畸形收据会崩溃。
+
+> **P1-2 收口（2026-11-17）**
+>
+> Worker 收口与协调入口现在都调用 `evaluateAuthoritativeCompletion`（唯一规则定义）；
+> 畸形收据改为"记原因并拒绝"而非抛 TypeError。
+> 补例 1 条；全量门禁 **807 files / 5350 passed，exit 0**。
+> 剩余：P1-3 要求 7（按预算/版本部分携带）。

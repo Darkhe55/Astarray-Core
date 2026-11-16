@@ -32,7 +32,7 @@ import type { ToolDescriptor } from "../core/types.js";
 import type { ContextPromptProvider } from "./context-prompt-assembler.js";
 // COMM-01-02（2026-10-26）：发布任务时登记自己的信箱 ⇒ 反馈走发布者反向通道。
 import { resolvePublisherRecipientIdForTask } from "./task-publisher-feedback-route.js";
-import { evaluateCompletionReceipt } from "./completion-receipt.js";
+import { evaluateAuthoritativeCompletion } from "./authoritative-completion.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { GoalGroupKind } from "./goal-dispatch-gate.js";
 import { resolveGoalTaskGroupKind } from "./goal-task-group-kind.js";
@@ -1822,15 +1822,38 @@ export class MissionOrchestrator {
          * 绝不补一个默认收据。
          */
         if (this.options.isCompletionReceiptRequired === true) {
-          const receiptEvaluation = evaluateCompletionReceipt({
-            receipt: outcome.completionReceipt ?? null,
+          /**
+           * P1-2 要求 1（2026-11-17）：Worker 收口与协调入口**共用同一个**权威完成校验。
+           * 之前这里直接调 `evaluateCompletionReceipt`，与协调门禁是两套宽严不同的逻辑。
+           */
+          const graphTask = this.dagScheduler.getCurrentGraph().getNode(taskId) ?? null;
+          const completionDecision = evaluateAuthoritativeCompletion({
+            entryKind: "worker",
+            outcome: "done",
+            sourceAgentInstanceIdentifier: ownerAgentInstanceId,
+            messageMissionIdentifier: null,
+            messageProjectIdentifier: null,
+            task:
+              graphTask === null
+                ? null
+                : {
+                    id: graphTask.id,
+                    status: graphTask.status,
+                    assignedAgentId: graphTask.assignedAgentId ?? null,
+                    taskType: graphTask.taskType,
+                  },
+            missionProjectIdentifier: null,
+            completionReceipt: outcome.completionReceipt ?? null,
             requiresCompletionControlEvent:
               this.options.requireCompletionControlEvent === true,
+            isCompletionReceiptRequired: true,
+            /** 执行完成 ≠ 验收结论；验收由独立审查决定。 */
+            reviewState: "none",
           });
-          if (!receiptEvaluation.isSufficient) {
+          if (!completionDecision.isAccepted) {
             await this.dagScheduler.blockTaskForHumanDecision(taskId).catch(() => null);
             this.options.onUserEscalation(
-              `任务 ${taskId} 的完成收据不足，未判 done: ${receiptEvaluation.reasons.join("；")}`,
+              `任务 ${taskId} 的完成校验未通过，未判 done: ${completionDecision.reason}`,
             );
             break;
           }

@@ -901,3 +901,29 @@ evaluateAuthoritativeCompletion
 而不是返回"收据不足"。收据来自本地 Worker，风险有限，但属于"坏输入导致异常"而非"拒绝"。
 
 全量门禁：**807 files / 5349 passed + 3 skipped，exit 0**。
+
+### P1-2 收口（2026-11-17）：Worker 收口接入共用校验 + 畸形收据不再崩溃
+
+**上一轮遗留**：`evaluateAuthoritativeCompletion` 已存在，但 `handleWorkerOutcome`
+仍直接调 `evaluateCompletionReceipt`——规则只有一个定义，调用点却有两处。
+
+| 改动 | 位置 |
+|---|---|
+| Worker 收口改为调用共用校验（`entryKind: "worker"`，任务取自 `getCurrentGraph().getNode(taskId)`） | `orchestration/mission-orchestrator.ts` |
+| 畸形收据逐字段类型判断：缺字段/类型错 ⇒ 记"收据不足"原因，**不再抛 TypeError** | `orchestration/completion-receipt.ts` |
+| 反例 1 条（缺 missionIdentifier 的收据必须被拒而不是崩） | `tests/core/unit/coordination-completion-gate.test.ts` |
+
+现状（两入口）：
+
+```text
+handleWorkerOutcome ─┐
+                     ├─→ evaluateAuthoritativeCompletion（唯一规则）
+协调入口 ────────────┘
+```
+
+Worker 路径传 `reviewState: "none"`：**执行完成 ≠ 验收结论**，验收仍由独立审查裁决；
+协调路径传真实裁决状态，因此不能覆盖返修/通过。
+
+全量门禁：**807 files / 5350 passed + 3 skipped，exit 0**。
+
+**仍未完成（P1-3 要求 7）**：协调消息仍一次性取全部 pending，未按预算/版本做部分携带。

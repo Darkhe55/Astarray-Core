@@ -54,19 +54,27 @@ export function evaluateCompletionReceipt(
     reasons.push("缺少完成收据：Worker 未提供可核对的本地完成记录");
     return { isSufficient: false, reasons };
   }
-  if (receipt.taskIdentifier.trim() === "") {
+  /**
+   * 2026-11-17（健壮性）：**畸形收据必须被"拒绝"，而不是抛 TypeError**。
+   *
+   * 此前直接 `receipt.taskIdentifier.trim()`：字段缺失时崩溃，等于把"坏输入"
+   * 变成未捕获异常（实测会打断调用方流程）。现在逐字段做类型判断，
+   * 缺失/类型错误一律记为"收据不足"的原因。
+   */
+  if (typeof receipt.taskIdentifier !== "string" || receipt.taskIdentifier.trim() === "") {
     reasons.push("完成收据缺少任务标识");
   }
-  if (receipt.missionIdentifier.trim() === "") {
+  if (typeof receipt.missionIdentifier !== "string" || receipt.missionIdentifier.trim() === "") {
     reasons.push("完成收据缺少 mission 标识");
   }
   if (!Number.isInteger(receipt.toolCallCount) || receipt.toolCallCount < 0) {
     reasons.push("完成收据的工具调用计数非法");
   }
-  if (input.requiresCompletionControlEvent && !receipt.hasVerifiedCompletionControlEvent) {
+  if (input.requiresCompletionControlEvent && receipt.hasVerifiedCompletionControlEvent !== true) {
     reasons.push("要求完成控制事件，但收据未声明已校验该事件");
   }
   if (
+    !Array.isArray(receipt.artifactPaths) ||
     receipt.artifactPaths.some(
       (artifactPath) => typeof artifactPath !== "string" || artifactPath.trim() === "",
     )
