@@ -1,0 +1,58 @@
+{
+  "reportIdentifier": "CLUSTER01_SYNTHETIC_EFFECT",
+  "generatedAtIso": "2026-11-16T00:00:00.000Z",
+  "seed": 20261116,
+  "dataset": {
+    "syntheticErrorCount": 60,
+    "faultClassCount": 10,
+    "eventsPerClass": 6,
+    "negativePairCount": 20,
+    "violatedNegativePairCount": 0
+  },
+  "metrics": {
+    "groupCount": 10,
+    "memberCount": 60,
+    "weightedPurity": 1,
+    "pairwisePrecision": 1,
+    "pairwiseRecall": 1,
+    "pairwiseF1": 1,
+    "truePositivePairs": 150,
+    "falsePositivePairs": 0,
+    "falseNegativePairs": 0
+  },
+  "negativePairs": {
+    "total": 20,
+    "samples": [
+      {
+        "leftRecord": "req-provider-timeout-0-480#1",
+        "rightRecord": "req-recovery-checkpoint-0-365#1",
+        "leftClass": "provider-timeout",
+        "rightClass": "recovery-checkpoint",
+        "isMerged": false
+      },
+      {
+        "leftRecord": "req-tool-permission-denied-1-72#1",
+        "rightRecord": "req-context-budget-1-110#1",
+        "leftClass": "tool-permission-denied",
+        "rightClass": "context-budget",
+        "isMerged": false
+      },
+      {
+        "leftRecord": "req-git-conflict-2-344#1",
+        "rightRecord": "req-artifact-missing-2-447#1",
+        "leftClass": "git-conflict",
+        "rightClass": "artifact-missing",
+        "isMerged": false
+      }
+    ]
+  },
+  "resource": {
+    "elapsedMilliseconds": 2.86,
+    "scannedEventCount": 60,
+    "excludedRecordCount": 0,
+    "partialReason": null,
+    "peakRssMegabytes": 64.09
+  },
+  "algorithmVersion": "cluster-01-synthetic",
+  "snapshotIdentifier": "a40a0535c53276fa"
+}

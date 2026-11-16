@@ -480,3 +480,46 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 
 - **合成数据效果与资源报告**：≥60 条合成错误、10 类标注、20 对负例、可复算指标。
   这部分**不需要真实数据或人工体验**，属可执行验收，尚未产出。
+
+## 合成数据效果与资源报告（2026-11-16）
+
+**更正**：此前把"效果/资源报告"列为"需真实数据、待人测"是**错的**。原卡验收要求是
+≥60 条合成错误、10 类标注、20 对负例与可复算指标——这部分不需要真实数据或人工体验。
+
+### 交付
+
+| 项 | 位置 |
+|---|---|
+| 验收用例（同时是报告生成器） | `tests/core/integration/cluster01-synthetic-effect-report.test.ts` |
+| 证据报告 | `docs/reports/CLUSTER01_SYNTHETIC_EFFECT_EVIDENCE_2026-11-16.json` |
+
+固定种子 `20261116`，60 条事件 / 10 类 / 每类 6 条，噪声只改数字与顺序、不改语义关键词。
+类别真值编码在 `requestIdentifier` 中（`req-<class>-<occurrence>-<noise>`），**聚类算法不读取该字段**，只用于复算指标。
+
+### 实测指标（可复算）
+
+| 指标 | 值 |
+|---|---|
+| 簇数 | 10 |
+| 成员总数 | 60 |
+| 加权纯度 | **1.0** |
+| 成对精确率 / 召回率 / F1 | **1.0 / 1.0 / 1.0** |
+| 真阳 / 假阳 / 假阴（成对） | 150 / 0 / 0 |
+| 负例对数 | 20（**违规 0**） |
+| 扫描事件数 | 60（排除 0） |
+
+资源：单次构建毫秒级（见报告 `resource.elapsedMilliseconds`），无 partial 截断。
+
+### 必须如实说明的边界
+
+- 合成数据**按设计可分**（同类模板只差数字），因此 1.0 的分数证明的是
+  "相同/结构相近的错误能聚在一起、不同类不会合并"，**不能外推为真实故障域的准确率**；
+- 真实数据的效果仍需后续用线上诊断事件复核（未做，不虚报）。
+
+### 复算方式
+
+```powershell
+npx vitest run tests/core/integration/cluster01-synthetic-effect-report.test.ts
+# 需要重新生成证据 JSON 时：
+$env:CLUSTER01_WRITE_REPORT="1"; npx vitest run tests/core/integration/cluster01-synthetic-effect-report.test.ts
+```
