@@ -87,3 +87,52 @@ expect(goalState.requiresReplanning).toBe(true);   // 实际 false
 
 - `graph-change-deterministic-drill` 的暂停路径（需要能让它稳定复现的方法：例如在负载下重复跑该文件并保留追踪）；
 - `anthropic-messages-runtime` 的低频失败现场。
+
+## 第三轮：把租约接管做成真正互斥（修好了一处真竞争）
+
+### 现象
+
+修好用例的"客观重叠"后，`cluster02-cross-process-lease` ① 在**满载门禁**下仍然红：
+
+```text
+两个实例争抢 ⇒ 只有一个构建，另一个 busy   // 偶发两个都 built
+```
+
+### 定位
+
+不是用例的问题，是租约实现的残留窗口：`tryAcquire` 是"读 → 判断无主 → 写 + 写后回读 + 5ms 让出"。
+两个实例可以**依次**完成 写→回读→放行，于是都认为自己是持有者。5ms 让出只是压窗口，不是互斥。
+
+### 修法：接管临界区用**排他创建**串行化
+
+```text
+tryAcquire:
+  ├─ 已有有效租约？ → 同持有者幂等复用 / 否则 held-by-other
+  └─ 接管：
+       fs.open(lease.lock, "wx")        // 排他创建，只有一方能成功
+         ├─ 拿到 → 双检租约 → 写新租约（token+1）→ 关闭并删除守卫
+         └─ 拿不到 → 5ms 重试（最多 20 次）→ 仍失败 → held-by-other
+```
+
+配套处理：
+
+- 守卫目录先 `mkdir -p`（否则首次运行 ENOENT，被误判成 held-by-other——这条在压测时 10/10 复现过）；
+- 守卫**陈旧**（持有者崩溃，>5s）视为可清理，避免永久 blocked；
+- 守卫是毫秒级临界区的空文件，不含用户数据。删除它需要在破坏性 API 守卫白名单里登记理由
+  （`core/src/orchestration/coordination-partition-lease.ts`，tokens `["unlink"]`）——
+  这与既有 `mission-lease-store` 的 `rm` 白名单同一性质。
+
+### 验证
+
+- 3 个租约/消费用例连跑 10 次：**0 失败**（修前 10/10 红或偶发红）；
+- 全量门禁：**805 files / 5328 passed + 3 skipped，exit 0**。
+
+### 这轮真正回答了什么
+
+"门禁偶发翻红"里，**至少有一类**是我自己新写的并发用例暴露的**产品级 TOCTOU**，
+而不是单纯的机器负载。修复后该文件稳定。
+
+## 仍然未确认
+
+- `graph-change-deterministic-drill` 的暂停路径（追踪代码已回退，未复现）；
+- `anthropic-messages-runtime` 的低频失败（约 1/8~1/20，尚未抓到现场）。

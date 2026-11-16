@@ -6185,3 +6185,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 产物缺失直接返修、缺报告/失败一律 rework，默认开关未切换。
 > 证据见 `docs/reports/WIRING_VERIFICATION_CONTEXT_AND_REVIEW_2026-11-16.md`；
 > 守卫 4 条；全量门禁 **805 files / 5328 passed，exit 0**。
+
+> **门禁抖动：租约接管互斥（2026-11-16）**
+>
+> 定位到一类真实竞争：`tryAcquire` 的"读→判断→写+回读"不是互斥，两个实例可依次放行，
+> 导致同一分区被两个写者同时持有（我自己新写的并发用例在满载下稳定暴露）。
+> 修复：接管临界区改用 `fs.open(lock, "wx")` 排他创建串行化 + 双检 + 陈旧守卫清理；
+> 守卫删除在破坏性 API 守卫登记理由。
+> 3 个用例连跑 10 次 0 失败；全量门禁 **805 files / 5328 passed，exit 0**。
+> 未确认：graph-change 暂停路径、anthropic-messages-runtime 低频失败。

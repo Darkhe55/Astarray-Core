@@ -120,41 +120,68 @@ export class CoordinationPartitionLeaseStore {
         expiresAtUnixMilliseconds: existing.expiresAtUnixMilliseconds,
       };
     }
-    const fencingToken = (existing?.fencingToken ?? 0) + 1;
-    const expiresAtUnixMilliseconds = now + input.ttlMilliseconds;
-    await this.writeLease({
-      schemaVersion: 1,
-      partitionKey: input.partitionKey,
-      ownerInstanceIdentifier: input.ownerInstanceIdentifier,
-      fencingToken,
-      expiresAtUnixMilliseconds,
-    });
     /**
-     * 2026-11-16（并发反例暴露）：**写入后回读校验**。
+     * 2026-11-16：**接管必须串行化**。
      *
-     * "读 → 判断无主 → 写" 不是原子操作：两个进程可能同时读到无主并各自写入，
-     * 随后都认为自己是持有者（真实用例里表现为同一条消息被应用两次）。
-     * 这里以**最终落盘者**为准：回读发现持有者或 token 不是自己 ⇒ 判 `held-by-other`。
+     * 单靠"写后回读"不够：两个实例可能依次完成 写→回读→放行，仍然都拿到租约
+     * （我自己的并发反例在满载门禁里复现过）。这里用 **排他创建的守卫文件**
+     * 把"接管"这一步串起来，只有持守卫的一方才能写新租约。
      */
-    /**
-     * 让并发写者的落盘有机会完成：写→读之间若另一个进程正在写，
-     * 单次回读可能仍读到自己那次写入。这里做**短暂让出后再回读**，
-     * 把"两个进程同时抢到租约"的窗口压到可忽略。
-     */
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    const persisted = await this.readLease(input.partitionKey);
-    if (
-      persisted === null ||
-      persisted.ownerInstanceIdentifier !== input.ownerInstanceIdentifier ||
-      persisted.fencingToken !== fencingToken
-    ) {
-      return {
-        outcome: "held-by-other",
-        expiresAtUnixMilliseconds:
-          persisted?.expiresAtUnixMilliseconds ?? expiresAtUnixMilliseconds,
-      };
+    const guardPath = `${this.filePathFor(input.partitionKey)}.lock`;
+    await fs.mkdir(this.stateDirectory, { recursive: true });
+    let guardHandle: Awaited<ReturnType<typeof fs.open>> | null = null;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        guardHandle = await fs.open(guardPath, "wx");
+        break;
+      } catch {
+        /**
+         * 守卫被他人持有：先判断是否**陈旧**（持有者崩溃会留下文件），超过 5s 视为陈旧并清理，
+         * 否则短暂让出后重试；始终拿不到 ⇒ 别人正在接管。
+         */
+        const guardStatistics = await fs.stat(guardPath).catch(() => null);
+        if (
+          guardStatistics !== null &&
+          Date.now() - guardStatistics.mtimeMs > 5_000
+        ) {
+          await fs.unlink(guardPath).catch(() => undefined);
+          continue;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
     }
-    return { outcome: "acquired", fencingToken, expiresAtUnixMilliseconds };
+    if (guardHandle === null) {
+      return { outcome: "held-by-other", expiresAtUnixMilliseconds: now + input.ttlMilliseconds };
+    }
+    try {
+      /** 双检：拿到守卫后重新读，避免基于过期快照决定。 */
+      const latest = await this.readLease(input.partitionKey);
+      if (
+        latest !== null &&
+        latest.ownerInstanceIdentifier !== null &&
+        latest.expiresAtUnixMilliseconds !== null &&
+        latest.expiresAtUnixMilliseconds > this.nowUnixMilliseconds() &&
+        latest.ownerInstanceIdentifier !== input.ownerInstanceIdentifier
+      ) {
+        return {
+          outcome: "held-by-other",
+          expiresAtUnixMilliseconds: latest.expiresAtUnixMilliseconds,
+        };
+      }
+      const fencingToken = (latest?.fencingToken ?? 0) + 1;
+      const expiresAtUnixMilliseconds = this.nowUnixMilliseconds() + input.ttlMilliseconds;
+      await this.writeLease({
+        schemaVersion: 1,
+        partitionKey: input.partitionKey,
+        ownerInstanceIdentifier: input.ownerInstanceIdentifier,
+        fencingToken,
+        expiresAtUnixMilliseconds,
+      });
+      return { outcome: "acquired", fencingToken, expiresAtUnixMilliseconds };
+    } finally {
+      await guardHandle.close().catch(() => undefined);
+      await fs.unlink(guardPath).catch(() => undefined);
+    }
   }
 
   /** 续租：token 必须是当前值且未过期，否则 `not-owner`。 */

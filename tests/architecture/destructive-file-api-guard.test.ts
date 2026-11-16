@@ -44,6 +44,16 @@ const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }>
     tokens: ["writeFile", "rm"],
     reason: "跨进程租约：排他创建内容写入 + 瞬时租约文件释放 rm（T12-01，非用户内容）",
   },
+  "core/src/orchestration/coordination-partition-lease.ts": {
+    tokens: ["unlink"],
+    /**
+     * 2026-11-16：协调分区租约的**接管守卫文件**释放。
+     *
+     * 该文件只存在于"接管写租约"的临界区内（毫秒级），内容为空、不含用户数据；
+     * 不释放会让后续接管永久 blocked。陈旧守卫（持有者崩溃，>5s）同样在此清理。
+     */
+    reason: "协调分区租约接管守卫：临界区空文件释放 + 陈旧守卫清理（非用户内容）",
+  },
   "core/src/tools/backup-vault.ts": {
     tokens: ["writeFile", "rm"],
     reason: "特权备份保管库自身（pre-image/恢复/隔离文件读写），受 ProtectedStoragePolicy 保护",
