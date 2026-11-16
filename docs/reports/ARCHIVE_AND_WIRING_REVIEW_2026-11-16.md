@@ -74,3 +74,11 @@ main-controller 的思索路径仍以当前 message 为 userPrompt，未见在�
 > 故新增"运行中 ⇒ `completeTaskByTaskIdentifier`，未运行 ⇒ 写任务链"双路径；
 > 并删除针对不存在的 `kind: "blocked"` 的分支（阻塞由 `blockTaskForHumanDecision` 判定）。
 > 守卫 8 条、单测 6 条；全量门禁 5317 passed。
+
+> **2026-11-16 更新（P2 上下文与独立审查核查）**：详见
+> `docs/reports/WIRING_VERIFICATION_CONTEXT_AND_REVIEW_2026-11-16.md`。
+> 要点：工作路径的上下文提供者**已接线**（`mission-orchestrator.ts:1340` → `worker-agent.ts:522`）；
+> 主 Agent 思索路径**未接线**（`missionId: null`，接进去会绕过个体隔离与预算，需单独设计）；
+> 上下文包 / 关闭节点回访**未启用**（默认提供者未传 `contextPacks`/`recalledContextBlocks`）。
+> 独立审查链**已闭环**且有 e2e 证据（派发 → 报告 → 裁决 → 返工/通过，缺报告/失败一律 rework），
+> 默认开关**未切换**。守卫：`tests/architecture/wiring-context-review-guard.test.ts`。
