@@ -101,3 +101,28 @@ describe("协调消息 → 权威任务状态", () => {
     expect(store.getCurrent()?.revision).toBe(3);
   });
 });
+
+describe("阻塞不由消息决定（2026-11-16 修正）", () => {
+  it("⑤ payload.kind 为 blocked ⇒ 不改任务状态（该载荷类型根本不存在）", async () => {
+    const store = buildStore(buildChain("running"));
+    const result = await applyCoordinationMessageToTaskState({
+      taskStore: store as never,
+      missionIdentifiers: ["mission-1"],
+      message: { messageIdentifier: "m-5", taskIdentifier: "T-001", payload: { kind: "blocked" } },
+    });
+    expect(result.outcome).toBe("status-unchanged");
+    expect(result.taskStatus).toBeNull();
+    expect(store.updateTaskChain).not.toHaveBeenCalled();
+  });
+
+  it("⑥ 失败消息 ⇒ failed（与 done 分开映射）", async () => {
+    const store = buildStore(buildChain("running"));
+    const result = await applyCoordinationMessageToTaskState({
+      taskStore: store as never,
+      missionIdentifiers: ["mission-1"],
+      message: { messageIdentifier: "m-6", taskIdentifier: "T-001", payload: { kind: "failure" } },
+    });
+    expect(result).toMatchObject({ outcome: "applied", taskStatus: "failed" });
+    expect(store.getCurrent()?.tasks[0]?.status).toBe("failed");
+  });
+});

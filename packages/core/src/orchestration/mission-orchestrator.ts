@@ -919,6 +919,19 @@ export class MissionOrchestrator {
     }
     return result;
   }
+  /**
+   * COORD 检查点 2（2026-11-16）：按协调消息判定**结算任务**。
+   *
+   * 与 `finishTask` 的既有语义一致：未 claim 的任务视为过期结果，
+   * 调度器内部幂等忽略（旧执行反馈不会重复结算）。
+   *
+   * 为什么需要这个公开入口：`dagScheduler` 是私有的，而调度器只重算内存图、
+   * 从不重读任务链——外部写入任务链对运行中的 mission 不可见。
+   */
+  async completeTaskByTaskIdentifier(taskId: string, outcome: "done" | "failed"): Promise<void> {
+    await this.dagScheduler.finishTask(taskId, outcome, null);
+  }
+
   async cancelTask(taskId: string): Promise<void> {
     await this.dagScheduler.cancelTask(taskId);
     this.wake();

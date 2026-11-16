@@ -69,3 +69,8 @@ main-controller 的思索路径仍以当前 message 为 userPrompt，未见在�
 > 证据：`application-runtime.runStartupRecovery`、`orchestration/coordination-task-state.ts`、
 > `tests/architecture/coord02-consumption-wiring-guard.test.ts`。
 > **仍未完成**：入库通知触发、ready set 显式重算、进程级崩溃/重复唤醒验证。
+
+> **2026-11-16 补充（COORD 运行中 mission）**：核实到 orchestrator/scheduler **从不重读任务链**，
+> 故新增"运行中 ⇒ `completeTaskByTaskIdentifier`，未运行 ⇒ 写任务链"双路径；
+> 并删除针对不存在的 `kind: "blocked"` 的分支（阻塞由 `blockTaskForHumanDecision` 判定）。
+> 守卫 8 条、单测 6 条；全量门禁 5317 passed。

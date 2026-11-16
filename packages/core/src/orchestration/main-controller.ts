@@ -5492,6 +5492,29 @@ export class MainController {
    * T12-02：安全启动编排会话。租约冲突（mission-locked）时把 mission
    * 置为 blocked 并转达用户，避免未处理拒绝导致进程崩溃或静默双跑。
    */
+  /**
+   * COORD 检查点 2（2026-11-16）：把协调消息判定出的任务结果应用到**运行中的调度器**。
+   *
+   * 为什么需要这一步：`DagScheduler` 只重算**内存图**，从不重读任务链
+   * （`git grep readTaskChain` 在 orchestrator/scheduler 里均为 0），
+   * 所以"只写任务链"对运行中的 mission 是**不可见**的。
+   *
+   * 返回 `mission-not-active` 时调用方应改为写任务链（重启后重建图生效）。
+   */
+  async applyCoordinationTaskOutcome(input: {
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly outcome: "done" | "failed";
+  }): Promise<{ readonly outcome: "applied-to-active-scheduler" | "mission-not-active" }> {
+    const active = this.activeOrchestrators.get(input.missionIdentifier);
+    if (active === undefined) {
+      return { outcome: "mission-not-active" };
+    }
+    /** `finishTask` 自身对未 claim 的任务是幂等忽略（旧执行反馈不会重复结算）。 */
+    await active.scheduler.completeTaskByTaskIdentifier(input.taskIdentifier, input.outcome);
+    return { outcome: "applied-to-active-scheduler" };
+  }
+
   private startSchedulerSafely(
     missionId: string,
     scheduler: AssistScheduler | DevolveScheduler,

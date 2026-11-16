@@ -134,7 +134,7 @@ import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-re
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { createCoordinationContextDeliveryPort } from "../orchestration/coordination-context-delivery.js";
 import { runCoordinationConsumptionOnce } from "../orchestration/coordination-consumption-runner.js";
-import { applyCoordinationMessageToTaskState } from "../orchestration/coordination-task-state.js";
+import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -4898,12 +4898,30 @@ const runCoordinationConsumptionForMission = async (missionIdentifier: string): 
         if (coordinationMessage === null) {
           continue;
         }
+        const coordinationTaskStatus = resolveCoordinationTaskStatus(
+          coordinationMessage.payload,
+        );
+        const coordinationTaskIdentifier = coordinationMessage.taskIdentifier ?? null;
+        /**
+         * 运行中的 mission：调度器只重算内存图、不重读任务链，因此必须**先**打到
+         * `activeOrchestrators` 里的 scheduler；只有 mission 未运行时才只写任务链。
+         */
+        if (coordinationTaskStatus !== null && coordinationTaskIdentifier !== null) {
+          const activeApplication = await controller.applyCoordinationTaskOutcome({
+            missionIdentifier,
+            taskIdentifier: coordinationTaskIdentifier,
+            outcome: coordinationTaskStatus,
+          });
+          if (activeApplication.outcome === "applied-to-active-scheduler") {
+            continue;
+          }
+        }
         await applyCoordinationMessageToTaskState({
           taskStore,
           missionIdentifiers: [missionIdentifier],
           message: {
             messageIdentifier,
-            taskIdentifier: coordinationMessage.taskIdentifier ?? null,
+            taskIdentifier: coordinationTaskIdentifier,
             payload: coordinationMessage.payload,
           },
         });

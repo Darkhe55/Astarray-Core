@@ -636,3 +636,49 @@ FeedbackTransport.onMessage                      // 既有入库通知点
 
 - **消费后主动触发 ready set 重算**（`scheduleRound()`）与派发；
 - 进程级崩溃窗口/重复唤醒用例。
+
+## 检查点 2 第四步：运行中 mission 必须打到调度器（2026-11-16）
+
+### 核实结论（先说事实）
+
+| 检查 | 结果 |
+|---|---|
+| `MissionOrchestrator` 是否重读任务链 | `git grep -c readTaskChain` ⇒ **0** |
+| `DagScheduler` 是否读任务链 | 同上 ⇒ **0** |
+| `scheduleRound()` 依据 | 仅**内存图** |
+
+⇒ **只写任务链，对运行中的 mission 不可见**；此前"写链即闭合"的判断是错的。
+
+### 修正后的路由
+
+```text
+消费应用 ⇒ 该 mission 是否在 activeOrchestrators 中？
+  ├─ 是 ⇒ scheduler.completeTaskByTaskIdentifier(taskId, outcome)   // 内存图推进；其既有循环负责 scheduleRound + 派发
+  └─ 否 ⇒ applyCoordinationMessageToTaskState(...)                  // 只写任务链，重启重建图生效
+```
+
+新增公开入口 `MissionOrchestrator.completeTaskByTaskIdentifier`（`dagScheduler` 是私有的，
+且 `finishTask` 对未 claim 任务幂等忽略 —— 正好覆盖"旧执行反馈"）。
+
+### 同时修正的错误映射：`blocked` 不存在
+
+`FeedbackMessagePayload`（`core/types.ts:373`）**没有** `kind: "blocked"`；
+任务 `blocked` 一律由调度器 `blockTaskForHumanDecision`（`mission-orchestrator.ts` 5 处调用）依据本地事实判定。
+`resolveCoordinationTaskStatus` 里的 blocked 分支已删除，并加守卫禁止复现（守卫⑧）。
+
+| 消息 kind | 任务链/调度器结果 |
+|---|---|
+| `success` | done |
+| `failure` | failed |
+| 其它（含臆想的 blocked） | 不改状态 |
+
+### 验证
+
+- `coord01-task-state-application.test.ts` 扩到 6 条（含"blocked 不改状态""failure 映射为 failed"）；
+- `coord02-consumption-wiring-guard.test.ts` 扩到 8 条（含"先问运行中调度器再写链""主控制器用注册表""不得含 blocked 分支"）；
+- 全量门禁：**801 files / 5317 passed + 3 skipped，exit 0**。
+
+### 仍未完成
+
+- 进程级崩溃窗口 / 重复唤醒的真实进程用例；
+- 消费结果若为 `done` 但任务未被 claim（未派发），当前按幂等忽略——是否需要"未 claim 也落链"的语义待定。

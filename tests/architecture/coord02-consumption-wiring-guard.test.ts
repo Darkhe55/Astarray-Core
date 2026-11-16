@@ -64,3 +64,35 @@ describe("COORD 入库通知触发（第二条触发路径）", () => {
     expect(schedulerCode).toContain("assistOptions.onCoordinationMessageIngested?.()");
   }, 30_000);
 });
+
+describe("运行中 mission 必须打到调度器（2026-11-16）", () => {
+  it("⑥ 运行时先问运行中调度器，未运行才写任务链", async () => {
+    const code = await readProductionCode();
+    expect(code).toContain("applyCoordinationTaskOutcome({");
+    /** 顺序：先 active 判定，再链写入（缩进无关，只看两处存在且 active 在前）。 */
+    const activeIndex = code.indexOf("applyCoordinationTaskOutcome({");
+    const chainIndex = code.indexOf("applyCoordinationMessageToTaskState({", activeIndex);
+    expect(activeIndex).toBeGreaterThan(-1);
+    expect(chainIndex).toBeGreaterThan(activeIndex);
+  }, 30_000);
+
+  it("⑦ 主控制器用运行中注册表派发（不得凭空造调度器）", async () => {
+    const controllerCode = await fs.readFile(
+      path.join(process.cwd(), "packages", "core", "src", "orchestration", "main-controller.ts"),
+      "utf8",
+    );
+    expect(controllerCode).toContain("this.activeOrchestrators.get(input.missionIdentifier)");
+    expect(controllerCode).toContain("completeTaskByTaskIdentifier(input.taskIdentifier, input.outcome)");
+  }, 30_000);
+
+  it("⑧ 阻塞不得来自消息：任务状态模块不含 blocked 分支", async () => {
+    const taskStateCode = await fs.readFile(
+      path.join(process.cwd(), "packages", "core", "src", "orchestration", "coordination-task-state.ts"),
+      "utf8",
+    );
+    const productionLines = taskStateCode
+      .split(/\r?\n/u)
+      .filter((line) => !line.trimStart().startsWith("*") && !line.trimStart().startsWith("//"));
+    expect(productionLines.join("\n")).not.toContain('kind === "blocked"');
+  }, 30_000);
+});

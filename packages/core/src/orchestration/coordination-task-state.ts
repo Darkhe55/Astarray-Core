@@ -12,7 +12,14 @@
  */
 import type { TaskChainDocument, TaskStorePort } from "../core/types.js";
 
-export type CoordinationTaskStatus = "done" | "failed" | "blocked";
+/**
+ * 只有 done / failed 两种。
+ *
+ * **没有 blocked**：反馈载荷 schema（`core/types.ts` 的 `FeedbackMessagePayload`）
+ * 根本不存在 `kind: "blocked"`；任务被置为 blocked 一律由调度器
+ * `blockTaskForHumanDecision` 依据本地事实判定，Agent 不能自报阻塞。
+ */
+export type CoordinationTaskStatus = "done" | "failed";
 
 export interface CoordinationTaskStateApplicationResult {
   readonly outcome: "applied" | "task-not-found" | "status-unchanged";
@@ -23,7 +30,7 @@ export interface CoordinationTaskStateApplicationResult {
 /**
  * 从载荷判定任务状态迁移。
  *
- * 只认这三种：成功 / 失败 / 阻塞。其它（澄清请求、协作请求、普通进度）不改变任务状态。
+ * 只认这两种：成功 / 失败。其它（澄清请求、协作请求、普通进度）不改变任务状态。\n *\n * 阻塞**不在这里**：它是调度器基于本地事实的判定，不存在对应的反馈载荷类型。
  */
 export function resolveCoordinationTaskStatus(payload: unknown): CoordinationTaskStatus | null {
   if (payload === null || typeof payload !== "object") {
@@ -32,7 +39,6 @@ export function resolveCoordinationTaskStatus(payload: unknown): CoordinationTas
   const kind = (payload as Record<string, unknown>)["kind"];
   if (kind === "success") return "done";
   if (kind === "failure") return "failed";
-  if (kind === "blocked") return "blocked";
   return null;
 }
 

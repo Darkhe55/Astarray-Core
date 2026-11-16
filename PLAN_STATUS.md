@@ -6148,3 +6148,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 与启动恢复共用同一函数；通知不阻塞消息处理、异常不冒泡。
 > 守卫扩到 5 条；全量门禁 **801 files / 5312 passed，exit 0**。
 > 仍未完成：消费后主动 `scheduleRound()` 重算 ready set 与派发、进程级崩溃验证。
+
+> **COORD 检查点 2 第四步（2026-11-16）**
+>
+> 核实：orchestrator 与 DagScheduler **从不重读任务链**（readTaskChain 命中 0），`scheduleRound` 只看内存图。
+> 因此新增 `MissionOrchestrator.completeTaskByTaskIdentifier`，运行时按"运行中 ⇒ 打调度器；未运行 ⇒ 写任务链"路由。
+> 同时修正：反馈载荷**不存在** `kind: "blocked"`，阻塞由 `blockTaskForHumanDecision` 判定，死分支已删并加守卫。
+> 全量门禁 **801 files / 5317 passed，exit 0**。
