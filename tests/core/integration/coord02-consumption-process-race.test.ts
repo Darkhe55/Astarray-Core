@@ -63,7 +63,8 @@ async function enqueue(journal: MailboxJournal, messageId: string) {
 
 function buildRun(
   instance: ReturnType<typeof buildProcessInstance>,
-  onAppliedMessages?: (applied: { appliedMessageIdentifiers: readonly string[] }) => Promise<void>,
+  /** 逐条应用（2026-11-17 起由 runner 按消息调用）。 */
+  onApplyMessage?: (messageIdentifier: string) => Promise<void>,
   ownerInstanceIdentifier = "scheduler-1",
 ) {
   return {
@@ -74,7 +75,12 @@ function buildRun(
     ownerInstanceIdentifier,
     leaseTtlMilliseconds: 60_000,
     toSnapshot: (message: { messageId: string }) => ({ lastAppliedMessageId: message.messageId }),
-    ...(onAppliedMessages === undefined ? {} : { onAppliedMessages }),
+    ...(onApplyMessage === undefined
+      ? {}
+      : {
+          applyMessage: async ({ messageIdentifier }: { messageIdentifier: string }) =>
+            onApplyMessage(messageIdentifier),
+        }),
   } as never;
 }
 
@@ -85,15 +91,15 @@ describe("消费的副作用不重复", () => {
 
     const firstApplied: string[][] = [];
     await runCoordinationConsumptionOnce(
-      buildRun(instance, async ({ appliedMessageIdentifiers }) => {
-        firstApplied.push([...appliedMessageIdentifiers]);
+      buildRun(instance, async (messageIdentifier: string) => {
+        firstApplied.push([messageIdentifier]);
       }) as never,
     );
 
     const secondApplied: string[][] = [];
     await runCoordinationConsumptionOnce(
-      buildRun(instance, async ({ appliedMessageIdentifiers }) => {
-        secondApplied.push([...appliedMessageIdentifiers]);
+      buildRun(instance, async (messageIdentifier: string) => {
+        secondApplied.push([messageIdentifier]);
       }) as never,
     );
 
@@ -111,15 +117,15 @@ describe("消费的副作用不重复", () => {
     const appliedBySecond: string[][] = [];
     const [firstResult, secondResult] = await Promise.all([
       runCoordinationConsumptionOnce(
-        buildRun(first, async ({ appliedMessageIdentifiers }) => {
-          appliedByFirst.push([...appliedMessageIdentifiers]);
+        buildRun(first, async (messageIdentifier: string) => {
+          appliedByFirst.push([messageIdentifier]);
         }) as never,
       ),
       runCoordinationConsumptionOnce(
         buildRun(
           second,
-          async ({ appliedMessageIdentifiers }) => {
-            appliedBySecond.push([...appliedMessageIdentifiers]);
+          async (messageIdentifier: string) => {
+            appliedBySecond.push([messageIdentifier]);
           },
           "process-b",
         ) as never,
@@ -170,23 +176,21 @@ describe("消费的副作用不重复", () => {
 
     const runOnce = () =>
       runCoordinationConsumptionOnce(
-        buildRun(instance, async ({ appliedMessageIdentifiers }) => {
-          for (const messageIdentifier of appliedMessageIdentifiers) {
-            const message = await instance.journal.findMessageByIdentifier(
-              RECIPIENT_ID,
+        buildRun(instance, async (messageIdentifier: string) => {
+          const message = await instance.journal.findMessageByIdentifier(
+            RECIPIENT_ID,
+            messageIdentifier,
+          );
+          if (message === null) return;
+          await applyCoordinationMessageToTaskState({
+            taskStore: taskStore as never,
+            missionIdentifiers: ["mission-1"],
+            message: {
               messageIdentifier,
-            );
-            if (message === null) continue;
-            await applyCoordinationMessageToTaskState({
-              taskStore: taskStore as never,
-              missionIdentifiers: ["mission-1"],
-              message: {
-                messageIdentifier,
-                taskIdentifier: message.taskIdentifier ?? null,
-                payload: message.payload,
-              },
-            });
-          }
+              taskIdentifier: message.taskIdentifier ?? null,
+              payload: message.payload,
+            },
+          });
         }) as never,
       );
 

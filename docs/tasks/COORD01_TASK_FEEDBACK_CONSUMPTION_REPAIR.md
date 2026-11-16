@@ -723,3 +723,45 @@ FeedbackTransport.onMessage                      // 既有入库通知点
 2. "两个进程"目前用**两个实例共享磁盘目录**表示（租约是文件级的，路径相同）；
    真正 `spawn` 子进程的用例需要构建产物，尚未做；
 3. 现有防线是"租约回读校验 + 应用状态复查 + 任务链幂等"三层，任一层单独都不够。
+
+## P1-1 返修（2026-11-17）：「消息已 applied，但权威任务状态未更新」的崩溃窗口
+
+### 原缺陷（先确认，不是照抄）
+
+消费器先写 `applied`（协调处理进度），外层回调**随后**才更新权威任务状态；
+两步之间崩溃 ⇒ 消息"已应用"、任务状态没变；而幂等重放不再触发外层更新 ⇒ **永久漏处理**。
+
+### 修复调用链
+
+```text
+runCoordinationConsumptionOnce
+  └─ 对每条 applied 消息：
+       1) ledger.recordIntent            // 持久化"准备更新业务状态"（先于任何业务写入）
+       2) applyMessage(...)              // 权威状态更新（幂等）
+       3) ledger.markCompleted / markFailed(原因) + 抛出
+runStartupRecovery
+  └─ drainCoordinationTaskApplications   // pending/failed 条目重放，补齐崩溃窗口
+```
+
+| 改动 | 位置 |
+|---|---|
+| 业务应用台账（意图/结论/原因，原子写，不存业务真相） | `orchestration/coordination-task-application-ledger.ts` |
+| runner 改为逐条"意图 → 应用 → 回执"，失败留痕并抛出 | `orchestration/coordination-consumption-runner.ts` |
+| 运行时：台账实例 + 权威更新函数 + 启动补齐 | `application/application-runtime.ts` |
+
+### 反例（4 条，全部在改动前可复现失败）
+
+| 用例 | 断言 |
+|---|---|
+| ① 意图已写、业务未做（崩溃点 1/2） | 重启 drain 后任务变 `done`、台账 `completed` |
+| ② 业务已做、回执未写（崩溃点 2/3） | 重放后任务链**只写过 1 次**（幂等，不重复派发/释放） |
+| ③ 业务更新抛错 | 台账 `failed` + 原因保留；重试成功后才 `completed` |
+| ④ 两消费者竞争 | 只有一个业务更新（写次数 1），台账 `completed` |
+
+### 边界（如实）
+
+- `applied` 仍是**协调处理进度**，不等于权威业务状态已更新；两者现在由台账分开表达；
+- 台账只记"做到哪一步"，**不存业务结论**，权威状态仍是任务链 + 调度器（未新建第二套）；
+- SIGKILL 仍可能丢失"最后一次回执写"，此时表现为 `pending` ⇒ 重启补齐（不是丢失数据）。
+
+全量门禁：**806 files / 5332 passed + 3 skipped，exit 0**。

@@ -133,7 +133,11 @@ import { createPlatformSandboxExecutionBackend } from "../execution/platform-san
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { createCoordinationContextDeliveryPort } from "../orchestration/coordination-context-delivery.js";
-import { runCoordinationConsumptionOnce } from "../orchestration/coordination-consumption-runner.js";
+import {
+  drainCoordinationTaskApplications,
+  runCoordinationConsumptionOnce,
+} from "../orchestration/coordination-consumption-runner.js";
+import { CoordinationTaskApplicationLedger } from "../orchestration/coordination-task-application-ledger.js";
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
@@ -4879,56 +4883,90 @@ const controller = new MainController({
  * 启动恢复与"消息入库通知"共用这一处实现，避免两条触发路径语义漂移：
  * 幂等消费 → 应用标识 → 权威任务链状态更新（revision 保护）。
  */
-const runCoordinationConsumptionForMission = async (missionIdentifier: string): Promise<void> => {
-  const coordinationRecipientId = `scheduler:${missionIdentifier}`;
-  await runCoordinationConsumptionOnce({
-    consumer: coordinationMessageConsumer,
-    journal: coordinationMailboxJournal,
-    partitionKey: coordinationPartitionKey,
-    recipientId: coordinationRecipientId,
-    ownerInstanceIdentifier: `coordination-consumption:${process.pid}`,
-    leaseTtlMilliseconds: 30_000,
-    toSnapshot: (message) => ({ lastAppliedMessageId: message.messageId }),
-    onAppliedMessages: async ({ appliedMessageIdentifiers }) => {
-      for (const messageIdentifier of appliedMessageIdentifiers) {
-        const coordinationMessage = await coordinationMailboxJournal.findMessageByIdentifier(
-          coordinationRecipientId,
-          messageIdentifier,
-        );
-        if (coordinationMessage === null) {
-          continue;
-        }
-        const coordinationTaskStatus = resolveCoordinationTaskStatus(
-          coordinationMessage.payload,
-        );
-        const coordinationTaskIdentifier = coordinationMessage.taskIdentifier ?? null;
-        /**
-         * 运行中的 mission：调度器只重算内存图、不重读任务链，因此必须**先**打到
-         * `activeOrchestrators` 里的 scheduler；只有 mission 未运行时才只写任务链。
-         */
-        if (coordinationTaskStatus !== null && coordinationTaskIdentifier !== null) {
-          const activeApplication = await controller.applyCoordinationTaskOutcome({
-            missionIdentifier,
-            taskIdentifier: coordinationTaskIdentifier,
-            outcome: coordinationTaskStatus,
-          });
-          if (activeApplication.outcome === "applied-to-active-scheduler") {
-            continue;
-          }
-        }
-        await applyCoordinationMessageToTaskState({
-          taskStore,
-          missionIdentifiers: [missionIdentifier],
-          message: {
-            messageIdentifier,
-            taskIdentifier: coordinationTaskIdentifier,
-            payload: coordinationMessage.payload,
-          },
-        });
-      }
-    },
+  /**
+   * P1-1（2026-11-17）：**业务应用台账**（持久化处理意图与结论）。
+   *
+   * 崩溃窗口在这里被关掉：先写 `pending` 意图，再更新权威状态，最后写结论；
+   * 重启时由 `drainCoordinationTaskApplications` 补齐 pending/failed 条目。
+   */
+  const coordinationTaskApplicationLedger = new CoordinationTaskApplicationLedger({
+    baseDirectory: stateDirectory,
   });
-};
+
+  /**
+   * P1-1（2026-11-17）：**权威状态更新（幂等）**。
+   *
+   * 与"协调处理进度"分开：消费器把消息标 applied 只代表协调层处理过；
+   * 这里才把结果落到权威任务状态（运行中 mission 打调度器，否则写任务链）。
+   */
+  const applyCoordinationMessageToAuthoritativeState = async (input: {
+    readonly missionIdentifier: string;
+    readonly messageIdentifier: string;
+    readonly recipientId: string;
+  }): Promise<void> => {
+    const coordinationMessage = await coordinationMailboxJournal.findMessageByIdentifier(
+      input.recipientId,
+      input.messageIdentifier,
+    );
+    /** 消息不在邮箱里 ⇒ 没有可应用的业务事实；台账会被标 completed（不是丢失）。 */
+    if (coordinationMessage === null) {
+      return;
+    }
+    const coordinationTaskStatus = resolveCoordinationTaskStatus(coordinationMessage.payload);
+    const coordinationTaskIdentifier = coordinationMessage.taskIdentifier ?? null;
+    /**
+     * 运行中的 mission：调度器只重算内存图、不重读任务链，因此必须**先**打到
+     * `activeOrchestrators` 里的 scheduler；只有 mission 未运行时才只写任务链。
+     */
+    if (coordinationTaskStatus !== null && coordinationTaskIdentifier !== null) {
+      const activeApplication = await controller.applyCoordinationTaskOutcome({
+        missionIdentifier: input.missionIdentifier,
+        taskIdentifier: coordinationTaskIdentifier,
+        outcome: coordinationTaskStatus,
+      });
+      if (activeApplication.outcome === "applied-to-active-scheduler") {
+        return;
+      }
+    }
+    await applyCoordinationMessageToTaskState({
+      taskStore,
+      missionIdentifiers: [input.missionIdentifier],
+      message: {
+        messageIdentifier: input.messageIdentifier,
+        taskIdentifier: coordinationTaskIdentifier,
+        payload: coordinationMessage.payload,
+      },
+    });
+  };
+
+  /**
+   * COORD 检查点 2（2026-11-16）：**单个 mission 的协调消息消费**。
+   *
+   * 启动恢复与"消息入库通知"共用这一处实现，避免两条触发路径语义漂移：
+   * 幂等消费 → 持久化业务应用意图 → 权威状态更新（revision 保护）→ 回执。
+   */
+  const runCoordinationConsumptionForMission = async (
+    missionIdentifier: string,
+  ): Promise<void> => {
+    const coordinationRecipientId = `scheduler:${missionIdentifier}`;
+    await runCoordinationConsumptionOnce({
+      consumer: coordinationMessageConsumer,
+      journal: coordinationMailboxJournal,
+      partitionKey: coordinationPartitionKey,
+      recipientId: coordinationRecipientId,
+      ownerInstanceIdentifier: `coordination-consumption:${process.pid}`,
+      leaseTtlMilliseconds: 30_000,
+      toSnapshot: (message) => ({ lastAppliedMessageId: message.messageId }),
+      ledger: coordinationTaskApplicationLedger,
+      missionIdentifier,
+      applyMessage: async ({ messageIdentifier }) =>
+        applyCoordinationMessageToAuthoritativeState({
+          missionIdentifier,
+          messageIdentifier,
+          recipientId: coordinationRecipientId,
+        }),
+    });
+  };
 
 const runStartupRecovery = async (): Promise<{
     scan: StartupRecoveryReport;
@@ -4986,6 +5024,25 @@ const runStartupRecovery = async (): Promise<{
       for (const missionIdentifier of missionIdentifiers) {
         await runCoordinationConsumptionForMission(missionIdentifier);
       }
+      /**
+       * P1-1（2026-11-17）：**补齐崩溃窗口**。
+       *
+       * 消费已 applied 但权威状态没写（意图 pending），或业务写了但回执没写（仍 pending），
+       * 都要在启动恢复里重放一次；业务更新幂等 ⇒ 不会重复释放槽位或派发。
+       */
+      await drainCoordinationTaskApplications({
+        ledger: coordinationTaskApplicationLedger,
+        applyMessage: async ({ messageIdentifier, missionIdentifier }) => {
+          if (missionIdentifier === null) {
+            return;
+          }
+          await applyCoordinationMessageToAuthoritativeState({
+            missionIdentifier,
+            messageIdentifier,
+            recipientId: `scheduler:${missionIdentifier}`,
+          });
+        },
+      });
     } catch {
       /** 启动消费失败不阻塞启动：协调消息留待下次入库通知或下次启动处理。 */
     }
@@ -5172,7 +5229,6 @@ function createNoopFeedbackTransport(): FeedbackTransportPort {
     onMessage: () => {},
   };
 }
-
 
 
 

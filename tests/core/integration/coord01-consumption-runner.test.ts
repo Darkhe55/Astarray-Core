@@ -60,10 +60,8 @@ async function enqueueMessage(journal: MailboxJournal, messageId: string) {
 function buildRunInput(input: {
   consumer: CoordinationMessageConsumer;
   journal: MailboxJournal;
-  onAppliedMessages?: (applied: {
-    appliedMessageIdentifiers: readonly string[];
-    step: { isWakeRequested: boolean };
-  }) => Promise<void>;
+  /** 逐条应用（2026-11-17 起由 runner 按消息调用，便于写持久化意图）。 */
+  onApplyMessage?: (messageIdentifier: string) => Promise<void>;
 }) {
   return {
     consumer: input.consumer,
@@ -73,21 +71,21 @@ function buildRunInput(input: {
     ownerInstanceIdentifier: "scheduler-1",
     leaseTtlMilliseconds: 60_000,
     toSnapshot: (message: { messageId: string }) => ({ lastAppliedMessageId: message.messageId }),
-    ...(input.onAppliedMessages === undefined
+    ...(input.onApplyMessage === undefined
       ? {}
-      : { onAppliedMessages: input.onAppliedMessages }),
+      : { applyMessage: async ({ messageIdentifier }: { messageIdentifier: string }) => input.onApplyMessage?.(messageIdentifier) }),
   };
 }
 
 describe("消费入口", () => {
   it("① 无待应用消息 ⇒ 不应用、不调用钩子", async () => {
     const { consumer, journal } = buildConsumer();
-    const onAppliedMessages = vi.fn(async () => undefined);
+    const onApplyMessage = vi.fn(async () => undefined);
     const result = await runCoordinationConsumptionOnce(
-      buildRunInput({ consumer, journal, onAppliedMessages }) as never,
+      buildRunInput({ consumer, journal, onApplyMessage }) as never,
     );
     expect(result.appliedMessageIdentifiers).toEqual([]);
-    expect(onAppliedMessages).not.toHaveBeenCalled();
+    expect(onApplyMessage).not.toHaveBeenCalled();
   });
 
   it("② 有待应用消息 ⇒ 应用并把消息标识交给调用方（不是只给计数）", async () => {
@@ -98,8 +96,8 @@ describe("消费入口", () => {
       buildRunInput({
         consumer,
         journal,
-        onAppliedMessages: async ({ appliedMessageIdentifiers }) => {
-          received.push(appliedMessageIdentifiers);
+        onApplyMessage: async (messageIdentifier: string) => {
+          received.push([messageIdentifier]);
         },
       }) as never,
     );
@@ -129,13 +127,13 @@ describe("消费入口", () => {
     });
     expect(heldLease.outcome).toBe("acquired");
 
-    const onAppliedMessages = vi.fn(async () => undefined);
+    const onApplyMessage = vi.fn(async () => undefined);
     const result = await runCoordinationConsumptionOnce(
-      buildRunInput({ consumer, journal, onAppliedMessages }) as never,
+      buildRunInput({ consumer, journal, onApplyMessage }) as never,
     );
     expect(result.step.isLeaseUnavailable).toBe(true);
     expect(result.appliedMessageIdentifiers).toEqual([]);
-    expect(onAppliedMessages).not.toHaveBeenCalled();
+    expect(onApplyMessage).not.toHaveBeenCalled();
   });
 
   it("④ 调用方钩子抛错 ⇒ 向上抛出（不静默吞掉“状态没推进”）", async () => {
@@ -146,7 +144,7 @@ describe("消费入口", () => {
         buildRunInput({
           consumer,
           journal,
-          onAppliedMessages: async () => {
+          onApplyMessage: async () => {
             throw new Error("权威状态更新失败");
           },
         }) as never,
