@@ -1,0 +1,137 @@
+{
+  "reportIdentifier": "FLAKE_TRACKER",
+  "generatedAtIso": "2026-11-16T13:43:47.860Z",
+  "runsPerFile": 3,
+  "files": [
+    {
+      "testFile": "tests/core/integration/anthropic-messages-runtime.test.ts",
+      "runs": 3,
+      "failureCount": 0,
+      "failureRate": 0,
+      "attempts": [
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 865.65,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  24 passed (24)\n   Start at  21:43:48\n   Duration  435ms (transform 81ms, setup 0ms, import 121ms, tests 127ms, environment 0ms)"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 841.34,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  24 passed (24)\n   Start at  21:43:49\n   Duration  440ms (transform 80ms, setup 0ms, import 121ms, tests 120ms, environment 0ms)"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 840.32,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  24 passed (24)\n   Start at  21:43:49\n   Duration  438ms (transform 82ms, setup 0ms, import 123ms, tests 136ms, environment 0ms)"
+        }
+      ]
+    },
+    {
+      "testFile": "tests/core/integration/anthropic-tool-loop-failclosed.test.ts",
+      "runs": 3,
+      "failureCount": 0,
+      "failureRate": 0,
+      "attempts": [
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 1174.37,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  21:43:50\n   Duration  767ms (transform 212ms, setup 0ms, import 326ms, tests 260ms, environment 0ms)"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 1183.31,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  21:43:51\n   Duration  765ms (transform 204ms, setup 0ms, import 320ms, tests 262ms, environment 0ms)"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 1171.25,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  21:43:53\n   Duration  770ms (transform 209ms, setup 0ms, import 323ms, tests 265ms, environment 0ms)"
+        }
+      ]
+    },
+    {
+      "testFile": "tests/core/integration/completion-gate-counterexamples.test.ts",
+      "runs": 3,
+      "failureCount": 0,
+      "failureRate": 0,
+      "attempts": [
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 5106.66,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  21:43:54\n   Duration  4.65s (transform 2.60s, setup 0ms, import 3.07s, tests 1.39s, environment 0ms)"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 5143.21,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  21:43:59\n   Duration  4.66s (transform 2.59s, setup 0ms, import 3.06s, tests 1.42s, environment 0ms)"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 5083.55,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  21:44:04\n   Duration  4.59s (transform 2.51s, setup 0ms, import 3.00s, tests 1.41s, environment 0ms)"
+        }
+      ]
+    },
+    {
+      "testFile": "tests/core/integration/graph-change-deterministic-drill.test.ts",
+      "runs": 3,
+      "failureCount": 1,
+      "failureRate": 0.3333,
+      "attempts": [
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 6237.79,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  21:44:09\n   Duration  5.73s (transform 2.48s, setup 0ms, import 2.95s, tests 2.61s, environment 0ms)"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 6463.03,
+          "tail": "\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  21:44:15\n   Duration  5.99s (transform 2.67s, setup 0ms, import 3.13s, tests 2.68s, environment 0ms)"
+        },
+        {
+          "isPassed": false,
+          "exitCode": 1,
+          "elapsedMilliseconds": 36109.07,
+          "tail": "    316|       expect(goalState.requiresReplanning).toBe(true);\n       |                                            ^\n    317|       expect(goalState.pauseReason).toContain(\"V 上升\");\n    318|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯"
+        }
+      ]
+    },
+    {
+      "testFile": "tests/core/integration/g4-tool-documentation-e2e.test.ts",
+      "runs": 3,
+      "failureCount": 0,
+      "failureRate": 0,
+      "attempts": [
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 3917.22,
+          "tail": " Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  21:44:58\n   Duration  3.46s (transform 2.42s, setup 0ms, import 2.88s, tests 409ms, environment 0ms)\n\ntemp-hygiene: 清理 0 个陈旧目录 + 2 个本次残留；剩余 0 个。"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 3700.95,
+          "tail": " Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  21:45:02\n   Duration  3.23s (transform 2.26s, setup 0ms, import 2.66s, tests 394ms, environment 0ms)\n\ntemp-hygiene: 清理 0 个陈旧目录 + 2 个本次残留；剩余 0 个。"
+        },
+        {
+          "isPassed": true,
+          "exitCode": 0,
+          "elapsedMilliseconds": 3739.02,
+          "tail": " Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  21:45:06\n   Duration  3.29s (transform 2.31s, setup 0ms, import 2.74s, tests 388ms, environment 0ms)\n\ntemp-hygiene: 清理 0 个陈旧目录 + 2 个本次残留；剩余 0 个。"
+        }
+      ]
+    }
+  ]
+}
