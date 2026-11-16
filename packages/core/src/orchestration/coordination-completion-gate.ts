@@ -48,15 +48,20 @@ export function evaluateCoordinationCompletion(input: {
   readonly completionReceiptIdentifier: string | null;
   /** 该任务当前的审查状态（由调用方从权威存储读取）。 */
   readonly reviewState: "none" | "pending" | "rework" | "accepted";
+  /**
+   * 入口种类（2026-11-17）：`worker` 是进程内受派收口，不携带消息侧 mission/project 声明，
+   * 因此跳过那两条"消息必须自证"的检查；收据/审查/来源/状态检查照旧。
+   */
+  readonly entryKind?: "coordination-message" | "worker";
 }): CoordinationCompletionDecision {
   const sourceAgentInstanceIdentifier = input.sourceAgentInstanceIdentifier?.trim() ?? "";
   if (sourceAgentInstanceIdentifier === "") {
     return reject("source-unknown", "反馈缺少来源个体标识：无法证明由谁报告完成");
   }
-  if (input.messageMissionIdentifier === null) {
+  if (input.entryKind !== "worker" && input.messageMissionIdentifier === null) {
     return reject("mission-mismatch", "反馈未声明所属 mission：不能默认绑定当前 mission");
   }
-  if (input.messageProjectIdentifier === null) {
+  if (input.entryKind !== "worker" && input.messageProjectIdentifier === null) {
     return reject("project-mismatch", "反馈未声明所属项目：不能默认绑定当前项目");
   }
   if (input.missionProjectIdentifier !== null && input.messageProjectIdentifier !== input.missionProjectIdentifier) {

@@ -124,3 +124,59 @@ describe("审查状态解析（读权威裁决）", () => {
     expect(decision.code).toBe("review-already-decided");
   });
 });
+
+describe("权威完成校验（两入口共用同一函数）", () => {
+  it("⑬ 协调入口：无收据 ⇒ 拒绝；有收据 ⇒ 接受", async () => {
+    const { evaluateAuthoritativeCompletion } = await import(
+      "../../../packages/core/src/orchestration/authoritative-completion.js"
+    );
+    const base = {
+      entryKind: "coordination-message" as const,
+      outcome: "done" as const,
+      sourceAgentInstanceIdentifier: "worker-1",
+      messageMissionIdentifier: "mission-1",
+      messageProjectIdentifier: "project-alpha",
+      task: { id: "T-001", status: "running", assignedAgentId: "worker-1", taskType: "data" },
+      missionProjectIdentifier: "project-alpha",
+      requiresCompletionControlEvent: false,
+      isCompletionReceiptRequired: true,
+      reviewState: "none" as const,
+    };
+    expect(evaluateAuthoritativeCompletion({ ...base, completionReceipt: null }).isAccepted).toBe(
+      false,
+    );
+    expect(
+      evaluateAuthoritativeCompletion({
+        ...base,
+        completionReceipt: {
+          taskIdentifier: "T-001",
+          missionIdentifier: "mission-1",
+          toolCallCount: 1,
+          artifactPaths: ["out.md"],
+          hasVerifiedCompletionControlEvent: true,
+        } as never,
+      }).isAccepted,
+    ).toBe(true);
+  });
+
+  it("⑭ Worker 入口：跳过消息侧自证，但仍校验收据", async () => {
+    const { evaluateAuthoritativeCompletion } = await import(
+      "../../../packages/core/src/orchestration/authoritative-completion.js"
+    );
+    const decision = evaluateAuthoritativeCompletion({
+      entryKind: "worker",
+      outcome: "done",
+      sourceAgentInstanceIdentifier: "worker-1",
+      messageMissionIdentifier: null,
+      messageProjectIdentifier: null,
+      task: { id: "T-001", status: "running", assignedAgentId: "worker-1", taskType: "data" },
+      missionProjectIdentifier: null,
+      completionReceipt: null,
+      requiresCompletionControlEvent: false,
+      isCompletionReceiptRequired: true,
+      reviewState: "none",
+    });
+    expect(decision.isAccepted).toBe(false);
+    expect(decision.code).toBe("completion-receipt-insufficient");
+  });
+});

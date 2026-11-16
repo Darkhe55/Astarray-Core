@@ -6227,3 +6227,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 判定改为「提交证据 + 确实开始返回」；已提交但无事件即失败 ⇒ `unknown`；未提交保持 `pending`。
 > 反例 3 条；全量门禁 **807 files / 5347 passed，exit 0**。
 > 未完成：按预算/版本的部分携带（要求 7）。
+
+> **P1-2 补强之二（2026-11-17）：单一权威完成校验**
+>
+> 抽出 `evaluateAuthoritativeCompletion`（收据 + 协调门禁，按 entryKind 区分消息自证），协调入口已接入。
+> 补例 2 条；全量门禁 **807 files / 5349 passed，exit 0**。
+> 仍未完成：Worker 收口尚未改为调用该函数；另记录 `evaluateCompletionReceipt` 对畸形收据会崩溃。

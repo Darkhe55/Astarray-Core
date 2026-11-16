@@ -870,3 +870,34 @@ WorkerAgent
 全量门禁：**807 files / 5347 passed + 3 skipped，exit 0**。
 （首轮门禁红在 `e2e01-provider-write-probe` / `obs01-diag-production-collection`，
 原因是我的 `options.cancellationSignal.aborted` 未做空值保护——**真实回归**，已修并复跑绿。）
+
+### P1-2 补强之二（2026-11-17）：抽出**单一**权威完成校验函数
+
+之前两条入口各写一套（Worker 走 `evaluateCompletionReceipt`，协调入口走协调门禁）。
+本步抽出 `evaluateAuthoritativeCompletion`：
+
+```text
+evaluateAuthoritativeCompletion
+  ├─ 收据校验（仅在 isCompletionReceiptRequired 时；**复用** evaluateCompletionReceipt，不重写规则）
+  └─ 协调门禁规则（来源=受派个体、任务 running、审查状态、收据存在）
+       entryKind="worker"            ⇒ 跳过"消息必须自证 mission/project"两条
+       entryKind="coordination-message" ⇒ 全量校验
+```
+
+| 改动 | 位置 |
+|---|---|
+| 共用校验函数（含入口种类） | `orchestration/authoritative-completion.ts` |
+| 协调入口改用它 | `application/application-runtime.ts` |
+| 补例 2 条（两入口各自输入） | `tests/core/unit/coordination-completion-gate.test.ts` |
+
+**仍未完成（必须说明）**：`MissionOrchestrator.handleWorkerOutcome` 内部**仍直接调用**
+`evaluateCompletionReceipt`，尚未改为调用共用函数。也就是说：
+- "同一套规则"已经**存在**（一个函数覆盖两边语义）；
+- 但 Worker 路径**还没接过去**，两条路径在代码上仍是两个调用点。
+
+### 过程中发现的健壮性缺口（未修，记录）
+
+`evaluateCompletionReceipt` 对**畸形收据**（缺 `missionIdentifier` 等）会 `.trim()` 崩溃，
+而不是返回"收据不足"。收据来自本地 Worker，风险有限，但属于"坏输入导致异常"而非"拒绝"。
+
+全量门禁：**807 files / 5349 passed + 3 skipped，exit 0**。

@@ -139,10 +139,8 @@ import {
 } from "../orchestration/coordination-consumption-runner.js";
 import { CoordinationTaskApplicationLedger } from "../orchestration/coordination-task-application-ledger.js";
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
-import {
-  evaluateCoordinationCompletion,
-  resolveReviewStateForCoordination,
-} from "../orchestration/coordination-completion-gate.js";
+import { resolveReviewStateForCoordination } from "../orchestration/coordination-completion-gate.js";
+import { evaluateAuthoritativeCompletion } from "../orchestration/authoritative-completion.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -4939,7 +4937,11 @@ const controller = new MainController({
       const storedCompletionVerdict = await completionVerdictStore
         .read(input.missionIdentifier, coordinationTaskIdentifier)
         .catch(() => null);
-      const completionDecision = evaluateCoordinationCompletion({
+      const completionDecision = evaluateAuthoritativeCompletion({
+        entryKind: "coordination-message",
+        isCompletionReceiptRequired: true,
+        completionReceipt: null,
+        requiresCompletionControlEvent: false,
         outcome: coordinationTaskStatus,
         sourceAgentInstanceIdentifier:
           coordinationMessage.source.sourceType === "agent"
@@ -4957,7 +4959,6 @@ const controller = new MainController({
                 taskType: coordinationTask.taskType,
               },
         missionProjectIdentifier: missionSummary?.projectIdentifier ?? null,
-        completionReceiptIdentifier: null,
         /**
          * 审查状态：审查型任务视为"审查中"；其它任务暂按 none。
          * 注意（如实记录）：这里**尚未**读取完成裁决存储，
