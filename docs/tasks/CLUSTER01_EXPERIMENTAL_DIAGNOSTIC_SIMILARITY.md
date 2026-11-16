@@ -450,3 +450,33 @@ CLI：`astarray similarity build|list|inspect|find-related|feedback` 与 `astarr
 **门禁**：`check:low-parallel` ⇒ **707 files / 4758 passed + 3 skipped，exit 0**。
 
 ⇒ `CLUSTER-01-02` 转 **implemented-unverified**。卡内 §6 剩余：**04 的效果与资源报告**（需真实数据，属待人测）。
+
+## 审查报告 P2 修正（2026-11-16）：跨进程写租约
+
+**问题**（报告原文）：`activeLeases` 是实例内 `Set`，两个服务实例或进程不共享它，不能满足跨进程竞争验收。
+
+**修复**：复用既有持久租约 `CoordinationPartitionLeaseStore`（已有 TTL + fencing token），不另造锁。
+
+| 变化 | 位置 |
+|---|---|
+| 选项新增 `leaseStore` / `ownerInstanceIdentifier` | `orchestration/diagnostic-cluster-service.ts` |
+| 构建前取持久租约，拿不到 ⇒ `busy`（不排队，避免两批扫描互相覆盖） | 同上 |
+| **提交前校验所有权**，被接管 ⇒ 新状态 `lease-lost`（丢弃结果，不覆盖新索引） | 同上 |
+| 实例内 `Set` 保留为快速路径（同进程并发仍先被它挡住） | 同上 |
+
+### 验证
+
+`tests/core/integration/cluster02-cross-process-lease.test.ts`（连续 5 次全绿）：
+
+| 用例 | 断言 |
+|---|---|
+| ① 两实例争抢 | 一个 `built`、一个 `busy`（不会两个都构建） |
+| ② 前者释放 | 后者可接管并构建 |
+| ③ 租约被接管 | 旧写者 `assertIsCurrentOwner` 返回 `false`（不得覆盖） |
+
+全量门禁：**803 files / 5323 passed + 3 skipped，exit 0**（`anthropic-tool-loop-failclosed` 抖动一次，隔离重跑 7/7 通过）。
+
+### 仍未完成（本检查点剩余）
+
+- **合成数据效果与资源报告**：≥60 条合成错误、10 类标注、20 对负例、可复算指标。
+  这部分**不需要真实数据或人工体验**，属可执行验收，尚未产出。

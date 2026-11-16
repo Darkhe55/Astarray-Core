@@ -38,6 +38,37 @@ export interface DiagnosticClusterServiceOptions {
   /** 新鲜度上限（卡内默认 24 小时）。 */
   readonly ttlMilliseconds?: number;
   readonly nowMilliseconds?: () => number;
+  /**
+   * 2026-11-16（审查报告 P2）：**跨进程写租约**。
+   *
+   * 实例内 `Set` 只能挡住同一进程内的并发，挡不住两个进程同时扫描并互相覆盖索引。
+   * 提供时复用既有持久租约（`CoordinationPartitionLeaseStore`，含 TTL 与 fencing token），
+   * 不再另造一套锁。
+   */
+  readonly leaseStore?: {
+    tryAcquire(input: {
+      readonly partitionKey: string;
+      readonly ownerInstanceIdentifier: string;
+      readonly ttlMilliseconds: number;
+    }): Promise<
+      | { readonly outcome: "acquired"; readonly fencingToken: number }
+      | { readonly outcome: "held-by-other" }
+      | { readonly outcome: "not-owner" }
+      | { readonly outcome: "unknown-partition" }
+    >;
+    assertIsCurrentOwner(input: {
+      readonly partitionKey: string;
+      readonly ownerInstanceIdentifier: string;
+      readonly fencingToken: number;
+    }): Promise<{ readonly isCurrentOwner: boolean }>;
+    releaseLease(input: {
+      readonly partitionKey: string;
+      readonly ownerInstanceIdentifier: string;
+      readonly fencingToken: number;
+    }): Promise<unknown>;
+  };
+  /** 写租约持有者标识（缺省按进程区分，便于两个实例互斥）。 */
+  readonly ownerInstanceIdentifier?: string;
 }
 
 export class DiagnosticClusterService {
@@ -53,10 +84,17 @@ export class DiagnosticClusterService {
     this.isEnabled = options.isEnabled === true;
     this.ttlMilliseconds = options.ttlMilliseconds ?? 24 * 60 * 60 * 1000;
     this.nowMilliseconds = options.nowMilliseconds ?? (() => Date.now());
+    this.leaseStore = options.leaseStore;
+    this.ownerInstanceIdentifier =
+      options.ownerInstanceIdentifier ?? `cluster-service:${process.pid}`;
   }
 
   /** 单项目写租约：同一项目并发 build ⇒ busy（不排队、不并行写）。 */
   private readonly activeLeases = new Set<string>();
+
+  private readonly leaseStore: DiagnosticClusterServiceOptions["leaseStore"];
+
+  private readonly ownerInstanceIdentifier: string;
 
   private readonly ttlMilliseconds: number;
 
@@ -83,6 +121,7 @@ export class DiagnosticClusterService {
   }): Promise<
     | { readonly status: "disabled" }
     | { readonly status: "busy" }
+    | { readonly status: "lease-lost" }
     | ({ readonly status: "built" } & BuildClusterSnapshotResult & { readonly latestUpdated: boolean })
   > {
     if (!this.isEnabled) {
@@ -93,21 +132,55 @@ export class DiagnosticClusterService {
       return { status: "busy" };
     }
     this.activeLeases.add(input.projectIdentifier);
+    /**
+     * 跨进程写租约：实例内 Set 只挡同进程并发，这里再取**持久租约**。
+     * 拿不到 ⇒ busy（不排队、不并行写，避免两批扫描互相覆盖索引）。
+     */
+    const leasePartitionKey = `diagnostic-cluster:${input.projectIdentifier}`;
+    let fencingToken: number | null = null;
     try {
-      return await this.buildSnapshotOnce(input);
+      if (this.leaseStore !== undefined) {
+        const lease = await this.leaseStore.tryAcquire({
+          partitionKey: leasePartitionKey,
+          ownerInstanceIdentifier: this.ownerInstanceIdentifier,
+          ttlMilliseconds: 60_000,
+        });
+        if (lease.outcome !== "acquired") {
+          return { status: "busy" };
+        }
+        fencingToken = lease.fencingToken;
+      }
+      return await this.buildSnapshotOnce(
+        input,
+        fencingToken === null ? null : { partitionKey: leasePartitionKey, fencingToken },
+      );
     } finally {
       this.activeLeases.delete(input.projectIdentifier);
+      if (this.leaseStore !== undefined && fencingToken !== null) {
+        await this.leaseStore
+          .releaseLease({
+            partitionKey: leasePartitionKey,
+            ownerInstanceIdentifier: this.ownerInstanceIdentifier,
+            fencingToken,
+          })
+          .catch(() => undefined);
+      }
     }
   }
 
-  private async buildSnapshotOnce(input: {
-    readonly projectIdentifier: string;
-    readonly generatedAtIso: string;
-    readonly resolveProjectIdentifier: (event: DiagnosticEvent) => string | null;
-    readonly cursor?: { readonly byteOffset: number; readonly lineNumber: number };
-    readonly signal?: AbortSignal;
-  }): Promise<
+  private async buildSnapshotOnce(
+    input: {
+      readonly projectIdentifier: string;
+      readonly generatedAtIso: string;
+      readonly resolveProjectIdentifier: (event: DiagnosticEvent) => string | null;
+      readonly cursor?: { readonly byteOffset: number; readonly lineNumber: number };
+      readonly signal?: AbortSignal;
+    },
+    /** 持久租约凭据：提交前用它校验"我仍是所有者"，否则丢弃结果（旧写者不得覆盖）。 */
+    lease: { readonly partitionKey: string; readonly fencingToken: number } | null = null,
+  ): Promise<
     | { readonly status: "disabled" }
+    | { readonly status: "lease-lost" }
     | ({ readonly status: "built" } & BuildClusterSnapshotResult & { readonly latestUpdated: boolean })
   > {
     const result = await buildDiagnosticClusterSnapshotForProject({
@@ -120,6 +193,20 @@ export class DiagnosticClusterService {
       ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
       ...(input.signal === undefined ? {} : { signal: input.signal }),
     });
+    /**
+     * 旧写者保护：构建期间租约可能过期并被另一进程接管。
+     * 提交前校验所有权，失败即丢弃本次结果——宁可 busy 一次，也不要覆盖新索引。
+     */
+    if (lease !== null && this.leaseStore !== undefined) {
+      const ownership = await this.leaseStore.assertIsCurrentOwner({
+        partitionKey: lease.partitionKey,
+        ownerInstanceIdentifier: this.ownerInstanceIdentifier,
+        fencingToken: lease.fencingToken,
+      });
+      if (!ownership.isCurrentOwner) {
+        return { status: "lease-lost" };
+      }
+    }
     const saved = await saveDiagnosticClusterSnapshot({
       stateDirectory: this.stateDirectory,
       snapshot: result.snapshot,
