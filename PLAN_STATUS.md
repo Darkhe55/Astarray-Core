@@ -6141,3 +6141,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 只认 success/failure/blocked；找不到任务不新建；已是目标状态不写盘；revision 保护并发。
 > 反例 4 条 + 接线守卫 2 条；全量门禁 **801 files / 5309 passed，exit 0**。
 > 仍未完成：入库通知触发、ready set 显式重算、进程级崩溃验证。
+
+> **COORD 检查点 2 第三步（2026-11-16）**
+>
+> 消息入库即触发消费：`FeedbackTransport.onMessage → AssistScheduler → MainController → runtime.runCoordinationConsumptionForMission`，
+> 与启动恢复共用同一函数；通知不阻塞消息处理、异常不冒泡。
+> 守卫扩到 5 条；全量门禁 **801 files / 5312 passed，exit 0**。
+> 仍未完成：消费后主动 `scheduleRound()` 重算 ready set 与派发、进程级崩溃验证。

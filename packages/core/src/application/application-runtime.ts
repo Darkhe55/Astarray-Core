@@ -4636,6 +4636,13 @@ const controller = new MainController({
     contextPromptProvider,
     /** 审查报告 P1 第二步：协调上下文投递端口（WorkerAgent 请求携带 pending 正文）。 */
     coordinationContextDeliveryPort,
+    /**
+     * COORD 检查点 2：**消息入库即触发一次消费**（第二条触发路径，与启动恢复共用实现）。
+     * 失败不冒泡：消息处理不能被消费异常打断，下一轮入库或重启会重试。
+     */
+    coordinationIngestionNotifier: (missionIdentifier: string) => {
+      void runCoordinationConsumptionForMission(missionIdentifier).catch(() => undefined);
+    },
     guidanceControlQueue,
     contextNodeLifecycle,
     streamOutput: options.streamOutput,
@@ -4866,7 +4873,46 @@ const controller = new MainController({
    * 启动自动恢复 Phase 2（2026-11-05）：扫描 + 执行（默认策略关闭时不会恢复任何任务）。
    * 只恢复 mission-backed 候选；sequence-only 如实标"待派发"。
    */
-  const runStartupRecovery = async (): Promise<{
+  /**
+ * COORD 检查点 2（2026-11-16）：**单个 mission 的协调消息消费**。
+ *
+ * 启动恢复与"消息入库通知"共用这一处实现，避免两条触发路径语义漂移：
+ * 幂等消费 → 应用标识 → 权威任务链状态更新（revision 保护）。
+ */
+const runCoordinationConsumptionForMission = async (missionIdentifier: string): Promise<void> => {
+  const coordinationRecipientId = `scheduler:${missionIdentifier}`;
+  await runCoordinationConsumptionOnce({
+    consumer: coordinationMessageConsumer,
+    journal: coordinationMailboxJournal,
+    partitionKey: coordinationPartitionKey,
+    recipientId: coordinationRecipientId,
+    ownerInstanceIdentifier: `coordination-consumption:${process.pid}`,
+    leaseTtlMilliseconds: 30_000,
+    toSnapshot: (message) => ({ lastAppliedMessageId: message.messageId }),
+    onAppliedMessages: async ({ appliedMessageIdentifiers }) => {
+      for (const messageIdentifier of appliedMessageIdentifiers) {
+        const coordinationMessage = await coordinationMailboxJournal.findMessageByIdentifier(
+          coordinationRecipientId,
+          messageIdentifier,
+        );
+        if (coordinationMessage === null) {
+          continue;
+        }
+        await applyCoordinationMessageToTaskState({
+          taskStore,
+          missionIdentifiers: [missionIdentifier],
+          message: {
+            messageIdentifier,
+            taskIdentifier: coordinationMessage.taskIdentifier ?? null,
+            payload: coordinationMessage.payload,
+          },
+        });
+      }
+    },
+  });
+};
+
+const runStartupRecovery = async (): Promise<{
     scan: StartupRecoveryReport;
     run: StartupRecoveryRunReport;
   }> => {
@@ -4920,36 +4966,7 @@ const controller = new MainController({
     try {
       const missionIdentifiers = await missionManager.listMissionIds();
       for (const missionIdentifier of missionIdentifiers) {
-        const coordinationRecipientId = `scheduler:${missionIdentifier}`;
-        await runCoordinationConsumptionOnce({
-          consumer: coordinationMessageConsumer,
-          journal: coordinationMailboxJournal,
-          partitionKey: coordinationPartitionKey,
-          recipientId: coordinationRecipientId,
-          ownerInstanceIdentifier: `startup-recovery:${process.pid}`,
-          leaseTtlMilliseconds: 30_000,
-          toSnapshot: (message) => ({ lastAppliedMessageId: message.messageId }),
-          onAppliedMessages: async ({ appliedMessageIdentifiers }) => {
-            for (const messageIdentifier of appliedMessageIdentifiers) {
-              const coordinationMessage = await coordinationMailboxJournal.findMessageByIdentifier(
-                coordinationRecipientId,
-                messageIdentifier,
-              );
-              if (coordinationMessage === null) {
-                continue;
-              }
-              await applyCoordinationMessageToTaskState({
-                taskStore,
-                missionIdentifiers: [missionIdentifier],
-                message: {
-                  messageIdentifier,
-                  taskIdentifier: coordinationMessage.taskIdentifier ?? null,
-                  payload: coordinationMessage.payload,
-                },
-              });
-            }
-          },
-        });
+        await runCoordinationConsumptionForMission(missionIdentifier);
       }
     } catch {
       /** 启动消费失败不阻塞启动：协调消息留待下次入库通知或下次启动处理。 */

@@ -353,6 +353,13 @@ export interface MainControllerOptions {
   contextPromptProvider?: ContextPromptProvider;
   /** COORD-01-03 §5（审查报告 P1 第二步）：协调上下文投递端口（缺省不携带）。 */
   coordinationContextDeliveryPort?: CoordinationContextDeliveryPort;
+  /**
+   * COORD 检查点 2（2026-11-16）：**消息入库通知**端口。
+   *
+   * 收到某个 mission 的反馈消息时调用，供运行层触发一次协调消息消费。
+   * 缺省 ⇒ 不触发（保持既有行为），不影响消息本身处理。
+   */
+  coordinationIngestionNotifier?: (missionIdentifier: string) => void;
   /** GUIDE-01-04：运行中指导控制队列（主 Agent 只读不变；指导由安全点消费）。 */
   guidanceControlQueue?: GuidanceControlQueue;
   /** T09A-R1-03：任务完成后的上下文节点收口。 */
@@ -4956,6 +4963,12 @@ export class MainController {
     }
     const initialChain = this.buildInitialChain(missionId, taskNodes);
     const scheduler = new AssistScheduler({
+      ...(this.options.coordinationIngestionNotifier === undefined
+        ? {}
+        : {
+            onCoordinationMessageIngested: () =>
+              this.options.coordinationIngestionNotifier?.(missionId),
+          }),
       missionId,
       initialChain,
       taskStore: this.options.taskStore,

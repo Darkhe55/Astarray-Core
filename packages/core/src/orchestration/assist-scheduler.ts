@@ -20,6 +20,14 @@ export type AssistSchedulerOptions = Omit<
   feedbackTransport: FeedbackTransportPort;
   /** 主 Agent 侧注册：接收调度层上报（mission 完成 / 需要用户裁决）。 */
   onReportToMain?: (message: FeedbackMessage) => void | Promise<void>;
+  /**
+   * COORD 检查点 2（2026-11-16）：**消息入库通知**。
+   *
+   * 收到该 mission 的任何反馈消息就回调一次，供运行层触发一次协调消息消费
+   * （"入库 → 幂等消费 → 权威任务链"这条链的即时触发点）。
+   * 回调不得阻塞消息处理，也不得抛错影响指令解析。
+   */
+  onCoordinationMessageIngested?: () => void;
 };
 
 export class AssistScheduler extends MissionOrchestrator {
@@ -50,6 +58,12 @@ export class AssistScheduler extends MissionOrchestrator {
     });
     this.feedbackTransport = assistOptions.feedbackTransport;
     assistOptions.feedbackTransport.onMessage((message) => {
+      /** 入库通知：先触发消费，再按消息类型做既有处理；异常一律吞掉，不影响消息处理。 */
+      try {
+        assistOptions.onCoordinationMessageIngested?.();
+      } catch {
+        // 通知失败不得影响消息处理
+      }
       if (
         message.recipientId === `scheduler:${assistOptions.missionId}` &&
         message.payload.kind === "instruction"

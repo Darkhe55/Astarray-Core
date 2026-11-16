@@ -602,3 +602,37 @@ runStartupRecovery()                       // 既有启动恢复入口（applica
 - **入库通知触发**（除启动恢复外的第二条触发路径）；
 - **ready set 重算 + 派发的显式触发**：当前依赖各 mission 既有 orchestrator 循环；
 - **崩溃窗口/重复唤醒的端到端验证**（需要进程级用例）。
+
+## 检查点 2 第三步：消息入库通知触发（2026-11-16）
+
+启动恢复之外的第二条触发路径已接上，并与启动恢复**共用同一实现**（避免语义漂移）：
+
+```text
+FeedbackTransport.onMessage                      // 既有入库通知点
+  └─ AssistScheduler.onMessage
+      └─ assistOptions.onCoordinationMessageIngested?.()      // 新：任何消息都通知，不只指令
+          └─ MainController options.coordinationIngestionNotifier(missionId)
+              └─ application-runtime.runCoordinationConsumptionForMission(missionId)
+                  └─ 幂等消费 → 权威任务链状态更新（与启动恢复同一函数）
+```
+
+### 关键设计
+
+| 点 | 处理 |
+|---|---|
+| 触发范围 | 该 mission 的**任何**反馈消息（不只是 `instruction`），因为专利「入库即消费」 |
+| 阻塞风险 | 通知用 `void ... .catch(() => undefined)`，**不阻塞消息处理**；回调内 try/catch 兜住同步异常 |
+| 语义一致 | 启动恢复与入库通知调用**同一个** `runCoordinationConsumptionForMission`，不存在两套逻辑 |
+| 幂等 | 由消费层（租约 + 应用状态 + 退避）保证；重复通知不会重复应用 |
+
+### 验证
+
+`tests/architecture/coord02-consumption-wiring-guard.test.ts` 扩到 5 条，钉住：
+运行时提供通知端口、主控制器真的转给 AssistScheduler、AssistScheduler 真的回调。
+
+全量门禁：**801 files / 5312 passed + 3 skipped，exit 0**。
+
+### 仍未完成
+
+- **消费后主动触发 ready set 重算**（`scheduleRound()`）与派发；
+- 进程级崩溃窗口/重复唤醒用例。

@@ -40,3 +40,27 @@ describe("COORD 消费接线守卫", () => {
     expect(code).toContain("applyCoordinationMessageToTaskState({");
   }, 30_000);
 });
+
+describe("COORD 入库通知触发（第二条触发路径）", () => {
+  it("③ 运行时必须提供入库通知端口，并复用同一消费实现", async () => {
+    const code = await readProductionCode();
+    expect(code).toContain("coordinationIngestionNotifier:");
+    expect(code).toContain("runCoordinationConsumptionForMission(missionIdentifier)");
+  }, 30_000);
+
+  it("④ 主控制器必须把通知转给 AssistScheduler（不得只在 options 里声明）", async () => {
+    const controllerCode = await fs.readFile(
+      path.join(process.cwd(), "packages", "core", "src", "orchestration", "main-controller.ts"),
+      "utf8",
+    );
+    expect(controllerCode).toContain("onCoordinationMessageIngested:");
+  }, 30_000);
+
+  it("⑤ AssistScheduler 收到消息必须真的回调（含非指令消息）", async () => {
+    const schedulerCode = await fs.readFile(
+      path.join(process.cwd(), "packages", "core", "src", "orchestration", "assist-scheduler.ts"),
+      "utf8",
+    );
+    expect(schedulerCode).toContain("assistOptions.onCoordinationMessageIngested?.()");
+  }, 30_000);
+});
