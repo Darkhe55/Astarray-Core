@@ -6134,3 +6134,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 任务链仅有 mission 级持久化，**无任务级持久化 API**。
 > 链路方案已写入卡内；**阻塞点**：①按 taskIdentifier 定位运行中 mission 的 DagScheduler（无注册表）；
 > ②任务级状态重启后与任务链对齐的约定缺失。未确认前不改调度器。
+
+> **COORD 检查点 2 第二步（2026-11-16）**
+>
+> 启动恢复已真实触发消费：`runStartupRecovery → runCoordinationConsumptionOnce → applyCoordinationMessageToTaskState → updateTaskChain`。
+> 只认 success/failure/blocked；找不到任务不新建；已是目标状态不写盘；revision 保护并发。
+> 反例 4 条 + 接线守卫 2 条；全量门禁 **801 files / 5309 passed，exit 0**。
+> 仍未完成：入库通知触发、ready set 显式重算、进程级崩溃验证。

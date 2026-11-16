@@ -566,3 +566,39 @@ git grep 'runConsumptionStep' packages/core/src → 只有 coordination-message-
 2. **任务级状态的持久化**：DagScheduler 状态目前只在内存图里；进程重启后如何与任务链对齐，现有代码没有约定。
 
 这两点一旦确定，接线是小的；但**在未确认前不动调度器**——改错会直接产生重复派发或状态丢失。
+
+## 检查点 2 第二步：启动恢复消费 → 权威任务链（2026-11-16）
+
+### 真实调用链（已接线）
+
+```text
+runStartupRecovery()                       // 既有启动恢复入口（application-runtime L4867）
+  └─ missionManager.listMissionIds()       // 逐个 mission
+      └─ runCoordinationConsumptionOnce({ recipientId: "scheduler:<missionId>" })
+          ├─ 幂等消费（租约 + fencing + 退避）
+          └─ onAppliedMessages(ids)
+              └─ applyCoordinationMessageToTaskState(...)
+                    └─ taskStore.updateTaskChain(missionId, revision+1)   // 权威任务链
+```
+
+### 新增能力
+
+| 项 | 位置 | 说明 |
+|---|---|---|
+| 消费 → 任务链状态 | `orchestration/coordination-task-state.ts` | 只认 `success`/`failure`/`blocked`；其它类型 `status-unchanged` 不写盘 |
+| 启动触发 | `application-runtime.runStartupRecovery` | 单个 mission 失败不影响其它 mission；失败不阻塞启动 |
+| 接线守卫 | `tests/architecture/coord02-consumption-wiring-guard.test.ts` | 钉住"启动恢复真的调用消费"与"结果真的落到任务链" |
+
+### 语义与安全边界
+
+- **不新建任务**：找不到任务 ⇒ `task-not-found`；
+- **不猜状态**：不认识的消息类型不动任务；
+- **幂等**：已是目标状态 ⇒ 不写盘（避免重放造成 revision 抖动）；
+- **并发安全**：写入走 `updateTaskChain` 的 revision 保护，旧写者会被 `stale-revision` 拒绝；
+- **不占锁**：消费步只在执行期间持租约，不做长模型调用。
+
+### 仍未完成
+
+- **入库通知触发**（除启动恢复外的第二条触发路径）；
+- **ready set 重算 + 派发的显式触发**：当前依赖各 mission 既有 orchestrator 循环；
+- **崩溃窗口/重复唤醒的端到端验证**（需要进程级用例）。

@@ -62,3 +62,10 @@ main-controller 的思索路径仍以当前 message 为 userPrompt，未见在�
 > 第一步拆开准入/投递（提交 `7ac03c9a`），第二步把准入消息接入 Worker 的真实模型请求，
 > 请求提交后才记 delivered（提交见下一条）。证据：`orchestration/coordination-context-delivery.ts`、
 > `tests/core/integration/coord01-context-delivery-wiring.test.ts`（捕获 systemPrompt 断言正文/来源/任务）。
+
+> **2026-11-16 更新（COORD 消费）**：`runConsumptionStep` 不再零调用——
+> 启动恢复经 `runCoordinationConsumptionOnce` 触发消费，并把结果经
+> `applyCoordinationMessageToTaskState` 落到**权威任务链**（`updateTaskChain`，revision 保护）。
+> 证据：`application-runtime.runStartupRecovery`、`orchestration/coordination-task-state.ts`、
+> `tests/architecture/coord02-consumption-wiring-guard.test.ts`。
+> **仍未完成**：入库通知触发、ready set 显式重算、进程级崩溃/重复唤醒验证。

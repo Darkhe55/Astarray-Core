@@ -133,6 +133,8 @@ import { createPlatformSandboxExecutionBackend } from "../execution/platform-san
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { createCoordinationContextDeliveryPort } from "../orchestration/coordination-context-delivery.js";
+import { runCoordinationConsumptionOnce } from "../orchestration/coordination-consumption-runner.js";
+import { applyCoordinationMessageToTaskState } from "../orchestration/coordination-task-state.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -4907,6 +4909,51 @@ const controller = new MainController({
       run,
       generatedAtIso: new Date().toISOString(),
     });
+    /**
+     * COORD 检查点 2（2026-11-16）：**启动恢复是消费的真实触发点**。
+     *
+     * 入库 → 幂等消费 → **权威任务链状态更新**（`updateTaskChain`，带 revision 保护）。
+     * 单个 mission 失败不影响其它 mission，也不阻塞启动；
+     * ready set 重算与派发仍由各 mission 既有的 DagScheduler／orchestrator 循环负责，
+     * 这里不另造调度器，也不维护第二套任务真相。
+     */
+    try {
+      const missionIdentifiers = await missionManager.listMissionIds();
+      for (const missionIdentifier of missionIdentifiers) {
+        const coordinationRecipientId = `scheduler:${missionIdentifier}`;
+        await runCoordinationConsumptionOnce({
+          consumer: coordinationMessageConsumer,
+          journal: coordinationMailboxJournal,
+          partitionKey: coordinationPartitionKey,
+          recipientId: coordinationRecipientId,
+          ownerInstanceIdentifier: `startup-recovery:${process.pid}`,
+          leaseTtlMilliseconds: 30_000,
+          toSnapshot: (message) => ({ lastAppliedMessageId: message.messageId }),
+          onAppliedMessages: async ({ appliedMessageIdentifiers }) => {
+            for (const messageIdentifier of appliedMessageIdentifiers) {
+              const coordinationMessage = await coordinationMailboxJournal.findMessageByIdentifier(
+                coordinationRecipientId,
+                messageIdentifier,
+              );
+              if (coordinationMessage === null) {
+                continue;
+              }
+              await applyCoordinationMessageToTaskState({
+                taskStore,
+                missionIdentifiers: [missionIdentifier],
+                message: {
+                  messageIdentifier,
+                  taskIdentifier: coordinationMessage.taskIdentifier ?? null,
+                  payload: coordinationMessage.payload,
+                },
+              });
+            }
+          },
+        });
+      }
+    } catch {
+      /** 启动消费失败不阻塞启动：协调消息留待下次入库通知或下次启动处理。 */
+    }
     return { scan, run };
   };
 
