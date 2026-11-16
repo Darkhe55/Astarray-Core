@@ -136,3 +136,48 @@ tryAcquire:
 
 - `graph-change-deterministic-drill` 的暂停路径（追踪代码已回退，未复现）；
 - `anthropic-messages-runtime` 的低频失败（约 1/8~1/20，尚未抓到现场）。
+
+## 第四轮：长循环采集，抓到两处失败现场
+
+20 次重复（保存每轮输出）结果：
+
+| 文件 | 失败 |
+|---|---|
+| `graph-change-deterministic-drill` | **4/20** |
+| `anthropic-messages-runtime` | **1/20** |
+
+### A. graph drill：`ENOENT ... goal-mode/.mission-bindings.json.<pid>...tmp`
+
+失败栈指向 `submitTask`，但错误是**临时文件 open 失败**：
+
+```text
+任务提交失败: ENOENT: no such file or directory, open '...\goal-mode\.mission-bin...tmp'
+```
+
+含义：`writeAtomicJson` 先 `mkdir -p` 再 `open(tmp)`，只有在**目录被并发删除**时才会 ENOENT。
+删除者是用例的 `afterEach`（`fs.rm(stateDirectory, ...)`）——它固定只等 200ms，
+而 `application.shutdown()` 返回后仍有后台原子写在飞。
+
+**修法（测试侧，不动产品语义）**：收尾前轮询"目录内没有 `.tmp` 残留"（最多 5s）再删。
+实测：**12/12 通过**（修前 4/20 失败）。
+
+**这暴露的产品问题（未修，已记录）**：`shutdown()` 不保证"后台写已收敛"，
+调用方只能靠沉降窗口。真正的修法是让 shutdown await 在飞写，属于更大改动。
+
+### B. anthropic-messages-runtime：`provider-network-error`（连不上本地假服务）
+
+失败现场：同一轮里 ⑤⑥⑦⑧ 连续四个用例全部 `provider-network-error`。
+
+已做的一处修复：`afterEach` 原先 `server.close()` **不 await**，关闭是异步的，
+下一个用例 `listen(0)` 可能撞上仍在关闭的端口/套接字。改为 await 关闭 + `closeAllConnections()`。
+
+结果：**1/20**（修前也是 1/20 量级）——**没有解决**，说明另有原因（可能是端点复用或连接池缓存）。
+如实记录，不宣称已修。
+
+## 小结：抖动的三类根因（目前证据）
+
+| 类别 | 实例 | 状态 |
+|---|---|---|
+| 产品级并发缺陷 | 租约接管不互斥 | **已修**（排他守卫） |
+| 用例收尾不收敛 | drill 删除目录撞后台写 | **已修**（等 `.tmp` 消失） |
+| 未确认 | anthropic 连接失败 | **未修**，1/20 |

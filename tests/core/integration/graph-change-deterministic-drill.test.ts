@@ -45,6 +45,24 @@ afterEach(async () => {
    * 并把整轮门禁的退出码打成非 0（实测：本轮 gate 4469 全绿仍 exit 1）。
    */
   await new Promise((resolve) => setTimeout(resolve, 200));
+  /**
+   * 2026-11-16（抖动归因）：**等到真的没有在飞写**再删目录。
+   *
+   * 固定 200ms 沉降不够：满载时后台原子写可能还在途中，删目录会让它的
+   * `open(.xxx.tmp)` 撞 ENOENT（实测 4/20 次失败）。这里改为轮询"没有 .tmp 残留"，
+   * 有界等待（最多 5s），超时也照常删除——宁可留残骸，也不要挂住测试。
+   */
+  const quiescenceDeadline = Date.now() + 5_000;
+  while (Date.now() < quiescenceDeadline) {
+    const hasInFlightTemporaryFile = await fs
+      .readdir(stateDirectory, { recursive: true })
+      .then((entries) => entries.some((entry) => String(entry).endsWith(".tmp")))
+      .catch(() => false);
+    if (!hasInFlightTemporaryFile) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
   await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
 });
 

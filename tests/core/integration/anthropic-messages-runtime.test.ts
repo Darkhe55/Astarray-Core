@@ -40,10 +40,19 @@ type CapturedUsageRecord = Parameters<
 
 let server: http.Server | null = null;
 
-afterEach(() => {
+afterEach(async () => {
   if (server !== null) {
-    server.close();
+    /**
+     * 2026-11-16（抖动归因）：**必须等关闭完成**。
+     *
+     * 原先 `server.close()` 不 await：关闭是异步的，紧接着下一个用例 `listen(0)`
+     * 可能拿到仍在关闭中的端口/套接字，表现为 `provider-network-error`（无法连接）。
+     */
+    const closingServer = server;
     server = null;
+    await new Promise<void>((resolve) => closingServer.close(() => resolve()));
+    /** 强制断开 keep-alive 连接，避免句柄滞留。 */
+    closingServer.closeAllConnections?.();
   }
 });
 
