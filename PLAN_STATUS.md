@@ -6207,3 +6207,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 现改为「持久化意图 → 幂等业务更新 → 回执」，启动恢复 drain pending/failed 补齐。
 > 反例 4 条（崩溃点各一 + 竞争）；全量门禁 **806 files / 5332 passed，exit 0**。
 > 边界：`applied` 仍是协调进度指标，非业务完成；台账不存业务真相。
+
+> **P1-2 返修（2026-11-17）：协调完成入口门禁**
+>
+> 协调消息的 success 不再能直接判 done：新增纯判定门禁（来源=受派个体、mission/project 一致、
+> 任务 running、审查状态、必须带完成收据），拒绝时记 blocked 并抛 `coordination-completion-rejected`。
+> 反例 9 条；全量门禁 **807 files / 5341 passed，exit 0**。
+> 未完成：审查状态尚未读裁决存储；与 Worker 路径的"同一套校验"未合并。

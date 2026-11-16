@@ -139,6 +139,7 @@ import {
 } from "../orchestration/coordination-consumption-runner.js";
 import { CoordinationTaskApplicationLedger } from "../orchestration/coordination-task-application-ledger.js";
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
+import { evaluateCoordinationCompletion } from "../orchestration/coordination-completion-gate.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -4914,6 +4915,68 @@ const controller = new MainController({
     }
     const coordinationTaskStatus = resolveCoordinationTaskStatus(coordinationMessage.payload);
     const coordinationTaskIdentifier = coordinationMessage.taskIdentifier ?? null;
+    /**
+     * P1-2（2026-11-17）：**协调完成入口不得绕过权威完成门禁**。
+     *
+     * 一条带 success 的协调消息不能把任务判成 done：必须来源是受派个体、
+     * mission/project 一致、任务仍在执行，且携带完成收据。协调消息本身不携带收据
+     * ⇒ done 一律被拒（失败反馈仍可如实推进）。
+     */
+    if (coordinationTaskStatus !== null && coordinationTaskIdentifier !== null) {
+      const missionTaskChain = await taskStore
+        .readTaskChain(input.missionIdentifier)
+        .catch(() => null);
+      const coordinationTask = missionTaskChain?.tasks.find(
+        (candidate) => candidate.id === coordinationTaskIdentifier,
+      );
+      const missionSummary = await missionManager
+        .readSummary(input.missionIdentifier)
+        .catch(() => null);
+      const completionDecision = evaluateCoordinationCompletion({
+        outcome: coordinationTaskStatus,
+        sourceAgentInstanceIdentifier:
+          coordinationMessage.source.sourceType === "agent"
+            ? coordinationMessage.source.agentInstanceId
+            : null,
+        messageMissionIdentifier: coordinationMessage.missionIdentifier ?? null,
+        messageProjectIdentifier: coordinationMessage.projectIdentifier ?? null,
+        task:
+          coordinationTask === undefined
+            ? null
+            : {
+                id: coordinationTask.id,
+                status: coordinationTask.status,
+                assignedAgentId: coordinationTask.assignedAgentId ?? null,
+                taskType: coordinationTask.taskType,
+              },
+        missionProjectIdentifier: missionSummary?.projectIdentifier ?? null,
+        completionReceiptIdentifier: null,
+        /**
+         * 审查状态：审查型任务视为"审查中"；其它任务暂按 none。
+         * 注意（如实记录）：这里**尚未**读取完成裁决存储，
+         * 因此"已有返修/通过结论"的覆盖保护只在裁决接入后完全生效。
+         */
+        reviewState: coordinationTask?.taskType === "review" ? "pending" : "none",
+      });
+      if (!completionDecision.isAccepted) {
+        /**
+         * 明确记录并抛出（不静默跳过）：这是"被门禁拒绝"，不是"一切正常"。
+         * 台账会记 failed + 原因，重启后重试仍会被同样拒绝——不会误判完成。
+         */
+        await coordinationMailboxJournal.recordApplicationState({
+          recipientId: input.recipientId,
+          messageId: input.messageIdentifier,
+          state: "blocked",
+          reason: `${completionDecision.code}: ${completionDecision.reason}`,
+          targetStateVersion: null,
+          updatedAtIso: new Date().toISOString(),
+        });
+        throw new DomainError(
+          "coordination-completion-rejected",
+          `${completionDecision.code}: ${completionDecision.reason}`,
+        );
+      }
+    }
     /**
      * 运行中的 mission：调度器只重算内存图、不重读任务链，因此必须**先**打到
      * `activeOrchestrators` 里的 scheduler；只有 mission 未运行时才只写任务链。

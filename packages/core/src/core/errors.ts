@@ -81,6 +81,11 @@ export type DomainErrorCode =
   | "permission-preview-stale"
   | "journal-corrupted"
   | "operation-not-idempotent"
+  /**
+   * P1-2（2026-11-17）：协调完成入口被权威完成门禁拒绝
+   * （来源不符/跨项目/任务非执行中/缺完成收据/已有审查结论）。
+   */
+  | "coordination-completion-rejected"
   | "tool-execution-failed"
   | "path-escape-attempt"
   | "task-sequence-not-found"

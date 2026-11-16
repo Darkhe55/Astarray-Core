@@ -765,3 +765,43 @@ runStartupRecovery
 - SIGKILL 仍可能丢失"最后一次回执写"，此时表现为 `pending` ⇒ 重启补齐（不是丢失数据）。
 
 全量门禁：**806 files / 5332 passed + 3 skipped，exit 0**。
+
+## P1-2 返修（2026-11-17）：协调完成入口不得绕过权威完成门禁
+
+### 原缺陷
+
+`MainController.applyCoordinationTaskOutcome` 直接
+`scheduler.completeTaskByTaskIdentifier → dagScheduler.finishTask`，
+于是一条带 `success` 的协调消息就能把任务写成 `done`，**绕过** Worker 收口路径上的
+完成收据校验与独立审查。
+
+### 本步修复
+
+| 改动 | 位置 |
+|---|---|
+| 纯判定门禁（来源/项目/mission/任务状态/审查状态/完成收据） | `orchestration/coordination-completion-gate.ts` |
+| 运行时在**写权威状态之前**调用门禁；拒绝则记 `blocked` 并抛 `coordination-completion-rejected` | `application/application-runtime.ts` |
+| 新错误码 | `core/errors.ts` |
+| 反例 9 条 | `tests/core/unit/coordination-completion-gate.test.ts` |
+
+### 判定规则（要点）
+
+| 情形 | 结果 |
+|---|---|
+| 缺来源个体 / mission / 项目 | 拒绝（不默认绑定当前执行） |
+| 来源不是该任务受派个体 | 拒绝（迟到/冒名反馈不得结算） |
+| 项目与 mission 项目不一致 | 拒绝 |
+| 任务不在 `running` | 拒绝（旧执行反馈） |
+| 审查中 / 已有返修或通过结论 | 拒绝（协调入口不得改判） |
+| `done` 但**没有完成收据** | 拒绝（success 文本/产物存在/退出码 0 都不是验收结论） |
+| `failed` 且来源与受派一致 | 接受（只推进执行状态，不涉及验收） |
+
+### 如实说明的未完成边界（重要）
+
+1. **审查状态目前只按 `taskType === "review"` 判定为 pending**，尚未读取完成裁决存储
+   ⇒ "已有返修/通过结论被覆盖"的保护**未完全生效**；
+2. **尚未与 Worker 收口路径合并成同一套校验**：Worker 路径有自己的完成收据评估，
+   本门禁目前只拦协调入口（要求 1 的"同一套校验"未达成）；
+3. 因此本步只做到"**堵住绕过**"，没有做到"两条路径共用一套门禁"。
+
+全量门禁：**807 files / 5341 passed + 3 skipped，exit 0**（`graph-change-deterministic-drill` 抖动一次，隔离重跑 3/3）。
