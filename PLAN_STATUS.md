@@ -6127,3 +6127,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 已交付 `runCoordinationConsumptionOnce()` + 消费结果新增 `appliedMessageIdentifiers`，
 > 反例 4 条（含"租约被占一条不应用""钩子抛错向上抛"）。全量门禁 **799 files / 5303 passed，exit 0**。
 > **检查点 2 未完成**：生产触发（入库通知/启动恢复）与权威任务状态更新钩子仍缺。
+
+> **COORD 检查点 2 接缝核查（2026-11-16）**
+>
+> 定位到既有权威能力：`dag-scheduler.finishTask` + `scheduleRound()`（ready set）+ orchestrator 循环派发；
+> 任务链仅有 mission 级持久化，**无任务级持久化 API**。
+> 链路方案已写入卡内；**阻塞点**：①按 taskIdentifier 定位运行中 mission 的 DagScheduler（无注册表）；
+> ②任务级状态重启后与任务链对齐的约定缺失。未确认前不改调度器。

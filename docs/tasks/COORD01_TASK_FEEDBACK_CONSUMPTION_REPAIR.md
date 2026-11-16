@@ -534,3 +534,35 @@ git grep 'runConsumptionStep' packages/core/src → 只有 coordination-message-
 - 崩溃窗口、重复投递、旧执行反馈、跨进程竞争、重复唤醒的端到端验证。
 
 **因此检查点 2 不能标完成**：现在只是把"可调用入口"和"应用标识"准备好，链路仍缺两段。
+
+## 检查点 2 主体：权威状态与派发的真实接缝（2026-11-16 核查）
+
+为免"抽错接口"，先定位**既有**权威状态与 ready set 的真实位置：
+
+| 能力 | 真实位置 | 结论 |
+|---|---|---|
+| 任务级状态推进 | `orchestration/dag-scheduler.ts`：`finishTask` / `releaseTaskBackToPending` / `blockTaskForHumanDecision` / `cancelTask` / `reassignTask` / `unblockTask` | **存在**，是权威图状态 |
+| ready set 重算 | 同文件 `scheduleRound()`（返回 `ScheduleAction[]`） | **存在**，调度器自己的入口 |
+| 派发 | `MissionOrchestrator` 消费 `scheduleRound()` 的动作 | **存在** |
+| 任务链持久化 | `MissionManager` 仅 `updateMissionStatus`（**mission 级**）+ 创建时 `writeTaskChain` | **无任务级持久化 API** |
+| 消费入口 | 本轮新增 `runCoordinationConsumptionOnce()` | 就绪 |
+
+**所以链路可以这样接（不需要另造调度器/任务存储）**：
+
+```text
+反馈入库/启动恢复
+  → runCoordinationConsumptionOnce()            // 幂等消费 + 应用标识
+  → onAppliedMessages(ids)                      // 交给调用方
+  → 由消息的 taskIdentifier 定位所属 mission 的 DagScheduler 实例
+  → scheduler.finishTask(...)                   // 权威图状态推进
+  → scheduler.scheduleRound()                   // ready set 重算
+  → MissionOrchestrator 既有循环派发            // 不另建派发器
+```
+
+### 缺口（需要设计确认，不能自行猜）
+
+1. **消息 → 运行中 mission 的路由**：`onAppliedMessages` 只拿到消息标识，需要判定它属于哪个 mission 的
+   `DagScheduler` 实例；当前没有"按 taskIdentifier 查运行中 orchestrator"的注册表。
+2. **任务级状态的持久化**：DagScheduler 状态目前只在内存图里；进程重启后如何与任务链对齐，现有代码没有约定。
+
+这两点一旦确定，接线是小的；但**在未确认前不动调度器**——改错会直接产生重复派发或状态丢失。
