@@ -121,7 +121,17 @@ async function startFakeAnthropicServer(
         headers: request.headers,
         body: JSON.parse(rawBody) as Record<string, unknown>,
       });
-      response.writeHead(200, { "content-type": "text/event-stream; charset=utf-8" });
+      /**
+     * 2026-11-16（抖动归因）：**禁止 keep-alive**。
+     *
+     * 每个用例都 `listen(0)` 起新服务；端口会被 OS 复用，而全局 fetch（undici）按 origin
+     * 池化连接 —— 复用到已被关闭服务的旧 socket 就会得到 `provider-network-error`。
+     * 显式 `connection: close` 让连接不可池化，从根上消除这条来源。
+     */
+    response.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8",
+      connection: "close",
+    });
       response.write(
         options.rawBody === true ? sseBody : completeAnthropicSseFixture(sseBody),
       );
@@ -509,7 +519,10 @@ describe("Anthropic Messages runtime：错误路径与选项分支", () => {
     server = http.createServer((request, response) => {
       request.resume();
       request.on("end", () => {
-        response.writeHead(statusCode, { "content-type": "text/plain; charset=utf-8" });
+        response.writeHead(statusCode, {
+      "content-type": "text/plain; charset=utf-8",
+      connection: "close",
+    });
         response.end(bodyText);
       });
     });

@@ -6194,3 +6194,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 守卫删除在破坏性 API 守卫登记理由。
 > 3 个用例连跑 10 次 0 失败；全量门禁 **805 files / 5328 passed，exit 0**。
 > 未确认：graph-change 暂停路径、anthropic-messages-runtime 低频失败。
+
+> **门禁抖动根因（2026-11-17）**
+>
+> 三类根因全部定位：①协调分区租约接管不互斥（产品缺陷，排他守卫修复）；②drill 用例删目录撞后台原子写（ENOENT，改为等 .tmp 收敛，12/12）；
+> ③anthropic 用例端口复用 + undici 连接池污染（假服务端改 `connection: close`，0/20）。
+> 20 次采样把"偶发"量化成可对比的失败率，修复后均归零。
