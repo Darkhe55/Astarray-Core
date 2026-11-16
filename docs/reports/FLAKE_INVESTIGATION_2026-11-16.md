@@ -53,3 +53,37 @@ expect(goalState.requiresReplanning).toBe(true);   // 实际 false
 
 - 本报告**不**声称抖动已修复；
 - `FLAKE_TRACKER` 数据的样本量很小（每文件 3 次），只能作为方向证据。
+
+## 第二轮：追踪尝试与一个自造抖动
+
+### 1. 给暂停联动加观测（临时）
+
+在 `onMissionGraphChanged` 里加了 `ASTARRAY_DEBUG_GRAPH_CHANGE=1` 才输出的追踪
+（记录 goal 绑定、目标状态、重算后的 V）。目的：判断 `requiresReplanning` 为什么没写。
+
+结果：**8 次单独重复全绿，追踪没有输出**；随后开着追踪跑全量（`--maxWorkers=2`），
+`graph-change-deterministic-drill` 也没红（红的是另一处）。也就是说这一轮没有复现，
+**暂停路径的原因仍未确认**。
+
+追踪代码已回退，不留在仓库里（没有证据就不该留调试分支）。
+
+### 2. 顺带发现：我自己新加的用例也会抖
+
+同一次全量里红的是 `tests/core/integration/cluster02-cross-process-lease.test.ts` ①：
+
+```text
+两个实例争抢 ⇒ 只有一个构建，另一个 busy   // 负载高时可能两个都是 built
+```
+
+原因：用例假定两次构建真的**重叠**，但 `Promise.all` 下若第一个很快完成并释放租约，
+第二个会在释放之后才拿到租约 ⇒ 两个都构建成功 ⇒ 断言失败。
+
+**已修（不是放宽断言）**：让假事件源每次读页 `await 50ms`，使第一次构建客观上有持续时间，
+两个实例必然重叠 ⇒ "另一个拿到 busy" 变成确定性结论。连续 6 次全绿。
+
+教训：写"并发"用例时，必须让并发**客观发生**，而不是假设调度会重叠。
+
+## 仍待确认
+
+- `graph-change-deterministic-drill` 的暂停路径（需要能让它稳定复现的方法：例如在负载下重复跑该文件并保留追踪）；
+- `anthropic-messages-runtime` 的低频失败现场。

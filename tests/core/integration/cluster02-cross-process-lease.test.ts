@@ -38,6 +38,8 @@ function buildLeaseStore() {
 function buildEmptyEventStore() {
   return {
     async readEventPages() {
+      /** 让第一次构建**客观上有持续时间**，保证两个实例真的重叠（否则第二个可能等在租约释放之后）。 */
+      await new Promise((resolve) => setTimeout(resolve, 50));
       /** 空事件源：关键字段是 `isComplete`，缺了会让构建循环跑到时长上限（实测 5s/10s）。 */
       return {
         pages: [],
