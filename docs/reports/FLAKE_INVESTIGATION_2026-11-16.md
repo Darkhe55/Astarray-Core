@@ -205,3 +205,27 @@ tryAcquire:
 | 产品级并发缺陷 | 协调分区租约接管不互斥 | 反例满载稳定复现 | ✅ 已修 |
 | 用例收尾不收敛 | drill 删目录撞后台写 → ENOENT | 20 次采样 4 次失败 | ✅ 已修（12/12） |
 | **测试连接池污染** | 端口复用 + undici keep-alive | 同一轮连续 4 用例失败 | ✅ 已修（0/20） |
+
+## 第六轮：`shutdown()` 的后台写收敛（已实现，2026-11-17）
+
+前几轮实证：`shutdown()` 等在途编排收敛，但**不等**事件回调里的
+`void (async () => …)()` 派生写。真实后果是"进程退出时最后一次派生写静默丢失"
+（目标暂停标记 `requiresReplanning` 可能没落盘）；测试里表现为删除目录后 `open(.tmp)` ENOENT。
+
+### 实现
+
+| 项 | 位置 |
+|---|---|
+| `PendingWriteTracker`（登记 + 有界 drain） | `orchestration/pending-write-tracker.ts` |
+| 三处事件回调改为 `backgroundWrites.track((async () => …)())` | `application/application-runtime.ts` |
+| `shutdown()` 末尾 drain（5s 上限；不完整时输出结构化告警，不挂死） | 同上 |
+| 反例 5 条（等待完成 / 超时不挂死 / 失败不产生未处理拒绝 / 空集合 / 返回原 Promise） | `tests/core/unit/pending-write-tracker.test.ts` |
+| 守卫 2 条（不得再有裸 `void (async`；drain 必须在 supervisor 之后） | `tests/architecture/shutdown01-background-writes.test.ts` |
+
+### 边界（如实）
+
+- 这是**收敛**修复，不是"零丢失"：SIGKILL / 断电仍会丢；
+- drain 只覆盖**登记过的**回调写；其它路径若有未登记的 fire-and-forget 写，不在覆盖范围；
+- 5s 上限是有意的：关闭不得被未知挂起拖死。
+
+全量门禁：**810 files / 5361 passed + 3 skipped，exit 0**。

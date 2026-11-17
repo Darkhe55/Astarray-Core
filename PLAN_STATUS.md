@@ -6263,3 +6263,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 证据：`docs/reports/STATUS_UPDATE_E2E01_VERTICAL_REWORK_RESOLVED_2026-11-17.md`；
 > 守卫 `tests/architecture/crosscheck01-result-location-semantics.test.ts`（3 条）；
 > 全量门禁 **808 files / 5354 passed，exit 0**。
+
+> **SHUTDOWN-01 后台写收敛（2026-11-17）**
+>
+> `shutdown()` 现在会登记并**有界**等待事件回调里的派生写（此前不等待 ⇒ 最后一次派生写可能静默丢失）。
+> 三处 `void (async …)()` 改为 tracker；drain 5s 上限，不完整时结构化告警。
+> 反例 5 条 + 守卫 2 条；全量门禁 **810 files / 5361 passed，exit 0**。
+> 边界：SIGKILL 仍会丢；只覆盖已登记的回调写。

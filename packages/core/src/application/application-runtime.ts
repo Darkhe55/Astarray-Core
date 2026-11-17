@@ -141,6 +141,7 @@ import { CoordinationTaskApplicationLedger } from "../orchestration/coordination
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
 import { resolveReviewStateForCoordination } from "../orchestration/coordination-completion-gate.js";
 import { evaluateAuthoritativeCompletion } from "../orchestration/authoritative-completion.js";
+import { PendingWriteTracker } from "../orchestration/pending-write-tracker.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
 import { FileSystemProcessExecutionStore } from "../execution/process-execution-store.js";
@@ -1077,6 +1078,11 @@ export async function createApplicationRuntime(
   options: ApplicationRuntimeOptions,
 ): Promise<ApplicationRuntime> {
   const stateDirectory = options.stateDirectory;
+  /**
+   * SHUTDOWN-01（2026-11-17）：登记**后台派生写**，让 `shutdown()` 能有界地等它们结束。
+   * 只在事件回调里登记，不改变原有写入时机。
+   */
+  const backgroundWrites = new PendingWriteTracker();
   // 检查点 B：主 Agent 实例 ID 不再固定字面量；同一 state dir（同一会话）内跨进程复用，
   // 不同会话（不同 state dir）互不复用。
   const mainAgentInstanceId =
@@ -3050,7 +3056,7 @@ export async function createApplicationRuntime(
     onRestToWorking: (observation: {
       readonly observedAtIso: string;
     }): void => {
-      void (async () => {
+      backgroundWrites.track((async () => {
         /** GUI-04-06：先做一次受控恢复（默认开启；可用开关关闭）。 */
         if (options.isWorkWindowAutoResumeEnabled !== false) {
           await workWindowDeferredMissionStore
@@ -3072,7 +3078,7 @@ export async function createApplicationRuntime(
             .catch(() => undefined);
         }
         await options.onWorkWindowRestToWorking?.(observation.observedAtIso);
-      })();
+      })());
     },
   });
   workWindowTransitionMonitor.start();
@@ -3951,7 +3957,7 @@ const controller = new MainController({
     /** R124：发布时自动登记整 mission 映射。 */
     /** R133：图变更 ⇒ 目标联动（标记需重新规划 + 暂停 + 落盘）。 */
     onMissionGraphChanged: (missionIdentifier, event) => {
-      void (async () => {
+      backgroundWrites.track((async () => {
         /** R139：删除任务 ⇒ 清理其映射（不指向已消失的节点）；"*" 不动。 */
         if (event.changeKind === "remove") {
           await missionTaskSequenceMapStore
@@ -4021,7 +4027,7 @@ const controller = new MainController({
           },
           updatedAtIso: new Date().toISOString(),
         });
-      })().catch(() => undefined);
+      })()).catch(() => undefined);
     },    missionTaskSequenceMapStore,
     graphChangeJournal: taskGraphChangeJournal,
     taskLedgerDivergenceJournal,
@@ -4104,7 +4110,7 @@ const controller = new MainController({
         recordedAtIso,
       });
       /** R97：同时写入目标状态，重启后由 hydrate 恢复（缺失不推断）。 */
-      void (async () => {
+      backgroundWrites.track((async () => {
         const goalIdentifier = await goalMissionBindingStore
           .readGoalIdentifier(violation.missionIdentifier)
           .catch(() => null);
@@ -4149,7 +4155,7 @@ const controller = new MainController({
             updatedAtIso: recordedAtIso,
           })
           .catch(() => undefined);
-      })();
+      })());
     },
     /** R74：目标完成耦合（缺省不传 ⇒ 不参与）。 */
     ...(options.isGoalCompletionRequired === true
@@ -4681,6 +4687,12 @@ const controller = new MainController({
     }, delayMilliseconds);
   }
 
+  /**
+   * SHUTDOWN-01（2026-11-17）：**后台派生写收敛**。
+   *
+   * 事件回调里的 `void (async () => …)()` 不被 `shutdown()` 等待，
+   * 进程退出会静默丢掉最后一次派生写（实测：目标暂停标记可能没落盘）。
+   */
   const shutdown = async (): Promise<void> => {
     /** 接线缺口第 ④ 项：先停时段检测器（幂等；未启动时返回 not-running）。 */
     if (startupRecoveryBootTimer !== null) {
@@ -4698,6 +4710,25 @@ const controller = new MainController({
     // 第二个请求永远不会有应答 ⇒ 客户端只能等到 `requestTimeoutMilliseconds`
     // （默认 5_000ms）再吞掉超时。实测：单次 stop 约 8ms，重复序列 **502ms→5014ms**。
     await supervisor?.stop().catch(() => {});
+    /**
+     * SHUTDOWN-01（2026-11-17）：最后收敛**后台派生写**（有界）。
+     *
+     * 事件回调里的 `void (async () => …)()` 此前不被关闭等待，进程退出会静默丢掉
+     * 最后一次派生写（实测：目标暂停标记可能没落盘）。
+     * 超时也返回，绝不把关闭挂死；不完整时留一条结构化告警，不假装全部写完。
+     */
+    const backgroundDrainResult = await backgroundWrites.drain({
+      timeoutMilliseconds: 5_000,
+    });
+    if (backgroundDrainResult.timedOutCount > 0 || backgroundDrainResult.failedCount > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "shutdown-background-writes-incomplete",
+          timedOutCount: backgroundDrainResult.timedOutCount,
+          failedCount: backgroundDrainResult.failedCount,
+        }),
+      );
+    }
   };
 
   const readMissionResultSummaries = async (
