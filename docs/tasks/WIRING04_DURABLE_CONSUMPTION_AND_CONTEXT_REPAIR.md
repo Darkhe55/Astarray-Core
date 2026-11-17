@@ -400,3 +400,35 @@ mission task ──精确映射(missionTaskSequenceMapStore)──▶ 序列节�
 ### 门禁
 
 **821 files / 5417 passed + 3 skipped，exit 0**。
+
+## 15. 施工记录：WIRING-04-02 第二步（2026-11-17）
+
+### 载荷指纹落账
+
+| 项 | 内容 |
+|---|---|
+| Worker 在请求前计算指纹 | `sha256(systemPrompt + "\n\n" + 任务正文)`（`orchestration/worker-agent.ts`） |
+| 投递端口转发 | `markDelivered({ …, payloadFingerprint })`（`orchestration/coordination-context-delivery.ts`） |
+| 准入回执持久化 | `ContextInjectionReceipt.payloadFingerprint`（`orchestration/context-admission.ts`） |
+| 断言 | `coord01-context-delivery-wiring` ② 校验回执里是 64 位十六进制 |
+
+语义：指纹只证明"这次请求带上了这份内容"，**不证明模型理解**，也不等于业务成功。
+
+### 过程记录（一个反复出现的失误）
+
+本轮又一次"以为改上了"：端口**接口**加了 `payloadFingerprint`，但 `markDelivered` 的**实现**没转发，
+导致回执里恒为 undefined。靠打印 `receipt.payloadFingerprint` 才定位。
+这类 `.Replace` 静默不匹配已连续出现三次，后续每处改动都要 grep 验证插入点。
+
+### 仍未完成
+
+| 必做项 | 现状 |
+|---|---|
+| 多次模型迭代**各自独立**落账 | 未做：目前一次 worker 运行只落一份最终回执 |
+| 回执写失败后启动补写 | 未做 |
+| mission↔序列**精确**映射写入方 | **阻塞**：写入方只写 `missionTaskIdentifier: "*"`（`main-controller.ts:2417`），
+  严格映射模式无法启用 |
+
+### 门禁
+
+**821 files / 5417 passed + 3 skipped，exit 0**。

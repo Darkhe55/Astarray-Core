@@ -32,6 +32,12 @@ export interface ContextInjectionReceipt {
   readonly deliveredAtIso: string | null;
   /** 携带该内容的请求标识（投递证据；未投递为 null）。 */
   readonly deliveryRequestIdentifier: string | null;
+  /**
+   * WIRING-04-02：**载荷指纹**——这次请求实际携带的内容指纹。
+   *
+   * 只证明"带上了这份内容"，不证明模型理解；未投递为 null。
+   */
+  readonly payloadFingerprint?: string | null;
 }
 
 interface ContextInjectionDocument {
@@ -162,6 +168,8 @@ export class ContextAdmissionController {
     messageIdentifier: string;
     requestIdentifier: string;
     deliveredAtIso?: string;
+    /** WIRING-04-02：本次请求实际携带内容的指纹（缺省不改旧行为）。 */
+    payloadFingerprint?: string;
   }): Promise<{
     outcome: "delivered" | "not-admitted" | "already-delivered";
     receipt: ContextInjectionReceipt | null;
@@ -183,6 +191,9 @@ export class ContextAdmissionController {
       ...target,
       deliveredAtIso: input.deliveredAtIso ?? new Date(this.nowUnixMilliseconds()).toISOString(),
       deliveryRequestIdentifier: input.requestIdentifier,
+      ...(input.payloadFingerprint === undefined
+        ? {}
+        : { payloadFingerprint: input.payloadFingerprint }),
     };
     await this.saveDocument({
       ...document,

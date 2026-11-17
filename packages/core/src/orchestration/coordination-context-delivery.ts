@@ -29,6 +29,8 @@ export interface CoordinationContextDeliveryPort {
     readonly recipientId: string;
     readonly messageIdentifiers: readonly string[];
     readonly requestIdentifier: string;
+    /** WIRING-04-02：本次请求实际携带内容的指纹（可选，缺省不改旧行为）。 */
+    readonly payloadFingerprint?: string;
   }): Promise<void>;
   /**
    * P1-3：**结果未知**。
@@ -174,6 +176,9 @@ export function createCoordinationContextDeliveryPort(input: {
           partitionKey: input.partitionKey,
           messageIdentifier,
           requestIdentifier: markInput.requestIdentifier,
+          ...(markInput.payloadFingerprint === undefined
+            ? {}
+            : { payloadFingerprint: markInput.payloadFingerprint }),
         });
       }
     },

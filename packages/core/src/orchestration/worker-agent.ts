@@ -3,7 +3,7 @@
  * 仅执行分配任务；异常/模糊/完成/权限请求均通过反馈工具上报后待机；
  * 不得自主扩大任务或静默放弃。
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type {
   AgentRuntime,
@@ -659,6 +659,9 @@ export class WorkerAgent {
             recipientId: coordinationRecipientId,
             messageIdentifiers: deliveredCoordinationMessageIdentifiers,
             requestIdentifier: coordinationRequestIdentifier,
+            ...(coordinationPayloadFingerprint === null
+              ? {}
+              : { payloadFingerprint: coordinationPayloadFingerprint }),
           })
           .catch(() => undefined);
         return;
@@ -673,9 +676,14 @@ export class WorkerAgent {
           .catch(() => undefined);
       }
     };
+    /** WIRING-04-02：本次请求实际携带内容的指纹（简报 + 协调区块 + 任务正文）。 */
+    let coordinationPayloadFingerprint: string | null = null;
     let acknowledgedRequestIdentifier: string | null = null;
     let outcomeUnknownReason: string | null = null;
     try {
+    coordinationPayloadFingerprint = createHash("sha256")
+      .update(systemPrompt + "\n\n" + this.options.task.description)
+      .digest("hex");
     const events = await runToolLoop(
       {
         missionId: this.options.missionId,

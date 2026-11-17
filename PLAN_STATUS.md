@@ -6350,3 +6350,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **过渡状态**：生产链路尚无映射写入，`isContextPackMappingRequired` 缺省关闭，否则所有任务会被阻塞。
 > 反例 9 条；全量门禁 **821 files / 5417 passed，exit 0**。
 > 未完成：映射写入方、显式依赖引用接线、哈希落账。
+
+> **WIRING-04-02 第二步（2026-11-17）：载荷指纹**
+>
+> 请求前计算内容指纹并随回执落账（`ContextInjectionReceipt.payloadFingerprint`），
+> 断言为 64 位十六进制。指纹只证明"带上了这份内容"，不证明模型理解。
+> 全量门禁 **821 files / 5417 passed，exit 0**。
+> 未完成：多迭代分别落账、回执写失败补写；精确映射写入方仍阻塞（只写通配 `*`）。

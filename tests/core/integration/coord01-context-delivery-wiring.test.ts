@@ -162,7 +162,6 @@ describe("协调上下文投递（真实请求携带）", () => {
       recipientId: RECIPIENT,
       messageId: "coord-message-1",
     });
-    console.log("DEBUG view=", JSON.stringify(view));
     expect(view?.contextDeliveryState).toBe("delivered");
 
     const receipt = await admission.readInjectionReceipt({
@@ -171,6 +170,8 @@ describe("协调上下文投递（真实请求携带）", () => {
     });
     expect(receipt?.deliveredAtIso).not.toBeNull();
     expect(receipt?.deliveryRequestIdentifier).toContain("worker-turn:T-777");
+    /** WIRING-04-02：载荷指纹必须落账，且证明"带上了这份内容"。 */
+    expect(receipt?.payloadFingerprint).toMatch(/^[a-f0-9]{64}$/u);
   });
 
   it("③ 没有 pending 消息 ⇒ 请求里没有该区块（不无中生有）", async () => {
