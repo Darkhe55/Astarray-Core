@@ -10,6 +10,7 @@
  * - 找不到任务 ⇒ `task-not-found`，不新建任务、不改别的任务；
  * - 写入走 revision 递增，避免覆盖并发写者（`stale-revision` 由 store 抛错）。
  */
+import { DomainError } from "../core/errors.js";
 import type { TaskChainDocument, TaskStorePort } from "../core/types.js";
 
 /**
@@ -56,10 +57,26 @@ export async function applyCoordinationMessageToTaskState(input: {
     readonly taskIdentifier: string | null;
     readonly payload: unknown;
   };
+  /**
+   * WIRING-04-03：**受控完成凭证**（非活动 mission 的持久状态入口）。
+   *
+   * 与 `completeTaskByTaskIdentifier` 同一纪律：标记 `done` 必须携带
+   * 权威完成校验已通过的凭证，防止新增调用方绕过门禁。
+   */
+  readonly completionAuthorization?: {
+    readonly code: "authoritative-completion-accepted";
+    readonly decidedAtIso: string;
+  };
 }): Promise<CoordinationTaskStateApplicationResult> {
   const taskStatus = resolveCoordinationTaskStatus(input.message.payload);
   if (taskStatus === null || input.message.taskIdentifier === null) {
     return { outcome: "status-unchanged", missionIdentifier: null, taskStatus: null };
+  }
+  if (taskStatus === "done" && input.completionAuthorization === undefined) {
+    throw new DomainError(
+      "completion-not-authorized",
+      `任务 ${input.message.taskIdentifier} 的 done 缺少权威校验凭证（不得直接写任务链）`,
+    );
   }
   const taskIdentifier = input.message.taskIdentifier;
   for (const missionIdentifier of input.missionIdentifiers) {

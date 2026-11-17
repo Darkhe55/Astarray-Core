@@ -53,6 +53,10 @@ describe("协调消息 → 权威任务状态", () => {
       taskStore: store as never,
       missionIdentifiers: ["mission-1"],
       message: { messageIdentifier: "m-1", taskIdentifier: "T-001", payload: { kind: "success" } },
+      completionAuthorization: {
+        code: "authoritative-completion-accepted",
+        decidedAtIso: "2026-11-16T00:00:00.000Z",
+      },
     });
     expect(result).toMatchObject({
       outcome: "applied",
@@ -84,6 +88,10 @@ describe("协调消息 → 权威任务状态", () => {
       taskStore: store as never,
       missionIdentifiers: ["mission-1"],
       message: { messageIdentifier: "m-3", taskIdentifier: "T-999", payload: { kind: "success" } },
+      completionAuthorization: {
+        code: "authoritative-completion-accepted",
+        decidedAtIso: "2026-11-16T00:00:00.000Z",
+      },
     });
     expect(result.outcome).toBe("task-not-found");
     expect(store.updateTaskChain).not.toHaveBeenCalled();
@@ -95,6 +103,10 @@ describe("协调消息 → 权威任务状态", () => {
       taskStore: store as never,
       missionIdentifiers: ["mission-1"],
       message: { messageIdentifier: "m-4", taskIdentifier: "T-001", payload: { kind: "success" } },
+      completionAuthorization: {
+        code: "authoritative-completion-accepted",
+        decidedAtIso: "2026-11-16T00:00:00.000Z",
+      },
     });
     expect(result.outcome).toBe("status-unchanged");
     expect(store.updateTaskChain).not.toHaveBeenCalled();
@@ -125,4 +137,54 @@ describe("阻塞不由消息决定（2026-11-16 修正）", () => {
     expect(result).toMatchObject({ outcome: "applied", taskStatus: "failed" });
     expect(store.getCurrent()?.tasks[0]?.status).toBe("failed");
   });
+});
+
+describe("WIRING-04-03：非活动 mission 的 done 需要受控凭证", () => {
+  it("① 无凭证的 done ⇒ 抛错且不改任务链", async () => {
+    const chain = buildChain("running");
+    const store = buildStore(chain);
+    await expect(
+      applyCoordinationMessageToTaskState({
+        taskStore: store as never,
+        missionIdentifiers: ["mission-1"],
+        message: {
+          messageIdentifier: "message-done-1",
+          taskIdentifier: "T-001",
+          payload: { kind: "success", summary: "完成" },
+        },
+      }),
+    ).rejects.toMatchObject({ errorCode: "completion-not-authorized" });
+    expect(store.updateTaskChain).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("② 带凭证的 done ⇒ 正常写链；failed 不需要凭证", async () => {
+    const chain = buildChain("running");
+    const store = buildStore(chain);
+    const applied = await applyCoordinationMessageToTaskState({
+      taskStore: store as never,
+      missionIdentifiers: ["mission-1"],
+      message: {
+        messageIdentifier: "message-done-2",
+        taskIdentifier: "T-001",
+        payload: { kind: "success", summary: "完成" },
+      },
+      completionAuthorization: {
+        code: "authoritative-completion-accepted",
+        decidedAtIso: "2026-11-17T00:00:00.000Z",
+      },
+    });
+    expect(applied.outcome).toBe("applied");
+
+    const failureStore = buildStore(buildChain("running"));
+    const failed = await applyCoordinationMessageToTaskState({
+      taskStore: failureStore as never,
+      missionIdentifiers: ["mission-1"],
+      message: {
+        messageIdentifier: "message-failed-1",
+        taskIdentifier: "T-001",
+        payload: { kind: "failure", summary: "失败" },
+      },
+    });
+    expect(failed.outcome).toBe("applied");
+  }, 30_000);
 });

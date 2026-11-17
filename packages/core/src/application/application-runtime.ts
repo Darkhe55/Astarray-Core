@@ -5166,6 +5166,15 @@ const controller = new MainController({
         taskIdentifier: coordinationTaskIdentifier,
         payload: coordinationMessage.payload,
       },
+      /** WIRING-04-03：非活动 mission 的 done 同样需要权威校验凭证。 */
+      ...(coordinationTaskStatus === "done"
+        ? {
+            completionAuthorization: {
+              code: "authoritative-completion-accepted" as const,
+              decidedAtIso: new Date().toISOString(),
+            },
+          }
+        : {}),
     });
   };
 

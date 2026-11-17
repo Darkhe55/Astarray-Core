@@ -6381,3 +6381,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 公开完成入口 `completeTaskByTaskIdentifier` 现在要求权威校验凭证：`done` 缺凭证抛 `completion-not-authorized`；
 > 控制器转发凭证，运行时只在通过门禁且 done 时发放。守卫 3 条；全量门禁 **824 files / 5426 passed，exit 0**。
 > 未完成：非活动 mission 入口的行为反例；01 核验/原子单元仍阻塞或待设计。
+
+> **WIRING-04-03 第二步（2026-11-17）：写链入口也要凭证**
+>
+> `applyCoordinationMessageToTaskState` 的 `done` 现在同样要求权威校验凭证，缺凭证抛 `completion-not-authorized`；
+> 运行时在门禁通过后传递。守卫增至 4 条，行为反例 2 条；全量门禁 **824 files / 5429 passed，exit 0**。
+> 说明：全量首跑 7 红中 4 条为既有用例缺凭证参数（已补），3 条为负载抖动（隔离通过）。

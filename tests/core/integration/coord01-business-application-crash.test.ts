@@ -124,6 +124,7 @@ function buildApply(taskStore: ReturnType<typeof buildTaskStore>, journal: Mailb
     if (message === null) {
       throw new Error(`消息不在邮箱里: ${input.messageIdentifier}`);
     }
+    /** WIRING-04-03：本用例验证的是消费/对账语义；完成凭证按门禁通过后发放。 */
     await applyCoordinationMessageToTaskState({
       taskStore: taskStore as never,
       missionIdentifiers: [input.missionIdentifier ?? MISSION_IDENTIFIER],
@@ -131,6 +132,10 @@ function buildApply(taskStore: ReturnType<typeof buildTaskStore>, journal: Mailb
         messageIdentifier: input.messageIdentifier,
         taskIdentifier: message.taskIdentifier ?? null,
         payload: message.payload,
+      },
+      completionAuthorization: {
+        code: "authoritative-completion-accepted",
+        decidedAtIso: "2026-11-17T00:00:00.000Z",
       },
     });
   };

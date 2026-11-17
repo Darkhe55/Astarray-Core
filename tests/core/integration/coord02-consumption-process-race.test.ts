@@ -190,6 +190,11 @@ describe("消费的副作用不重复", () => {
               taskIdentifier: message.taskIdentifier ?? null,
               payload: message.payload,
             },
+            /** WIRING-04-03：完成凭证（本用例验证并发语义）。 */
+            completionAuthorization: {
+              code: "authoritative-completion-accepted",
+              decidedAtIso: "2026-11-17T00:00:00.000Z",
+            },
           });
         }) as never,
       );

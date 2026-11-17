@@ -556,3 +556,34 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 ### 门禁
 
 **824 files / 5426 passed + 3 skipped，exit 0**。
+
+## 20. 施工记录：WIRING-04-03 第二步（2026-11-17）
+
+### 非活动 mission 入口同样要凭证
+
+审计发现第二条绕过路径：`applyCoordinationMessageToTaskState`（写任务链的持久状态入口）
+也是导出函数，任何调用方都能直接写 `done`。
+
+| 层 | 改动 |
+|---|---|
+| `coordination-task-state.ts` | `done` 缺 `completionAuthorization` ⇒ 抛 `completion-not-authorized`；`failed` 不需凭证 |
+| `application-runtime.ts` | 非活动 mission 分支在门禁通过且 `done` 时传凭证 |
+| 守卫 | `wiring04-completion-authorization-guard` 增加 ①b（写链入口自校验） |
+
+### 行为反例
+
+`tests/core/integration/coord01-task-state-application.test.ts` 新增 2 条：
+
+- ① 无凭证的 `done` ⇒ 抛错且 `updateTaskChain` **未被调用**（任务链不被污染）；
+- ② 带凭证 `done` ⇒ applied；`failed` 无凭证 ⇒ applied。
+
+既有 4 条断言保留原意，仅补上凭证参数（验证的是写链语义，不是授权语义）。
+
+### 全量门禁回归（如实记录）
+
+第一次全量出现 7 个失败：4 个是崩溃/竞态用例**直接调用写链函数**（缺凭证，已按新契约补参数），
+另外 3 个（`anthropic-tool-loop-failclosed`、`g3a-positive-path`）**隔离重跑全部通过** ⇒ 负载抖动。
+
+### 门禁
+
+**824 files / 5429 passed + 3 skipped，exit 0**。

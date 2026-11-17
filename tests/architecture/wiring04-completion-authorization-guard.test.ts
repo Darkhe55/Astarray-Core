@@ -26,6 +26,14 @@ describe("完成凭证守卫", () => {
     expect(orchestrator).toContain("completionAuthorization");
   }, 30_000);
 
+
+  it("①b 非活动 mission 的写链入口同样校验凭证", async () => {
+    const chainUpdater = await readSource(
+      "packages/core/src/orchestration/coordination-task-state.ts",
+    );
+    expect(chainUpdater).toContain("completion-not-authorized");
+    expect(chainUpdater).toContain("completionAuthorization");
+  }, 30_000);
   it("② 控制器转发凭证（不吞不造）", async () => {
     const controller = await readSource("packages/core/src/orchestration/main-controller.ts");
     expect(controller).toContain("completionAuthorization");
