@@ -111,6 +111,28 @@ describe("上下文包", () => {
     expect(text).toContain("separate：独立成组，不与其他包合并");
     expect(text.indexOf("pack-atomic")).toBeLessThan(text.indexOf("pack-separate"));
   });
+
+  it("④ 装配硬预算：context packs 与协调消息合计超限时 fail-closed", () => {
+    expect(() =>
+      assembleContextPrompt({
+        systemRulesText: "规则",
+        necessaryConditions: [],
+        globalDecisionRecords: [],
+        activeFrontier: null,
+        contextPacks: [atomicPack],
+        coordinationMessages: [
+          {
+            messageIdentifier: "m1",
+            sourceTaskIdentifier: "task-a",
+            sequenceIdentifier: "seq-a",
+            isSameFactAsSequence: true,
+            text: "协调消息正文",
+          },
+        ],
+        maximumPromptTokenCount: 5,
+      }),
+    ).toThrow(/上下文提示词超过硬上限/u);
+  });
 });
 
 

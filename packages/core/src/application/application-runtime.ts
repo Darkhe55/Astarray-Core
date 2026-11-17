@@ -1049,6 +1049,10 @@ export interface ApplicationRuntimeOptions {
   isConversationMode?: boolean;
   /** T09A-R1-01：全局上下文预算（token，默认 4096）。 */
   globalContextBudgetTokens?: number;
+  /** P1：系统规则/当前任务/工具说明/协议/输出预留的 token 总量。 */
+  contextReservedInputTokens?: number;
+  /** P3：装配后的上下文提示词硬上限；缺省由 modelInputSpaceTokens 兜底。 */
+  contextPromptTokenLimit?: number;
   /** T09A-R1-01：任务必要条件；不满足时阻塞而非静默执行。 */
   mandatoryContextConditions?: NecessaryContextCondition[];
   /** T09A-R1-01：上下文提示词装配提供者覆盖（测试/嵌入用）。 */
@@ -3149,6 +3153,9 @@ export async function createApplicationRuntime(
         };
       },
       modelInputSpaceTokens: options.modelInputSpaceTokens,
+      reservedInputTokens: options.contextReservedInputTokens,
+      maximumPromptTokenCount:
+        options.contextPromptTokenLimit ?? options.modelInputSpaceTokens ?? undefined,
       runtimeEventSink: (event) => contextRuntimeEventStore.append(event),
       deferredContextWriter: async (input) => {
         await deferUnselectedGlobalDecisions({

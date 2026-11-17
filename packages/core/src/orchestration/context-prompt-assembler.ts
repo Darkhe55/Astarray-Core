@@ -88,7 +88,12 @@ export interface AssembleContextPromptInput {
    * 装配时按"同任务 + 同序列"分块；未确认同一事实的消息单列，**不并入合并块**。
    * 缺省不注入该区块 ⇒ 旧行为不变。
    */
+  /** COMM-01：可选协调消息。 */
   coordinationMessages?: ReadonlyArray<PendingAssemblyMessage>;
+  /** P3：最终提示词硬上限（token 估算）；超限 fail-closed，不静默截断。 */
+  maximumPromptTokenCount?: number | undefined;
+  /** 可注入的 token 估算器；缺省按字符/4 的保守估算。 */
+  countPromptTokens?: ((text: string) => number) | undefined;
 }
 
 export interface AssembledContextPrompt {
@@ -110,6 +115,8 @@ export interface AssembledContextPrompt {
   injectedCoordinationMessageIdentifiers?: string[];
   /** COMM-01：未确认同一事实、单独列出的协调消息标识。 */
   unmergedCoordinationMessageIdentifiers?: string[];
+  /** P3：本次装配的保守 token 估算。 */
+  estimatedPromptTokenCount?: number;
 }
 
 export function assembleContextPrompt(
@@ -245,8 +252,38 @@ export function assembleContextPrompt(
   }
 
   const promptText = lines.join("\n");
+  const countPromptTokens =
+    input.countPromptTokens ??
+    ((text: string): number => {
+      let codePoints = 0;
+      for (const character of text) {
+        void character;
+        codePoints += 1;
+      }
+      return Math.ceil(codePoints / 4);
+    });
+  const estimatedPromptTokenCount = countPromptTokens(promptText);
+  if (input.maximumPromptTokenCount !== undefined) {
+    if (
+      !Number.isInteger(input.maximumPromptTokenCount) ||
+      input.maximumPromptTokenCount < 0
+    ) {
+      throw new DomainError(
+        "context-budget-invalid",
+        "maximumPromptTokenCount must be a non-negative integer",
+      );
+    }
+    if (estimatedPromptTokenCount > input.maximumPromptTokenCount) {
+      throw new DomainError(
+        "context-budget-insufficient",
+        "上下文提示词超过硬上限，不能静默截断；请拆分任务或缩小注入范围" +
+          `（estimated=${estimatedPromptTokenCount}, budget=${input.maximumPromptTokenCount}）`,
+      );
+    }
+  }
   return {
     promptText,
+    estimatedPromptTokenCount,
     /**
      * SEC-02 通道 12 / R14（2026-10-29）：**注入侧扫描标注**。
      *
@@ -288,6 +325,8 @@ export interface ContextPromptProviderOptions {
   modelInputSpaceTokens?: number | null;
   /** P1：系统规则、当前任务、工具说明、协议与输出预留的 token 总量。 */
   reservedInputTokens?: number | undefined;
+  /** P3：最终装配提示词的硬上限；缺省不启用。 */
+  maximumPromptTokenCount?: number | undefined;
   /** P2：未进入提示词的全局决策写入按 Agent/任务隔离的延后上下文。 */
   deferredContextWriter?: (
     input: {
@@ -469,6 +508,7 @@ export function createContextPromptProvider(
               })),
               excludedClosedNodeCount: frontier.excludedClosedNodeCount,
             },
+      maximumPromptTokenCount: options.maximumPromptTokenCount,
     });
     emitRuntimeEvent(assembled);
     /**
