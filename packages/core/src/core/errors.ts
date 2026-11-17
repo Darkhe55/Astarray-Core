@@ -68,6 +68,7 @@ export type DomainErrorCode =
   | "provider-rate-limited"
   | "provider-server-error"
   | "provider-http-error"
+  | "provider-context-overflow"
   | "mission-not-found"
   | "mission-locked"
   | "stale-revision"

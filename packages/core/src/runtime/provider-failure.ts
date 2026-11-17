@@ -46,6 +46,25 @@ export function describeProviderNetworkFailure(input: {
   );
 }
 
+function isContextOverflowDetail(detail: string): boolean {
+  return /(?:context[_ -]?length|maximum context|context window|too many tokens|prompt is too long|input is too long|request too large)/iu.test(
+    detail,
+  );
+}
+
+/**
+ * P5：上下文窗口溢出的稳定判定。
+ *
+ * 413 一律按溢出处理；400 只在 Provider 详情明确指向 context length/window
+ * 时处理，避免把普通参数错误误判为可降级重试。
+ */
+export function isProviderContextOverflowError(error: unknown): boolean {
+  return (
+    error instanceof DomainError &&
+    error.errorCode === "provider-context-overflow"
+  );
+}
+
 async function readProviderErrorDetail(response: Response): Promise<string> {
   try {
     const text = (await response.text()).trim();
@@ -98,6 +117,14 @@ export async function describeProviderHttpFailure(
     return new DomainError(
       "provider-rate-limited",
       `[provider-rate-limited] HTTP 429：请求过于频繁或额度不足，请稍后重试或检查配额。${suffix}`,
+    );
+  }
+  if (status === 413 || (status === 400 && isContextOverflowDetail(detail))) {
+    return new DomainError(
+      "provider-context-overflow",
+      `[provider-context-overflow] HTTP ${status}${statusText}：请求超过上下文窗口；` +
+        "已识别为可降级上下文，不应按普通参数错误重试。" +
+        suffix,
     );
   }
   if (status >= 500) {
