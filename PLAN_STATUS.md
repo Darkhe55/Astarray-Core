@@ -6246,3 +6246,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 协调上下文改为按字符预算装填，只对**被选中**的消息标 delivered，其余保持 pending。
 > 反例 1 条；全量门禁 **807 files / 5351 passed，exit 0**。
 > 未实现：任务 revision / 授权 epoch 的适用性校验（消息不携带这两个字段，需生产者先补）。
+
+> **COORD-02 立卡（2026-11-17）：消息版本与授权标记**
+>
+> P1-3 要求 7 的"版本适用/授权"部分**阻塞在上游字段**：`FeedbackMessage` 没有
+> `taskRevision` / `authorizationEpoch`，消费端不猜（猜即伪造授权）。
+> 预算部分已实现（只标记被携带的消息）。卡：`docs/tasks/COORD02_MESSAGE_VERSION_AND_AUTHORIZATION_STAMPING.md`；
+> 台账合入说明见 `docs/reports/STATUS_UPDATE_COORD02_2026-11-17.md`（本轮未改共享台账）。
