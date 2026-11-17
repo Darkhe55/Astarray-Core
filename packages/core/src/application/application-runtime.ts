@@ -3200,10 +3200,22 @@ export async function createApplicationRuntime(
           (entry) => entry.missionTaskIdentifier === missionTaskIdentifier,
         );
         if (exactEntry === undefined) {
-          return {
-            kind: "mapping-missing" as const,
-            reason: `缺少 mission task ${missionTaskIdentifier} 与序列 ${sequenceIdentifier} 的精确映射`,
-          };
+          /**
+           * WIRING-04-04：只有整 mission 级关联（`*`）时**不得**当作"未声明包"，
+           * 也不得按名称/最近任务猜；如实报告"关联不精确"。
+           */
+          const hasWildcardBinding = mapEntries.some(
+            (entry) => entry.missionTaskIdentifier === "*",
+          );
+          return hasWildcardBinding
+            ? {
+                kind: "mapping-imprecise" as const,
+                reason: `mission ${missionIdentifier} 只有整 mission 级关联（*），无法确定 mission task ${missionTaskIdentifier} 的包`,
+              }
+            : {
+                kind: "mapping-missing" as const,
+                reason: `缺少 mission task ${missionTaskIdentifier} 与序列 ${sequenceIdentifier} 的精确映射`,
+              };
         }
         const sequenceDocument = await agentTaskSequenceStore
           .readSequence(exactEntry.ownerAgentInstanceIdentifier, exactEntry.sequenceIdentifier)

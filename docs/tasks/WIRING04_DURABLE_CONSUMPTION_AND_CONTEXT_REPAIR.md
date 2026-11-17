@@ -684,3 +684,34 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 ### 门禁
 
 **825 files / 5438 passed + 3 skipped，exit 0**。
+
+## 24. 施工记录：WIRING-04-04 第二步（2026-11-17）
+
+### 区分"关联不精确"与"未声明包"
+
+投影侧目前只写 `missionTaskIdentifier: "*"`（整 mission 级）。读取侧此前把"没有精确项"一律
+当作 `mapping-missing`，而过渡期又不阻塞 ⇒ **真实的"关联存在但不精确"被静默吞掉**。
+
+| 项 | 内容 |
+|---|---|
+| 新结果种类 | `mapping-imprecise`（存在 `*` 关联但无精确项） |
+| 严格模式（`isContextPackMappingRequired=true`） | 阻塞，原因写明"只有整 mission 级关联（*），无法确定该任务的包" |
+| 过渡期（缺省关闭） | 不阻塞、不注入包（与之前行为一致，但**不再被误报为"未声明"**） |
+| 绝不 | 按名称 / 最近任务 / 固定 `T-001` 猜精确映射 |
+
+### 反例
+
+`context-prompt-assembler.test.ts` 新增 2 条：④ 严格模式抛 `context-pack-unresolvable`；
+⑤ 过渡期照常装配、不注入。
+
+### 仍未完成
+
+| 项 | 现状 |
+|---|---|
+| 精确映射**写入方** | 阻塞：投影侧仍只写 `*`（需改发布侧，不在本卡范围） |
+| 包 revision 落账到运行记录 | 未做 |
+| 显式依赖引用（dependencyReferences） | 未接（解析层已有端口，装配仍传空） |
+
+### 门禁
+
+**825 files / 5440 passed + 3 skipped，exit 0**（`nodectx01-multi-model-fake-service-e2e` 抖动一次，隔离重跑通过）。

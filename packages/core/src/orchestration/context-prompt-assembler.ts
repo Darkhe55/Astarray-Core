@@ -348,6 +348,12 @@ export interface ContextPromptProviderOptions {
         readonly contentHash: string;
       }
     | { readonly kind: "mapping-missing"; readonly reason: string }
+    /**
+     * WIRING-04-04：**只有整 mission 级关联**（通配 `*`），无法确定某个任务的包。
+     *
+     * 与 `mapping-missing` 分开，是为了**不把"关联存在但不精确"当作"未声明包"**。
+     */
+    | { readonly kind: "mapping-imprecise"; readonly reason: string }
     | { readonly kind: "declared-but-missing"; readonly reason: string }
   >;
   /**
@@ -596,7 +602,8 @@ export function createContextPromptProvider(
     if (
       packResolution !== null &&
       (packResolution.kind === "declared-but-missing" ||
-        (packResolution.kind === "mapping-missing" &&
+        ((packResolution.kind === "mapping-missing" ||
+          packResolution.kind === "mapping-imprecise") &&
           options.isContextPackMappingRequired === true))
     ) {
       throw new DomainError("context-pack-unresolvable", packResolution.reason);

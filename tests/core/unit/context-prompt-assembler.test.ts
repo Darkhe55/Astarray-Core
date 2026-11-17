@@ -281,3 +281,59 @@ describe("WIRING-04-05：显式回访内容注入", () => {
     expect(assembled.promptText).not.toContain("已关闭节点的正文内容");
   }, 30_000);
 });
+
+describe("WIRING-04-04：关联不精确 ≠ 未声明包", () => {
+  it("④ 只有通配关联时：严格模式阻塞，且原因写明「整 mission 级」", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory });
+    const graphStore = new LocalContextGraphStore({ baseDirectory });
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore,
+      maximumGlobalContextTokenCount: 4096,
+      isContextPackMappingRequired: true,
+      contextPackResolver: async () => ({
+        kind: "mapping-imprecise",
+        reason: "只有整 mission 级关联（*），无法确定该任务的包",
+      }),
+    });
+    await expect(
+      provider({
+        missionId: "mission-1",
+        agentInstanceId: "worker-1",
+        task: {
+          id: "T-001",
+          description: "probe",
+          dependsOn: [],
+          taskType: "data",
+          toolNames: [],
+        } as never,
+      }),
+    ).rejects.toMatchObject({ errorCode: "context-pack-unresolvable" });
+  }, 30_000);
+
+  it("⑤ 过渡期（严格模式关闭）：不阻塞、不注入包", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory });
+    const graphStore = new LocalContextGraphStore({ baseDirectory });
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore,
+      maximumGlobalContextTokenCount: 4096,
+      contextPackResolver: async () => ({
+        kind: "mapping-imprecise",
+        reason: "只有整 mission 级关联（*）",
+      }),
+    });
+    const assembled = await provider({
+      missionId: "mission-1",
+      agentInstanceId: "worker-1",
+      task: {
+        id: "T-001",
+        description: "probe",
+        dependsOn: [],
+        taskType: "data",
+        toolNames: [],
+      } as never,
+    });
+    expect(assembled.promptText).toContain("[系统规则]");
+  }, 30_000);
+});

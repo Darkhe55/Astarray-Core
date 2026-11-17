@@ -6406,3 +6406,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 任务链文档新增 `coordinationApplicationEvidence`，判重移入 updater 内部，证据与状态变更随同一份文档原子落盘；
 > 同消息重放不再递增 revision。反例 2 条；全量门禁 **825 files / 5438 passed，exit 0**。
 > 边界：意图台账与任务链仍是两个存储（跨存储原子性未解决，靠对账兜底）。
+
+> **WIRING-04-04 第二步（2026-11-17）：关联不精确 ≠ 未声明包**
+>
+> 新增 `mapping-imprecise`：存在 `*` 通配但无精确项时如实报告；严格模式阻塞（原因写明整 mission 级），
+> 过渡期不阻塞也不注入。反例 2 条；全量门禁 **825 files / 5440 passed，exit 0**。
+> 未完成：精确映射写入方仍在投影侧（阻塞）。
