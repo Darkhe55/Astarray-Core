@@ -872,3 +872,35 @@ zod 默认**丢弃未知字段** ⇒ 经过 schema 的读写会把手写进去�
 ### 门禁
 
 **828 files / 5452 passed + 3 skipped，exit 0**。
+
+## 30. 施工记录：按节点严格度（2026-11-18）
+
+### 问题
+
+全局 `isContextPackMappingRequired` 只能"全开/全关"：开了会让**多节点/旧任务**全部阻塞，
+关了又让**已声明来源**的节点继续宽松运行。
+
+### 做法：严格度由**节点是否声明来源**决定
+
+| 节点情况 | 判定 |
+|---|---|
+| 声明了来源（三字段齐全）且映射一致 | `exact` ⇒ 用该序列节点 |
+| 声明了来源但映射缺失/不符 | `declared-missing` ⇒ **阻塞**（必要输入不可得） |
+| 未声明来源、只有 `*` | `imprecise` ⇒ 过渡态（不阻塞、不注入） |
+| 未声明来源、无任何关联 | `missing` ⇒ 过渡态 |
+
+实现：纯函数 `classifyContextPackMapping`（可单测）+ 运行时解析器接入；全局开关保持不变。
+
+### 同时修掉的竞态
+
+原先精确绑定是 **fire-and-forget**；一旦严格度按节点生效，首个 worker 可能抢在绑定前启动 ⇒
+被误判 `declared-but-missing` 而阻塞。改为**创建时同步 await 绑定**（失败不阻断创建）。
+
+### 反例
+
+`context-pack-resolution.test.ts` 新增 3 条：⑦ 一致 ⇒ exact；⑧ 缺失/不符 ⇒ declared-missing；
+⑨ 未声明 ⇒ imprecise / missing。
+
+### 门禁
+
+**828 files / 5455 passed + 3 skipped，exit 0**。

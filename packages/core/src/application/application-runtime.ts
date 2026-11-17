@@ -146,7 +146,10 @@ import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } fr
 import { resolveReviewStateForCoordination } from "../orchestration/coordination-completion-gate.js";
 import { evaluateAuthoritativeCompletion } from "../orchestration/authoritative-completion.js";
 import { executeRecallToolCall } from "../orchestration/recall-tool-call.js";
-import { computeContextPackContentHash } from "../orchestration/context-pack-resolution.js";
+import {
+  classifyContextPackMapping,
+  computeContextPackContentHash,
+} from "../orchestration/context-pack-resolution.js";
 import { PendingWriteTracker } from "../orchestration/pending-write-tracker.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
@@ -3196,27 +3199,49 @@ export async function createApplicationRuntime(
           sequenceIdentifier,
         });
         const missionTaskIdentifier = resolverInput.missionTaskIdentifier;
-        const exactEntry = mapEntries.find(
-          (entry) => entry.missionTaskIdentifier === missionTaskIdentifier,
+        /**
+         * WIRING-04-04：**按节点是否声明来源决定严格度**（不打开全局闸）。
+         * 声明了来源 ⇒ 缺映射/不符必须阻塞；未声明 ⇒ 过渡态（不精确/缺失如实报告）。
+         */
+        const missionChainForMapping = await taskStore
+          .readTaskChain(missionIdentifier)
+          .catch(() => null);
+        const declaredNode = missionChainForMapping?.tasks.find(
+          (candidate) => candidate.id === missionTaskIdentifier,
         );
-        if (exactEntry === undefined) {
-          /**
-           * WIRING-04-04：只有整 mission 级关联（`*`）时**不得**当作"未声明包"，
-           * 也不得按名称/最近任务猜；如实报告"关联不精确"。
-           */
-          const hasWildcardBinding = mapEntries.some(
-            (entry) => entry.missionTaskIdentifier === "*",
-          );
-          return hasWildcardBinding
-            ? {
-                kind: "mapping-imprecise" as const,
-                reason: `mission ${missionIdentifier} 只有整 mission 级关联（*），无法确定 mission task ${missionTaskIdentifier} 的包`,
-              }
-            : {
-                kind: "mapping-missing" as const,
-                reason: `缺少 mission task ${missionTaskIdentifier} 与序列 ${sequenceIdentifier} 的精确映射`,
-              };
+        const mappingClassification = classifyContextPackMapping({
+          missionTaskIdentifier,
+          entries: mapEntries,
+          declaredSource:
+            declaredNode?.sourceSequenceTaskIdentifier === undefined ||
+            declaredNode.sourceSequenceIdentifier === undefined ||
+            declaredNode.sourceSequenceOwnerAgentInstanceIdentifier === undefined
+              ? null
+              : {
+                  sequenceTaskIdentifier: declaredNode.sourceSequenceTaskIdentifier,
+                  sequenceIdentifier: declaredNode.sourceSequenceIdentifier,
+                  ownerAgentInstanceIdentifier:
+                    declaredNode.sourceSequenceOwnerAgentInstanceIdentifier,
+                },
+        });
+        if (mappingClassification.kind === "declared-missing") {
+          return {
+            kind: "declared-but-missing" as const,
+            reason: mappingClassification.reason,
+          };
         }
+        if (mappingClassification.kind === "imprecise") {
+          return { kind: "mapping-imprecise" as const, reason: mappingClassification.reason };
+        }
+        if (mappingClassification.kind === "missing") {
+          return { kind: "mapping-missing" as const, reason: mappingClassification.reason };
+        }
+        const exactEntry = {
+          missionTaskIdentifier,
+          sequenceTaskIdentifier: mappingClassification.entry.sequenceTaskIdentifier,
+          sequenceIdentifier: mappingClassification.entry.sequenceIdentifier,
+          ownerAgentInstanceIdentifier: mappingClassification.entry.ownerAgentInstanceIdentifier,
+        };
         const sequenceDocument = await agentTaskSequenceStore
           .readSequence(exactEntry.ownerAgentInstanceIdentifier, exactEntry.sequenceIdentifier)
           .catch(() => null);

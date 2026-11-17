@@ -95,3 +95,74 @@ describe("WIRING-04-04：任务包解析", () => {
     expect(changedHash).not.toBe(sameHash);
   });
 });
+
+describe("WIRING-04-04：按是否声明来源决定严格度", () => {
+  const entry = {
+    missionTaskIdentifier: "T-003",
+    sequenceTaskIdentifier: "seq-task-7",
+    sequenceIdentifier: "sequence-1",
+    ownerAgentInstanceIdentifier: "agent-1",
+  };
+
+  it("⑦ 声明来源且映射一致 ⇒ exact", async () => {
+    const { classifyContextPackMapping } = await import(
+      "../../../packages/core/src/orchestration/context-pack-resolution.js"
+    );
+    const result = classifyContextPackMapping({
+      missionTaskIdentifier: "T-003",
+      entries: [entry],
+      declaredSource: {
+        sequenceTaskIdentifier: "seq-task-7",
+        sequenceIdentifier: "sequence-1",
+        ownerAgentInstanceIdentifier: "agent-1",
+      },
+    });
+    expect(result.kind).toBe("exact");
+  }, 30_000);
+
+  it("⑧ 声明了来源但映射缺失/不符 ⇒ declared-missing（阻塞）", async () => {
+    const { classifyContextPackMapping } = await import(
+      "../../../packages/core/src/orchestration/context-pack-resolution.js"
+    );
+    const missing = classifyContextPackMapping({
+      missionTaskIdentifier: "T-003",
+      entries: [],
+      declaredSource: {
+        sequenceTaskIdentifier: "seq-task-7",
+        sequenceIdentifier: "sequence-1",
+        ownerAgentInstanceIdentifier: "agent-1",
+      },
+    });
+    expect(missing.kind).toBe("declared-missing");
+
+    const mismatched = classifyContextPackMapping({
+      missionTaskIdentifier: "T-003",
+      entries: [entry],
+      declaredSource: {
+        sequenceTaskIdentifier: "seq-task-8",
+        sequenceIdentifier: "sequence-1",
+        ownerAgentInstanceIdentifier: "agent-1",
+      },
+    });
+    expect(mismatched.kind).toBe("declared-missing");
+  }, 30_000);
+
+  it("⑨ 未声明来源 ⇒ 过渡态（通配为 imprecise、无关联为 missing）", async () => {
+    const { classifyContextPackMapping } = await import(
+      "../../../packages/core/src/orchestration/context-pack-resolution.js"
+    );
+    const imprecise = classifyContextPackMapping({
+      missionTaskIdentifier: "T-009",
+      entries: [{ ...entry, missionTaskIdentifier: "*" }],
+      declaredSource: null,
+    });
+    expect(imprecise.kind).toBe("imprecise");
+
+    const missing = classifyContextPackMapping({
+      missionTaskIdentifier: "T-009",
+      entries: [],
+      declaredSource: null,
+    });
+    expect(missing.kind).toBe("missing");
+  }, 30_000);
+});

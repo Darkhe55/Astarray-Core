@@ -1419,12 +1419,21 @@ export class MainController {
       taskNodesWithSource[0] !== undefined &&
       this.options.missionTaskSequenceMapStore != null
     ) {
-      void bindExactMissionTaskMapping({
-        store: this.options.missionTaskSequenceMapStore,
-        missionIdentifier: missionId,
-        missionTaskIdentifier: taskNodesWithSource[0].id,
-        ...singleNodeSource,
-      }).catch(() => undefined);
+      /**
+       * **同步绑定**：解析层现在对"声明了来源"的节点要求精确映射；
+       * fire-and-forget 会让首个 worker 抢在绑定前启动 ⇒ 误判 `declared-but-missing` 而阻塞。
+       * 绑定失败不阻断创建（如实降级为"缺少精确映射"，下次启动仍可对账）。
+       */
+      try {
+        await bindExactMissionTaskMapping({
+          store: this.options.missionTaskSequenceMapStore,
+          missionIdentifier: missionId,
+          missionTaskIdentifier: taskNodesWithSource[0].id,
+          ...singleNodeSource,
+        });
+      } catch {
+        /** 绑定失败不阻断 mission 创建。 */
+      }
     }
     /**
      * ALIGN-01-01：把本次执行登记成该会话下的一次**运行**。

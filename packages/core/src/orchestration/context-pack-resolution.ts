@@ -34,6 +34,89 @@ export interface ContextPackResolutionPort {
   }): Promise<{ readonly contextPack: ContextPack | null; readonly revision: number } | null>;
 }
 
+/**
+ * WIRING-04-04（2026-11-18）：**按任务是否声明来源决定严格度**。
+ *
+ * - 节点声明了来源（三个字段齐全）⇒ 精确认定是必须的：缺映射或不符 ⇒ `declared-missing`（阻塞）；
+ * - 节点未声明来源 ⇒ 沿用过渡态：通配 ⇒ `imprecise`，无任何关联 ⇒ `missing`。
+ *
+ * 这样不必打开全局严格开关，也不会让"已声明来源"的任务继续宽松运行。
+ */
+export function classifyContextPackMapping(input: {
+  readonly missionTaskIdentifier: string;
+  readonly entries: ReadonlyArray<{
+    readonly missionTaskIdentifier: string;
+    readonly sequenceTaskIdentifier: string;
+    readonly sequenceIdentifier: string;
+    readonly ownerAgentInstanceIdentifier: string;
+  }>;
+  readonly declaredSource: {
+    readonly sequenceTaskIdentifier?: string;
+    readonly sequenceIdentifier?: string;
+    readonly ownerAgentInstanceIdentifier?: string;
+  } | null;
+}):
+  | {
+      readonly kind: "exact";
+      readonly entry: {
+        readonly sequenceTaskIdentifier: string;
+        readonly sequenceIdentifier: string;
+        readonly ownerAgentInstanceIdentifier: string;
+      };
+    }
+  | { readonly kind: "declared-missing"; readonly reason: string }
+  | { readonly kind: "imprecise"; readonly reason: string }
+  | { readonly kind: "missing"; readonly reason: string } {
+  const declared = input.declaredSource;
+  const isDeclaredComplete =
+    declared !== null &&
+    typeof declared.sequenceTaskIdentifier === "string" &&
+    declared.sequenceTaskIdentifier.trim() !== "" &&
+    typeof declared.sequenceIdentifier === "string" &&
+    declared.sequenceIdentifier.trim() !== "" &&
+    typeof declared.ownerAgentInstanceIdentifier === "string" &&
+    declared.ownerAgentInstanceIdentifier.trim() !== "";
+
+  const exactEntry = input.entries.find(
+    (entry) => entry.missionTaskIdentifier === input.missionTaskIdentifier,
+  );
+
+  if (isDeclaredComplete) {
+    if (
+      exactEntry === undefined ||
+      exactEntry.sequenceTaskIdentifier !== declared.sequenceTaskIdentifier ||
+      exactEntry.sequenceIdentifier !== declared.sequenceIdentifier ||
+      exactEntry.ownerAgentInstanceIdentifier !== declared.ownerAgentInstanceIdentifier
+    ) {
+      return {
+        kind: "declared-missing",
+        reason:
+          exactEntry === undefined
+            ? `节点声明来源（序列任务 ${declared.sequenceTaskIdentifier}），但缺少精确映射：必要输入不可得`
+            : `节点声明的来源与映射不一致（声明 ${declared.sequenceTaskIdentifier}/${declared.sequenceIdentifier}，映射 ${exactEntry.sequenceTaskIdentifier}/${exactEntry.sequenceIdentifier}）：不按映射猜`,
+      };
+    }
+    return { kind: "exact", entry: exactEntry };
+  }
+
+  if (exactEntry !== undefined) {
+    /** 未声明来源却存在精确项：按精确项用（不额外加锁）。 */
+    return { kind: "exact", entry: exactEntry };
+  }
+  const hasWildcardBinding = input.entries.some(
+    (entry) => entry.missionTaskIdentifier === "*",
+  );
+  return hasWildcardBinding
+    ? {
+        kind: "imprecise",
+        reason: `mission 只有整 mission 级关联（*），无法确定 mission task ${input.missionTaskIdentifier} 的包`,
+      }
+    : {
+        kind: "missing",
+        reason: `缺少 mission task ${input.missionTaskIdentifier} 的精确映射`,
+      };
+}
+
 export type ContextPackResolution =
   | { readonly kind: "no-pack-declared" }
   | {
