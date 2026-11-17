@@ -6278,3 +6278,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 回访默认显式按需、预声明依赖可授权自动读、自动相关性召回恒为空、side effects 恒为 false。
 > 反例 12 条；契约文档：`docs/adr/0031-context-node-closure-and-recall.md`（新增补充章节）。
 > **未接线**：策略尚未接入 `context-prompt-provider` 的默认提供者（未传 `contextPacks`/`recalledContextBlocks`）。
+
+> **COORD-03 接线阻塞（2026-11-17）**
+>
+> 核实：`contextPack` 在 `AgentTaskNode`（个体任务序列），而上下文提供者拿到的是 `TaskDependencyNode`（mission 任务链）
+> —— 两者没有对齐，"当前任务绑定包"当前**无字段可读**。
+> 三条接线路径（A agent 序列层 / B schema 扩字段 / C 用 mission↔sequence 映射）已写入卡内，**需裁决后再动**。
+> 尝试过的提供者改动已回退（类型检查挡住），未留半成品。

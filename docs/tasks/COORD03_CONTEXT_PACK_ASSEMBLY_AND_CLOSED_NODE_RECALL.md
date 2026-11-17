@@ -51,3 +51,29 @@
 - 定向：12 条反例通过；
 - 全量门禁：811 files / 5373 passed + 3 skipped，exit 0；
 - **未做**真实进程级/包级验证（本卡是策略层，未改变外部接口）。
+## 5. 接线阻塞点：`contextPack` 不在 mission 任务节点上（2026-11-17 核实）
+
+尝试把"当前任务绑定包"接进 `createContextPromptProvider` 时被类型系统挡住：
+
+| 事实 | 证据 |
+|---|---|
+| `contextPack` 字段属于 **`AgentTaskNode`**（个体待办序列） | `core/types.ts:694`；schema `core/schemas.ts:368`；使用方 `orchestration/task-sequence-controllers.ts:344` |
+| `createContextPromptProvider` 的入参任务类型是 **`TaskDependencyNode`**（mission 任务链节点） | `orchestration/context-prompt-assembler.ts` 第 62-90 行输入契约 + `TaskDependencyNode` 定义中没有 `contextPack` |
+
+也就是说：**"当前任务绑定包"在当前链路里没有可读字段**——不是实现漏了，是两个任务域没有对齐。
+
+### 三条可选接线路径（需裁决）
+
+| 方案 | 做法 | 代价 |
+|---|---|---|
+| A | 在 **agent 任务序列层**装配（字段已存在） | 与 mission 提供者不是同一条链路；需要新入口 |
+| B | 给 `TaskDependencyNode` 增加可选 `contextPack`，由发布者写入 | schema + 生产者的改动；旧任务没有该字段 |
+| C | 用既有 `missionTaskSequenceMapStore` 把 mission 任务映射到 agent 任务，再从序列存储读包 | 多一次映射查询；映射缺失时要如实降级 |
+
+**未选择的理由**：三者的影响面不同（A 换链路、B 改 schema、C 依赖映射完整度），
+在没有裁决前动手等于替使用者决定"包挂在哪一层"。本轮**不接线**，只记录证据。
+
+## 6. 已回退的尝试（如实记录）
+
+- 曾在 `context-prompt-assembler.ts` 里读 `input.task.contextPack` 并调用 `planContextPackAssembly`，
+  **类型检查直接失败**（`TaskDependencyNode` 无该字段）⇒ 已 `git checkout` 回退，未留在仓库。
