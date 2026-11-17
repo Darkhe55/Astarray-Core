@@ -31,6 +31,57 @@ export interface MissionTaskSequenceMapDocument {
   readonly maps: readonly MissionTaskSequenceMapEntry[];
 }
 
+/**
+ * WIRING-04-04（方案 A）：**建立精确的任务级映射**。
+ *
+ * 与 R124 的整 mission 通配（`*`）不同，这里要求三个来源字段齐全，
+ * 缺一个就**不写**（返回 skipped），绝不按名称或最近任务猜。
+ */
+export async function bindExactMissionTaskMapping(input: {
+  readonly store: {
+    bind(input: {
+      readonly missionIdentifier: string;
+      readonly sequenceIdentifier: string;
+      readonly ownerAgentInstanceIdentifier: string;
+      readonly missionTaskIdentifier: string;
+      readonly sequenceTaskIdentifier: string;
+    }): Promise<unknown>;
+  };
+  readonly missionIdentifier: string;
+  readonly missionTaskIdentifier: string;
+  readonly sourceSequenceTaskIdentifier?: string;
+  readonly sourceSequenceIdentifier?: string;
+  readonly sourceSequenceOwnerAgentInstanceIdentifier?: string;
+}): Promise<{
+  readonly outcome: "bound" | "skipped-missing-source" | "skipped-not-found";
+  readonly reason: string;
+}> {
+  const sequenceTaskIdentifier = input.sourceSequenceTaskIdentifier?.trim() ?? "";
+  const sequenceIdentifier = input.sourceSequenceIdentifier?.trim() ?? "";
+  const ownerAgentInstanceIdentifier =
+    input.sourceSequenceOwnerAgentInstanceIdentifier?.trim() ?? "";
+  if (
+    sequenceTaskIdentifier === "" ||
+    sequenceIdentifier === "" ||
+    ownerAgentInstanceIdentifier === "" ||
+    input.missionTaskIdentifier.trim() === "" ||
+    input.missionTaskIdentifier === "*"
+  ) {
+    return {
+      outcome: "skipped-missing-source",
+      reason: "来源不完整（需要序列任务/序列标识/属主三者齐全，且不得用通配）",
+    };
+  }
+  await input.store.bind({
+    missionIdentifier: input.missionIdentifier,
+    sequenceIdentifier,
+    ownerAgentInstanceIdentifier,
+    missionTaskIdentifier: input.missionTaskIdentifier,
+    sequenceTaskIdentifier,
+  });
+  return { outcome: "bound", reason: "已建立精确映射" };
+}
+
 export class MissionTaskSequenceMapStore {
   private readonly filePath: string;
   private readonly backupFilePath: string;

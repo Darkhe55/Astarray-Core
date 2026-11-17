@@ -5,6 +5,7 @@
  * 权限询问转达用户并记录会话授权。
  */
 import { createHash, randomUUID } from "node:crypto";
+import { bindExactMissionTaskMapping } from "./mission-task-sequence-map-store.js";
 import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
@@ -4578,6 +4579,13 @@ export class MainController {
       readonly dependsOn: readonly string[];
       readonly taskType: string;
       readonly toolNames: readonly string[];
+      /**
+       * WIRING-04-04（方案 A）：来源序列节点。
+       * 三者齐全时建立**精确映射**；缺一个就不写（不猜来源）。
+       */
+      readonly sourceSequenceTaskIdentifier?: string;
+      readonly sourceSequenceIdentifier?: string;
+      readonly sourceSequenceOwnerAgentInstanceIdentifier?: string;
     },
   ): Promise<{
     readonly outcome: "injected" | "refused";
@@ -4615,7 +4623,7 @@ export class MainController {
         reason: "当前调度器不支持安全点注入。",
       };
     }
-    return scheduler.injectTaskBySpec({
+    const injected = await scheduler.injectTaskBySpec({
       ...node,
       dependsOn: [...node.dependsOn],
       toolNames: [...node.toolNames],
@@ -4623,6 +4631,31 @@ export class MainController {
       status: "pending",
       resultLocation: null,
     });
+    /**
+     * WIRING-04-04（方案 A）：注入成功且来源齐全 ⇒ 建立**精确映射**（失败不阻断注入）。
+     * 缺来源时**不写**通配兜底：那会把"不知道"伪装成"整 mission 级关联"。
+     */
+    const sequenceMapStore = this.options.missionTaskSequenceMapStore ?? null;
+    if (injected.outcome === "injected" && sequenceMapStore !== null) {
+      void bindExactMissionTaskMapping({
+        store: sequenceMapStore,
+        missionIdentifier: missionId,
+        missionTaskIdentifier: node.id,
+        ...(node.sourceSequenceTaskIdentifier === undefined
+          ? {}
+          : { sourceSequenceTaskIdentifier: node.sourceSequenceTaskIdentifier }),
+        ...(node.sourceSequenceIdentifier === undefined
+          ? {}
+          : { sourceSequenceIdentifier: node.sourceSequenceIdentifier }),
+        ...(node.sourceSequenceOwnerAgentInstanceIdentifier === undefined
+          ? {}
+          : {
+              sourceSequenceOwnerAgentInstanceIdentifier:
+                node.sourceSequenceOwnerAgentInstanceIdentifier,
+            }),
+      }).catch(() => undefined);
+    }
+    return injected;
   }
 
   /**

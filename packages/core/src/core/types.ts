@@ -355,6 +355,15 @@ export interface TaskDependencyNode {
    * 可选以兼容既有任务链文档（旧文档无此字段 ⇒ 走回退并如实说明）。
    */
   publishedByRecipientId?: string | null;
+  /**
+   * WIRING-04-04（方案 A，2026-11-18 用户裁决）：**该节点来自哪个个体任务序列节点**。
+   *
+   * 只有三个字段齐全时读取方才会建立/使用**精确映射**；
+   * 缺失即视为来源不可考（不得按名称或最近任务猜）。
+   */
+  sourceSequenceTaskIdentifier?: string;
+  sourceSequenceIdentifier?: string;
+  sourceSequenceOwnerAgentInstanceIdentifier?: string;
 }
 
 /**

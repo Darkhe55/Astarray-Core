@@ -6419,3 +6419,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `docs/reports/WIRING04_DELIVERY_REPORT_2026-11-18.md`。
 > 02 完成；01/03/04/05 主体完成；剩余 4 项需外部输入（精确映射写入、消息 revision 字段、
 > 跨存储原子性、依赖/产物反查索引）。最后一次全量门禁 825 files / 5440 passed，exit 0。
+
+> **WIRING-04-04 方案 A 第一步（2026-11-18）**
+>
+> 按用户裁决实现精确映射写出路径：任务节点新增三个来源字段，`bindExactMissionTaskMapping`
+> 仅在来源齐全时建立精确映射（拒绝通配、缺一不写）；`injectMissionTask` 注入成功后绑定。
+> 反例 4 条；全量门禁 **826 files / 5444 passed，exit 0**。
+> 剩余：规划/投影侧填充来源字段；`(2)` 消息版本字段与 `(3)` 台账合并待做。

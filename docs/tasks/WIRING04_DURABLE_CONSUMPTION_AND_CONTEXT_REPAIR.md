@@ -715,3 +715,39 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 ### 门禁
 
 **825 files / 5440 passed + 3 skipped，exit 0**（`nodectx01-multi-model-fake-service-e2e` 抖动一次，隔离重跑通过）。
+
+## 25. 施工记录：WIRING-04-04 方案 A 第一步（2026-11-18，用户裁决）
+
+### 背景
+
+用户裁决选择**方案 A**：给 mission 任务节点加来源字段，由投影侧建立**精确映射**，
+取代"只写 `missionTaskIdentifier: "*"`"的通配关联。
+
+### 已实现
+
+| 项 | 内容 |
+|---|---|
+| 任务节点新字段 | `sourceSequenceTaskIdentifier` / `sourceSequenceIdentifier` / `sourceSequenceOwnerAgentInstanceIdentifier`（均可选） |
+| 精确绑定规则 | `bindExactMissionTaskMapping`：三者齐全才写；缺一返回 `skipped-missing-source`；**拒绝通配** |
+| 接线 | `MainController.injectMissionTask` 成功注入且来源齐全 ⇒ 建立精确映射（失败不阻断注入） |
+| 缺来源时 | **不写通配兜底**（不把"不知道"伪装成"整 mission 级关联"） |
+
+### 反例
+
+`tests/core/unit/mission-task-exact-mapping.test.ts`（4 条）：
+
+- ① 来源齐全 ⇒ 精确映射（且**不存在** `*` 条目）；
+- ② 缺一个来源 ⇒ 不写；
+- ③ 用通配任务标识 ⇒ 拒绝；
+- ④ 两个 mission 任务各绑自己的序列节点（同名任务不串包）。
+
+### 已知边界
+
+- `injectMissionTask` 里绑定是**fire-and-forget**：注入后立刻跑该任务时，严格模式可能瞬时读到"未精确映射"。
+  若要消除，需要改为注入前同步绑定或读侧短暂重试——本轮未做。
+- 真正把来源字段**填进** mission 节点的写入方（规划/投影）仍不在本卡：本轮提供的是字段与绑定规则；
+  没有该字段的任务按"来源不可考"处理，严格模式会阻塞（符合卡内要求）。
+
+### 门禁
+
+**826 files / 5444 passed + 3 skipped，exit 0**。
