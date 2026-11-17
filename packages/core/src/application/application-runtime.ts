@@ -19,7 +19,10 @@ import { PermissionDecider } from "../core/permission-policy.js";
 import { TaskStore } from "../infra/task-store.js";
 import { MissionLeaseStore } from "../infra/mission-lease-store.js";
 import { ToolRegistry } from "../tools/registry.js";
-import { BUILTIN_TOOL_DESCRIPTORS } from "../tools/builtins.js";
+import {
+  BUILTIN_TOOL_DESCRIPTORS,
+  RECALL_CLOSED_CONTEXT_TOOL_DESCRIPTOR,
+} from "../tools/builtins.js";
 import { PolicyWrapper } from "../tools/policy-wrapper.js";
 import { WorkspaceBoundary } from "../tools/workspace-boundary.js";
 import { FolderGrantStore } from "../orchestration/folder-grant-store.js";
@@ -1152,6 +1155,8 @@ export async function createApplicationRuntime(
    * 但对主 Agent 预览隐藏（主 Agent 不获得该写工具）。
    */
   registry.register(GOAL_PROPOSAL_TOOL_DESCRIPTOR, { isHiddenFromPreview: true });
+  /** WIRING-04-05：回访工具单独注册（非内置描述符，走自定义处理器）。 */
+  registry.register(RECALL_CLOSED_CONTEXT_TOOL_DESCRIPTOR, { isHiddenFromPreview: true });
   // AUTH-SCOPE-03：范围判定只使用显式登记的工程根，不再隐式读取 cwd。
   const registeredProjectRoots: RegisteredProjectRoot[] = [
     {
@@ -4673,6 +4678,7 @@ const controller = new MainController({
               async (argumentsJson: string, callId: string) => {
                 const recallOutcome = await executeRecallToolCall({
                   callerAgentInstanceId: agentInstanceId ?? "",
+                  taskExecutionId: `task-exec:${agentInstanceId ?? task.id}`,
                   argumentsJson,
                   recall: async (recallInput) => {
                     const recallController = contextRecallControllerFactory(

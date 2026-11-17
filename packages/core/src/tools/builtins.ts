@@ -148,6 +148,34 @@ export interface BuiltinToolExecutionContext {
   processExecutionOwnership?: ProcessExecutionOwnership | null;
 }
 
+/**
+ * WIRING-04-05（2026-11-18 实测修正）：回访工具**不是内置工具**。
+ *
+ * 内置描述符会被 `executeBuiltinTool` 接管（那里没有它的实现 ⇒ "未知内置工具"）。
+ * 它必须像 `proposeGoal` 一样**单独注册 + 自定义处理器**，才能走到真正实现。
+ */
+export const RECALL_CLOSED_CONTEXT_TOOL_DESCRIPTOR: ToolDescriptor = {
+  name: "recallClosedContext",
+  summary: "按节点标识与固定 revision 读取已关闭上下文（只读，不重开节点）",
+  category: "readonly",
+  mutationKind: "none",
+  backupPolicy: "not-required",
+  authorizationPolicy: "standard",
+  supportedTaskTypes: ["data", "doc", "code"],
+  isIdempotent: true,
+  inputSchema: {
+    type: "object",
+    properties: {
+      contextNodeIdentifier: { type: "string" },
+      sourceRevision: { type: "number" },
+      reasonCode: { type: "string" },
+      maximumTokenCount: { type: "number" },
+    },
+    required: ["contextNodeIdentifier", "sourceRevision", "reasonCode"],
+    additionalProperties: false,
+  },
+};
+
 export const BUILTIN_TOOL_DESCRIPTORS: ToolDescriptor[] = [
   {
     name: "readFile",
@@ -365,33 +393,6 @@ export const BUILTIN_TOOL_DESCRIPTORS: ToolDescriptor[] = [
         maximumBytes: { type: "number" },
         reason: { type: "string" },
       },
-    },
-  },
-  /**
-   * WIRING-04-05：**按需回访已关闭节点**（只读，不改任何状态）。
-   *
-   * 卡内裁决：Agent 经已有读取权限发起请求，无需每次人工确认；
-   * 调用者身份由 harness 注入（模型参数里的同名字段会被拒绝）。
-   */
-  {
-    name: "recallClosedContext",
-    summary: "按节点标识与固定 revision 读取已关闭上下文（只读，不重开节点）",
-    category: "readonly",
-    mutationKind: "none",
-    backupPolicy: "not-required",
-    authorizationPolicy: "standard",
-    supportedTaskTypes: ["data", "doc", "code"],
-    isIdempotent: true,
-    inputSchema: {
-      type: "object",
-      properties: {
-        contextNodeIdentifier: { type: "string" },
-        sourceRevision: { type: "number" },
-        reasonCode: { type: "string" },
-        maximumTokenCount: { type: "number" },
-      },
-      required: ["contextNodeIdentifier", "sourceRevision", "reasonCode"],
-      additionalProperties: false,
     },
   },
 ];

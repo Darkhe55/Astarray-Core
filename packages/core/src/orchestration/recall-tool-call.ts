@@ -10,6 +10,9 @@
  *
  * 本模块只做"工具调用 → 控制器"的转换与形状收敛，便于在没有完整运行时装配时先验证语义。
  */
+import { randomUUID } from "node:crypto";
+
+import { CONTEXT_RECALL_REQUEST_SCHEMA_VERSION } from "./context-closure-schemas.js";
 import type { ContextRecallResult } from "./context-recall-controller.js";
 
 export interface RecallToolCallOutcome {
@@ -21,6 +24,8 @@ export interface RecallToolCallOutcome {
 export async function executeRecallToolCall(input: {
   /** harness 注入的调用者身份（**不来自模型参数**）。 */
   readonly callerAgentInstanceId: string;
+  /** harness 注入的执行标识（**不来自模型参数**）。 */
+  readonly taskExecutionId: string;
   readonly argumentsJson: string;
   readonly recall: (input: {
     callerAgentInstanceId: string;
@@ -85,9 +90,72 @@ export async function executeRecallToolCall(input: {
     };
   }
 
+  /**
+   * WIRING-04-05：**控制器契约要求的字段由 harness 组装**，模型只提供它该知道的部分。
+   * 模型若自带 schemaVersion/requestId/taskExecutionId ⇒ 直接拒绝（不得伪造）。
+   */
+  const forbiddenHarnessFields = ["schemaVersion", "requestId", "taskExecutionId"] as const;
+  const forgedField = forbiddenHarnessFields.find(
+    (fieldName) => argumentRecord[fieldName] !== undefined,
+  );
+  if (forgedField !== undefined) {
+    return {
+      isOk: false,
+      contentText: JSON.stringify({
+        status: "refused",
+        errorCode: "context-recall-invalid",
+        reason: `字段 ${forgedField} 由 harness 填写，模型不得提供`,
+      }),
+    };
+  }
+  const readString = (fieldName: string): string | null => {
+    const value = argumentRecord[fieldName];
+    return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+  };
+  const contextNodeIdentifier = readString("contextNodeIdentifier");
+  const reasonCode = readString("reasonCode");
+  const requiredInformation = readString("requiredInformation");
+  const nodeRevisionRaw = argumentRecord["nodeRevision"];
+  const maximumTokenCountRaw = argumentRecord["maximumTokenCount"];
+  const nodeRevision =
+    typeof nodeRevisionRaw === "number" && Number.isInteger(nodeRevisionRaw) && nodeRevisionRaw > 0
+      ? nodeRevisionRaw
+      : null;
+  const maximumTokenCount =
+    typeof maximumTokenCountRaw === "number" &&
+    Number.isInteger(maximumTokenCountRaw) &&
+    maximumTokenCountRaw > 0
+      ? maximumTokenCountRaw
+      : 512;
+  if (
+    contextNodeIdentifier === null ||
+    reasonCode === null ||
+    requiredInformation === null ||
+    nodeRevision === null
+  ) {
+    return {
+      isOk: false,
+      contentText: JSON.stringify({
+        status: "refused",
+        errorCode: "context-recall-invalid",
+        reason:
+          "必须提供 contextNodeIdentifier、nodeRevision（正整数）、reasonCode、requiredInformation",
+      }),
+    };
+  }
+  const request = {
+    schemaVersion: CONTEXT_RECALL_REQUEST_SCHEMA_VERSION,
+    requestId: `recall-${randomUUID()}`,
+    taskExecutionId: input.taskExecutionId,
+    contextNodeIdentifier,
+    nodeRevision,
+    reasonCode,
+    requiredInformation,
+    maximumTokenCount,
+  };
   const result = await input.recall({
     callerAgentInstanceId: input.callerAgentInstanceId,
-    request: parsedArguments,
+    request,
   });
   if (result.status === "not-found" && input.listCandidateReferences !== undefined) {
     /** 找不到 ⇒ 附**最小候选引用**（标识 + revision），正文仍必须另行请求。 */

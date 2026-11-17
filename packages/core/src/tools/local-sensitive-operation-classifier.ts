@@ -56,6 +56,11 @@ const TOOL_NAME_CLASS: Record<string, SensitiveOperationClass> = {
   backupVault: "backup-access",
   deleteBackup: "backup-access",
   taskSequenceStatus: "state-query",
+  /**
+   * WIRING-04-05（2026-11-18）：回访工具此前未登记 ⇒ 被判 `unknown` ⇒ 走**安装门禁**被 fail-closed 拒绝。
+   * 它只读该调用者可见的已关闭胶囊，属**状态查询**，不应进入安装门禁。
+   */
+  recallClosedContext: "state-query",
     // G3a（第 215 轮）：内置证据工具。此前未登记 ⇒ 被判 unknown ⇒ 走安装门禁被 fail-closed 拒绝；
     // 其网络检索由权限能力 network.read 管辖，不需安装门禁。
     factVerification: "network-access",

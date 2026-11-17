@@ -992,3 +992,39 @@ zod 默认**丢弃未知字段** ⇒ 经过 schema 的读写会把手写进去�
 ### 门禁
 
 **829 files / 5463 passed + 3 skipped，exit 0**。
+
+## 34. 施工记录：回访工具端到端打通（2026-11-18）——**此前三段"完成"其实不可用**
+
+### 触发
+
+按计划写"回访工具产品路径"反例（假 Provider 让模型真的调用 `recallClosedContext`），
+第一次跑出来的是三段真实缺陷，此前单测全绿、产品路径从未被执行过：
+
+| # | 现象 | 根因 | 修法 |
+|---|---|---|---|
+| 1 | `tool-permission-denied: 安装门禁拒绝（无可信交互通道）` | 操作分类器未登记该工具 ⇒ `unknown` ⇒ 走安装门禁 fail-closed | 分类为 `state-query`（与 `taskSequenceStatus` 同类） |
+| 2 | `tool-execution-failed: 未知内置工具` | 描述符放在 `BUILTIN_TOOL_DESCRIPTORS` 里 ⇒ 被 `executeBuiltinTool` 接管，而那里没有实现 | 移出内置清单，改为**单独注册 + 自定义处理器**（与 `proposeGoal` 同模式） |
+| 3 | `context-recall-invalid: schemaVersion 期望 1` | 适配层把模型参数**原样**当请求 ⇒ 缺 `schemaVersion/requestId/taskExecutionId` 等权威字段 | 适配层**由 harness 组装**请求；模型若自带这些字段 ⇒ 明确拒绝 |
+
+### 现在的契约
+
+- 模型只提供：`contextNodeIdentifier`、`nodeRevision`、`reasonCode`、`requiredInformation`、`maximumTokenCount`；
+- harness 补充：`schemaVersion`、`requestId`（一次性）、`taskExecutionId`；
+- 模型的 `callerAgentInstanceId` / 上述权威字段出现在参数里 ⇒ **直接拒绝**；
+- 找不到节点 ⇒ `not-found` + 最多 5 条候选（只有标识与 revision）。
+
+### 反例
+
+| 文件 | 内容 |
+|---|---|
+| `tests/core/unit/recall-tool-call.test.ts` | 9 条：身份注入+请求组装、伪造身份、伪造权威字段、非法 JSON、空身份、缺必需字段、控制器拒绝透传、候选截断、成功不附候选 |
+| `tests/core/integration/wiring04-recall-tool-product-path.test.ts` | **端到端**：假 Provider 先给分解草案、再发 `recallClosedContext` 调用；断言下一次请求里出现 `"role":"tool"`、`"tool_call_id":"tc-recall-1"`、`context-recall-refused` 与 `not-found` |
+
+### 教训（写给后续轮次）
+
+"工具已登记 + 单测通过"**不等于**产品路径可用。权限分类、内置执行器接管、控制器请求契约是三处独立的失配点，
+只有让**真实模型请求**真的调用一次才能发现。
+
+### 门禁
+
+**830 files / 5466 passed + 3 skipped，exit 0**。
