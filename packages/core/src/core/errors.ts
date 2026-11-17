@@ -91,6 +91,8 @@ export type DomainErrorCode =
   | "task-briefing-budget-exceeded"
   /** WIRING-04-04：任务包无法按精确映射解析（缺映射 / 声明有包却读不到）⇒ 阻塞。 */
   | "context-pack-unresolvable"
+  /** WIRING-04-03：缺少权威完成校验凭证却尝试标记 done。 */
+  | "completion-not-authorized"
   /** WIRING-04-04：必要上下文包超预算（不截断）。 */
   | "context-pack-budget-exceeded"
   | "tool-execution-failed"

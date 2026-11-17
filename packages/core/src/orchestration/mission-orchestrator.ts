@@ -928,7 +928,27 @@ export class MissionOrchestrator {
    * 为什么需要这个公开入口：`dagScheduler` 是私有的，而调度器只重算内存图、
    * 从不重读任务链——外部写入任务链对运行中的 mission 不可见。
    */
-  async completeTaskByTaskIdentifier(taskId: string, outcome: "done" | "failed"): Promise<void> {
+  async completeTaskByTaskIdentifier(
+    taskId: string,
+    outcome: "done" | "failed",
+    /**
+     * WIRING-04-03：**受控完成凭证**。
+     *
+     * 标记 `done` 必须携带权威完成校验已通过的凭证；没有凭证就抛错，
+     * 防止新增调用方绕过 `evaluateAuthoritativeCompletion`。
+     * `failed` 不需要凭证（失败不构成"完成"）。
+     */
+    completionAuthorization?: {
+      readonly code: "authoritative-completion-accepted";
+      readonly decidedAtIso: string;
+    },
+  ): Promise<void> {
+    if (outcome === "done" && completionAuthorization === undefined) {
+      throw new DomainError(
+        "completion-not-authorized",
+        `任务 ${taskId} 的完成缺少权威校验凭证（不得直接标记 done）`,
+      );
+    }
     await this.dagScheduler.finishTask(taskId, outcome, null);
   }
 

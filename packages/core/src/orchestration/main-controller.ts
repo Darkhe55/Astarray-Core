@@ -5505,13 +5505,22 @@ export class MainController {
     readonly missionIdentifier: string;
     readonly taskIdentifier: string;
     readonly outcome: "done" | "failed";
+    /** WIRING-04-03：权威完成校验凭证（标记 done 必需）。 */
+    readonly completionAuthorization?: {
+      readonly code: "authoritative-completion-accepted";
+      readonly decidedAtIso: string;
+    };
   }): Promise<{ readonly outcome: "applied-to-active-scheduler" | "mission-not-active" }> {
     const active = this.activeOrchestrators.get(input.missionIdentifier);
     if (active === undefined) {
       return { outcome: "mission-not-active" };
     }
     /** `finishTask` 自身对未 claim 的任务是幂等忽略（旧执行反馈不会重复结算）。 */
-    await active.scheduler.completeTaskByTaskIdentifier(input.taskIdentifier, input.outcome);
+    await active.scheduler.completeTaskByTaskIdentifier(
+      input.taskIdentifier,
+      input.outcome,
+      input.completionAuthorization,
+    );
     return { outcome: "applied-to-active-scheduler" };
   }
 

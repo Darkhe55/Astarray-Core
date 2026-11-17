@@ -6375,3 +6375,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 提供者新增 `recalledContextBlocksProvider`：显式回访块（节点+固定 revision）可进入装配，缺省不注入。
 > 反例 2 条；全量门禁 **823 files / 5423 passed，exit 0**。
 > **阻塞**：没有回访工具（`ContextRecallController` 已存在但工具注册表无入口），新增需权限类别/审计/限次策略设计决策。
+
+> **WIRING-04-03 第一步（2026-11-17）：受控完成凭证**
+>
+> 公开完成入口 `completeTaskByTaskIdentifier` 现在要求权威校验凭证：`done` 缺凭证抛 `completion-not-authorized`；
+> 控制器转发凭证，运行时只在通过门禁且 done 时发放。守卫 3 条；全量门禁 **824 files / 5426 passed，exit 0**。
+> 未完成：非活动 mission 入口的行为反例；01 核验/原子单元仍阻塞或待设计。

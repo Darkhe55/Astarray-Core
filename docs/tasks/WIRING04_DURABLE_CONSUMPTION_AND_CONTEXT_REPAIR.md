@@ -523,3 +523,36 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 ### 门禁
 
 **823 files / 5423 passed + 3 skipped，exit 0**（`graph-change-deterministic-drill` 抖动一次，隔离重跑通过）。
+
+## 19. 施工记录：WIRING-04-03 第一步（2026-11-17）
+
+### 缺口（审计发现）
+
+`MissionOrchestrator.completeTaskByTaskIdentifier(taskId, outcome)` 是**公开入口**，
+任何调用方都能直接标 `done`，绕过 `evaluateAuthoritativeCompletion`。
+卡内明确要求："内部完成 API 改为接收受控校验结果或在内部校验，防止新增调用方绕过。"
+
+### 实现
+
+| 层 | 改动 |
+|---|---|
+| `mission-orchestrator` | `completeTaskByTaskIdentifier(..., completionAuthorization?)`：`done` 缺凭证 ⇒ 抛 `completion-not-authorized`；`failed` 不需凭证 |
+| `main-controller.applyCoordinationTaskOutcome` | 转发 `completionAuthorization`（不吞、不造） |
+| `application-runtime` | 只有**通过权威门禁**后、且 `coordinationTaskStatus === "done"` 时才发放 `authoritative-completion-accepted` 凭证 |
+
+### 守卫
+
+`tests/architecture/wiring04-completion-authorization-guard.test.ts`（3 条）：
+入口自校验、控制器转发、运行时仅在 done 时发放。
+
+### 仍未完成
+
+| 项 | 现状 |
+|---|---|
+| 非活动 mission 持久状态入口的**行为**反例 | 未补（本次只有静态守卫） |
+| 01 的 revision/执行尝试核验 | 阻塞（消息无字段） |
+| 01 原子提交单元 | 待设计 |
+
+### 门禁
+
+**824 files / 5426 passed + 3 skipped，exit 0**。

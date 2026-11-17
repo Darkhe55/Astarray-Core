@@ -5144,6 +5144,15 @@ const controller = new MainController({
         missionIdentifier: input.missionIdentifier,
         taskIdentifier: coordinationTaskIdentifier,
         outcome: coordinationTaskStatus,
+        /** WIRING-04-03：只有通过权威完成校验（本函数前段已判定）才发放凭证。 */
+        ...(coordinationTaskStatus === "done"
+          ? {
+              completionAuthorization: {
+                code: "authoritative-completion-accepted" as const,
+                decidedAtIso: new Date().toISOString(),
+              },
+            }
+          : {}),
       });
       if (activeApplication.outcome === "applied-to-active-scheduler") {
         return;

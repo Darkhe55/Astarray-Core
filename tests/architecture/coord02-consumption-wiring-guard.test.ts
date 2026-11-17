@@ -82,7 +82,8 @@ describe("运行中 mission 必须打到调度器（2026-11-16）", () => {
       "utf8",
     );
     expect(controllerCode).toContain("this.activeOrchestrators.get(input.missionIdentifier)");
-    expect(controllerCode).toContain("completeTaskByTaskIdentifier(input.taskIdentifier, input.outcome)");
+    expect(controllerCode).toContain("completeTaskByTaskIdentifier(");
+    expect(controllerCode).toContain("input.completionAuthorization");
   }, 30_000);
 
   it("⑧ 阻塞不得来自消息：任务状态模块不含 blocked 分支", async () => {
