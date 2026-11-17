@@ -273,6 +273,7 @@ export class ContextNodeLifecycleController {
       inputSummary: input.input.taskDescription.slice(0, 200),
       outputSummary: input.input.summaryText.slice(0, 400),
       verificationState: input.verificationState,
+      sourceTaskIdentifier: input.input.taskIdentifier,
       informationSource: {
         sourceType: "agent",
         agentInstanceId: input.input.ownerAgentInstanceId,

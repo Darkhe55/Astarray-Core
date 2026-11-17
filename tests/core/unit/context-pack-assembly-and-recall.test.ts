@@ -297,3 +297,44 @@ describe("WIRING-04-05：候选按产物关联排序", () => {
     ).toEqual(["node-a", "node-b"]);
   }, 30_000);
 });
+
+describe("WIRING-04-05：依赖关系优先于产物关联", () => {
+  it("⑮ 依赖任务关闭的胶囊排在产物命中之前", () => {
+    const ordered = orderRecallCandidatesByArtifactAssociation({
+      capsules: [
+        {
+          contextNodeIdentifier: "node-artifact",
+          sourceRevision: 1,
+          artifactOrCommitReferences: ["out/report.md"],
+        },
+        { contextNodeIdentifier: "node-dep", sourceRevision: 2, sourceTaskIdentifier: "T-000" },
+        { contextNodeIdentifier: "node-other", sourceRevision: 3 },
+      ],
+      missionArtifactLocations: ["out/report.md"],
+      dependencyTaskIdentifiers: ["T-000"],
+    });
+    expect(ordered.map((candidate) => candidate.contextNodeIdentifier)).toEqual([
+      "node-dep",
+      "node-artifact",
+      "node-other",
+    ]);
+  }, 30_000);
+
+  it("⑯ 没有依赖声明 ⇒ 行为与原来一致（产物优先）", () => {
+    const ordered = orderRecallCandidatesByArtifactAssociation({
+      capsules: [
+        { contextNodeIdentifier: "node-a", sourceRevision: 1 },
+        {
+          contextNodeIdentifier: "node-b",
+          sourceRevision: 2,
+          artifactOrCommitReferences: ["out/report.md"],
+        },
+      ],
+      missionArtifactLocations: ["out/report.md"],
+    });
+    expect(ordered.map((candidate) => candidate.contextNodeIdentifier)).toEqual([
+      "node-b",
+      "node-a",
+    ]);
+  }, 30_000);
+});

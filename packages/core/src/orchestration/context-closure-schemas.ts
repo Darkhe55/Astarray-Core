@@ -260,6 +260,8 @@ export const contextClosureCapsuleSchema = z
     ]),
     artifactOrCommitReferences: z.array(z.string().min(1)).default([]),
     testEvidenceReferences: z.array(z.string().min(1)).default([]),
+    /** WIRING-04-05：关闭该节点时对应的任务（可选；旧胶囊没有）。 */
+    sourceTaskIdentifier: z.string().min(1).optional(),
     informationSource: contextInformationSourceSchema,
     contentHash: sha256FingerprintSchema,
     unresolvedItems: z.array(z.string().min(1)).default([]),

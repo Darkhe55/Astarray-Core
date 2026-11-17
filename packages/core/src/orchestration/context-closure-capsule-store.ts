@@ -44,6 +44,13 @@ export interface CreateClosureCapsuleInput {
   verificationState: "awaiting-user-acceptance" | "accepted-closed" | "deferred-review-closed";
   artifactOrCommitReferences?: string[];
   testEvidenceReferences?: string[];
+  /**
+   * WIRING-04-05（2026-11-18）：**该胶囊关闭时对应的任务**。
+   *
+   * 用于"按依赖关系召回"：当前任务依赖的任务，其胶囊应优先作为候选。
+   * 旧胶囊没有该字段 ⇒ 视为未知来源（不猜、不参与依赖排序）。
+   */
+  sourceTaskIdentifier?: string;
   informationSource:
     | { sourceType: "agent"; agentInstanceId: string }
     | { sourceType: "user"; userId?: string };
@@ -100,6 +107,10 @@ export class ContextClosureCapsuleStore {
         outputSummary: input.outputSummary,
         verificationState: input.verificationState,
         artifactOrCommitReferences: input.artifactOrCommitReferences ?? [],
+        ...(input.sourceTaskIdentifier === undefined ||
+        input.sourceTaskIdentifier.trim() === ""
+          ? {}
+          : { sourceTaskIdentifier: input.sourceTaskIdentifier.trim() }),
         testEvidenceReferences: input.testEvidenceReferences ?? [],
         informationSource: input.informationSource,
         contentHash,

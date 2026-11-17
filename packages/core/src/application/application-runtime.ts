@@ -4706,8 +4706,12 @@ const controller = new MainController({
                         contextNodeIdentifier: capsule.contextNodeIdentifier,
                         sourceRevision: capsule.contextGraphRevision,
                         artifactOrCommitReferences: capsule.artifactOrCommitReferences ?? [],
+                        ...(capsule.sourceTaskIdentifier === undefined
+                          ? {}
+                          : { sourceTaskIdentifier: capsule.sourceTaskIdentifier }),
                       })),
                       missionArtifactLocations,
+                      dependencyTaskIdentifiers: task.dependsOn,
                     });
                   },
                 });

@@ -104,8 +104,12 @@ export function orderRecallCandidatesByArtifactAssociation(input: {
     readonly contextNodeIdentifier: string;
     readonly sourceRevision: number;
     readonly artifactOrCommitReferences?: readonly string[];
+    /** WIRING-04-05：关闭该节点的任务（用于依赖关系排序）。 */
+    readonly sourceTaskIdentifier?: string;
   }>;
   readonly missionArtifactLocations: readonly string[];
+  /** 当前任务的依赖任务标识（依赖关系排序依据）。 */
+  readonly dependencyTaskIdentifiers?: readonly string[];
 }): ReadonlyArray<{
   readonly contextNodeIdentifier: string;
   readonly sourceRevision: number;
@@ -123,10 +127,24 @@ export function orderRecallCandidatesByArtifactAssociation(input: {
       artifactLocations.has(reference.trim()),
     );
   };
-  /** 稳定排序：命中产物关联的在前，其余保持原顺序。 */
+  const dependencyIdentifiers = new Set(
+    (input.dependencyTaskIdentifiers ?? []).map((taskIdentifier) => taskIdentifier.trim()),
+  );
+  const matchesDependency = (capsule: { readonly sourceTaskIdentifier?: string }): boolean =>
+    capsule.sourceTaskIdentifier !== undefined &&
+    dependencyIdentifiers.has(capsule.sourceTaskIdentifier.trim());
+  /**
+   * 稳定排序：**依赖关系命中**优先，其次**产物关联命中**，其余保持原顺序。
+   * 两级都不扩大候选集。
+   */
   const ordered = [
-    ...input.capsules.filter((capsule) => matchesArtifact(capsule)),
-    ...input.capsules.filter((capsule) => !matchesArtifact(capsule)),
+    ...input.capsules.filter((capsule) => matchesDependency(capsule)),
+    ...input.capsules.filter(
+      (capsule) => !matchesDependency(capsule) && matchesArtifact(capsule),
+    ),
+    ...input.capsules.filter(
+      (capsule) => !matchesDependency(capsule) && !matchesArtifact(capsule),
+    ),
   ];
   return ordered.map((capsule) => ({
     contextNodeIdentifier: capsule.contextNodeIdentifier,
