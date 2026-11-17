@@ -841,3 +841,34 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 
 (1) 精确映射的来源字段填充仍是下一步：字段与绑定规则已就绪（§25），
 缺口是"谁在分解/投影时填写来源"。需要先追踪 mission 创建与分解写链路径再动手。
+
+## 29. 施工记录：WIRING-04-04 方案 A 第二步（2026-11-18）
+
+### 来源字段开始被真正填写
+
+| 位置 | 内容 |
+|---|---|
+| mission 创建（`main-controller`） | **单节点 + 有用户任务序列** ⇒ 节点带上三个来源字段，并建立精确映射 |
+| 多节点分解 | **不填、不绑**（1:N 无法确定来源；不猜） |
+
+### 顺带发现并修掉一个会静默丢数据的缺陷
+
+`taskChainSchema`（zod）**没有登记** `coordinationApplicationEvidence` 与新增的来源字段。
+zod 默认**丢弃未知字段** ⇒ 经过 schema 的读写会把手写进去的证据**悄悄删掉**，
+而用假 store 的单测仍然全绿。
+
+已登记两个字段，并加回归守卫 `task-chain-schema-preserves-wiring-fields.test.ts`（3 条）：
+证据保留、来源保留、非法状态值被拒。
+
+### 又一次真实回归（必须记录）
+
+首次全量：**46 files / 68 tests 红**，整条产品链路 `blocked`。
+根因：精确映射的属主写成了 `responsibleSecondaryAgentInstanceId`，
+而序列注册用的是 `resolveSecondaryAgentInstanceIdentifier(missionId)` —— 属主不一致 ⇒
+解析层读不到序列节点 ⇒ `declared-but-missing` ⇒ 任务被阻塞。
+
+修法：注册与绑定用**同一个**属主变量。修复后全量恢复绿。
+
+### 门禁
+
+**828 files / 5452 passed + 3 skipped，exit 0**。

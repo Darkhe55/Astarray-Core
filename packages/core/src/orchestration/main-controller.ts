@@ -1358,20 +1358,43 @@ export class MainController {
      */
     const responsibleSecondaryAgentInstanceId =
       this.ensureResponsibleSecondaryAgentInstance(missionId);
+    /**
+     * 序列的属主必须与注册时**同一个**：否则精确映射指到别的属主，
+     * 读序列会失败 ⇒ 解析层判 `declared-but-missing` ⇒ 任务被误阻塞。
+     */
+    const userTaskSequenceOwnerAgentInstanceIdentifier =
+      this.resolveSecondaryAgentInstanceIdentifier(missionId);
     const userTaskSequence =
       mode === "assist"
         ? await this.registerUserTaskInSequence({
             missionId,
             instructionText: message,
-            secondaryAgentInstanceId:
-              this.resolveSecondaryAgentInstanceIdentifier(missionId),
+            secondaryAgentInstanceId: userTaskSequenceOwnerAgentInstanceIdentifier,
           })
         : null;
+    /**
+     * WIRING-04-04（方案 A）：**单节点 + 有用户任务序列**时，该任务来自那条序列。
+     *
+     * 多节点分解是 1:N，无法确定"哪个节点来自哪条序列" ⇒ 不填、不绑（不猜）。
+     */
+    const singleNodeSource =
+      userTaskSequence !== null && taskNodes.length === 1
+        ? {
+            sourceSequenceTaskIdentifier: userTaskSequence.taskIdentifier,
+            sourceSequenceIdentifier: userTaskSequence.taskSequenceIdentifier,
+            sourceSequenceOwnerAgentInstanceIdentifier:
+              userTaskSequenceOwnerAgentInstanceIdentifier,
+          }
+        : null;
+    const taskNodesWithSource =
+      singleNodeSource === null || taskNodes[0] === undefined
+        ? taskNodes
+        : [{ ...taskNodes[0], ...singleNodeSource }, ...taskNodes.slice(1)];
     await this.options.missionManager.createMission({
       missionId,
       mode,
       prompt: message,
-      taskNodes,
+      taskNodes: taskNodesWithSource,
       responsibleSecondaryAgentInstanceId,
       ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
       ...(conversationIdentity === null
@@ -1388,6 +1411,21 @@ export class MainController {
         ? {}
         : { taskPlanningFallbackReason: taskPlanning.fallbackReason }),
     });
+    /**
+     * WIRING-04-04：节点已带来源 ⇒ 建立**精确映射**（缺来源就不写，不退化成通配）。
+     */
+    if (
+      singleNodeSource !== null &&
+      taskNodesWithSource[0] !== undefined &&
+      this.options.missionTaskSequenceMapStore != null
+    ) {
+      void bindExactMissionTaskMapping({
+        store: this.options.missionTaskSequenceMapStore,
+        missionIdentifier: missionId,
+        missionTaskIdentifier: taskNodesWithSource[0].id,
+        ...singleNodeSource,
+      }).catch(() => undefined);
+    }
     /**
      * ALIGN-01-01：把本次执行登记成该会话下的一次**运行**。
      *

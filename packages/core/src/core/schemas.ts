@@ -136,6 +136,15 @@ export const taskDependencyNodeSchema = z.object({
   acceptanceCriteria: z.string().min(1).optional(),
   /** ALIGN-02-03：执行节点优先级（可选；旧文档没有该字段 ⇒ 按用户层 0）。 */
   priorityTier: z.number().int().min(0).max(3).optional(),
+  /**
+   * WIRING-04-04（方案 A）：该节点来自哪个个体任务序列节点。
+   *
+   * **必须显式登记**，否则 zod 默认会把未知字段**静默丢弃**——
+   * 那样"精确映射"在读链时就永远看不到来源。
+   */
+  sourceSequenceTaskIdentifier: z.string().min(1).optional(),
+  sourceSequenceIdentifier: z.string().min(1).optional(),
+  sourceSequenceOwnerAgentInstanceIdentifier: z.string().min(1).optional(),
 });
 
 export const taskChainSchema = z.object({
@@ -144,6 +153,20 @@ export const taskChainSchema = z.object({
   revision: z.number().int().min(1),
   updatedAtIso: z.iso.datetime(),
   tasks: z.array(taskDependencyNodeSchema).min(1),
+  /**
+   * WIRING-04-01：协调消息应用证据（与状态同一次写）。
+   *
+   * 同样必须登记：zod 默认丢弃未知字段，不登记就等于"写了也读不回来"。
+   */
+  coordinationApplicationEvidence: z
+    .array(
+      z.object({
+        messageIdentifier: z.string().min(1),
+        appliedAtIso: z.iso.datetime(),
+        resultingTaskStatus: z.enum(["done", "failed"]),
+      }),
+    )
+    .optional(),
 });
 
 export type TaskChainDocumentSchemaInput = z.input<typeof taskChainSchema>;
