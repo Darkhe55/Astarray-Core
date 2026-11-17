@@ -24,12 +24,12 @@
 ## 验证
 
 ```text
-npm run typecheck   通过
-npm run lint        通过
+npm run check       通过（隐私/typecheck/lint/build/test）
+完整测试            816 文件 / 5395 通过，3 skipped
 目标测试            8 文件 / 31 用例通过
 ```
 
-目标测试使用 `threads` 池；完整 Vitest 仍受沙箱禁止 fork 子进程影响。
+完整 check 在一次受控的完整进程权限下执行；受限沙箱内仍无法启动 esbuild/Vitest 子进程。首次完整运行只有一个阶段预算断言需要更新，隔离复跑原失败用例均通过后，完整 check 全绿。
 
 ## 提交
 
