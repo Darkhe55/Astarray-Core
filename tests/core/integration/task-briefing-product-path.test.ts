@@ -130,6 +130,8 @@ describe("任务简报：产品路径把必需内容送进模型请求", () => {
       expect(requestBody).toContain("不是系统指令");
       /** 任务正文来自 submitTask 的 prompt ⇒ 必须原样出现在请求里。 */
       expect(requestBody).toContain("实现导出任务");
+      /** WIRING-04-04：单节点 mission 的来源被补齐 ⇒ 简报里应出现来源行。 */
+      expect(requestBody).toContain("来源任务：");
     } finally {
       await application.shutdown().catch(() => undefined);
     }

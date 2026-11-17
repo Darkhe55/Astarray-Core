@@ -52,6 +52,8 @@ export function buildTaskBriefing(input: {
     readonly toolNames: readonly string[];
     readonly acceptanceCriteria?: string | null;
     readonly dependsOn: readonly string[];
+    /** WIRING-04-04：该任务源自哪条用户任务（缺省 ⇒ 未声明）。 */
+    readonly sourceSequenceTaskIdentifier?: string | null;
   };
   /** 只传入**声明过的**依赖（由调用方按 dependsOn 取，不递归）。 */
   readonly dependencies: ReadonlyArray<{
@@ -78,6 +80,12 @@ export function buildTaskBriefing(input: {
     `- 任务：${input.task.id}（类型 ${input.task.taskType}）`,
     `- 要求：${input.task.description.trim() === "" ? "（未声明）" : input.task.description.trim()}`,
     `- 验收要求：${acceptanceCriteriaText === "" ? "未声明" : acceptanceCriteriaText}`,
+    `- 来源任务：${
+      typeof input.task.sourceSequenceTaskIdentifier === "string" &&
+      input.task.sourceSequenceTaskIdentifier.trim() !== ""
+        ? `${input.task.sourceSequenceTaskIdentifier.trim()}（用户任务序列中的原始任务）`
+        : "未声明"
+    }`,
   ];
 
   /** 依赖：只列声明过的；声明的顺序保持，不按"相关性"重排。 */

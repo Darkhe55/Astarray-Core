@@ -36,6 +36,7 @@ function buildWorker(input: {
   }>;
   toolNames?: string[];
   maximumCharacterCount?: number;
+  sourceSequenceTaskIdentifier?: string;
 }) {
   const workerOptions: Record<string, unknown> = {
     agentInstanceId: "worker-1",
@@ -52,6 +53,9 @@ function buildWorker(input: {
       ...(input.acceptanceCriteria === undefined
         ? {}
         : { acceptanceCriteria: input.acceptanceCriteria }),
+      ...(input.sourceSequenceTaskIdentifier === undefined
+        ? {}
+        : { sourceSequenceTaskIdentifier: input.sourceSequenceTaskIdentifier }),
     },
     runtime: {
       async *run(runInput: { systemPrompt: string }) {
@@ -148,4 +152,26 @@ describe("任务简报文本（纯函数）", () => {
     expect(briefing.budget.kind).toBe("fits");
     expect(briefing.undeclaredFields).toEqual(["acceptanceCriteria", "toolNames"]);
   });
+});
+
+describe("WIRING-04-04：简报显示任务来源", () => {
+  it("⑦ 声明来源 ⇒ 简报写明来源任务", async () => {
+    const capturedPrompts: string[] = [];
+    const worker = buildWorker({
+      capturedPrompts,
+      sourceSequenceTaskIdentifier: "task-mission-1",
+    });
+    await worker.run();
+    const prompt = capturedPrompts[0] ?? "";
+    expect(prompt).toContain("来源任务：task-mission-1");
+    expect(prompt).toContain("用户任务序列中的原始任务");
+  }, 30_000);
+
+  it("⑧ 未声明来源 ⇒ 明确写「未声明」（不伪造）", async () => {
+    const capturedPrompts: string[] = [];
+    const worker = buildWorker({ capturedPrompts });
+    await worker.run();
+    const prompt = capturedPrompts[0] ?? "";
+    expect(prompt).toContain("来源任务：未声明");
+  }, 30_000);
 });

@@ -601,6 +601,9 @@ export class WorkerAgent {
         toolNames: this.options.task.toolNames ?? [],
         acceptanceCriteria: this.options.task.acceptanceCriteria ?? null,
         dependsOn: this.options.task.dependsOn ?? [],
+        sourceSequenceTaskIdentifier:
+          (this.options.task as { sourceSequenceTaskIdentifier?: string })
+            .sourceSequenceTaskIdentifier ?? null,
       },
       dependencies: this.options.dependencyBriefings ?? [],
       maximumCharacterCount: this.options.taskBriefingMaximumCharacterCount ?? 4_000,
