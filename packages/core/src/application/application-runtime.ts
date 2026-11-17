@@ -134,7 +134,7 @@ import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-re
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { createCoordinationContextDeliveryPort } from "../orchestration/coordination-context-delivery.js";
 import {
-  drainCoordinationTaskApplications,
+  reconcileCoordinationTaskApplications,
   runCoordinationConsumptionOnce,
 } from "../orchestration/coordination-consumption-runner.js";
 import { CoordinationTaskApplicationLedger } from "../orchestration/coordination-task-application-ledger.js";
@@ -5178,8 +5178,23 @@ const runStartupRecovery = async (): Promise<{
        * 消费已 applied 但权威状态没写（意图 pending），或业务写了但回执没写（仍 pending），
        * 都要在启动恢复里重放一次；业务更新幂等 ⇒ 不会重复释放槽位或派发。
        */
-      await drainCoordinationTaskApplications({
+      /**
+       * WIRING-04-01 第二步（2026-11-17）：启动恢复改用**对账**而不是盲目重放。
+       *
+       * - 权威状态里已有同消息应用证据 ⇒ 只补 completed（不重放业务）；
+       * - 没有证据 ⇒ 才补做；
+       * - 分区状态文档里的 `appliedMessages` 就是"同消息幂等证据"，与快照同一原子写入。
+       */
+      await reconcileCoordinationTaskApplications({
         ledger: coordinationTaskApplicationLedger,
+        isAppliedInAuthoritativeState: async ({ messageIdentifier }) => {
+          const partitionState = await coordinationStateStore.readState(coordinationPartitionKey);
+          return (
+            partitionState?.appliedMessages.some(
+              (appliedMessage) => appliedMessage.messageIdentifier === messageIdentifier,
+            ) === true
+          );
+        },
         applyMessage: async ({ messageIdentifier, missionIdentifier }) => {
           if (missionIdentifier === null) {
             return;

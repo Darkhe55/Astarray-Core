@@ -202,3 +202,34 @@
 ### 门禁
 
 **817 files / 5400 passed + 3 skipped，exit 0**。
+
+## 10. 施工记录：WIRING-04-01 第三步（2026-11-17）
+
+### 启动恢复改为对账
+
+`runStartupRecovery` 里的 `drainCoordinationTaskApplications`（无条件重放）已替换为
+`reconcileCoordinationTaskApplications`：
+
+```text
+isAppliedInAuthoritativeState(messageIdentifier)
+  = coordinationStateStore.readState(coordinationPartitionKey)
+      .appliedMessages.some(m => m.messageIdentifier === messageIdentifier)
+```
+
+- 分区状态文档的 `appliedMessages` 与 `snapshot` 由 `writeAtomicJson` **同一原子写入**
+  ⇒ 这条证据与"任务状态已变更"天然同源；
+- 有证据 ⇒ 只补 `completed`；无证据 ⇒ 才补做；两者都不重复产生业务副作用。
+
+### 仍未完成
+
+| 必做项 | 现状 |
+|---|---|
+| 该对账的**产品路径反例**（启动恢复真的不重放） | **未补**：目前只有函数级反例 ⑤⑥，运行时入口未单测 |
+| 按原 revision / 执行尝试核验 | 未做：只按消息标识核对证据 |
+| 旧状态迁移（applied 无意图 ⇒ needs-reconciliation + 备份） | 未做 |
+| 真实子进程终止/恢复 | 未做 |
+| mission 未知时意图 | 已知限制（沿用旧行为） |
+
+### 门禁
+
+**817 files / 5400 passed + 3 skipped，exit 0**。
