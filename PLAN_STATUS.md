@@ -6327,3 +6327,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 启动恢复对账已接线（以分区状态 `appliedMessages` 为证据）。但产品路径反例写不下去：
 > 只 enqueue 消息、没有真实 mission 任务链时，启动恢复**不会遍历到该 mission**，意图永不写入。
 > 尝试的用例已删除（未提交）。下一步：用 e2e harness 先造出带任务的 mission，再验证"不重放"。
+
+> **WIRING-04-01 第四步（2026-11-17）**
+>
+> ① 启动恢复对账的**产品入口反例**已补（构造磁盘现场 + `runStartupRecovery()`，断言只补 completed、不重放）。
+> ② 旧状态迁移落地：applied 无意图 ⇒ 有证据补 completed / 无证据标 needs-reconciliation，迁移前 atomic-json 备份，一次性标记。
+> 反例 4 条；全量门禁 **819 files / 5405 passed，exit 0**。
+> 阻塞：revision/执行尝试核验依赖消息字段（COORD-02）；原子提交单元未做；真实子进程恢复测试未做。

@@ -261,3 +261,55 @@ isAppliedInAuthoritativeState(messageIdentifier)
 | 对账函数 | ✅ 实现 + 函数级反例 ⑤⑥ |
 | 启动恢复接线 | ✅ 已接（读分区状态 `appliedMessages`） |
 | 产品路径反例 | ❌ **阻塞**（缺 mission 任务链 fixture） |
+
+## 12. 施工记录：WIRING-04-01 第四步（2026-11-17）
+
+### 产品入口反例（解除上一节的阻塞，换了一条更小的路）
+
+不再驱动整条 mission，而是**直接构造崩溃后的磁盘现场**（台账 pending + 分区状态已应用），
+再调用真实入口 `runtime.runStartupRecovery()`：
+
+| 断言 | 结果 |
+|---|---|
+| 台账条目变 `completed` | ✅ |
+| 分区状态 `appliedMessages` 数量**不变** | ✅（没有第二次业务应用） |
+| `stateVersion` 不变 | ✅ |
+
+理由：启动恢复的对账只依赖这两份持久化证据，造 mission 只会引入与对账语义无关的调度噪声。
+（先前"必须真实 mission"的判断过于保守，已在本节更正。）
+
+### 旧状态迁移（一次性）
+
+新增 `orchestration/coordination-legacy-migration.ts`：
+
+```text
+遍历 journal 所有收件人 → 消息 applicationState=applied 且台账无记录
+  有权威同消息应用证据 ⇒ 补 completed
+  无证据 ⇒ 标 needs-reconciliation（原因写明"不自动重放"）
+  已有台账记录 ⇒ 不动
+  迁移前先用 atomic-json 写 `.pre-migration.bak`
+```
+
+运行时在 `runStartupRecovery` 里**一次性**执行（标记文件 `coordination/legacy-migration.done`）；
+迁移失败不写标记（下次重试），且不阻塞启动。
+
+反例 `tests/core/integration/wiring04-legacy-migration.test.ts`（4 条）：
+无证据 ⇒ needs-reconciliation；有证据 ⇒ completed；备份存在且含旧内容；已有记录不被改写。
+
+### 教训（过程记录）
+
+首次实现用了 `writeFile` / `copyFile`，被 `destructive-file-api-guard` 拦下（白名单外禁止直接写文件）。
+改为全部经 `writeAtomicJson`，守卫通过——**这是守卫应有的行为，不是绕过**。
+
+### 仍未完成
+
+| 必做项 | 现状 |
+|---|---|
+| 按原 revision / 执行尝试核验 | **阻塞**：消息结构无 `taskRevision` / `executionAttempt`（见 COORD-02） |
+| 意图与权威状态同一原子提交单元 | 未做（三步 + 对账；要同一单元需合并两个存储的写边界） |
+| 真实子进程终止/恢复 | 未做 |
+| 无包/无 mission 的历史数据边界 | 已知限制未变 |
+
+### 门禁
+
+**819 files / 5405 passed + 3 skipped，exit 0**。

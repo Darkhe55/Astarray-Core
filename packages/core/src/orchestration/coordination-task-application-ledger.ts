@@ -26,7 +26,12 @@ import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 
-export type CoordinationTaskApplicationStatus = "pending" | "completed" | "failed";
+export type CoordinationTaskApplicationStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  /** 旧数据迁移：journal 已 applied 但**没有**业务意图记录 ⇒ 需对账，禁止自动重放。 */
+  | "needs-reconciliation";
 
 export interface CoordinationTaskApplicationEntry {
   readonly messageIdentifier: string;
@@ -175,6 +180,32 @@ export class CoordinationTaskApplicationLedger {
       reason: input.reason,
       updatedAtIso: this.nowIso(),
     }));
+  }
+
+  /** 迁移用：标为 needs-reconciliation（需人工/权威证据对账，不自动重放）。 */
+  async markNeedsReconciliation(input: {
+    readonly messageIdentifier: string;
+    readonly reason: string;
+  }): Promise<void> {
+    await this.updateEntry(input.messageIdentifier, (entry) => ({
+      ...entry,
+      status: "needs-reconciliation",
+      reason: input.reason,
+      updatedAtIso: this.nowIso(),
+    }));
+  }
+
+  /** 迁移前备份：把当前台账文件复制为 `.pre-migration.bak`（失败不覆盖旧文件）。 */
+  async createMigrationBackup(): Promise<string> {
+    const backupPath = `${this.filePath}.pre-migration.bak`;
+    /**
+     * 用 `copyFile` 而不是 `writeFile`：备份是**原样复制**，且架构守卫禁止白名单外
+     * 直接写文件（写入必须走 atomic-json）。
+     */
+    /** 备份用 atomic-json 写出同一份文档（架构守卫禁止白名单外直接复制/写文件）。 */
+    const documentForBackup = await this.readDocument();
+    await writeAtomicJson(backupPath, documentForBackup);
+    return backupPath;
   }
 
   private async updateEntry(

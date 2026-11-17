@@ -133,6 +133,7 @@ import { createPlatformSandboxExecutionBackend } from "../execution/platform-san
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { createCoordinationContextDeliveryPort } from "../orchestration/coordination-context-delivery.js";
+import { migrateLegacyAppliedMessagesWithoutIntent } from "../orchestration/coordination-legacy-migration.js";
 import {
   reconcileCoordinationTaskApplications,
   runCoordinationConsumptionOnce,
@@ -243,7 +244,7 @@ import {
 } from "../tools/goal-proposal-tool.js";
 import { partitionInvariantViolations } from "../orchestration/goal-invariant-catalog.js";
 import { rotateInvariantViolationArchiveIfNeeded } from "../orchestration/goal-invariant-archive.js";
-import { appendFile, mkdir } from "node:fs/promises";
+import { access, appendFile, mkdir } from "node:fs/promises";
 import { evaluateGoalCompletion } from "../orchestration/goal-completion-requirement.js";
 import { evaluateGoalPauseConditions } from "../orchestration/goal-pause-conditions.js";
 import { buildInvalidatedGoalState } from "../orchestration/goal-evidence-invalidation.js";
@@ -5178,6 +5179,43 @@ const runStartupRecovery = async (): Promise<{
        * 消费已 applied 但权威状态没写（意图 pending），或业务写了但回执没写（仍 pending），
        * 都要在启动恢复里重放一次；业务更新幂等 ⇒ 不会重复释放槽位或派发。
        */
+      /**
+       * WIRING-04-01：**一次性旧状态迁移**（2026-11-17）。
+       *
+       * 早期数据可能 journal 已 applied 但无业务意图；迁移只做标记，
+       * 有权威证据才补 completed，缺证据标 needs-reconciliation，**绝不自动重放**。
+       * 迁移失败不写标记（下次启动重试），且不阻塞启动。
+       */
+      const legacyMigrationMarkerPath = path.join(
+        stateDirectory,
+        "coordination",
+        "legacy-migration.done",
+      );
+      const hasLegacyMigrationRun = await access(legacyMigrationMarkerPath)
+        .then(() => true)
+        .catch(() => false);
+      if (!hasLegacyMigrationRun) {
+        await migrateLegacyAppliedMessagesWithoutIntent({
+          journal: coordinationMailboxJournal,
+          ledger: coordinationTaskApplicationLedger,
+          isAppliedInAuthoritativeState: async ({ messageIdentifier }) => {
+            const partitionState = await coordinationStateStore.readState(
+              coordinationPartitionKey,
+            );
+            return (
+              partitionState?.appliedMessages.some(
+                (appliedMessage) => appliedMessage.messageIdentifier === messageIdentifier,
+              ) === true
+            );
+          },
+        });
+        await mkdir(path.dirname(legacyMigrationMarkerPath), { recursive: true });
+        /** 标记文件同样走 atomic-json（架构守卫禁止白名单外直接写文件）。 */
+        await writeAtomicJson(legacyMigrationMarkerPath, {
+          completedAtIso: new Date().toISOString(),
+        });
+      }
+
       /**
        * WIRING-04-01 第二步（2026-11-17）：启动恢复改用**对账**而不是盲目重放。
        *
