@@ -6270,3 +6270,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 三处 `void (async …)()` 改为 tracker；drain 5s 上限，不完整时结构化告警。
 > 反例 5 条 + 守卫 2 条；全量门禁 **810 files / 5361 passed，exit 0**。
 > 边界：SIGKILL 仍会丢；只覆盖已登记的回调写。
+
+> **COORD-03 上下文包装配与关闭节点回访策略（2026-11-17）**
+>
+> 按用户裁决实现纯判定层：当前任务包 + 显式依赖引用（固定 revision、不递归继承）、
+> 去重保留来源、指令冲突按发布权限裁决、事实冲突升级上级、超预算拆分/阻塞不截断、跨个体隔离；
+> 回访默认显式按需、预声明依赖可授权自动读、自动相关性召回恒为空、side effects 恒为 false。
+> 反例 12 条；契约文档：`docs/adr/0031-context-node-closure-and-recall.md`（新增补充章节）。
+> **未接线**：策略尚未接入 `context-prompt-provider` 的默认提供者（未传 `contextPacks`/`recalledContextBlocks`）。
