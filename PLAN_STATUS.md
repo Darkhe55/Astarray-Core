@@ -6253,3 +6253,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `taskRevision` / `authorizationEpoch`，消费端不猜（猜即伪造授权）。
 > 预算部分已实现（只标记被携带的消息）。卡：`docs/tasks/COORD02_MESSAGE_VERSION_AND_AUTHORIZATION_STAMPING.md`；
 > 台账合入说明见 `docs/reports/STATUS_UPDATE_COORD02_2026-11-17.md`（本轮未改共享台账）。
+
+> **e2e01-vertical-rework 断点结案（2026-11-17）**
+>
+> 台账第 2044–2060 行的"送审必然 rework / 产物路径非空 ⇒ blocked"已查明：
+> 送审产物取自**完成收据**（`mission-orchestrator.ts:1488`），`resultLocation` 在恢复对账里表示
+> "已产出未回执"（`main-controller.ts:3221`），二者语义不同 —— 回填 `resultLocation` 是错的方向。
+> 结论：**无需改产品代码**，只需更正文档 + 加守卫。
+> 证据：`docs/reports/STATUS_UPDATE_E2E01_VERTICAL_REWORK_RESOLVED_2026-11-17.md`；
+> 守卫 `tests/architecture/crosscheck01-result-location-semantics.test.ts`（3 条）；
+> 全量门禁 **808 files / 5354 passed，exit 0**。
