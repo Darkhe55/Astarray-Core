@@ -35,6 +35,10 @@ export interface CoordinationTaskApplicationEntry {
   readonly status: CoordinationTaskApplicationStatus;
   /** 失败或阻塞的原因（`completed` 时为 null）。 */
   readonly reason: string | null;
+  /** 内容指纹（同键异内容必须拒绝，不能复用成另一件事）。 */
+  readonly contentFingerprint?: string;
+  /** 该消息对应的执行尝试（无法确定时缺省，不默认绑定当前执行）。 */
+  readonly executionAttemptIdentifier?: string | null;
   readonly updatedAtIso: string;
 }
 
@@ -102,13 +106,29 @@ export class CoordinationTaskApplicationLedger {
     readonly messageIdentifier: string;
     readonly missionIdentifier: string;
     readonly taskIdentifier: string | null;
-  }): Promise<void> {
+    /** 内容指纹：同键异内容必须拒绝，不能"复用"成另一件事。 */
+    readonly contentFingerprint?: string;
+    readonly executionAttemptIdentifier?: string | null;
+  }): Promise<{ readonly outcome: "recorded" | "reused" | "conflict"; readonly reason?: string }> {
     const document = await this.readDocument();
     const existing = document.entries.find(
       (entry) => entry.messageIdentifier === input.messageIdentifier,
     );
-    if (existing !== undefined && existing.status === "completed") {
-      return;
+    if (existing !== undefined) {
+      /** 同键同内容 ⇒ 复用；同键异内容 ⇒ 冲突（不覆盖、不冒充已完成）。 */
+      if (
+        input.contentFingerprint !== undefined &&
+        existing.contentFingerprint !== undefined &&
+        existing.contentFingerprint !== input.contentFingerprint
+      ) {
+        return {
+          outcome: "conflict",
+          reason: `同一消息标识出现不同内容（指纹 ${existing.contentFingerprint} vs ${input.contentFingerprint}）`,
+        };
+      }
+      if (existing.status === "completed") {
+        return { outcome: "reused" };
+      }
     }
     const nextEntry: CoordinationTaskApplicationEntry = {
       messageIdentifier: input.messageIdentifier,
@@ -117,6 +137,12 @@ export class CoordinationTaskApplicationLedger {
       status: "pending",
       reason: null,
       updatedAtIso: this.nowIso(),
+      ...(input.contentFingerprint === undefined
+        ? {}
+        : { contentFingerprint: input.contentFingerprint }),
+      ...(input.executionAttemptIdentifier === undefined
+        ? {}
+        : { executionAttemptIdentifier: input.executionAttemptIdentifier }),
     };
     const entries =
       existing === undefined
@@ -125,6 +151,7 @@ export class CoordinationTaskApplicationLedger {
             entry.messageIdentifier === input.messageIdentifier ? nextEntry : entry,
           );
     await this.writeDocument(document, entries);
+    return { outcome: existing === undefined ? "recorded" : "reused" };
   }
 
   /** 业务更新成功 ⇒ 记完成。 */

@@ -14,7 +14,7 @@
 
 | 检查点 | 必做结果 | 状态 |
 |---|---|---|
-| WIRING-04-01 | 消费意图先持久化、业务应用可重放、旧状态可对账 | pending |
+| WIRING-04-01 | 消费意图先持久化、业务应用可重放、旧状态可对账 | in_progress（顺序已改；原子单元/迁移/双进程待做） |
 | WIRING-04-02 | 请求投递事实由适配器提供，回执准确且有界 | pending |
 | WIRING-04-03 | 完成反馈统一门禁及生产版本来源闭合 | pending |
 | WIRING-04-04 | 按映射读取当前任务包、授权依赖及固定版本 | pending |
@@ -129,3 +129,37 @@
 运行定向反例、npm run check、安全与状态机专项；用安装后的 tarball 公共入口验证反馈入库→业务状态→调度，以及任务映射→包/回访→真实模型请求载荷。使用本地假 Provider，无真实付费模型。故障测试必须证明恢复，不仅证明抛错；并发至少一条真实双进程，不用两个对象代替全部跨进程证据。
 
 交付报告逐项列：变更前后调用链、持久化顺序、权限来源、测试命令/退出码、包文件哈希、文档更新、提交号、剩余限制。只按显式路径提交自身文件，各检查点独立提交并按仓库纪律推送。只有所有必做项和生产入口验证通过才可整卡 done；模型真实体验、平台未验证等范围如实单列，不用测试数量覆盖未闭合问题。
+
+## 8. 施工记录：WIRING-04-01 第一步（2026-11-17）
+
+### 已改（顺序修正）
+
+| 项 | 内容 |
+|---|---|
+| 消费器新增 `businessIntentPort`，在 `applyMessage` **之前**写意图 | `orchestration/coordination-message-consumer.ts` |
+| 意图写入失败 ⇒ 不应用（异常上抛；journal 不标 applied） | 同上 |
+| 意图冲突（同键异内容）⇒ 记 `blocked` 且不应用 | 同上 |
+| 台账 `recordIntent` 增加内容指纹/执行尝试，返回 `recorded`/`reused`/`conflict` | `orchestration/coordination-task-application-ledger.ts` |
+| 运行时把台账适配成意图端口 | `application/application-runtime.ts` |
+
+### 反例
+
+`tests/core/integration/coord01-consumption-runner.test.ts`：
+
+- ⑬ 意图写入抛错 ⇒ journal 仍列该消息为待应用（未标 applied），不产生权威状态；
+- ⑭ 意图冲突 ⇒ `appliedMessageCount=0`、`blockedMessageCount=1`。
+
+### 本轮**未完成**（不得当作 01 已闭环）
+
+| 必做项 | 现状 |
+|---|---|
+| 意图与权威状态**同一原子提交单元** | 未实现：仍是"意图 → 应用"两步 |
+| 启动恢复扫描 pending/failed 意图并按原版本补做 | 未实现（现有 drain 只看台账，不校验版本/权限） |
+| 旧状态迁移（applied 无意图 ⇒ needs-reconciliation、备份、不自动重放） | 未实现 |
+| 生产 runner 端口"不可选" | 未实现：consumer 端口仍是可选（测试需要），仅运行时必传 |
+| 至少一条真实子进程终止/恢复测试 | 未实现 |
+| mission 未知时的意图 | **已知限制**：运行时返回 `reused` 沿用旧行为，未按 blocked；需生产方补 mission 后收紧 |
+
+### 门禁
+
+**817 files / 5398 passed + 3 skipped，exit 0**。

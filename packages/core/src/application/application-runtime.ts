@@ -1213,6 +1213,31 @@ export async function createApplicationRuntime(
     leaseStore: coordinationLeaseStore,
     stateStore: coordinationStateStore,
     retryStore: coordinationRetryStore,
+    /**
+     * WIRING-04-01：**意图先于权威状态**。
+     *
+     * 生产路径必须提供该端口；`conflict`（同键异内容）⇒ 该消息记 blocked 且不应用。
+     */
+    businessIntentPort: {
+      recordIntent: async (intentInput) => {
+        if (intentInput.missionIdentifier === null) {
+          /**
+           * mission 未知时**不能绑定意图，也不能猜 mission**。
+           *
+           * 这里沿用旧行为（不写意图、继续应用），并在文档里记为已知限制：
+           * 待消息生产方补齐 mission 后，此分支应改为 blocked。
+           */
+          return { outcome: "reused" as const };
+        }
+        return await coordinationTaskApplicationLedger.recordIntent({
+          messageIdentifier: intentInput.messageIdentifier,
+          missionIdentifier: intentInput.missionIdentifier,
+          taskIdentifier: intentInput.taskIdentifier,
+          contentFingerprint: intentInput.contentFingerprint,
+          executionAttemptIdentifier: intentInput.executionAttemptIdentifier,
+        });
+      },
+    },
     /** COORD-01-03 §3：只有**显式要求产物证明**的消息才进门禁，默认行为不变。 */
     artifactGate: {
       isArtifactProofRequired: (message) =>

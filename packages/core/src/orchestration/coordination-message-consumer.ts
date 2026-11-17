@@ -36,6 +36,22 @@ export interface CoordinationMessageConsumerOptions {
   readonly journal: MailboxJournal;
   readonly leaseStore: CoordinationPartitionLeaseStore;
   readonly stateStore: CoordinationStateTransactionStore;
+  /**
+   * WIRING-04-01：**业务意图端口**（生产必须提供；纯函数测试可给假端口）。
+   *
+   * 意图先于权威状态写入；`conflict` ⇒ 该消息记 blocked 且不应用。
+   */
+  readonly businessIntentPort?: {
+    recordIntent(input: {
+      readonly messageIdentifier: string;
+      readonly recipientIdentifier: string;
+      readonly missionIdentifier: string | null;
+      readonly projectIdentifier: string | null;
+      readonly taskIdentifier: string | null;
+      readonly executionAttemptIdentifier: string | null;
+      readonly contentFingerprint: string;
+    }): Promise<{ readonly outcome: "recorded" | "reused" | "conflict"; readonly reason?: string }>;
+  };
   /** COORD-01-02 §4.7：可选失败退避（未提供则不退避，行为与之前一致）。 */
   readonly retryStore?: CoordinationRetryStore;
   /**
@@ -57,6 +73,8 @@ export class CoordinationMessageConsumer {
   private readonly leaseStore: CoordinationPartitionLeaseStore;
   private readonly stateStore: CoordinationStateTransactionStore;
   private readonly retryStore: CoordinationRetryStore | undefined;
+  /** WIRING-04-01：业务意图端口（先于权威状态写入）。 */
+  private readonly businessIntentPort: CoordinationMessageConsumerOptions["businessIntentPort"];
   private readonly artifactGate:
     | {
         readonly isArtifactProofRequired: (message: {
@@ -75,6 +93,7 @@ export class CoordinationMessageConsumer {
     this.leaseStore = options.leaseStore;
     this.stateStore = options.stateStore;
     this.retryStore = options.retryStore;
+    this.businessIntentPort = options.businessIntentPort;
     this.artifactGate = options.artifactGate;
     this.nowUnixMilliseconds = options.nowUnixMilliseconds ?? (() => Date.now());
   }
@@ -198,6 +217,38 @@ export class CoordinationMessageConsumer {
             });
             continue;
           }
+        }
+      }
+      /**
+       * WIRING-04-01（2026-11-17 返修卡）：**先持久化业务意图，再动权威状态**。
+       *
+       * 原实现先写 journal applied、由外层 runner 事后写意图 —— 崩溃窗口里两边都不再处理。
+       * 这里把意图写进循环内部，且**失败即不应用**（绝不先确认后补单）。
+       */
+      if (this.businessIntentPort !== undefined) {
+        const contentFingerprint = JSON.stringify(message.payload);
+        const intentOutcome = await this.businessIntentPort.recordIntent({
+          messageIdentifier: message.messageId,
+          recipientIdentifier: input.recipientId,
+          missionIdentifier:
+            (message as { missionIdentifier?: string }).missionIdentifier ?? null,
+          projectIdentifier:
+            (message as { projectIdentifier?: string }).projectIdentifier ?? null,
+          taskIdentifier: message.taskIdentifier ?? null,
+          executionAttemptIdentifier: null,
+          contentFingerprint,
+        });
+        if (intentOutcome.outcome === "conflict") {
+          blockedMessageCount += 1;
+          await this.journal.recordApplicationState({
+            recipientId: input.recipientId,
+            messageId: message.messageId,
+            state: "blocked",
+            reason: intentOutcome.reason ?? "业务意图冲突",
+            targetStateVersion: null,
+            updatedAtIso: new Date(this.nowUnixMilliseconds()).toISOString(),
+          });
+          continue;
         }
       }
       const currentState = await this.stateStore.readState(input.partitionKey);

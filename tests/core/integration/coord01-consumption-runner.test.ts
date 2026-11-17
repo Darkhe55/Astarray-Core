@@ -28,7 +28,17 @@ afterEach(async () => {
   await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 5 });
 });
 
-function buildConsumer() {
+function buildConsumer(businessIntentPort?: {
+  recordIntent(input: {
+    readonly messageIdentifier: string;
+    readonly recipientIdentifier: string;
+    readonly missionIdentifier: string | null;
+    readonly projectIdentifier: string | null;
+    readonly taskIdentifier: string | null;
+    readonly executionAttemptIdentifier: string | null;
+    readonly contentFingerprint: string;
+  }): Promise<{ readonly outcome: "recorded" | "reused" | "conflict"; readonly reason?: string }>;
+}) {
   const journal = new MailboxJournal(stateDirectory);
   const leaseStore = new CoordinationPartitionLeaseStore({
     stateDirectory: path.join(stateDirectory, "leases"),
@@ -39,7 +49,12 @@ function buildConsumer() {
     leaseStore,
     nowUnixMilliseconds: () => 1_700_000_000_000,
   });
-  const consumer = new CoordinationMessageConsumer({ journal, leaseStore, stateStore });
+  const consumer = new CoordinationMessageConsumer({
+    journal,
+    leaseStore,
+    stateStore,
+    ...(businessIntentPort === undefined ? {} : { businessIntentPort }),
+  });
   return { consumer, journal };
 }
 
@@ -151,4 +166,65 @@ describe("消费入口", () => {
       ),
     ).rejects.toThrow(/权威状态更新失败/u);
   });
+});
+
+describe("WIRING-04-01：意图先于权威状态", () => {
+  it("⑬ 意图写入失败 ⇒ journal 不得标 applied（消息仍在待应用集合）", async () => {
+    const { consumer, journal } = buildConsumer({
+      recordIntent: async () => {
+        throw new Error("磁盘满");
+      },
+    });
+    await enqueueMessage(journal, "m-intent-1");
+    const leaseStore = new CoordinationPartitionLeaseStore({
+      stateDirectory: path.join(stateDirectory, "leases"),
+      nowUnixMilliseconds: () => 1_700_000_000_000,
+    });
+    await leaseStore.tryAcquire({
+      partitionKey: PARTITION_KEY,
+      ownerInstanceIdentifier: "consumer-1",
+      ttlMilliseconds: 30_000,
+    });
+
+    await expect(
+      consumer.runConsumptionStep({
+        partitionKey: PARTITION_KEY,
+        recipientId: RECIPIENT_ID,
+        ownerInstanceIdentifier: "consumer-1",
+        leaseTtlMilliseconds: 30_000,
+        toSnapshot: () => ({ marker: "x" }),
+      }),
+    ).rejects.toThrow(/磁盘满/u);
+
+    const pending = await journal.listPendingApplication(RECIPIENT_ID);
+    expect(pending.map((message) => message.messageId)).toContain("m-intent-1");
+  }, 30_000);
+
+  it("⑭ 意图冲突（同键异内容）⇒ 记 blocked 且不应用", async () => {
+    const { consumer, journal } = buildConsumer({
+      recordIntent: async () => ({ outcome: "conflict", reason: "同键异内容" }),
+    });
+    await enqueueMessage(journal, "m-intent-2");
+    const leaseStore = new CoordinationPartitionLeaseStore({
+      stateDirectory: path.join(stateDirectory, "leases"),
+      nowUnixMilliseconds: () => 1_700_000_000_000,
+    });
+    await leaseStore.tryAcquire({
+      partitionKey: PARTITION_KEY,
+      ownerInstanceIdentifier: "consumer-1",
+      ttlMilliseconds: 30_000,
+    });
+
+    const stepResult = await consumer.runConsumptionStep({
+      partitionKey: PARTITION_KEY,
+      recipientId: RECIPIENT_ID,
+      ownerInstanceIdentifier: "consumer-1",
+      leaseTtlMilliseconds: 30_000,
+      toSnapshot: () => ({ marker: "x" }),
+    });
+
+    /** 冲突 ⇒ 记 blocked，且**没有**任何权威状态被应用。 */
+    expect(stepResult.appliedMessageCount).toBe(0);
+    expect(stepResult.blockedMessageCount).toBe(1);
+  }, 30_000);
 });
