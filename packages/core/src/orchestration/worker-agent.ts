@@ -45,6 +45,7 @@ import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-
 import { buildFullDocumentation } from "../tools/tool-documentation-recall.js";
 import { renderToolGroupDocumentation } from "../tools/tool-documentation-renderer.js";
 import { runToolLoop } from "../runtime/tool-loop.js";
+import { isProviderContextOverflowError } from "../runtime/provider-failure.js";
 import type { RunHistoryStore } from "./run-history-store.js";
 import type {
   GuidanceSafePointPort,
@@ -278,6 +279,8 @@ export class WorkerAgent {
   private capturedFactVerificationOutput: string | null = null;
   /** 本 AGENT **尝试过**的写类工具（含被门禁拦下、执行失败的调用）。 */
   private readonly attemptedMutatingTools = new Set<string>();
+  /** P5：同一 Agent 只允许一次上下文溢出降级重试。 */
+  private hasRetriedContextOverflow = false;
 
   /** G3b（第 218 轮）：把捕获输出解析为证据包（形状不符 ⇒ null）。 */
   private parseCapturedEvidenceBundle(): EvidenceBundle | null {
@@ -411,9 +414,32 @@ export class WorkerAgent {
   }
 
   async run(): Promise<WorkerOutcome> {
+    try {
+      return await this.runOnce(false);
+    } catch (error) {
+      /**
+       * P5：只在“还没有收到模型文本、也没有执行任何工具”时做一次降级重试。
+       * 已产生副作用或已输出内容时不重跑，避免重复工具调用/重复消息。
+       */
+      if (
+        !this.hasRetriedContextOverflow &&
+        isProviderContextOverflowError(error) &&
+        this.toolCallsByCallId.size === 0 &&
+        this.outputTextChunks.length === 0
+      ) {
+        this.hasRetriedContextOverflow = true;
+        return await this.runOnce(true);
+      }
+      throw error;
+    }
+  }
+
+  private async runOnce(isContextOverflowRetry: boolean): Promise<WorkerOutcome> {
     const { feedbackTransport } = this.options;
-    feedbackTransport.setAgentStatus(this.options.agentInstanceId, "busy");
-    await this.appendArchiveEntry("assignment", `开始执行任务 ${this.options.task.id}`);
+    if (!isContextOverflowRetry) {
+      feedbackTransport.setAgentStatus(this.options.agentInstanceId, "busy");
+      await this.appendArchiveEntry("assignment", `开始执行任务 ${this.options.task.id}`);
+    }
     let finalReason: WorkerOutcome = { outcome: "cancelled" };
     const toolFailureThresholdHit = new Set<string>();
 
@@ -530,6 +556,7 @@ export class WorkerAgent {
         missionId: this.options.missionId,
         agentInstanceId: this.options.agentInstanceId,
         task: this.options.task,
+        phase: isContextOverflowRetry ? "recall" : "execution",
       });
       if (assembledContext.unsatisfiedNecessaryConditionIdentifiers.length > 0) {
         throw new DomainError(

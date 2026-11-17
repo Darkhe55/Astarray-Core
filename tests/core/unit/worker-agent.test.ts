@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AgentRuntime, TaskDependencyNode } from "../../../packages/core/src/core/types.js";
+import { DomainError } from "../../../packages/core/src/core/errors.js";
 import { ToolFailureCounter } from "../../../packages/core/src/orchestration/failure-counter.js";
 import { WorkerAgent } from "../../../packages/core/src/orchestration/worker-agent.js";
 import { ScriptedRuntime } from "../../../packages/core/src/runtime/scripted-runtime.js";
@@ -70,6 +71,51 @@ describe("WorkerAgent", () => {
     });
     const outcome = await worker.run();
     expect(outcome.outcome).toBe("success");
+    expect(statuses).toEqual(["busy", "idle"]);
+  });
+
+  it("P5：上下文溢出在无工具/无文本时只降级重试一次", async () => {
+    const { statuses, transport } = makeTransport();
+    let runCount = 0;
+    const runtime: AgentRuntime = {
+      async *run(agentRunInput) {
+        runCount += 1;
+        if (runCount === 1) {
+          throw new DomainError(
+            "provider-context-overflow",
+            "maximum context length exceeded",
+          );
+        }
+        yield { kind: "textDelta", deltaText: "重试成功" };
+        yield {
+          kind: "runFinished",
+          agentId: agentRunInput.agentId,
+          reason: "success",
+          detail: "完成",
+        };
+      },
+    };
+    const worker = new WorkerAgent({
+      agentInstanceId: "worker-retry",
+      missionId: "mission-retry",
+      task: makeTask(),
+      runtime,
+      toolPort: {
+        execute: async () => ({
+          kind: "success",
+          callId: "c1",
+          outputText: "ok",
+          isSideEffectFree: true,
+        }),
+      } as never,
+      failureCounter: new ToolFailureCounter(),
+      feedbackTransport: transport,
+      maxLoopIterations: 5,
+      buildPermissionExplanation: () => "说明",
+    });
+    const outcome = await worker.run();
+    expect(outcome.outcome).toBe("success");
+    expect(runCount).toBe(2);
     expect(statuses).toEqual(["busy", "idle"]);
   });
 
