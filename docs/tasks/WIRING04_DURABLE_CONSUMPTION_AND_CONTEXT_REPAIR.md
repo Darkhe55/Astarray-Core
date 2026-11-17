@@ -654,3 +654,33 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 ### 门禁
 
 **825 files / 5436 passed + 3 skipped，exit 0**。
+
+## 23. 施工记录：WIRING-04-01 第五步（2026-11-17）
+
+### 应用证据与状态变更进入同一次原子提交
+
+卡内要求："同消息幂等证据与任务状态变更必须处于同一个原子提交单元。"
+
+| 项 | 内容 |
+|---|---|
+| 任务链文档新增 | `coordinationApplicationEvidence[]`（messageIdentifier / appliedAtIso / resultingTaskStatus） |
+| 写链逻辑 | 判重放入 `updateTaskChain` 的 **updater 内部**（先读后写的竞态被消除）；证据与状态在同一次整文档写入中落盘 |
+| 重放语义 | 同消息重放 ⇒ `status-unchanged`，**revision 不再递增**、证据不重复 |
+| 无变化快路径 | 状态已等于目标 ⇒ 直接返回，不调用 `updateTaskChain`（避免无意义写盘） |
+
+### 反例
+
+`coord01-task-state-application.test.ts` 新增 2 条：
+
+- ⑤ 同一消息两次 ⇒ revision 只涨一次（4），证据仅 1 条；
+- ⑥ 不同消息在"状态已达成"后再来 ⇒ 不重复记证据（状态不变不产生第二次迁移）。
+
+### 边界（如实）
+
+- 跨**两个存储**（意图台账 vs 任务链）的原子性仍未解决：台账是独立文件。
+  当前靠"意图先写 → 应用 → 对账"处理；合并两者需要统一存储层，属更大改造。
+- 其它重写任务链的代码路径若从零构造文档，可能丢弃该证据字段 ⇒ 退化为"按状态判重"（不产生错误，只是少一层证据）。
+
+### 门禁
+
+**825 files / 5438 passed + 3 skipped，exit 0**。

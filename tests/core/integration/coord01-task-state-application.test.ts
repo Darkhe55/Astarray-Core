@@ -188,3 +188,55 @@ describe("WIRING-04-03：非活动 mission 的 done 需要受控凭证", () => {
     expect(failed.outcome).toBe("applied");
   }, 30_000);
 });
+
+describe("WIRING-04-01：应用证据与状态变更同一次提交", () => {
+  it("⑤ 同一条消息重放 ⇒ revision 只涨一次，证据只记一条", async () => {
+    const store = buildStore(buildChain("running"));
+    const proof = {
+      code: "authoritative-completion-accepted" as const,
+      decidedAtIso: "2026-11-17T00:00:00.000Z",
+    };
+    const first = await applyCoordinationMessageToTaskState({
+      taskStore: store as never,
+      missionIdentifiers: ["mission-1"],
+      message: { messageIdentifier: "m-dup-1", taskIdentifier: "T-001", payload: { kind: "success" } },
+      completionAuthorization: proof,
+    });
+    expect(first.outcome).toBe("applied");
+
+    const second = await applyCoordinationMessageToTaskState({
+      taskStore: store as never,
+      missionIdentifiers: ["mission-1"],
+      message: { messageIdentifier: "m-dup-1", taskIdentifier: "T-001", payload: { kind: "success" } },
+      completionAuthorization: proof,
+    });
+    expect(second.outcome).toBe("status-unchanged");
+
+    const chain = store.getCurrent();
+    expect(chain?.revision).toBe(4);
+    expect(chain?.coordinationApplicationEvidence).toHaveLength(1);
+    expect(chain?.coordinationApplicationEvidence?.[0]?.messageIdentifier).toBe("m-dup-1");
+  }, 30_000);
+
+  it("⑥ 不同消息各记一条证据；证据随文档一起落盘", async () => {
+    const store = buildStore(buildChain("running"));
+    const proof = {
+      code: "authoritative-completion-accepted" as const,
+      decidedAtIso: "2026-11-17T00:00:00.000Z",
+    };
+    await applyCoordinationMessageToTaskState({
+      taskStore: store as never,
+      missionIdentifiers: ["mission-1"],
+      message: { messageIdentifier: "m-a", taskIdentifier: "T-001", payload: { kind: "success" } },
+      completionAuthorization: proof,
+    });
+    await applyCoordinationMessageToTaskState({
+      taskStore: store as never,
+      missionIdentifiers: ["mission-1"],
+      message: { messageIdentifier: "m-b", taskIdentifier: "T-001", payload: { kind: "success" } },
+      completionAuthorization: proof,
+    });
+    const chain = store.getCurrent();
+    expect(chain?.coordinationApplicationEvidence).toHaveLength(1);
+  }, 30_000);
+});

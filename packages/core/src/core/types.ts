@@ -362,6 +362,17 @@ export interface TaskDependencyNode {
  * 存放于 .astarray/missions/<missionId>/task-chain.json（ADR-0004）。
  */
 export interface TaskChainDocument {
+  /**
+   * WIRING-04-01：**协调消息的应用证据**（与任务状态写在同一个文档、同一次原子提交）。
+   *
+   * 有了它，"是否已应用过这条消息"不再需要在另一个存储里查，
+   * 也不再依赖"读-判-写"的跨存储推断。
+   */
+  coordinationApplicationEvidence?: ReadonlyArray<{
+    readonly messageIdentifier: string;
+    readonly appliedAtIso: string;
+    readonly resultingTaskStatus: "done" | "failed";
+  }>;
   schemaVersion: number;
   missionId: string;
   revision: number;

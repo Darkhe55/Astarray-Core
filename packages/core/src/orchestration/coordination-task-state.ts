@@ -92,6 +92,12 @@ export async function applyCoordinationMessageToTaskState(input: {
     if (target.status === taskStatus) {
       return { outcome: "status-unchanged", missionIdentifier, taskStatus };
     }
+    /**
+     * WIRING-04-01：**同一条消息的应用证据与任务状态变更写在同一个文档、同一次提交**。
+     *
+     * 判重放在 updater 内部（而不是先读后写），因此并发重放不会各写一次。
+     */
+    let didApply = false;
     await input.taskStore.updateTaskChain(missionIdentifier, (current) => {
       const base: TaskChainDocument =
         current ?? {
@@ -100,7 +106,24 @@ export async function applyCoordinationMessageToTaskState(input: {
           revision: chain.revision,
           updatedAtIso: chain.updatedAtIso,
           tasks: chain.tasks,
+          ...(chain.coordinationApplicationEvidence === undefined
+            ? {}
+            : { coordinationApplicationEvidence: chain.coordinationApplicationEvidence }),
         };
+      const existingEvidence = base.coordinationApplicationEvidence ?? [];
+      if (
+        existingEvidence.some(
+          (evidence) => evidence.messageIdentifier === input.message.messageIdentifier,
+        )
+      ) {
+        /** 同消息已应用 ⇒ 原样返回（不递增 revision，不产生第二次状态迁移）。 */
+        return base;
+      }
+      const targetTask = base.tasks.find((task) => task.id === taskIdentifier);
+      if (targetTask === undefined || targetTask.status === taskStatus) {
+        return base;
+      }
+      didApply = true;
       return {
         ...base,
         revision: base.revision + 1,
@@ -108,8 +131,19 @@ export async function applyCoordinationMessageToTaskState(input: {
         tasks: base.tasks.map((task) =>
           task.id === taskIdentifier ? { ...task, status: taskStatus } : task,
         ),
+        coordinationApplicationEvidence: [
+          ...existingEvidence,
+          {
+            messageIdentifier: input.message.messageIdentifier,
+            appliedAtIso: new Date().toISOString(),
+            resultingTaskStatus: taskStatus,
+          },
+        ],
       };
     });
+    if (!didApply) {
+      return { outcome: "status-unchanged", missionIdentifier, taskStatus };
+    }
     return { outcome: "applied", missionIdentifier, taskStatus };
   }
   return { outcome: "task-not-found", missionIdentifier: null, taskStatus };
