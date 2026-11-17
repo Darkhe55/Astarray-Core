@@ -642,8 +642,39 @@ export class WorkerAgent {
 
     const coordinationRequestIdentifier = `worker-turn:${this.options.task.id}:${randomUUID()}`;
     /** P1-3：这两个标志必须在调用工具循环**之前**声明（提交回调会在循环内部触发）。 */
-    let hasSubmittedCoordinationRequest = false;
-    let hasReceivedProviderEvent = false;
+    /**
+     * WIRING-04-02：**一次请求一份回执**（不再逐事件重复写）。
+     * acknowledged ⇒ delivered；否则失败时 unknown；都没有 ⇒ 保持 pending（不猜）。
+     */
+    const recordCoordinationReceipt = async (failureReason: string | null): Promise<void> => {
+      if (
+        deliveredCoordinationMessageIdentifiers.length === 0 ||
+        coordinationContextDeliveryPort === undefined
+      ) {
+        return;
+      }
+      if (acknowledgedRequestIdentifier !== null) {
+        await coordinationContextDeliveryPort
+          .markDelivered({
+            recipientId: coordinationRecipientId,
+            messageIdentifiers: deliveredCoordinationMessageIdentifiers,
+            requestIdentifier: coordinationRequestIdentifier,
+          })
+          .catch(() => undefined);
+        return;
+      }
+      if (failureReason !== null) {
+        await coordinationContextDeliveryPort
+          .markUnknown({
+            recipientId: coordinationRecipientId,
+            messageIdentifiers: deliveredCoordinationMessageIdentifiers,
+            reason: outcomeUnknownReason ?? failureReason,
+          })
+          .catch(() => undefined);
+      }
+    };
+    let acknowledgedRequestIdentifier: string | null = null;
+    let outcomeUnknownReason: string | null = null;
     try {
     const events = await runToolLoop(
       {
@@ -734,9 +765,17 @@ export class WorkerAgent {
         coordinationContextDeliveryPort === undefined
           ? {}
           : {
-              onRequestSubmitted: async () => {
-                /** 只记录"请求已发起"；真正的 delivered 要等确认开始返回（见下方循环）。 */
-                hasSubmittedCoordinationRequest = true;
+              /**
+               * WIRING-04-02（2026-11-17）：投递事实**只认适配器发布的生命周期**。
+               * `acknowledged` ⇒ 请求携带内容且对端已作答；`outcome-unknown` ⇒ 已发出但无可靠响应。
+               */
+              onRequestLifecycle: (event) => {
+                if (event.kind === "acknowledged") {
+                  acknowledgedRequestIdentifier = event.requestIdentifier ?? "unidentified-request";
+                }
+                if (event.kind === "outcome-unknown") {
+                  outcomeUnknownReason = event.reason ?? "已发出但无可靠对端响应";
+                }
               },
             }),
       },
@@ -752,22 +791,6 @@ export class WorkerAgent {
      * 后者按 P1-3 要求记 `unknown`（不冒充 delivered，也不断言未发送）。
      */
       for await (const event of events) {
-      hasReceivedProviderEvent = true;
-      /**
-       * P1-3：**提交证据 + 确实开始返回** 才记 delivered。
-       * 仅"请求已发起"不够（连接可能立刻失败），所以两者都要。
-       */
-      if (
-        hasSubmittedCoordinationRequest &&
-        deliveredCoordinationMessageIdentifiers.length > 0 &&
-        coordinationContextDeliveryPort !== undefined
-      ) {
-        await coordinationContextDeliveryPort.markDelivered({
-          recipientId: coordinationRecipientId,
-          messageIdentifiers: deliveredCoordinationMessageIdentifiers,
-          requestIdentifier: coordinationRequestIdentifier,
-        });
-      }
       switch (event.kind) {
         case "textDelta":
           this.outputTextChunks.push(event.deltaText);
@@ -1000,28 +1023,13 @@ export class WorkerAgent {
         modeKey: this.options.contextLifecycleModeKey ?? "assist",
       });
     }
+    await recordCoordinationReceipt(null);
     await this.reportOutcome(finalReason);
     feedbackTransport.setAgentStatus(this.options.agentInstanceId, "idle");
     return finalReason;
     } catch (error) {
-      /** P1-3：请求发起后失败（网络/超时）⇒ 结果未知，记 unknown 而非 delivered。 */
-      if (
-        !hasReceivedProviderEvent &&
-        deliveredCoordinationMessageIdentifiers.length > 0 &&
-        coordinationContextDeliveryPort !== undefined
-      ) {
-        /**
-         * 已收到事件仍失败 ⇒ 请求确实提交过且部分返回，保留 delivered（内容已随请求发出）；
-         * 未收到任何事件 ⇒ 结果未知，记 `unknown`。
-         */
-        await coordinationContextDeliveryPort
-          .markUnknown({
-            recipientId: coordinationRecipientId,
-            messageIdentifiers: deliveredCoordinationMessageIdentifiers,
-            reason: error instanceof Error ? error.message : String(error),
-          })
-          .catch(() => undefined);
-      }
+      /** WIRING-04-02：失败也要按已发布的生命周期落回执（acknowledged ⇒ delivered；否则 unknown）。 */
+      await recordCoordinationReceipt(error instanceof Error ? error.message : String(error));
       throw error;
     }
   }

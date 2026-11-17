@@ -4,6 +4,7 @@
  * 结果回填 → 再次调用 runtime，直到 success/error/cancelled 或达到最大迭代数。
  */
 import { createHash } from "node:crypto";
+import type { RequestLifecycleEvent } from "../core/types.js";
 import type { AgentEvent } from "../core/events.js";
 import { TASK_COMPLETION_MARKER } from "../core/completion-protocol.js";
 // DIAG-01（第 85 轮）：复用**既有**的"执行前拒绝"判定，拒绝不得记成故障
@@ -92,6 +93,11 @@ export interface ToolLoopOptions {
   onRequestSubmitted?: (input: {
     readonly iterationIndex: number;
   }) => void | Promise<void>;
+  /**
+   * WIRING-04-02：请求生命周期（prepared/dispatched/acknowledged/failed-before-dispatch/outcome-unknown）。
+   * 适配器在真实传输边界发布后四类；本循环只发 `prepared`。
+   */
+  onRequestLifecycle?: (event: RequestLifecycleEvent) => void;
   /**
    * G2（2026-11-08，第 130 轮）：**活锁/循环守卫端口**（可选）。
    *
@@ -445,6 +451,13 @@ export async function runToolLoop(
     const iterationInput: AgentRunInput = {
       ...agentRunInput,
       toolResultMessages: [...conversationMessages],
+      /** WIRING-04-02：把生命周期观察者交给适配器（它在真实传输边界发布事实）。 */
+      ...(options.onRequestLifecycle === undefined
+        ? {}
+        : {
+            requestLifecycleObserver: (event: RequestLifecycleEvent) =>
+              options.onRequestLifecycle?.(event),
+          }),
     };
     /**
      * P1-3（2026-11-17）：**请求提交证据**。
@@ -456,6 +469,27 @@ export async function runToolLoop(
     /** 请求前已取消 ⇒ 不构成"已提交"，回调不得触发。 */
     /** 兼容缺省取消信号（既有调用方可能未传）。 */
     const isCancelledBeforeRequest = options.cancellationSignal?.aborted === true;
+    if (isCancelledBeforeRequest) {
+      /**
+       * WIRING-04-02：请求前已取消 ⇒ `failed-before-dispatch`（**未调用传输 API**）。
+       * 不发起请求，也不得让任何适配器事后声称 `acknowledged`。
+       */
+      options.onRequestLifecycle?.({
+        kind: "failed-before-dispatch",
+        requestIdentifier: null,
+        reason: "请求前已取消",
+      });
+      /** 返回"已取消"终态（不发起请求，也不产生任何投递证据）。 */
+      return (async function* cancelledEventStream() {
+        yield {
+          kind: "runFinished" as const,
+          agentId: agentRunInput.agentId,
+          reason: "cancelled" as const,
+          detail: "请求前已取消，未调用传输 API",
+        };
+      })();
+    }
+    options.onRequestLifecycle?.({ kind: "prepared", requestIdentifier: null });
     const providerEventStream = options.runtime.run(iterationInput, options.cancellationSignal);
     if (!isCancelledBeforeRequest) {
       await options.onRequestSubmitted?.({ iterationIndex: iterationCount });

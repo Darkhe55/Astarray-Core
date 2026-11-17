@@ -96,8 +96,20 @@ function buildWorker(input: {
     runtime:
       input.runtime ??
       {
-        async *run(runInput: { systemPrompt: string }) {
+        async *run(runInput: {
+          systemPrompt: string;
+          requestLifecycleObserver?: (event: {
+            kind: string;
+            requestIdentifier: string | null;
+            reason?: string;
+          }) => void;
+        }) {
           input.capturedPrompts.push(runInput.systemPrompt);
+          /** WIRING-04-02：投递事实由适配器生命周期发布（首事件不再算证据）。 */
+          runInput.requestLifecycleObserver?.({
+            kind: "acknowledged",
+            requestIdentifier: "request-1",
+          });
           yield { kind: "textDelta", deltaText: "已收到" };
         },
       },
@@ -150,6 +162,7 @@ describe("协调上下文投递（真实请求携带）", () => {
       recipientId: RECIPIENT,
       messageId: "coord-message-1",
     });
+    console.log("DEBUG view=", JSON.stringify(view));
     expect(view?.contextDeliveryState).toBe("delivered");
 
     const receipt = await admission.readInjectionReceipt({
@@ -201,7 +214,18 @@ describe("P1-3：未提交不得标 delivered", () => {
       capturedPrompts: [],
       runtime: {
         // eslint-disable-next-line require-yield
-        async *run() {
+        async *run(runInput: {
+          requestLifecycleObserver?: (event: {
+            kind: string;
+            requestIdentifier: string | null;
+            reason?: string;
+          }) => void;
+        }) {
+          runInput.requestLifecycleObserver?.({
+            kind: "outcome-unknown",
+            requestIdentifier: "request-2",
+            reason: "连接中断：结果未知",
+          });
           throw new Error("连接中断：结果未知");
         },
       },

@@ -180,6 +180,13 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
         requestBodyJson: serializedRequestBody,
         options: this.egressScanOptions,
       });
+      /**
+       * WIRING-04-02：**传输边界事实**。`dispatched` 在真正调用传输 API 前发布。
+       */
+      agentRunInput.requestLifecycleObserver?.({
+        kind: "dispatched",
+        requestIdentifier,
+      });
       try {
         response = await this.fetchImpl(this.options.baseUrl, {
           method: "POST",
@@ -191,6 +198,15 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
           signal: abortController.signal,
         });
       } catch (error) {
+        /**
+         * WIRING-04-02：已调用传输 API 却拿不到对端响应（断网/超时/取消）
+         * ⇒ `outcome-unknown`（不是 delivered，也不是 failed-before-dispatch）。
+         */
+        agentRunInput.requestLifecycleObserver?.({
+          kind: "outcome-unknown",
+          requestIdentifier,
+          reason: error instanceof Error ? error.message : String(error),
+        });
         // 只有调用方取消才算 cancelled；本适配器超时（abortController）必须报超时失败。
         if (cancellationSignal.aborted) {
           yield {
@@ -207,6 +223,13 @@ export class OpenAiCompatibleRuntime implements AgentRuntime {
           timeoutMilliseconds: this.options.requestTimeoutMilliseconds,
         });
       }
+      /**
+       * WIRING-04-02：拿到对端响应即 `acknowledged`（HTTP 4xx/5xx 也算对端作答）。
+       */
+      agentRunInput.requestLifecycleObserver?.({
+        kind: "acknowledged",
+        requestIdentifier,
+      });
       if (!response.ok || !response.body) {
         throw await describeProviderHttpFailure(response);
       }

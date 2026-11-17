@@ -6334,3 +6334,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > ② 旧状态迁移落地：applied 无意图 ⇒ 有证据补 completed / 无证据标 needs-reconciliation，迁移前 atomic-json 备份，一次性标记。
 > 反例 4 条；全量门禁 **819 files / 5405 passed，exit 0**。
 > 阻塞：revision/执行尝试核验依赖消息字段（COORD-02）；原子提交单元未做；真实子进程恢复测试未做。
+
+> **WIRING-04-02 第一步（2026-11-17）**
+>
+> 请求投递事实改由**适配器生命周期**发布：prepared / dispatched / acknowledged / failed-before-dispatch / outcome-unknown。
+> Worker 只按事实落回执（acknowledged⇒delivered，失败无确认⇒unknown，其余 pending），移除逐事件重复写。
+> 请求前取消不调用传输 API 并发布 failed-before-dispatch。
+> 反例：适配器 3 条 + 投递链路 6 条；全量门禁 **820 files / 5408 passed，exit 0**。
+> 未完成：多迭代分别落账、载荷指纹、回执写失败补写。

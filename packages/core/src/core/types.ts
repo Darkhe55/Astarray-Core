@@ -551,6 +551,8 @@ export interface FeedbackAck {
 
 /** 单次 Agent 运行输入（Runtime 契约）。 */
 export interface AgentRunInput {
+  /** WIRING-04-02：请求生命周期观察者（只在内部装配写入，模型无法伪造）。 */
+  readonly requestLifecycleObserver?: (event: RequestLifecycleEvent) => void;
   missionId: string | null;
   agentId: string;
   systemPrompt: string;
@@ -569,6 +571,27 @@ export interface AgentRunInput {
  * 单次 run = 一次 provider/脚本迭代，产出事件流；
  * 多次迭代与工具结果回填由 ToolLoop 编排。
  */
+/**
+ * WIRING-04-02（2026-11-17）：**请求生命周期事实**。
+ *
+ * 只有适配器能在真实传输边界发布 `dispatched` / `acknowledged`；
+ * 本地门禁拒绝、序列化失败 ⇒ `failed-before-dispatch`；
+ * 已发出但无可靠对端响应（断网/超时/取消）⇒ `outcome-unknown`。
+ * **首事件、迭代器创建、runFinished 都不构成投递证据。**
+ */
+export type RequestLifecycleEventKind =
+  | "prepared"
+  | "dispatched"
+  | "acknowledged"
+  | "failed-before-dispatch"
+  | "outcome-unknown";
+
+export interface RequestLifecycleEvent {
+  readonly kind: RequestLifecycleEventKind;
+  readonly requestIdentifier: string | null;
+  readonly reason?: string;
+}
+
 export interface AgentRuntime {
   run(
     agentRunInput: AgentRunInput,

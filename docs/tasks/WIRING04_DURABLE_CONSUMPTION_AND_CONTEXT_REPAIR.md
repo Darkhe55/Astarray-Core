@@ -313,3 +313,47 @@ isAppliedInAuthoritativeState(messageIdentifier)
 ### 门禁
 
 **819 files / 5405 passed + 3 skipped，exit 0**。
+
+## 13. 施工记录：WIRING-04-02 第一步（2026-11-17）
+
+### 请求生命周期（替代"首事件=已投递"）
+
+`core/types.ts` 新增：
+
+```ts
+type RequestLifecycleEventKind =
+  | "prepared" | "dispatched" | "acknowledged"
+  | "failed-before-dispatch" | "outcome-unknown";
+```
+
+| 发布者 | 发布什么 | 位置 |
+|---|---|---|
+| 工具循环 | `prepared`（请求已装配）与 `failed-before-dispatch`（请求前已取消，**不调用传输 API**） | `runtime/tool-loop.ts` |
+| OpenAI 兼容适配器 | `dispatched`（调用传输前）、`acknowledged`（拿到对端响应，**含 4xx/5xx**）、`outcome-unknown`（已发出但无响应） | `runtime/openai-compatible-runtime.ts` |
+| Worker | 只按这些事实落回执：`acknowledged ⇒ delivered`；失败且无 acknowledged ⇒ `unknown`；其余保持 `pending` | `orchestration/worker-agent.ts` |
+
+同时移除了"逐事件重复写回执"（一次请求一份回执）。
+
+### 反例
+
+| 用例 | 断言 |
+|---|---|
+| `tests/core/unit/request-lifecycle-adapter.test.ts` ① | 正常响应：`dispatched → acknowledged` |
+| ② | HTTP 403 也算 `acknowledged`（对端作答 ≠ 业务成功） |
+| ③ | 传输层抛错：`dispatched → outcome-unknown`（不是 delivered） |
+| `coord01-context-delivery-wiring` ② | 请求被确认后才 `delivered`，回执带回 `worker-turn:` 请求标识 |
+| ⑤ | 发起即断网 ⇒ `unknown`，不冒充 delivered |
+| ⑥ | 请求前取消 ⇒ 保持 `pending` |
+
+### 仍未完成
+
+| 必做项 | 现状 |
+|---|---|
+| 模型迭代多次时"各自独立记录" | 部分：回执按请求一份，但多迭代的请求标识尚未分别落账 |
+| `failed-before-dispatch` 的 receipt 语义（保持 pending） | 已按卡实现，但未单独断言回执不写 |
+| 请求装配固定"实际携带消息 ID 集合 + 载荷指纹" | 未做：目前只带消息 ID 集合 |
+| 适配器层"回执写失败启动补写" | 未做 |
+
+### 门禁
+
+**820 files / 5408 passed + 3 skipped，exit 0**。
