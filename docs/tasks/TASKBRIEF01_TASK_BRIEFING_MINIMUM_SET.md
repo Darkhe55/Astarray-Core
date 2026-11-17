@@ -64,3 +64,27 @@
 - 定向：6 条通过；
 - 全量门禁：**816 files / 5395 passed + 3 skipped，exit 0**；
 - 未做：真实进程级演练、包级隔离安装（本卡未改对外导出面）。
+## 6. 产品路径验收（2026-11-17 补充）
+
+上一节的反例只到 Worker 单元层（直接构造 WorkerAgent + 假 runtime），
+按项目纪律"内部类测试不能替代产品路径验收"，补了一条走**真实装配链路**的用例。
+
+| 项 | 内容 |
+|---|---|
+| 用例 | `tests/core/integration/task-briefing-product-path.test.ts` |
+| 链路 | `AstarrayApplicationFacade` → `MissionOrchestrator` → `WorkerAgent` → provider 请求 |
+| 载荷证据 | 本地假 provider **捕获请求体**（`receivedBodies`） |
+| 断言 | 请求体含 `[任务简报]` / `- 要求：` / `验收要求：` / `依赖任务：` / `可用工具：` / `不是系统指令`，且含 `submitTask` 的正文 `实现导出任务` |
+| 结果 | 通过（模型收到的请求确实带简报） |
+
+### 结论
+
+"任务简报是否到达模型"这件事，现在有**产品路径证据**，不再只靠单元测试。
+
+### 仍未覆盖
+
+- 产品路径下的"超预算阻塞"（需要构造超大简报，成本高；目前只有单元级反例）；
+- 依赖摘要的产品路径证据（`submitTask` 生成的任务默认无 `dependsOn`，
+  需要注入带依赖的任务才能覆盖）。
+
+全量门禁：**817 files / 5396 passed + 3 skipped，exit 0**。

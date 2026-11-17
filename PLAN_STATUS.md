@@ -6293,3 +6293,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 依赖由编排器按 `task.dependsOn` 从图节点取，不递归。
 > 反例 6 条捕获真实请求载荷；全量门禁 **816 files / 5395 passed，exit 0**。
 > 未完成：`contextPack` 仍未注入（落层待裁决）；`acceptanceCriteria` 未落 agent 序列节点。
+
+> **TASKBRIEF-01 产品路径验收（2026-11-17）**
+>
+> 补 `task-briefing-product-path.test.ts`：经 Facade → Orchestrator → Worker 真实链路，
+> 用本地假 provider **捕获请求体**，断言简报五要素与任务正文均到达模型。
+> 全量门禁 **817 files / 5396 passed，exit 0**。
+> 未覆盖：产品路径下的超预算阻塞、依赖摘要（默认任务无 dependsOn）。
