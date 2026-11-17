@@ -6285,3 +6285,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > —— 两者没有对齐，"当前任务绑定包"当前**无字段可读**。
 > 三条接线路径（A agent 序列层 / B schema 扩字段 / C 用 mission↔sequence 映射）已写入卡内，**需裁决后再动**。
 > 尝试过的提供者改动已回退（类型检查挡住），未留半成品。
+
+> **TASKBRIEF-01 任务简报最小集（2026-11-17）**
+>
+> 修复"模型收不到任务必需内容"：新增 `buildTaskBriefing`，Worker 提示词前置任务简报
+> （任务正文 / 验收要求 / 声明过的依赖摘要 / 工具清单；缺字段写「未声明」，超预算阻塞不截断）。
+> 依赖由编排器按 `task.dependsOn` 从图节点取，不递归。
+> 反例 6 条捕获真实请求载荷；全量门禁 **816 files / 5395 passed，exit 0**。
+> 未完成：`contextPack` 仍未注入（落层待裁决）；`acceptanceCriteria` 未落 agent 序列节点。

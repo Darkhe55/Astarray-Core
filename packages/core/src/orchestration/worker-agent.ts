@@ -27,6 +27,7 @@ import {
   formatCoordinationContextBlock,
   selectCoordinationContextEntries,
 } from "./coordination-context-delivery.js";
+import { buildTaskBriefing } from "./task-briefing.js";
 import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 import type { CompletionReceipt } from "./completion-receipt.js";
 // COMM-01-02（2026-10-25）：反馈默认走**任务发布者的反向通道**（不再按上下级/硬编码推断）。
@@ -145,6 +146,18 @@ export interface WorkerAgentOptions {
   coordinationContextDeliveryPort?: CoordinationContextDeliveryPort;
   /** P1-3 要求 7：协调上下文单轮最大字符预算（缺省 4000）。 */
   coordinationContextMaximumCharacterCount?: number;
+  /**
+   * 任务简报（2026-11-17）：**声明过的依赖**的内容。
+   *
+   * 只由上层按 `task.dependsOn` 取（不递归、不自动召回）；缺省 ⇒ 简报标注「无可用描述」。
+   */
+  dependencyBriefings?: ReadonlyArray<{
+    readonly taskIdentifier: string;
+    readonly description: string | null;
+    readonly status: string;
+  }>;
+  /** 任务简报最大字符预算（缺省 4000；超预算阻塞，不截断）。 */
+  taskBriefingMaximumCharacterCount?: number;
   /** GUIDE-01-04：运行中指导安全点端口（缺省表示该 worker 不接受运行中指导）。 */
   guidanceSafePointPort?: GuidanceSafePointPort;
   /** T09A-R1-03：任务完成后的上下文节点收口（建立/验证/关闭/胶囊/核验任务）。 */
@@ -575,6 +588,33 @@ export class WorkerAgent {
      * - 区块带来源/任务/消息标识，并明确标注"待处理"而不是"已完成事实"；
      * - 投递标记在**请求提交之后**才写（见下方 `markDelivered`）。
      */
+    /**
+     * 任务简报（2026-11-17）：把**必需内容**确定性放进提示词。
+     *
+     * 缺字段写「未声明」、依赖只列声明过的、超预算阻塞——三条都不允许"看起来完整"。
+     */
+    const taskBriefing = buildTaskBriefing({
+      task: {
+        id: this.options.task.id,
+        description: this.options.task.description,
+        taskType: this.options.task.taskType,
+        toolNames: this.options.task.toolNames ?? [],
+        acceptanceCriteria: this.options.task.acceptanceCriteria ?? null,
+        dependsOn: this.options.task.dependsOn ?? [],
+      },
+      dependencies: this.options.dependencyBriefings ?? [],
+      maximumCharacterCount: this.options.taskBriefingMaximumCharacterCount ?? 4_000,
+    });
+    if (taskBriefing.budget.kind !== "fits") {
+      throw new DomainError(
+        "task-briefing-budget-exceeded",
+        `任务简报超预算（${String(taskBriefing.budget.characterCount)} > ${String(
+          taskBriefing.budget.maximumCharacterCount,
+        )}）：不截断，需拆分任务或放宽预算`,
+      );
+    }
+    systemPrompt = taskBriefing.text + "\n\n" + systemPrompt;
+
     const coordinationContextDeliveryPort = this.options.coordinationContextDeliveryPort;
     const coordinationRecipientId = `agent:${this.options.agentInstanceId}`;
     let deliveredCoordinationMessageIdentifiers: readonly string[] = [];

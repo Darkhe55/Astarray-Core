@@ -87,6 +87,8 @@ export type DomainErrorCode =
    * （来源不符/跨项目/任务非执行中/缺完成收据/已有审查结论）。
    */
   | "coordination-completion-rejected"
+  /** 2026-11-17：任务简报超预算（不截断，需拆分或放宽）。 */
+  | "task-briefing-budget-exceeded"
   | "tool-execution-failed"
   | "path-escape-attempt"
   | "task-sequence-not-found"

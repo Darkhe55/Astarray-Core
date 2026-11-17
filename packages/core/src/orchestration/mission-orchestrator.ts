@@ -1338,6 +1338,19 @@ export class MissionOrchestrator {
         ? {}
         : { artifactWorkspaceRootPath: this.options.artifactWorkspaceRootPath }),
       contextPromptProvider: this.options.contextPromptProvider,
+      /**
+       * 任务简报（2026-11-17）：只按 `task.dependsOn` 取**声明过的**依赖（不递归）。
+       * 取不到描述 ⇒ 传 null，简报会如实写「无可用描述」。
+       */
+      dependencyBriefings: (task.dependsOn ?? []).map((dependencyIdentifier) => {
+        const dependencyNode =
+          this.dagScheduler.getCurrentGraph().getNode(dependencyIdentifier) ?? null;
+        return {
+          taskIdentifier: dependencyIdentifier,
+          description: dependencyNode?.description ?? null,
+          status: dependencyNode?.status ?? "unknown",
+        };
+      }),
       ...(this.options.coordinationContextDeliveryPort === undefined
         ? {}
         : { coordinationContextDeliveryPort: this.options.coordinationContextDeliveryPort }),
