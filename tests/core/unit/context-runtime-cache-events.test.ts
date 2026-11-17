@@ -121,7 +121,7 @@ describe("T09A-R1-04：装配事件与缓存指标", () => {
     expect(storedEvents[0]).toMatchObject({
       schemaVersion: 1,
       eventType: "context-assembly",
-      effectiveBudgetTokens: 4096,
+      effectiveBudgetTokens: 3072,
     });
   });
 });
