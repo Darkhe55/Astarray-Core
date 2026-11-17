@@ -927,3 +927,22 @@ Worker 路径传 `reviewState: "none"`：**执行完成 ≠ 验收结论**，验
 全量门禁：**807 files / 5350 passed + 3 skipped，exit 0**。
 
 **仍未完成（P1-3 要求 7）**：协调消息仍一次性取全部 pending，未按预算/版本做部分携带。
+
+### P1-3 要求 7（2026-11-17）：按预算部分携带
+
+之前一轮取该个体**全部** `pending` 消息，既可能超预算，也让"未进入请求"与"已携带"无法区分。
+
+| 改动 | 位置 |
+|---|---|
+| 新增 `selectCoordinationContextEntries`（按渲染长度装填，放不下的排除） | `orchestration/coordination-context-delivery.ts` |
+| Worker 只用**被选中的**消息组装区块，并**只对这些**标记投递；其余保持 `pending` | `orchestration/worker-agent.ts` |
+| 新增选项 `coordinationContextMaximumCharacterCount`（缺省 4000） | 同上 |
+| 反例：3 条消息、预算只够 1 条 ⇒ 只含 m-1，m-2/m-3 被排除且不进提示词 | `tests/core/integration/coord01-context-delivery-wiring.test.ts` |
+
+### 如实说明的边界
+
+- 当前只按**字符预算**选择；**任务 revision / 授权 epoch 的适用性校验未实现**——
+  消息本身不携带这两个字段，需要生产者先补，本函数届时再加判断；
+- 被排除的消息保持 `pending`，下一轮仍会被考虑（不会丢，也不会被误确认）。
+
+全量门禁：**807 files / 5351 passed + 3 skipped，exit 0**。

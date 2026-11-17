@@ -232,3 +232,30 @@ describe("P1-3：未提交不得标 delivered", () => {
     expect(view?.contextDeliveryState).toBe("pending");
   });
 });
+
+describe("P1-3 要求 7：按预算部分携带", () => {
+  function buildEntry(identifier: string) {
+    return {
+      messageIdentifier: identifier,
+      sourceIdentifier: "agent-requester",
+      taskIdentifier: "T-777",
+      summaryText: "x".repeat(40),
+      enqueuedSequence: 1,
+    };
+  }
+
+  it("⑦ 超预算的条目被排除，且不进入提示词", async () => {
+    const { selectCoordinationContextEntries, formatCoordinationContextBlock } = await import(
+      "../../../packages/core/src/orchestration/coordination-context-delivery.js"
+    );
+    const selection = selectCoordinationContextEntries({
+      entries: [buildEntry("m-1"), buildEntry("m-2"), buildEntry("m-3")],
+      maximumCharacterCount: 70,
+    });
+    expect(selection.includedEntries.map((entry) => entry.messageIdentifier)).toEqual(["m-1"]);
+    expect(selection.excludedMessageIdentifiers).toEqual(["m-2", "m-3"]);
+    const block = formatCoordinationContextBlock(selection.includedEntries);
+    expect(block).toContain("m-1");
+    expect(block).not.toContain("m-2");
+  });
+});

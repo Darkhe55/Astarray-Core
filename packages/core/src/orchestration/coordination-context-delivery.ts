@@ -44,6 +44,43 @@ export interface CoordinationContextDeliveryPort {
 }
 
 /**
+ * P1-3 要求 7（2026-11-17）：**按预算选择要携带的消息**。
+ *
+ * 之前是一轮取该个体全部 pending 消息；这既可能超出预算，也让"未进入请求"的消息
+ * 无法与"已携带"区分。现在按顺序装填，**放不下的留在 pending**，不批量确认。
+ *
+ * 说明（如实）：当前只按**字符预算**选择。消息本身不携带任务 revision / 授权 epoch，
+ * 因此"版本适用性与授权校验"没有可依据的字段——需要生产者先补字段，本函数届时再加判断。
+ */
+export function selectCoordinationContextEntries(input: {
+  readonly entries: readonly PendingCoordinationContextEntry[];
+  readonly maximumCharacterCount: number;
+}): {
+  readonly includedEntries: readonly PendingCoordinationContextEntry[];
+  readonly excludedMessageIdentifiers: readonly string[];
+} {
+  const maximumCharacterCount = Math.max(0, input.maximumCharacterCount);
+  const includedEntries: PendingCoordinationContextEntry[] = [];
+  const excludedMessageIdentifiers: string[] = [];
+  let usedCharacterCount = 0;
+  for (const entry of input.entries) {
+    /** 单条长度：按渲染后的实际文本计，避免"估算通过、实际超限"。 */
+    const entryCharacterCount =
+      entry.messageIdentifier.length +
+      entry.sourceIdentifier.length +
+      (entry.taskIdentifier?.length ?? 0) +
+      entry.summaryText.length;
+    if (usedCharacterCount + entryCharacterCount > maximumCharacterCount) {
+      excludedMessageIdentifiers.push(entry.messageIdentifier);
+      continue;
+    }
+    usedCharacterCount += entryCharacterCount;
+    includedEntries.push(entry);
+  }
+  return { includedEntries, excludedMessageIdentifiers };
+}
+
+/**
  * 渲染成可放进提示词的区块。
  *
  * 刻意标注"这是待处理的外部消息"而不是"背景资料"：避免模型把它当成已完成的事实。

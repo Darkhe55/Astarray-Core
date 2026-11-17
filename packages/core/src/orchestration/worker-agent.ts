@@ -23,7 +23,10 @@ import {
 import { DomainError } from "../core/errors.js";
 // ALIGN-03-03（2026-10-28）：完成收据（真实工具调用数/落盘产物/完成事件校验结果）。
 import { buildCompletionReceipt } from "./completion-receipt.js";
-import { formatCoordinationContextBlock } from "./coordination-context-delivery.js";
+import {
+  formatCoordinationContextBlock,
+  selectCoordinationContextEntries,
+} from "./coordination-context-delivery.js";
 import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 import type { CompletionReceipt } from "./completion-receipt.js";
 // COMM-01-02（2026-10-25）：反馈默认走**任务发布者的反向通道**（不再按上下级/硬编码推断）。
@@ -139,6 +142,8 @@ export interface WorkerAgentOptions {
    * 请求提交后才把它们标成 delivered（缺省不携带、不标记）。
    */
   coordinationContextDeliveryPort?: CoordinationContextDeliveryPort;
+  /** P1-3 要求 7：协调上下文单轮最大字符预算（缺省 4000）。 */
+  coordinationContextMaximumCharacterCount?: number;
   /** GUIDE-01-04：运行中指导安全点端口（缺省表示该 worker 不接受运行中指导）。 */
   guidanceSafePointPort?: GuidanceSafePointPort;
   /** T09A-R1-03：任务完成后的上下文节点收口（建立/验证/关闭/胶囊/核验任务）。 */
@@ -551,10 +556,17 @@ export class WorkerAgent {
         recipientId: coordinationRecipientId,
       });
       if (pendingCoordinationEntries.length > 0) {
-        const coordinationBlock = formatCoordinationContextBlock(pendingCoordinationEntries);
+        /**
+         * P1-3 要求 7：**只携带放得下的消息**；未进入请求的继续等待，不批量确认。
+         */
+        const selection = selectCoordinationContextEntries({
+          entries: pendingCoordinationEntries,
+          maximumCharacterCount: this.options.coordinationContextMaximumCharacterCount ?? 4000,
+        });
+        const coordinationBlock = formatCoordinationContextBlock(selection.includedEntries);
         if (coordinationBlock !== "") {
           systemPrompt = coordinationBlock + "\n\n" + systemPrompt;
-          deliveredCoordinationMessageIdentifiers = pendingCoordinationEntries.map(
+          deliveredCoordinationMessageIdentifiers = selection.includedEntries.map(
             (entry) => entry.messageIdentifier,
           );
         }
