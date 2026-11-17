@@ -145,6 +145,7 @@ import { CoordinationTaskApplicationLedger } from "../orchestration/coordination
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
 import { resolveReviewStateForCoordination } from "../orchestration/coordination-completion-gate.js";
 import { evaluateAuthoritativeCompletion } from "../orchestration/authoritative-completion.js";
+import { orderRecallCandidatesByArtifactAssociation } from "../orchestration/closed-node-recall-policy.js";
 import { executeRecallToolCall } from "../orchestration/recall-tool-call.js";
 import {
   classifyContextPackMapping,
@@ -4679,15 +4680,29 @@ const controller = new MainController({
                     );
                     return await recallController.recall(recallInput);
                   },
-                  /** WIRING-04-05：候选只来自**该调用者自己的**已关闭胶囊（个体隔离）。 */
+                  /**
+                   * WIRING-04-05：候选只来自**该调用者自己的**已关闭胶囊（个体隔离），
+                   * 并按"当前 mission 的产物关联"优先排序（只重排，不扩大候选集）。
+                   */
                   listCandidateReferences: async (callerAgentInstanceId) => {
                     const capsules = await contextClosureCapsuleStore
                       .listCapsules(callerAgentInstanceId)
                       .catch(() => []);
-                    return capsules.map((capsule) => ({
-                      contextNodeIdentifier: capsule.contextNodeIdentifier,
-                      sourceRevision: capsule.contextGraphRevision,
-                    }));
+                    const artifactDocument = await artifactRecordStore.read().catch(() => null);
+                    const missionArtifactLocations =
+                      missionIdentifier === null || artifactDocument === null
+                        ? []
+                        : artifactDocument.records
+                            .filter((record) => record.missionIdentifier === missionIdentifier)
+                            .map((record) => record.location);
+                    return orderRecallCandidatesByArtifactAssociation({
+                      capsules: capsules.map((capsule) => ({
+                        contextNodeIdentifier: capsule.contextNodeIdentifier,
+                        sourceRevision: capsule.contextGraphRevision,
+                        artifactOrCommitReferences: capsule.artifactOrCommitReferences ?? [],
+                      })),
+                      missionArtifactLocations,
+                    });
                   },
                 });
                 return recallOutcome.isOk

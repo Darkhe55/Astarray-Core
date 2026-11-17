@@ -94,6 +94,47 @@ export function buildClosedNodeRecallCandidateIndex(input: {
 }
 
 /**
+ * WIRING-04-05：**按产物关联排序候选**（不新增存储）。
+ *
+ * 依据现成数据：胶囊自带 `artifactOrCommitReferences`，产物登记带 mission + location。
+ * 命中"当前 mission 产物"的胶囊排在前面，其次保持原有顺序；**只重排，不扩大候选集**。
+ */
+export function orderRecallCandidatesByArtifactAssociation(input: {
+  readonly capsules: ReadonlyArray<{
+    readonly contextNodeIdentifier: string;
+    readonly sourceRevision: number;
+    readonly artifactOrCommitReferences?: readonly string[];
+  }>;
+  readonly missionArtifactLocations: readonly string[];
+}): ReadonlyArray<{
+  readonly contextNodeIdentifier: string;
+  readonly sourceRevision: number;
+}> {
+  const artifactLocations = new Set(
+    input.missionArtifactLocations.map((location) => location.trim()).filter((l) => l !== ""),
+  );
+  const matchesArtifact = (capsule: {
+    readonly artifactOrCommitReferences?: readonly string[];
+  }): boolean => {
+    if (artifactLocations.size === 0) {
+      return false;
+    }
+    return (capsule.artifactOrCommitReferences ?? []).some((reference) =>
+      artifactLocations.has(reference.trim()),
+    );
+  };
+  /** 稳定排序：命中产物关联的在前，其余保持原顺序。 */
+  const ordered = [
+    ...input.capsules.filter((capsule) => matchesArtifact(capsule)),
+    ...input.capsules.filter((capsule) => !matchesArtifact(capsule)),
+  ];
+  return ordered.map((capsule) => ({
+    contextNodeIdentifier: capsule.contextNodeIdentifier,
+    sourceRevision: capsule.sourceRevision,
+  }));
+}
+
+/**
  * **自动相关性召回：首版恒为空**。
  *
  * 这不是"还没实现"，而是裁决要求：没有向量模型/自动决策模型时，

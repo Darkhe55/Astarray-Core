@@ -14,6 +14,7 @@ import type { ContextPack } from "../../../packages/core/src/orchestration/conte
 import {
   buildClosedNodeRecallCandidateIndex,
   evaluateClosedNodeRecall,
+  orderRecallCandidatesByArtifactAssociation,
   selectAutomaticRecallCandidates,
 } from "../../../packages/core/src/orchestration/closed-node-recall-policy.js";
 
@@ -253,4 +254,46 @@ describe("关闭节点回访（用户裁决逐条）", () => {
       mutatesHistory: false,
     });
   });
+});
+
+describe("WIRING-04-05：候选按产物关联排序", () => {
+  it("⑬ 命中当前 mission 产物的胶囊排在前面，其余保持原序", () => {
+    const ordered = orderRecallCandidatesByArtifactAssociation({
+      capsules: [
+        { contextNodeIdentifier: "node-a", sourceRevision: 1, artifactOrCommitReferences: [] },
+        {
+          contextNodeIdentifier: "node-b",
+          sourceRevision: 2,
+          artifactOrCommitReferences: ["out/report.md"],
+        },
+        { contextNodeIdentifier: "node-c", sourceRevision: 3, artifactOrCommitReferences: [] },
+      ],
+      missionArtifactLocations: ["out/report.md"],
+    });
+    expect(ordered.map((candidate) => candidate.contextNodeIdentifier)).toEqual([
+      "node-b",
+      "node-a",
+      "node-c",
+    ]);
+    /** 只给标识与 revision，不带正文。 */
+    expect(ordered[0]).toEqual({ contextNodeIdentifier: "node-b", sourceRevision: 2 });
+  }, 30_000);
+
+  it("⑭ 没有产物或没有引用 ⇒ 保持原序（不做无关重排）", () => {
+    const capsules = [
+      { contextNodeIdentifier: "node-a", sourceRevision: 1 },
+      { contextNodeIdentifier: "node-b", sourceRevision: 2 },
+    ];
+    expect(
+      orderRecallCandidatesByArtifactAssociation({ capsules, missionArtifactLocations: [] }).map(
+        (candidate) => candidate.contextNodeIdentifier,
+      ),
+    ).toEqual(["node-a", "node-b"]);
+    expect(
+      orderRecallCandidatesByArtifactAssociation({
+        capsules,
+        missionArtifactLocations: ["out/report.md"],
+      }).map((candidate) => candidate.contextNodeIdentifier),
+    ).toEqual(["node-a", "node-b"]);
+  }, 30_000);
 });

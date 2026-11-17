@@ -955,3 +955,40 @@ zod 默认**丢弃未知字段** ⇒ 经过 schema 的读写会把手写进去�
 ### 门禁
 
 **829 files / 5461 passed + 3 skipped，exit 0**。
+
+## 33. 施工记录：候选索引接入产物关联（2026-11-18）
+
+### 不需要新增存储
+
+卡里要求候选"仅基于显式引用 / 依赖关系 / 产物关联"。核实后发现**产物关联可以用现成数据**：
+
+- 胶囊自带 `artifactOrCommitReferences`；
+- 产物登记 `ArtifactRecordStore` 记录 `missionIdentifier` 与 `location`。
+
+因此：**当前 mission 的产物 location** ∩ **胶囊的产物引用** ⇒ 产物关联命中。
+
+### 实现
+
+| 项 | 内容 |
+|---|---|
+| 纯函数 | `orderRecallCandidatesByArtifactAssociation`：命中产物关联的胶囊排前，其余保持原序 |
+| 排序纪律 | **只重排、不扩大候选集**（仍是"该调用者自己的胶囊"）；仍然只给标识 + revision |
+| 运行时 | `listCandidateReferences` 读取产物登记（仅当前 mission）+ 胶囊引用后排序 |
+
+### 反例
+
+`context-pack-assembly-and-recall.test.ts` 新增 2 条：
+
+- ⑬ 命中产物的胶囊排第一，其余原序；候选仍是 `{标识, revision}`，无正文；
+- ⑭ 无产物或无引用 ⇒ 保持原序（不做无关重排）。
+
+### 仍未做
+
+| 项 | 原因 |
+|---|---|
+| **依赖关系候选** | 胶囊没有任务/依赖回指字段；要做得先给胶囊记录"来源任务"，属存储改动 |
+| 真实进程级（spawn）竞争/崩溃 | 需构建产物，成本较高 |
+
+### 门禁
+
+**829 files / 5463 passed + 3 skipped，exit 0**。
