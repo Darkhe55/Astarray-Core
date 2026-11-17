@@ -6321,3 +6321,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 启动恢复由"无条件重放"改为**对账**：以分区状态文档的 `appliedMessages`（与快照同一原子写入）为证据，
 > 有证据只补 completed、无证据才补做。全量门禁 **817 files / 5400 passed，exit 0**。
 > 未完成：该对账缺产品路径反例；revision/执行尝试核验、旧状态迁移、真实子进程恢复未做。
+
+> **WIRING-04-01 产品路径反例：阻塞（2026-11-17）**
+>
+> 启动恢复对账已接线（以分区状态 `appliedMessages` 为证据）。但产品路径反例写不下去：
+> 只 enqueue 消息、没有真实 mission 任务链时，启动恢复**不会遍历到该 mission**，意图永不写入。
+> 尝试的用例已删除（未提交）。下一步：用 e2e harness 先造出带任务的 mission，再验证"不重放"。

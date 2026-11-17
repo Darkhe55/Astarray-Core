@@ -233,3 +233,31 @@ isAppliedInAuthoritativeState(messageIdentifier)
 ### 门禁
 
 **817 files / 5400 passed + 3 skipped，exit 0**。
+
+## 11. 阻塞点：对账的产品路径反例需要真实 mission 任务链（2026-11-17）
+
+尝试写"启动恢复不重放"的产品路径反例（`wiring04-startup-reconciliation`）时受阻：
+
+| 观察 | 含义 |
+|---|---|
+| 只 `enqueue` 一条带 `missionIdentifier` 的协调消息，等 20s 仍**没有**任何意图写入 | 启动恢复的消费只遍历**已知 mission**（来自任务链存储）；没有任务链就没有 mission 可遍历 |
+| 因此 `applyMessage` 从未被调用 | 不是对账逻辑问题，是**测试前置缺失** |
+
+### 已回退
+
+该测试文件**未提交**，已删除（不留半成品/不留失败用例在网络恢复后混进门禁）。
+
+### 下一步第一条动作（解除阻塞）
+
+给该反例准备**真实 mission 任务链**：用现有 e2e harness（`e2e01-provider-write-probe` 或
+`coord01-coordination-wiring`）里创建 mission 的入口，先产生一个带任务的 mission，
+再 enqueue 协调消息、等待应用、把台账改回 pending、调用 `runStartupRecovery()`，
+断言：条目变 `completed` 且 `appliedMessages` 数量不变。
+
+### 当前状态
+
+| 项 | 状态 |
+|---|---|
+| 对账函数 | ✅ 实现 + 函数级反例 ⑤⑥ |
+| 启动恢复接线 | ✅ 已接（读分区状态 `appliedMessages`） |
+| 产品路径反例 | ❌ **阻塞**（缺 mission 任务链 fixture） |
