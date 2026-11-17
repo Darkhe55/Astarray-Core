@@ -6342,3 +6342,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 请求前取消不调用传输 API 并发布 failed-before-dispatch。
 > 反例：适配器 3 条 + 投递链路 6 条；全量门禁 **820 files / 5408 passed，exit 0**。
 > 未完成：多迭代分别落账、载荷指纹、回执写失败补写。
+
+> **WIRING-04-04 方案 C 第一步（2026-11-17）**
+>
+> 当前任务包改由 **mission↔序列精确映射**解析（`contextPackResolver`）：返回 pack+revision+哈希；
+> 声明有包却读不到 ⇒ 阻塞；未声明 ⇒ 无包运行。提供者侧已接，运行时用真实存储实现。
+> **过渡状态**：生产链路尚无映射写入，`isContextPackMappingRequired` 缺省关闭，否则所有任务会被阻塞。
+> 反例 9 条；全量门禁 **821 files / 5417 passed，exit 0**。
+> 未完成：映射写入方、显式依赖引用接线、哈希落账。

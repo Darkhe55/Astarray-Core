@@ -89,6 +89,10 @@ export type DomainErrorCode =
   | "coordination-completion-rejected"
   /** 2026-11-17：任务简报超预算（不截断，需拆分或放宽）。 */
   | "task-briefing-budget-exceeded"
+  /** WIRING-04-04：任务包无法按精确映射解析（缺映射 / 声明有包却读不到）⇒ 阻塞。 */
+  | "context-pack-unresolvable"
+  /** WIRING-04-04：必要上下文包超预算（不截断）。 */
+  | "context-pack-budget-exceeded"
   | "tool-execution-failed"
   | "path-escape-attempt"
   | "task-sequence-not-found"

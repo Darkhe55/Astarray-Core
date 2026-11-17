@@ -10,6 +10,7 @@
 import type { TaskDependencyNode } from "../core/types.js";
 import { DomainError } from "../core/errors.js";
 import { buildPromptActiveFrontier } from "./context-closure-capsule-store.js";
+import { planContextPackAssembly } from "./context-pack-assembly.js";
 import type { GlobalDecisionStore } from "./global-decision-store.js";
 import type { GlobalDecisionRecord } from "./context-closure-schemas.js";
 import { selectGlobalDecisionsForTask } from "./global-decision-selector.js";
@@ -328,6 +329,36 @@ export interface ContextPromptProviderOptions {
   graphStore: LocalContextGraphStore;
   maximumGlobalContextTokenCount: number;
   mandatoryConditions?: NecessaryContextCondition[];
+  /**
+   * WIRING-04-04（返修卡方案 C）：按 mission↔序列**精确映射**解析当前任务包。
+   *
+   * 缺映射、声明有包却读不到 ⇒ 必须阻塞（抛 `context-pack-unresolvable`），
+   * 不能当作"未声明包"继续跑。
+   */
+  contextPackResolver?: (input: {
+    readonly missionIdentifier: string | null;
+    readonly agentInstanceIdentifier: string;
+    readonly missionTaskIdentifier: string;
+  }) => Promise<
+    | { readonly kind: "no-pack-declared" }
+    | {
+        readonly kind: "pack";
+        readonly pack: ContextPack;
+        readonly revision: number;
+        readonly contentHash: string;
+      }
+    | { readonly kind: "mapping-missing"; readonly reason: string }
+    | { readonly kind: "declared-but-missing"; readonly reason: string }
+  >;
+  /**
+   * 是否要求 mission↔序列映射（缺省 false）。
+   *
+   * 过渡状态说明：生产链路尚未写入映射，缺省不阻塞；映射具备后应显式打开，
+   * 让"缺映射"按卡内要求阻塞任务。
+   */
+  isContextPackMappingRequired?: boolean;
+  /** 当前任务包的字符预算（缺省 4000；超预算阻塞，不截断）。 */
+  maximumContextPackCharacterCount?: number;
   /** T09A-R1-02：预算策略提供者（设置变化通过 revision 使选择缓存失效）。 */
   budgetPolicyProvider?: (input: ContextPromptProviderInput) => Promise<{
     configuredMaximumGlobalContextTokenCount: number;
@@ -527,7 +558,60 @@ export function createContextPromptProvider(
       };
       void Promise.resolve(runtimeEventSink(event)).catch(() => {});
     };
+    /**
+     * WIRING-04-04（方案 C）：按精确映射解析当前任务包。
+     * 缺映射 / 声明有包却读不到 ⇒ **阻塞**（不当作"未声明包"）。
+     */
+    const packResolution =
+      options.contextPackResolver === undefined
+        ? null
+        : await options.contextPackResolver({
+            missionIdentifier: input.missionId,
+            agentInstanceIdentifier: input.agentInstanceId,
+            missionTaskIdentifier: input.task.id,
+          });
+    /**
+     * 阻塞策略（2026-11-17 实测修正）：
+     * - `declared-but-missing` ⇒ **始终阻塞**（声明了包却读不到，绝不能当作无包）；
+     * - `mapping-missing` ⇒ 仅当调用方要求映射时阻塞。
+     *   原因：当前生产链路尚未写入 mission↔序列映射，若一律阻塞会让**所有任务**无法启动；
+     *   这是已知过渡状态，映射写入后应把 `isContextPackMappingRequired` 打开。
+     */
+    if (
+      packResolution !== null &&
+      (packResolution.kind === "declared-but-missing" ||
+        (packResolution.kind === "mapping-missing" &&
+          options.isContextPackMappingRequired === true))
+    ) {
+      throw new DomainError("context-pack-unresolvable", packResolution.reason);
+    }
+    const resolvedPack = packResolution !== null && packResolution.kind === "pack"
+      ? packResolution.pack
+      : null;
+    if (resolvedPack !== null) {
+      const packPlan = planContextPackAssembly({
+        currentTask: {
+          taskIdentifier: input.task.id,
+          pack: resolvedPack,
+          ...(packResolution !== null && packResolution.kind === "pack"
+            ? { pinnedRevision: packResolution.revision }
+            : {}),
+        },
+        dependencyReferences: [],
+        currentAgentInstanceIdentifier: input.agentInstanceId,
+        maximumCharacterCount: options.maximumContextPackCharacterCount ?? 4_000,
+      });
+      if (packPlan.budget.kind !== "fits") {
+        throw new DomainError(
+          "context-pack-budget-exceeded",
+          `必要上下文超预算（${String(packPlan.budget.characterCount)} > ${String(
+            packPlan.budget.maximumCharacterCount,
+          )}）：不截断`,
+        );
+      }
+    }
     const assembled = assembleContextPrompt({
+      ...(resolvedPack === null ? {} : { contextPacks: [resolvedPack] }),
       systemRulesText: APPLICATION_CONTEXT_SYSTEM_RULES,
       necessaryConditions: options.mandatoryConditions ?? [],
       globalDecisionRecords: selection.selected.map((record) => ({

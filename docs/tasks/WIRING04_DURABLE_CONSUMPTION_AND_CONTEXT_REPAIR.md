@@ -357,3 +357,46 @@ type RequestLifecycleEventKind =
 ### 门禁
 
 **820 files / 5408 passed + 3 skipped，exit 0**。
+
+## 14. 施工记录：WIRING-04-04（方案 C）第一步（2026-11-17）
+
+### 解析链（按卡内指定方案 C）
+
+```text
+mission task ──精确映射(missionTaskSequenceMapStore)──▶ 序列节点(agentTaskSequenceStore)
+            ──▶ contextPack + 序列 revision + 内容哈希
+```
+
+| 项 | 位置 |
+|---|---|
+| 解析模块（三态 + 哈希 + 禁止 0 占位） | `orchestration/context-pack-resolution.ts` |
+| 提供者钩子 `contextPackResolver` + 预算阻塞 | `orchestration/context-prompt-assembler.ts` |
+| 运行时用真实存储实现解析（missionRelationIndexStore → mapStore → sequenceStore） | `application/application-runtime.ts` |
+| 新错误码 `context-pack-unresolvable` / `context-pack-budget-exceeded` | `core/errors.ts` |
+
+### 反例
+
+| 用例 | 断言 |
+|---|---|
+| `context-pack-resolution` ①-⑥ | 精确映射命中返回包+revision+哈希；缺映射 `mapping-missing`；节点读不到 `declared-but-missing`；未声明 `no-pack-declared`；revision=0 阻塞；哈希稳定/变化 |
+| `context-prompt-assembler` 新增 3 条 | 有包 ⇒ 提示词含成员摘要；声明却读不到 ⇒ 抛 `context-pack-unresolvable`；未声明 ⇒ 照常装配 |
+
+### 过渡状态（实测发现，必须记录）
+
+首次接线后 `task-briefing-product-path` 直接红：真实 mission **没有** mission↔序列映射，
+按"缺映射即阻塞"会让**所有任务无法启动**。
+
+处理：`isContextPackMappingRequired`（缺省 false）——缺映射暂按无包运行并记录该配置项；
+`declared-but-missing`（声明了包却读不到）**始终阻塞**。映射写入后应打开该开关。
+
+### 仍未完成
+
+| 项 | 现状 |
+|---|---|
+| 生产链路写入 mission↔序列映射 | 未做（映射写入方不属于本卡范围）→ 阻塞开关只能保持关闭 |
+| 显式依赖引用（dependencyReferences） | 未接：解析层已有端口，装配仍传空数组 |
+| 包的内容哈希与 revision 落账到运行记录 | 未做 |
+
+### 门禁
+
+**821 files / 5417 passed + 3 skipped，exit 0**。

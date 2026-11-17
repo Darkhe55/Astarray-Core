@@ -141,3 +141,90 @@ describe("T09A-R1-01：真实存储装配（全局选择 + 活跃前沿）", () 
     ]);
   });
 });
+
+describe("WIRING-04-04：当前任务包按精确映射注入", () => {
+  it("① 解析到包 ⇒ 提示词含成员摘要（不再只有四段）", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory });
+    const graphStore = new LocalContextGraphStore({ baseDirectory });
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore,
+      maximumGlobalContextTokenCount: 4096,
+      contextPackResolver: async () => ({
+        kind: "pack",
+        revision: 7,
+        contentHash: "hash",
+        pack: {
+          packIdentifier: "pack-1",
+          mergePolicy: "summarize-allowed",
+          sourcePriority: "agent",
+          members: [
+            { memberIdentifier: "m-1", sourceKind: "agent", summary: "任务包事实正文" },
+          ],
+        },
+      }),
+    });
+    const assembled = await provider({
+      missionId: "mission-1",
+      agentInstanceId: "worker-1",
+      task: {
+        id: "T-001",
+        description: "probe",
+        dependsOn: [],
+        taskType: "data",
+        toolNames: [],
+      } as never,
+    });
+    expect(assembled.promptText).toContain("任务包事实正文");
+  }, 30_000);
+
+  it("② 声明有包却读不到 ⇒ 阻塞（context-pack-unresolvable）", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory });
+    const graphStore = new LocalContextGraphStore({ baseDirectory });
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore,
+      maximumGlobalContextTokenCount: 4096,
+      contextPackResolver: async () => ({
+        kind: "declared-but-missing",
+        reason: "映射指向的序列任务读不到",
+      }),
+    });
+    await expect(
+      provider({
+        missionId: "mission-1",
+        agentInstanceId: "worker-1",
+        task: {
+          id: "T-001",
+          description: "probe",
+          dependsOn: [],
+          taskType: "data",
+          toolNames: [],
+        } as never,
+      }),
+    ).rejects.toMatchObject({ errorCode: "context-pack-unresolvable" });
+  }, 30_000);
+
+  it("③ 未声明包 ⇒ 照常装配（不注入包区块）", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory });
+    const graphStore = new LocalContextGraphStore({ baseDirectory });
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore,
+      maximumGlobalContextTokenCount: 4096,
+      contextPackResolver: async () => ({ kind: "no-pack-declared" }),
+    });
+    const assembled = await provider({
+      missionId: "mission-1",
+      agentInstanceId: "worker-1",
+      task: {
+        id: "T-001",
+        description: "probe",
+        dependsOn: [],
+        taskType: "data",
+        toolNames: [],
+      } as never,
+    });
+    expect(assembled.promptText).toContain("[系统规则]");
+  }, 30_000);
+});

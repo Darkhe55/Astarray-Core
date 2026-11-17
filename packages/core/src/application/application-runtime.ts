@@ -142,6 +142,7 @@ import { CoordinationTaskApplicationLedger } from "../orchestration/coordination
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
 import { resolveReviewStateForCoordination } from "../orchestration/coordination-completion-gate.js";
 import { evaluateAuthoritativeCompletion } from "../orchestration/authoritative-completion.js";
+import { computeContextPackContentHash } from "../orchestration/context-pack-resolution.js";
 import { PendingWriteTracker } from "../orchestration/pending-write-tracker.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
@@ -3160,6 +3161,74 @@ export async function createApplicationRuntime(
       graphStore: contextGraphStore,
       maximumGlobalContextTokenCount: options.globalContextBudgetTokens ?? 4096,
       mandatoryConditions: options.mandatoryContextConditions,
+      /**
+       * WIRING-04-04（返修卡方案 C）：当前任务包经 **mission↔序列精确映射** 解析。
+       * 缺映射 / 声明有包却读不到 ⇒ 返回失败由提供者阻塞（不按名称或最近任务猜）。
+       */
+      contextPackResolver: async (resolverInput) => {
+        const missionIdentifier = resolverInput.missionIdentifier;
+        if (missionIdentifier === null) {
+          return { kind: "no-pack-declared" as const };
+        }
+        const allRelations = await missionRelationIndexStore.listAll();
+        const relation = allRelations.find(
+          (candidate) => candidate.missionIdentifier === missionIdentifier,
+        );
+        if (relation === undefined) {
+          return {
+            kind: "mapping-missing" as const,
+            reason: `mission ${missionIdentifier} 没有任务序列关联`,
+          };
+        }
+        const sequenceIdentifier = relation.taskSequenceIdentifier;
+        if (sequenceIdentifier === null) {
+          return {
+            kind: "mapping-missing" as const,
+            reason: `mission ${missionIdentifier} 的关联没有任务序列标识`,
+          };
+        }
+        const mapEntries = await missionTaskSequenceMapStore.listForMission({
+          missionIdentifier,
+          sequenceIdentifier,
+        });
+        const missionTaskIdentifier = resolverInput.missionTaskIdentifier;
+        const exactEntry = mapEntries.find(
+          (entry) => entry.missionTaskIdentifier === missionTaskIdentifier,
+        );
+        if (exactEntry === undefined) {
+          return {
+            kind: "mapping-missing" as const,
+            reason: `缺少 mission task ${missionTaskIdentifier} 与序列 ${sequenceIdentifier} 的精确映射`,
+          };
+        }
+        const sequenceDocument = await agentTaskSequenceStore
+          .readSequence(exactEntry.ownerAgentInstanceIdentifier, exactEntry.sequenceIdentifier)
+          .catch(() => null);
+        const sequenceNode = sequenceDocument?.nodes.find(
+          (node) => node.taskId === exactEntry.sequenceTaskIdentifier,
+        );
+        if (sequenceDocument === null || sequenceNode === undefined) {
+          return {
+            kind: "declared-but-missing" as const,
+            reason: `映射指向序列任务 ${exactEntry.sequenceTaskIdentifier}，但该节点读取不到`,
+          };
+        }
+        if (sequenceNode.contextPack === undefined || sequenceNode.contextPack === null) {
+          return { kind: "no-pack-declared" as const };
+        }
+        if (sequenceDocument.revision <= 0) {
+          return {
+            kind: "declared-but-missing" as const,
+            reason: "序列声明了包但没有有效 revision（不得用 0 占位）",
+          };
+        }
+        return {
+          kind: "pack" as const,
+          pack: sequenceNode.contextPack,
+          revision: sequenceDocument.revision,
+          contentHash: computeContextPackContentHash(sequenceNode.contextPack),
+        };
+      },
       budgetPolicyProvider: async (input) => {
         const globalPolicy = await globalContextBudgetStore.readPolicy();
         const scoped = await scopedSettingsStore.read();

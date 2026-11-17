@@ -106,6 +106,8 @@ export function planContextPackAssembly(input: {
   readonly currentTask: {
     readonly taskIdentifier: string;
     readonly pack: ContextPack | null;
+    /** WIRING-04-04：当前任务的**固定 revision**（禁止 0 占位；缺省视为未固定）。 */
+    readonly pinnedRevision?: number;
   };
   readonly dependencyReferences: readonly DependencyPackReference[];
   readonly currentAgentInstanceIdentifier: string;
@@ -119,7 +121,7 @@ export function planContextPackAssembly(input: {
       pack: input.currentTask.pack,
       provenance: "current-task",
       sourceIdentifier: input.currentTask.taskIdentifier,
-      pinnedRevision: 0,
+      pinnedRevision: input.currentTask.pinnedRevision ?? 0,
     });
   }
 
