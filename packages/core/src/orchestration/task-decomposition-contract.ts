@@ -33,6 +33,8 @@ const ALLOWED_DRAFT_NODE_FIELDS = [
   "dependsOn",
   "acceptanceCriteria",
   "toolNames",
+  /** WIRING-04-04：节点可选地声明"我来自哪条用户任务序列任务"（只声明 id）。 */
+  "sourceSequenceTaskIdentifier",
 ] as const;
 
 export interface TaskDecompositionValidationInput {
@@ -123,6 +125,14 @@ export function parseAndValidateTaskDecomposition(
         `节点 ${nodeIdentifier} 声明了未注册工具: ${unknownToolNames.join(", ")}`,
       );
     }
+    /**
+     * WIRING-04-04（方案 A）：候选稿**只允许声明来源任务 id**；
+     * 序列标识与属主属于权威信息，由装配层按 mission 上下文补齐。
+     */
+    const declaredSourceSequenceTaskIdentifier = readOptionalString(
+      record,
+      "sourceSequenceTaskIdentifier",
+    );
     nodes.push({
       id: nodeIdentifier,
       description,
@@ -137,6 +147,9 @@ export function parseAndValidateTaskDecomposition(
       acceptanceCriteria,
       /** ALIGN-02-03：规划节点恒为 Agent 层（1），不由候选稿决定。 */
       priorityTier: 1,
+      ...(declaredSourceSequenceTaskIdentifier === undefined
+        ? {}
+        : { sourceSequenceTaskIdentifier: declaredSourceSequenceTaskIdentifier }),
     });
   }
 
@@ -205,6 +218,24 @@ function readRequiredString(
   const value = record[fieldName];
   if (typeof value !== "string" || value.trim() === "") {
     throw new DomainError("task-decomposition-invalid", `${label}不能为空（字段 ${fieldName}）。`);
+  }
+  return value.trim();
+}
+
+/** 可选字符串字段：缺省返回 undefined；给了就必须是非空字符串（不静默忽略类型错误）。 */
+function readOptionalString(
+  record: Record<string, unknown>,
+  fieldName: string,
+): string | undefined {
+  const value = record[fieldName];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new DomainError(
+      "task-decomposition-invalid",
+      `字段 ${fieldName} 若出现必须是非空字符串。`,
+    );
   }
   return value.trim();
 }

@@ -6,6 +6,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { bindExactMissionTaskMapping } from "./mission-task-sequence-map-store.js";
+import { stampDeclaredSequenceSources } from "./task-sequence-source-stamping.js";
 import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
 import type { ToolPublicDocumentationRegistryEntry } from "../tools/tool-public-documentation-registry.js";
@@ -1373,12 +1374,25 @@ export class MainController {
           })
         : null;
     /**
-     * WIRING-04-04（方案 A）：**单节点 + 有用户任务序列**时，该任务来自那条序列。
+     * WIRING-04-04（方案 A）：来源补齐有两条合法路径。
      *
-     * 多节点分解是 1:N，无法确定"哪个节点来自哪条序列" ⇒ 不填、不绑（不猜）。
+     * 1. 候选稿**显式声明** `sourceSequenceTaskIdentifier`（必须等于权威用户任务，否则剥离）；
+     * 2. **单节点分解**本身就是那条用户任务（1:1），无需声明即补齐。
+     *
+     * 多节点且未声明 ⇒ 不补、不绑（1:N 无法确定来源，不猜）。
      */
-    const singleNodeSource =
-      userTaskSequence !== null && taskNodes.length === 1
+    const declaredStamping = stampDeclaredSequenceSources({
+      nodes: taskNodes,
+      originalTaskIdentifier: userTaskSequence?.taskIdentifier ?? null,
+      sequenceIdentifier: userTaskSequence?.taskSequenceIdentifier ?? null,
+      ownerAgentInstanceIdentifier:
+        userTaskSequence === null ? null : userTaskSequenceOwnerAgentInstanceIdentifier,
+    });
+    const singleNodeImplicitSource =
+      userTaskSequence !== null &&
+      declaredStamping.stampedMissionTaskIdentifiers.length === 0 &&
+      declaredStamping.rejectedMissionTaskIdentifiers.length === 0 &&
+      declaredStamping.nodes.length === 1
         ? {
             sourceSequenceTaskIdentifier: userTaskSequence.taskIdentifier,
             sourceSequenceIdentifier: userTaskSequence.taskSequenceIdentifier,
@@ -1387,9 +1401,22 @@ export class MainController {
           }
         : null;
     const taskNodesWithSource =
-      singleNodeSource === null || taskNodes[0] === undefined
-        ? taskNodes
-        : [{ ...taskNodes[0], ...singleNodeSource }, ...taskNodes.slice(1)];
+      singleNodeImplicitSource === null || declaredStamping.nodes[0] === undefined
+        ? declaredStamping.nodes
+        : [{ ...declaredStamping.nodes[0], ...singleNodeImplicitSource }];
+    const missionTaskIdentifiersWithSource = [
+      ...declaredStamping.stampedMissionTaskIdentifiers,
+      ...(singleNodeImplicitSource === null || taskNodesWithSource[0] === undefined
+        ? []
+        : [taskNodesWithSource[0].id]),
+    ];
+    if (declaredStamping.rejectedMissionTaskIdentifiers.length > 0) {
+      /** 声明了来源但与权威用户任务不一致 ⇒ 剥离，并让用户看得见。 */
+      this.options.streamOutput(
+        null,
+        `[来源未采信] 节点声明了未知来源，已剥离：${declaredStamping.rejectedMissionTaskIdentifiers.join(", ")}`,
+      );
+    }
     await this.options.missionManager.createMission({
       missionId,
       mode,
@@ -1414,25 +1441,27 @@ export class MainController {
     /**
      * WIRING-04-04：节点已带来源 ⇒ 建立**精确映射**（缺来源就不写，不退化成通配）。
      */
-    if (
-      singleNodeSource !== null &&
-      taskNodesWithSource[0] !== undefined &&
-      this.options.missionTaskSequenceMapStore != null
-    ) {
+    const sequenceMapStoreForBinding = this.options.missionTaskSequenceMapStore ?? null;
+    if (userTaskSequence !== null && sequenceMapStoreForBinding !== null) {
       /**
-       * **同步绑定**：解析层现在对"声明了来源"的节点要求精确映射；
+       * **同步绑定**：解析层对"声明了来源"的节点要求精确映射；
        * fire-and-forget 会让首个 worker 抢在绑定前启动 ⇒ 误判 `declared-but-missing` 而阻塞。
        * 绑定失败不阻断创建（如实降级为"缺少精确映射"，下次启动仍可对账）。
        */
-      try {
-        await bindExactMissionTaskMapping({
-          store: this.options.missionTaskSequenceMapStore,
-          missionIdentifier: missionId,
-          missionTaskIdentifier: taskNodesWithSource[0].id,
-          ...singleNodeSource,
-        });
-      } catch {
-        /** 绑定失败不阻断 mission 创建。 */
+      for (const missionTaskIdentifierWithSource of missionTaskIdentifiersWithSource) {
+        try {
+          await bindExactMissionTaskMapping({
+            store: sequenceMapStoreForBinding,
+            missionIdentifier: missionId,
+            missionTaskIdentifier: missionTaskIdentifierWithSource,
+            sourceSequenceTaskIdentifier: userTaskSequence.taskIdentifier,
+            sourceSequenceIdentifier: userTaskSequence.taskSequenceIdentifier,
+            sourceSequenceOwnerAgentInstanceIdentifier:
+              userTaskSequenceOwnerAgentInstanceIdentifier,
+          });
+        } catch {
+          /** 单个绑定失败不阻断 mission 创建。 */
+        }
       }
     }
     /**
