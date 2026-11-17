@@ -6363,3 +6363,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `markDelivered` 改为先写准入回执再更新邮箱投影；新增 `reconcileContextDeliveryProjection`，
 > 启动时按回执补写邮箱状态（无回执证据不补）。反例 2 条；全量门禁 **822 files / 5419 passed，exit 0**。
 > 未完成：多迭代分别落账；精确映射写入方与 01 的核验/原子单元仍阻塞或待设计。
+
+> **WIRING-04-02 收口（2026-11-17）**
+>
+> 多迭代分别留痕：事件带 `iterationIndex`，回执 `deliveryAttempts[]` 按请求幂等追加，首次投递时间不被覆盖；
+> 请求标识改用适配器给出的真实 `requestIdentifier`（worker 自造标签已移除）。
+> 反例 2 条；全量门禁 **823 files / 5421 passed，exit 0**。WIRING-04-02 卡内要求全部达成。

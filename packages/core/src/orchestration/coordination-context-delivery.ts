@@ -31,6 +31,8 @@ export interface CoordinationContextDeliveryPort {
     readonly requestIdentifier: string;
     /** WIRING-04-02：本次请求实际携带内容的指纹（可选，缺省不改旧行为）。 */
     readonly payloadFingerprint?: string;
+    /** WIRING-04-02：本次请求属于第几次模型迭代（多迭代分别留痕）。 */
+    readonly iterationIndex?: number | null;
   }): Promise<void>;
   /**
    * P1-3：**结果未知**。
@@ -239,6 +241,9 @@ export function createCoordinationContextDeliveryPort(input: {
           ...(markInput.payloadFingerprint === undefined
             ? {}
             : { payloadFingerprint: markInput.payloadFingerprint }),
+          ...(markInput.iterationIndex === undefined
+            ? {}
+            : { iterationIndex: markInput.iterationIndex }),
         });
         await input.journal.setContextDeliveryState({
           recipientId: markInput.recipientId,

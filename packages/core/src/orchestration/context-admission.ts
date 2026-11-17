@@ -38,6 +38,17 @@ export interface ContextInjectionReceipt {
    * 只证明"带上了这份内容"，不证明模型理解；未投递为 null。
    */
   readonly payloadFingerprint?: string | null;
+  /**
+   * WIRING-04-02：**每次模型迭代的请求记录**（同一消息可能被多轮请求携带）。
+   *
+   * 按 `requestIdentifier` 幂等；`iterationIndex` 区分轮次。
+   */
+  readonly deliveryAttempts?: ReadonlyArray<{
+    readonly requestIdentifier: string;
+    readonly payloadFingerprint: string | null;
+    readonly iterationIndex: number | null;
+    readonly recordedAtIso: string;
+  }>;
 }
 
 interface ContextInjectionDocument {
@@ -170,6 +181,8 @@ export class ContextAdmissionController {
     deliveredAtIso?: string;
     /** WIRING-04-02：本次请求实际携带内容的指纹（缺省不改旧行为）。 */
     payloadFingerprint?: string;
+    /** WIRING-04-02：本次请求属于第几次模型迭代（缺省按 null 记录）。 */
+    iterationIndex?: number | null;
   }): Promise<{
     outcome: "delivered" | "not-admitted" | "already-delivered";
     receipt: ContextInjectionReceipt | null;
@@ -184,16 +197,49 @@ export class ContextAdmissionController {
     if (target === undefined) {
       return { outcome: "not-admitted", receipt: null };
     }
+    const recordedAtIso = new Date(this.nowUnixMilliseconds()).toISOString();
+    /**
+     * WIRING-04-02：**每次迭代的请求都要留痕**。
+     *
+     * 首投改写 `deliveredAtIso/deliveryRequestIdentifier`；此后同一消息被新请求再次携带时，
+     * 只追加一条 attempt（按 requestIdentifier 幂等），不覆盖首次投递时间。
+     */
+    const existingAttempts = target.deliveryAttempts ?? [];
+    const isAttemptAlreadyRecorded = existingAttempts.some(
+      (attempt) => attempt.requestIdentifier === input.requestIdentifier,
+    );
+    const nextAttempts = isAttemptAlreadyRecorded
+      ? existingAttempts
+      : [
+          ...existingAttempts,
+          {
+            requestIdentifier: input.requestIdentifier,
+            payloadFingerprint: input.payloadFingerprint ?? null,
+            iterationIndex: input.iterationIndex ?? null,
+            recordedAtIso,
+          },
+        ];
     if (target.deliveredAtIso !== null) {
-      return { outcome: "already-delivered", receipt: target };
+      if (isAttemptAlreadyRecorded) {
+        return { outcome: "already-delivered", receipt: target };
+      }
+      const updatedReceipt: ContextInjectionReceipt = { ...target, deliveryAttempts: nextAttempts };
+      await this.saveDocument({
+        ...document,
+        receipts: document.receipts.map((receipt) =>
+          receipt.messageIdentifier === input.messageIdentifier ? updatedReceipt : receipt,
+        ),
+      });
+      return { outcome: "already-delivered", receipt: updatedReceipt };
     }
     const deliveredReceipt: ContextInjectionReceipt = {
       ...target,
-      deliveredAtIso: input.deliveredAtIso ?? new Date(this.nowUnixMilliseconds()).toISOString(),
+      deliveredAtIso: input.deliveredAtIso ?? recordedAtIso,
       deliveryRequestIdentifier: input.requestIdentifier,
       ...(input.payloadFingerprint === undefined
         ? {}
         : { payloadFingerprint: input.payloadFingerprint }),
+      deliveryAttempts: nextAttempts,
     };
     await this.saveDocument({
       ...document,

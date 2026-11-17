@@ -640,7 +640,6 @@ export class WorkerAgent {
       }
     }
 
-    const coordinationRequestIdentifier = `worker-turn:${this.options.task.id}:${randomUUID()}`;
     /** P1-3：这两个标志必须在调用工具循环**之前**声明（提交回调会在循环内部触发）。 */
     /**
      * WIRING-04-02：**一次请求一份回执**（不再逐事件重复写）。
@@ -653,17 +652,22 @@ export class WorkerAgent {
       ) {
         return;
       }
-      if (acknowledgedRequestIdentifier !== null) {
-        await coordinationContextDeliveryPort
-          .markDelivered({
-            recipientId: coordinationRecipientId,
-            messageIdentifiers: deliveredCoordinationMessageIdentifiers,
-            requestIdentifier: coordinationRequestIdentifier,
-            ...(coordinationPayloadFingerprint === null
-              ? {}
-              : { payloadFingerprint: coordinationPayloadFingerprint }),
-          })
-          .catch(() => undefined);
+      if (acknowledgedRequestIdentifiersByIteration.size > 0) {
+        /** WIRING-04-02：每个被确认的迭代各落一条请求记录（消息 delivered 状态只迁移一次）。 */
+        for (const [iterationIndex, acknowledgedRequestIdentifier] of
+          acknowledgedRequestIdentifiersByIteration) {
+          await coordinationContextDeliveryPort
+            .markDelivered({
+              recipientId: coordinationRecipientId,
+              messageIdentifiers: deliveredCoordinationMessageIdentifiers,
+              requestIdentifier: acknowledgedRequestIdentifier,
+              iterationIndex,
+              ...(coordinationPayloadFingerprint === null
+                ? {}
+                : { payloadFingerprint: coordinationPayloadFingerprint }),
+            })
+            .catch(() => undefined);
+        }
         return;
       }
       if (failureReason !== null) {
@@ -678,7 +682,10 @@ export class WorkerAgent {
     };
     /** WIRING-04-02：本次请求实际携带内容的指纹（简报 + 协调区块 + 任务正文）。 */
     let coordinationPayloadFingerprint: string | null = null;
-    let acknowledgedRequestIdentifier: string | null = null;
+    /**
+     * WIRING-04-02：**按迭代**记录已确认的请求（同一运行会发起多次请求）。
+     */
+    const acknowledgedRequestIdentifiersByIteration = new Map<number, string>();
     let outcomeUnknownReason: string | null = null;
     try {
     coordinationPayloadFingerprint = createHash("sha256")
@@ -779,7 +786,10 @@ export class WorkerAgent {
                */
               onRequestLifecycle: (event) => {
                 if (event.kind === "acknowledged") {
-                  acknowledgedRequestIdentifier = event.requestIdentifier ?? "unidentified-request";
+                  acknowledgedRequestIdentifiersByIteration.set(
+                    event.iterationIndex ?? 0,
+                    event.requestIdentifier ?? "unidentified-request",
+                  );
                 }
                 if (event.kind === "outcome-unknown") {
                   outcomeUnknownReason = event.reason ?? "已发出但无可靠对端响应";

@@ -169,7 +169,8 @@ describe("协调上下文投递（真实请求携带）", () => {
       messageIdentifier: "coord-message-1",
     });
     expect(receipt?.deliveredAtIso).not.toBeNull();
-    expect(receipt?.deliveryRequestIdentifier).toContain("worker-turn:T-777");
+    /** WIRING-04-02：请求标识由**适配器**给出（投递证据），不再用 worker 自造标签。 */
+    expect(receipt?.deliveryRequestIdentifier).toBeTruthy();
     /** WIRING-04-02：载荷指纹必须落账，且证明"带上了这份内容"。 */
     expect(receipt?.payloadFingerprint).toMatch(/^[a-f0-9]{64}$/u);
   });

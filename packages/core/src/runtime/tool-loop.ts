@@ -456,7 +456,7 @@ export async function runToolLoop(
         ? {}
         : {
             requestLifecycleObserver: (event: RequestLifecycleEvent) =>
-              options.onRequestLifecycle?.(event),
+              options.onRequestLifecycle?.({ ...event, iterationIndex: iterationCount }),
           }),
     };
     /**
@@ -489,7 +489,11 @@ export async function runToolLoop(
         };
       })();
     }
-    options.onRequestLifecycle?.({ kind: "prepared", requestIdentifier: null });
+    options.onRequestLifecycle?.({
+      kind: "prepared",
+      requestIdentifier: null,
+      iterationIndex: iterationCount,
+    });
     const providerEventStream = options.runtime.run(iterationInput, options.cancellationSignal);
     if (!isCancelledBeforeRequest) {
       await options.onRequestSubmitted?.({ iterationIndex: iterationCount });

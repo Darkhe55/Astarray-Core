@@ -463,3 +463,33 @@ mission task ──精确映射(missionTaskSequenceMapStore)──▶ 序列节�
 ### 门禁
 
 **822 files / 5419 passed + 3 skipped，exit 0**。
+
+## 17. 施工记录：WIRING-04-02 收口（2026-11-17）
+
+### 多迭代分别落账
+
+| 项 | 内容 |
+|---|---|
+| 事件带迭代序号 | `RequestLifecycleEvent.iterationIndex`，由工具循环盖章 |
+| 回执按迭代留痕 | `ContextInjectionReceipt.deliveryAttempts[]`（requestIdentifier / 指纹 / iterationIndex / 时间） |
+| 幂等 | 同一 `requestIdentifier` 重复记录不追加 |
+| 首次投递时间 | 后续迭代**不覆盖** `deliveredAtIso`（它表示"第一次真正带上"） |
+| 请求标识来源 | 改用**适配器**给出的 `requestIdentifier`；worker 自造的 `worker-turn:*` 已移除（它不是请求证据） |
+
+反例 `tests/core/unit/context-delivery-attempts.test.ts`（2 条）：两次迭代 ⇒ 两条 attempt 且首次时间不变；同请求重复 ⇒ 幂等。
+
+### WIRING-04-02 完成度（如实）
+
+| 卡内要求 | 状态 |
+|---|---|
+| 只按适配器生命周期落回执 | ✅ |
+| prepared/failed-before-dispatch 保持 pending | ✅ |
+| acknowledged ⇒ delivered；outcome-unknown ⇒ unknown | ✅ |
+| 一次请求一份回执（移除逐事件重复写） | ✅ |
+| 固定携带消息 ID 集合 + 载荷指纹 | ✅（指纹为整块内容哈希） |
+| **多迭代各自独立记录** | ✅ |
+| 回执写失败启动补写 | ✅（投影方向） |
+
+### 门禁
+
+**823 files / 5421 passed + 3 skipped，exit 0**。

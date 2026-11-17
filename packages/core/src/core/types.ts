@@ -590,6 +590,13 @@ export interface RequestLifecycleEvent {
   readonly kind: RequestLifecycleEventKind;
   readonly requestIdentifier: string | null;
   readonly reason?: string;
+  /**
+   * WIRING-04-02：第几次模型迭代（由工具循环盖章）。
+   *
+   * 同一 worker 运行会发起多次请求，回执必须**按迭代分别记录**，
+   * 不能把"某次被确认"当成整轮都已确认。
+   */
+  readonly iterationIndex?: number;
 }
 
 export interface AgentRuntime {
