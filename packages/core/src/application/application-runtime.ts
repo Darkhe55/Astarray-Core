@@ -5147,6 +5147,14 @@ const controller = new MainController({
         isCompletionReceiptRequired: true,
         completionReceipt: null,
         requiresCompletionControlEvent: false,
+        /**
+         * WIRING-04-04：消息自带版本/尝试 vs 任务链当前 revision。
+         * 执行尝试当前**没有权威来源**（任务节点无该字段）⇒ 传 null，如实记为不可验证。
+         */
+        messageTaskRevision: coordinationMessage.taskRevision ?? null,
+        messageExecutionAttempt: coordinationMessage.executionAttempt ?? null,
+        currentTaskRevision: missionTaskChain?.revision ?? null,
+        currentExecutionAttempt: null,
         outcome: coordinationTaskStatus,
         sourceAgentInstanceIdentifier:
           coordinationMessage.source.sourceType === "agent"

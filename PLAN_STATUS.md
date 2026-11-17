@@ -6426,3 +6426,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 仅在来源齐全时建立精确映射（拒绝通配、缺一不写）；`injectMissionTask` 注入成功后绑定。
 > 反例 4 条；全量门禁 **826 files / 5444 passed，exit 0**。
 > 剩余：规划/投影侧填充来源字段；`(2)` 消息版本字段与 `(3)` 台账合并待做。
+
+> **版本与执行尝试核验（2026-11-18）**
+>
+> `FeedbackMessage` 新增可选 `taskRevision`/`executionAttempt`；门禁在**双方都有值**时比较，
+> 旧版本/旧尝试拒绝（`task-version-mismatch`/`execution-attempt-mismatch`）；缺失视为不可验证，不拒绝也不放行。
+> 反例 3 条；全量门禁 **826 files / 5447 passed，exit 0**。
+> 限制：权威版本用任务链 revision（非单任务版本），并发下可能误拒；执行尝试无权威来源。

@@ -194,3 +194,70 @@ describe("畸形收据不得抛异常（健壮性）", () => {
     expect(evaluation.reasons.join("；")).toContain("mission");
   });
 });
+
+describe("WIRING-04-04：版本与执行尝试核验", () => {
+  const base = {
+    outcome: "done" as const,
+    entryKind: "coordination-message" as const,
+    sourceAgentInstanceIdentifier: "worker-1",
+    messageMissionIdentifier: "mission-1",
+    messageProjectIdentifier: "project-alpha",
+    task: { id: "T-001", status: "running", assignedAgentId: "worker-1", taskType: "data" },
+    missionProjectIdentifier: "project-alpha",
+    completionReceipt: {
+      taskIdentifier: "T-001",
+      missionIdentifier: "mission-1",
+      toolCallCount: 1,
+      artifactPaths: ["out.md"],
+      hasVerifiedCompletionControlEvent: true,
+    } as never,
+    requiresCompletionControlEvent: false,
+    isCompletionReceiptRequired: true,
+    reviewState: "none" as const,
+  };
+
+  it("⑯ 旧版本反馈 ⇒ task-version-mismatch", async () => {
+    const { evaluateAuthoritativeCompletion } = await import(
+      "../../../packages/core/src/orchestration/authoritative-completion.js"
+    );
+    const decision = evaluateAuthoritativeCompletion({
+      ...base,
+      messageTaskRevision: 3,
+      currentTaskRevision: 5,
+    });
+    expect(decision.isAccepted).toBe(false);
+    expect(decision.code).toBe("task-version-mismatch");
+  }, 30_000);
+
+  it("⑰ 旧执行尝试 ⇒ execution-attempt-mismatch", async () => {
+    const { evaluateAuthoritativeCompletion } = await import(
+      "../../../packages/core/src/orchestration/authoritative-completion.js"
+    );
+    const decision = evaluateAuthoritativeCompletion({
+      ...base,
+      messageExecutionAttempt: 1,
+      currentExecutionAttempt: 2,
+    });
+    expect(decision.isAccepted).toBe(false);
+    expect(decision.code).toBe("execution-attempt-mismatch");
+  }, 30_000);
+
+  it("⑱ 版本一致或任一侧缺失 ⇒ 接受（缺失视为不可验证，不默认通过也不阻塞）", async () => {
+    const { evaluateAuthoritativeCompletion } = await import(
+      "../../../packages/core/src/orchestration/authoritative-completion.js"
+    );
+    const matched = evaluateAuthoritativeCompletion({
+      ...base,
+      messageTaskRevision: 5,
+      currentTaskRevision: 5,
+    });
+    expect(matched.isAccepted).toBe(true);
+
+    /** 消息没声明版本 ⇒ 不可验证，但仍不能因此拒绝（否则旧生产者全停）。 */
+    const undeclared = evaluateAuthoritativeCompletion({
+      ...base,
+      currentTaskRevision: 5,
+    });
+    expect(undeclared.isAccepted).toBe(true);
+  }, 30_000);
+});

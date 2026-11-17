@@ -24,7 +24,11 @@ export type CoordinationCompletionCode =
   | "task-not-running"
   | "completion-receipt-required"
   | "review-pending"
-  | "review-already-decided";
+  | "review-already-decided"
+  /** WIRING-04-04：消息声明的任务版本与权威当前版本不一致。 */
+  | "task-version-mismatch"
+  /** WIRING-04-04：消息声明的执行尝试与权威当前尝试不一致。 */
+  | "execution-attempt-mismatch";
 
 export interface CoordinationCompletionDecision {
   readonly code: CoordinationCompletionCode;
@@ -53,6 +57,15 @@ export function evaluateCoordinationCompletion(input: {
    * 因此跳过那两条"消息必须自证"的检查；收据/审查/来源/状态检查照旧。
    */
   readonly entryKind?: "coordination-message" | "worker";
+  /**
+   * WIRING-04-04：消息自带的版本/尝试与权威当前值。
+   *
+   * 只有**双方都有值**时才比较；任何一侧缺失 ⇒ 记为"不可验证"（不阻塞、不默认通过）。
+   */
+  readonly messageTaskRevision?: number | null;
+  readonly messageExecutionAttempt?: number | null;
+  readonly currentTaskRevision?: number | null;
+  readonly currentExecutionAttempt?: number | null;
 }): CoordinationCompletionDecision {
   const sourceAgentInstanceIdentifier = input.sourceAgentInstanceIdentifier?.trim() ?? "";
   if (sourceAgentInstanceIdentifier === "") {
@@ -72,6 +85,33 @@ export function evaluateCoordinationCompletion(input: {
   }
   if (input.task === null) {
     return reject("task-not-found", "任务不在当前任务链里：不新建、不改别的任务");
+  }
+  /** WIRING-04-04：版本/尝试只在**双方都有值**时比较；缺失记为不可验证。 */
+  const isTaskRevisionDeclared = typeof input.messageTaskRevision === "number";
+  const isExecutionAttemptDeclared = typeof input.messageExecutionAttempt === "number";
+  if (
+    isTaskRevisionDeclared &&
+    typeof input.currentTaskRevision === "number" &&
+    input.messageTaskRevision !== input.currentTaskRevision
+  ) {
+    return reject(
+      "task-version-mismatch",
+      `反馈基于任务版本 ${String(input.messageTaskRevision)}，权威当前为 ${String(
+        input.currentTaskRevision,
+      )}：不结算旧版本反馈`,
+    );
+  }
+  if (
+    isExecutionAttemptDeclared &&
+    typeof input.currentExecutionAttempt === "number" &&
+    input.messageExecutionAttempt !== input.currentExecutionAttempt
+  ) {
+    return reject(
+      "execution-attempt-mismatch",
+      `反馈基于执行尝试 ${String(input.messageExecutionAttempt)}，权威当前为 ${String(
+        input.currentExecutionAttempt,
+      )}：不结算旧尝试反馈`,
+    );
   }
   if (input.task.status !== "running") {
     return reject(

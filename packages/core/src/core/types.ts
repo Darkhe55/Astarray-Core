@@ -533,6 +533,14 @@ export interface AgentWorkArchiveAttachment {
 export interface FeedbackMessage {
   protocolVersion: number;
   messageId: string;
+  /**
+   * WIRING-04-04（2026-11-18 用户裁决）：**消息版本与执行尝试**。
+   *
+   * 由生产者在构造消息时填写（任务链 revision / 执行尝试序号）。
+   * 缺省 ⇒ 消费端视为**不可验证**：如实记录，不猜测、也不默认通过。
+   */
+  taskRevision?: number;
+  executionAttempt?: number;
   source: FeedbackMessageSource;
   recipientId: string;
   priority: MessagePriority;

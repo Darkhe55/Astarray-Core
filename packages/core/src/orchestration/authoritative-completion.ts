@@ -42,6 +42,11 @@ export function evaluateAuthoritativeCompletion(input: {
    * `worker` 是进程内受派收口，不涉及消息声明，但同样要过收据与审查状态。
    */
   readonly entryKind?: "coordination-message" | "worker";
+  /** WIRING-04-04：版本/尝试（双方都有值时才比较）。 */
+  readonly messageTaskRevision?: number | null;
+  readonly messageExecutionAttempt?: number | null;
+  readonly currentTaskRevision?: number | null;
+  readonly currentExecutionAttempt?: number | null;
 }): AuthoritativeCompletionDecision {
   /** 1) 收据校验（仅在要求时；沿用既有 `evaluateCompletionReceipt`，不重写规则）。 */
   if (input.outcome === "done" && input.isCompletionReceiptRequired) {
@@ -72,5 +77,17 @@ export function evaluateAuthoritativeCompletion(input: {
         : "completion-receipt",
     reviewState: input.reviewState,
     ...(input.entryKind === undefined ? {} : { entryKind: input.entryKind }),
+    ...(input.messageTaskRevision === undefined
+      ? {}
+      : { messageTaskRevision: input.messageTaskRevision }),
+    ...(input.messageExecutionAttempt === undefined
+      ? {}
+      : { messageExecutionAttempt: input.messageExecutionAttempt }),
+    ...(input.currentTaskRevision === undefined
+      ? {}
+      : { currentTaskRevision: input.currentTaskRevision }),
+    ...(input.currentExecutionAttempt === undefined
+      ? {}
+      : { currentExecutionAttempt: input.currentExecutionAttempt }),
   });
 }

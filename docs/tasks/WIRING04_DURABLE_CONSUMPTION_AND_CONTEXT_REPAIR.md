@@ -751,3 +751,33 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 ### 门禁
 
 **826 files / 5444 passed + 3 skipped，exit 0**。
+
+## 26. 施工记录：版本与执行尝试核验（2026-11-18，用户裁决同意）
+
+### 改动
+
+| 层 | 内容 |
+|---|---|
+| 消息 | `FeedbackMessage` 新增可选 `taskRevision` / `executionAttempt`（生产者填写） |
+| 门禁 | `evaluateAuthoritativeCompletion` 新增四项输入；**双方都有值**才比较 |
+| 拒绝码 | `task-version-mismatch` / `execution-attempt-mismatch` |
+| 运行时 | 传入消息声明值与任务链当前 `revision`；执行尝试当前无权威来源 ⇒ 传 `null`（如实不可验证） |
+
+### 语义（必须记住）
+
+- 消息**没声明**版本/尝试 ⇒ 视为不可验证，**既不拒绝也不默认通过**（否则旧生产者全停）；
+- 消息声明了、权威侧也有值且不一致 ⇒ **拒绝**（旧版本/旧尝试不得结算）。
+
+### 反例
+
+`coordination-completion-gate.test.ts` 新增 3 条：⑯ 旧版本拒绝；⑰ 旧尝试拒绝；⑱ 一致或缺失 ⇒ 接受。
+
+### 已知限制（重要）
+
+当前"权威当前版本"取的是**任务链文档 revision**，不是**单任务版本**——任何一次链写入都会抬高它。
+后果：并发场景下，一条合法完成反馈可能因为期间别的任务写入而被判 `task-version-mismatch`。
+要收紧需要"按任务的 revision"或"执行尝试登记"，两者当前都不存在；本轮不靠猜补齐，如实记录。
+
+### 门禁
+
+**826 files / 5447 passed + 3 skipped，exit 0**。
