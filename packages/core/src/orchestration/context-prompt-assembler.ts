@@ -29,6 +29,11 @@ import {
   type ContextPhase,
   type ContextPhasePolicy,
 } from "./context-phase-policy.js";
+import {
+  rankOptionalContextCandidates,
+  type OptionalContextScorer,
+} from "./context-optional-scorer.js";
+import { estimateGlobalDecisionTokenCount } from "./global-decision-store.js";
 
 /** 系统规则文本（独立于可选全局记录，任何预算下都进入提示词）。 */
 export const APPLICATION_CONTEXT_SYSTEM_RULES = [
@@ -337,6 +342,8 @@ export interface ContextPromptProviderOptions {
   /** P4：默认阶段与阶段策略。 */
   contextPhase?: ContextPhase | undefined;
   contextPhasePolicy?: ContextPhasePolicy | undefined;
+  /** P6：未注入候选的延后/回访排序评分器；不得影响 required 选择。 */
+  optionalContextScorer?: OptionalContextScorer | undefined;
   /** P2：未进入提示词的全局决策写入按 Agent/任务隔离的延后上下文。 */
   deferredContextWriter?: (
     input: {
@@ -460,11 +467,28 @@ export function createContextPromptProvider(
       selection.unselectedRelatedDecisions.length > 0 &&
       options.deferredContextWriter !== undefined
     ) {
+      const candidates = selection.unselectedRelatedDecisions.flatMap((record) => {
+        const category = selection.selectionReasonsByIdentifier[
+          record.globalDecisionIdentifier
+        ];
+        return category === undefined
+          ? []
+          : [{
+              record,
+              category,
+              estimatedTokenCount: estimateGlobalDecisionTokenCount(record),
+              phase,
+            }];
+      });
+      const ranked = rankOptionalContextCandidates(
+        candidates,
+        options.optionalContextScorer,
+      );
       await options.deferredContextWriter({
         missionId: input.missionId,
         agentInstanceId: input.agentInstanceId,
         task: input.task,
-        decisions: selection.unselectedRelatedDecisions,
+        decisions: ranked.map((candidate) => candidate.record),
       });
     }
     if (effectiveHistoryTokenCount > 0 && selection.budgetInsufficient) {
