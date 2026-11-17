@@ -493,3 +493,33 @@ mission task ──精确映射(missionTaskSequenceMapStore)──▶ 序列节�
 ### 门禁
 
 **823 files / 5421 passed + 3 skipped，exit 0**。
+
+## 18. 施工记录：WIRING-04-05 第一步（2026-11-17）
+
+### 已接：显式回访内容进入装配
+
+`createContextPromptProvider` 新增 `recalledContextBlocksProvider`：返回带
+`contextNodeIdentifier + sourceRevision + text` 的块，交由 `assembleContextPrompt` 注入；
+缺省不注入（旧行为不变）。
+
+反例 `context-prompt-assembler` 新增 2 条：提供的块进入提示词；未提供不注入。
+
+### 阻塞：**没有回访工具**
+
+核实结论：`ContextRecallController.recall()` 与 `MainController.recallClosedContext()` 都已存在
+（含 schema 绑定节点/revision/原因码/预算、按 taskExecution 限次、拒绝路径），
+但**工具注册表里没有任何回访工具**：
+
+```text
+grep "recall" packages/core/src/tools → 只有 help/documentation 相关，无工具描述符
+BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
+```
+
+即"运行中的临时历史需求通过工具请求"这一步**没有入口**，模型无法发起回访。
+
+新增该工具需要先定：权限类别（readonly？）、是否受限、审计与限次策略如何与
+`ContextRecallController` 的预算叠加——这些属于权限设计决策，不是消费端能自行拍板的。
+
+### 门禁
+
+**823 files / 5423 passed + 3 skipped，exit 0**（`graph-change-deterministic-drill` 抖动一次，隔离重跑通过）。

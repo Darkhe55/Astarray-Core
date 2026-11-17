@@ -6369,3 +6369,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 多迭代分别留痕：事件带 `iterationIndex`，回执 `deliveryAttempts[]` 按请求幂等追加，首次投递时间不被覆盖；
 > 请求标识改用适配器给出的真实 `requestIdentifier`（worker 自造标签已移除）。
 > 反例 2 条；全量门禁 **823 files / 5421 passed，exit 0**。WIRING-04-02 卡内要求全部达成。
+
+> **WIRING-04-05 第一步（2026-11-17）**
+>
+> 提供者新增 `recalledContextBlocksProvider`：显式回访块（节点+固定 revision）可进入装配，缺省不注入。
+> 反例 2 条；全量门禁 **823 files / 5423 passed，exit 0**。
+> **阻塞**：没有回访工具（`ContextRecallController` 已存在但工具注册表无入口），新增需权限类别/审计/限次策略设计决策。

@@ -351,6 +351,22 @@ export interface ContextPromptProviderOptions {
     | { readonly kind: "declared-but-missing"; readonly reason: string }
   >;
   /**
+   * WIRING-04-05：**显式回访的已关闭节点内容**（可选；缺省不注入该区块）。
+   *
+   * 只接受带节点标识与固定 revision 的块；没有来源的文本一律不注入。
+   */
+  recalledContextBlocksProvider?: (input: {
+    readonly missionIdentifier: string | null;
+    readonly agentInstanceIdentifier: string;
+    readonly missionTaskIdentifier: string;
+  }) => Promise<
+    ReadonlyArray<{
+      readonly contextNodeIdentifier: string;
+      readonly sourceRevision: number;
+      readonly text: string;
+    }>
+  >;
+  /**
    * 是否要求 mission↔序列映射（缺省 false）。
    *
    * 过渡状态说明：生产链路尚未写入映射，缺省不阻塞；映射具备后应显式打开，
@@ -610,8 +626,17 @@ export function createContextPromptProvider(
         );
       }
     }
+    const recalledContextBlocks =
+      options.recalledContextBlocksProvider === undefined
+        ? []
+        : await options.recalledContextBlocksProvider({
+            missionIdentifier: input.missionId,
+            agentInstanceIdentifier: input.agentInstanceId,
+            missionTaskIdentifier: input.task.id,
+          });
     const assembled = assembleContextPrompt({
       ...(resolvedPack === null ? {} : { contextPacks: [resolvedPack] }),
+      ...(recalledContextBlocks.length === 0 ? {} : { recalledContextBlocks }),
       systemRulesText: APPLICATION_CONTEXT_SYSTEM_RULES,
       necessaryConditions: options.mandatoryConditions ?? [],
       globalDecisionRecords: selection.selected.map((record) => ({

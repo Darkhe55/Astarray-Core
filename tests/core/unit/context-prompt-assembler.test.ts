@@ -228,3 +228,56 @@ describe("WIRING-04-04：当前任务包按精确映射注入", () => {
     expect(assembled.promptText).toContain("[系统规则]");
   }, 30_000);
 });
+
+describe("WIRING-04-05：显式回访内容注入", () => {
+  it("① 提供的回访块（带节点与 revision）进入提示词", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory });
+    const graphStore = new LocalContextGraphStore({ baseDirectory });
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore,
+      maximumGlobalContextTokenCount: 4096,
+      recalledContextBlocksProvider: async () => [
+        {
+          contextNodeIdentifier: "node-closed-1",
+          sourceRevision: 4,
+          text: "已关闭节点的正文内容",
+        },
+      ],
+    });
+    const assembled = await provider({
+      missionId: "mission-1",
+      agentInstanceId: "worker-1",
+      task: {
+        id: "T-001",
+        description: "probe",
+        dependsOn: [],
+        taskType: "data",
+        toolNames: [],
+      } as never,
+    });
+    expect(assembled.promptText).toContain("已关闭节点的正文内容");
+  }, 30_000);
+
+  it("② 未提供 ⇒ 不注入该区块（旧行为不变）", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory });
+    const graphStore = new LocalContextGraphStore({ baseDirectory });
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore,
+      maximumGlobalContextTokenCount: 4096,
+    });
+    const assembled = await provider({
+      missionId: "mission-1",
+      agentInstanceId: "worker-1",
+      task: {
+        id: "T-001",
+        description: "probe",
+        dependsOn: [],
+        taskType: "data",
+        toolNames: [],
+      } as never,
+    });
+    expect(assembled.promptText).not.toContain("已关闭节点的正文内容");
+  }, 30_000);
+});
