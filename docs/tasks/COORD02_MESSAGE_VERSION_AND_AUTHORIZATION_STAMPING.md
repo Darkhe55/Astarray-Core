@@ -1,6 +1,6 @@
 # COORD-02：消息版本与授权标记（生产者前置）
 
-**状态**：`blocked-on-producer-fields`（消费端已就绪，缺上游字段）
+**状态**：`partially-unblocked`（`taskRevision`/`executionAttempt` 字段已加并由门禁比较；仍缺 `authorizationEpoch` 与生产侧盖章）
 **立卡日期**：2026-11-17
 **来源**：P1-3 返修时发现的硬前置（见 `COORD01_TASK_FEEDBACK_CONSUMPTION_REPAIR.md` P1-3 要求 7）
 

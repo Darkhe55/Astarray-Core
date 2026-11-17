@@ -6485,3 +6485,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > 胶囊新增 `sourceTaskIdentifier`；候选排序改为"依赖命中 → 产物命中 → 其余"，仍只重排不扩大候选集。
 > 显式引用/依赖/产物三种依据齐备。反例 2 条；全量门禁 **830 files / 5468 passed，exit 0**。
+
+> **巡检轮（2026-11-18 06:00）：落盘往返回归 + 卡片状态校正**
+>
+> 新增 `task-chain-durable-evidence`（2 条）：用真实 `TaskStore` 证明应用证据与来源字段经落盘/重读（新实例）仍在，
+> `updateTaskChain` 追加证据不覆盖旧证据——针对 §29 那类"schema 未登记 ⇒ 静默丢失"的回归守卫。
+> 卡片校正：COORD-02 → `partially-unblocked`（字段与门禁已就绪，仍缺 `authorizationEpoch` 与生产侧盖章）；
+> COORD-03 → `implemented`（已接入提供者、回访工具端到端可执行；真实会话验收未做）。
+> 全量门禁 **831 files / 5470 passed，exit 0**。
