@@ -24,6 +24,11 @@ import {
 import { recordPromptContentScan } from "./prompt-scan-journal.js";
 import { renderContextPacks, validateContextPack } from "./context-pack.js";
 import { planContextCapacity } from "./context-capacity-planner.js";
+import {
+  resolveContextPhaseBudget,
+  type ContextPhase,
+  type ContextPhasePolicy,
+} from "./context-phase-policy.js";
 
 /** 系统规则文本（独立于可选全局记录，任何预算下都进入提示词）。 */
 export const APPLICATION_CONTEXT_SYSTEM_RULES = [
@@ -305,6 +310,8 @@ export interface ContextPromptProviderInput {
   missionId: string;
   agentInstanceId: string;
   task: TaskDependencyNode;
+  /** P4：当前所处阶段；缺省由 provider 配置或 execution 决定。 */
+  phase?: ContextPhase;
 }
 
 export type ContextPromptProvider = (
@@ -327,6 +334,9 @@ export interface ContextPromptProviderOptions {
   reservedInputTokens?: number | undefined;
   /** P3：最终装配提示词的硬上限；缺省不启用。 */
   maximumPromptTokenCount?: number | undefined;
+  /** P4：默认阶段与阶段策略。 */
+  contextPhase?: ContextPhase | undefined;
+  contextPhasePolicy?: ContextPhasePolicy | undefined;
   /** P2：未进入提示词的全局决策写入按 Agent/任务隔离的延后上下文。 */
   deferredContextWriter?: (
     input: {
@@ -392,6 +402,15 @@ export function createContextPromptProvider(
       modelInputSpaceTokens: options.modelInputSpaceTokens,
       reservedInputTokens: options.reservedInputTokens,
     });
+    const phase = input.phase ?? options.contextPhase ?? "execution";
+    const phaseBudget = resolveContextPhaseBudget({
+      phase,
+      configuredHistoryTokenCount: budget.effectiveMaximumGlobalContextTokenCount,
+      maximumPromptTokenCount: options.maximumPromptTokenCount,
+      policy: options.contextPhasePolicy,
+    });
+    const effectiveHistoryTokenCount = phaseBudget.historyTokenCount;
+    const effectivePromptTokenLimit = phaseBudget.maximumPromptTokenCount ?? undefined;
     const records = await options.globalDecisionStore.listRecords();
     const recordsFingerprint = records
       .map((record) => record.globalDecisionIdentifier + ":" + record.globalContextRevision)
@@ -400,15 +419,16 @@ export function createContextPromptProvider(
       input.missionId,
       input.agentInstanceId,
       input.task.id,
+      phase,
       String(budget.budgetPolicyRevision),
-      String(budget.effectiveMaximumGlobalContextTokenCount),
+      String(effectiveHistoryTokenCount),
       recordsFingerprint,
     ].join("|");
     const scopeKey = input.missionId + "|" + input.agentInstanceId + "|" + input.task.id;
     const previousKeyParts = lastKeyPartsByScope.get(scopeKey);
     lastKeyPartsByScope.set(scopeKey, {
       budgetPolicyRevision: budget.budgetPolicyRevision,
-      effectiveBudgetTokens: budget.effectiveMaximumGlobalContextTokenCount,
+      effectiveBudgetTokens: effectiveHistoryTokenCount,
       recordsFingerprint,
     });
     let selection = selectionCache.get(cacheKey);
@@ -417,7 +437,7 @@ export function createContextPromptProvider(
     if (selection === undefined && previousKeyParts !== undefined) {
       if (previousKeyParts.budgetPolicyRevision !== budget.budgetPolicyRevision) {
         invalidationReason = "budget-policy-revision-change";
-      } else if (previousKeyParts.effectiveBudgetTokens !== budget.effectiveMaximumGlobalContextTokenCount) {
+      } else if (previousKeyParts.effectiveBudgetTokens !== effectiveHistoryTokenCount) {
         invalidationReason = "effective-budget-change";
       } else if (previousKeyParts.recordsFingerprint !== recordsFingerprint) {
         invalidationReason = "global-records-change";
@@ -431,13 +451,12 @@ export function createContextPromptProvider(
           scopeKeys: [input.missionId, input.task.id],
         },
         records,
-        maximumGlobalContextTokenCount:
-          budget.effectiveMaximumGlobalContextTokenCount,
+        maximumGlobalContextTokenCount: effectiveHistoryTokenCount,
       });
       selectionCache.set(cacheKey, selection);
     }
     if (
-      budget.effectiveMaximumGlobalContextTokenCount > 0 &&
+      effectiveHistoryTokenCount > 0 &&
       selection.unselectedRelatedDecisions.length > 0 &&
       options.deferredContextWriter !== undefined
     ) {
@@ -448,14 +467,11 @@ export function createContextPromptProvider(
         decisions: selection.unselectedRelatedDecisions,
       });
     }
-    if (
-      budget.effectiveMaximumGlobalContextTokenCount > 0 &&
-      selection.budgetInsufficient
-    ) {
+    if (effectiveHistoryTokenCount > 0 && selection.budgetInsufficient) {
       throw new DomainError(
         "context-budget-insufficient",
         "最高优先级全局决策无法在有效预算内装入；请拆分任务或提高全局上下文预算" +
-          `（task=${input.task.id}, budget=${budget.effectiveMaximumGlobalContextTokenCount}` +
+          `（task=${input.task.id}, phase=${phase}, budget=${effectiveHistoryTokenCount}` +
           `, unmet=${selection.highestPriorityUnmetTokenCount ?? "unknown"}）`,
       );
     }
@@ -483,7 +499,7 @@ export function createContextPromptProvider(
         excludedClosedNodeCount: assembled.excludedClosedNodeCount,
         estimatedInjectedTokenCount: estimateRecallTokenCount(assembled.promptText),
         budgetPolicyRevision: budget.budgetPolicyRevision,
-        effectiveBudgetTokens: budget.effectiveMaximumGlobalContextTokenCount,
+        effectiveBudgetTokens: effectiveHistoryTokenCount,
       };
       void Promise.resolve(runtimeEventSink(event)).catch(() => {});
     };
@@ -508,7 +524,7 @@ export function createContextPromptProvider(
               })),
               excludedClosedNodeCount: frontier.excludedClosedNodeCount,
             },
-      maximumPromptTokenCount: options.maximumPromptTokenCount,
+      maximumPromptTokenCount: effectivePromptTokenLimit,
     });
     emitRuntimeEvent(assembled);
     /**
