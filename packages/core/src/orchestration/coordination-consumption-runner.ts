@@ -91,6 +91,70 @@ export async function runCoordinationConsumptionOnce(
  * - `failed`（做过但失败）⇒ 重试；
  * - 失败不中断其余条目：逐条记录原因后继续，返回值如实报告。
  */
+/**
+ * WIRING-04-01 恢复对账（2026-11-17）：**pending 意图必须以权威状态为准**。
+ *
+ * 崩溃可能落在"意图已写、应用已提交、完成回执未写"之间。此时**不能重放业务**，
+ * 只能核对权威状态里的同消息应用证据：
+ * - 已有应用证据 ⇒ 只补 `completed`（不产生新副作用）；
+ * - 没有证据 ⇒ 才调用应用端口补做；
+ * - 应用失败 ⇒ 保留失败原因，不冒充完成。
+ */
+export async function reconcileCoordinationTaskApplications(input: {
+  readonly ledger: CoordinationTaskApplicationLedger;
+  readonly isAppliedInAuthoritativeState: (input: {
+    readonly messageIdentifier: string;
+    readonly missionIdentifier: string;
+  }) => Promise<boolean>;
+  readonly applyMessage?: (input: {
+    readonly messageIdentifier: string;
+    readonly missionIdentifier: string;
+  }) => Promise<void>;
+}): Promise<{
+  readonly reconciledFromEvidenceCount: number;
+  readonly replayedCount: number;
+  readonly failedCount: number;
+}> {
+  const recoverableEntries = await input.ledger.listRecoverable();  let reconciledFromEvidenceCount = 0;
+  let replayedCount = 0;
+  let failedCount = 0;
+  for (const entry of recoverableEntries) {
+    const isAlreadyApplied = await input.isAppliedInAuthoritativeState({
+      messageIdentifier: entry.messageIdentifier,
+      missionIdentifier: entry.missionIdentifier,
+    });
+    if (isAlreadyApplied) {
+      /** 已有权威证据：只补回执，绝不重放。 */
+      await input.ledger.markCompleted({ messageIdentifier: entry.messageIdentifier });
+      reconciledFromEvidenceCount += 1;
+      continue;
+    }
+    if (input.applyMessage === undefined) {
+      failedCount += 1;
+      await input.ledger.markFailed({
+        messageIdentifier: entry.messageIdentifier,
+        reason: "缺少业务应用端口：无法补做（不冒充完成）",
+      });
+      continue;
+    }
+    try {
+      await input.applyMessage({
+        messageIdentifier: entry.messageIdentifier,
+        missionIdentifier: entry.missionIdentifier,
+      });
+      await input.ledger.markCompleted({ messageIdentifier: entry.messageIdentifier });
+      replayedCount += 1;
+    } catch (error) {
+      failedCount += 1;
+      await input.ledger.markFailed({
+        messageIdentifier: entry.messageIdentifier,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { reconciledFromEvidenceCount, replayedCount, failedCount };
+}
+
 export async function drainCoordinationTaskApplications(input: {
   readonly ledger: CoordinationTaskApplicationLedger;
   readonly applyMessage: (input: {

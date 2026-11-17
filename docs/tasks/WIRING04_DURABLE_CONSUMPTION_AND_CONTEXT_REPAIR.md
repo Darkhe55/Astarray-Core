@@ -163,3 +163,42 @@
 ### 门禁
 
 **817 files / 5398 passed + 3 skipped，exit 0**。
+
+## 9. 施工记录：WIRING-04-01 第二步（2026-11-17）
+
+### 新增：恢复对账（以权威证据为准，不重放）
+
+`orchestration/coordination-consumption-runner.ts` 新增 `reconcileCoordinationTaskApplications`：
+
+```text
+对每个 pending/failed 意图：
+  权威状态里**已有**该消息的应用证据 ⇒ 只补 completed（绝不重放业务）
+  没有证据 ⇒ 才调用应用端口补做；成功记 completed，失败保留原因
+  缺应用端口 ⇒ 记失败并写明"不冒充完成"
+```
+
+对应卡内要求：
+
+> 启动恢复扫描 pending/failed 意图，按原版本重新核验并补做；
+> completed 意图只补 journal/唤醒回执。
+
+### 反例
+
+`tests/core/integration/coord01-business-application-crash.test.ts`：
+
+- ⑤ 已有权威应用证据 ⇒ `reconciledFromEvidenceCount=1`，应用端口**调用 0 次**，条目变 `completed`；
+- ⑥ 无证据 ⇒ 调用一次应用端口并记 `completed`。
+
+### 仍未完成
+
+| 必做项 | 现状 |
+|---|---|
+| 把 `reconcileCoordinationTaskApplications` 接进 `runStartupRecovery` | **未接**：函数已就绪，运行时启动恢复仍只做 `drainCoordinationTaskApplications` |
+| 按**原版本/权限**核验（revision、执行尝试） | 未做：目前只按消息标识核对应用证据 |
+| 旧状态迁移（applied 无意图） | 未做 |
+| 原子提交单元 | 未做：仍是"意图 → 应用 → 回执"三步 + 对账 |
+| 真实子进程终止/恢复 | 未做 |
+
+### 门禁
+
+**817 files / 5400 passed + 3 skipped，exit 0**。

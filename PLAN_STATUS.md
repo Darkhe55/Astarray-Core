@@ -6308,3 +6308,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例 2 条（意图失败不标 applied、冲突不应用）；全量门禁 **817 files / 5398 passed，exit 0**。
 > **未完成**：原子提交单元、启动恢复按版本核验、旧状态迁移、端口不可选、真实子进程恢复测试；
 > mission 未知时仍沿用旧行为（已知限制，待生产方补 mission）。
+
+> **WIRING-04-01 第二步（2026-11-17）**
+>
+> 新增 `reconcileCoordinationTaskApplications`：pending 意图以**权威应用证据**为准，
+> 已有证据只补 completed（不重放），无证据才补做，缺端口记失败不冒充完成。
+> 反例 2 条；全量门禁 **817 files / 5400 passed，exit 0**。
+> 未接：启动恢复尚未调用该对账；版本/权限核验、旧状态迁移、真实子进程恢复仍未做。

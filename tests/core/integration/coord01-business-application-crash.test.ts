@@ -267,3 +267,69 @@ async function drainFailingOnce(input: {
   });
   return result.failedCount > 0 ? "failed" : "completed";
 }
+
+describe("WIRING-04-01 恢复对账：以权威证据为准，不重放", () => {
+  it("⑤ 意图 pending + 权威已有应用证据 ⇒ 只补 completed，不重放业务", async () => {
+    const { reconcileCoordinationTaskApplications } = await import(
+      "../../../packages/core/src/orchestration/coordination-consumption-runner.js"
+    );
+    const { CoordinationTaskApplicationLedger } = await import(
+      "../../../packages/core/src/orchestration/coordination-task-application-ledger.js"
+    );
+    const ledger = new CoordinationTaskApplicationLedger({
+      baseDirectory: await fs.mkdtemp(path.join(os.tmpdir(), "coord-rec-")),
+      nowIso: () => "2026-11-17T00:00:00.000Z",
+    });
+    await ledger.recordIntent({
+      messageIdentifier: "m-1",
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-1",
+    });
+    let applyCallCount = 0;
+    const applyMessage = async () => {
+      applyCallCount += 1;
+    };
+
+    const result = await reconcileCoordinationTaskApplications({
+      ledger,
+      isAppliedInAuthoritativeState: async () => true,
+      applyMessage,
+    });
+
+    expect(result.reconciledFromEvidenceCount).toBe(1);
+    expect(applyCallCount).toBe(0);
+    const entry = (await ledger.readAll()).get("m-1");
+    expect(entry?.status).toBe("completed");
+  }, 30_000);
+
+  it("⑥ 无应用证据 ⇒ 才补做业务，成功后 completed", async () => {
+    const { reconcileCoordinationTaskApplications } = await import(
+      "../../../packages/core/src/orchestration/coordination-consumption-runner.js"
+    );
+    const { CoordinationTaskApplicationLedger } = await import(
+      "../../../packages/core/src/orchestration/coordination-task-application-ledger.js"
+    );
+    const ledger = new CoordinationTaskApplicationLedger({
+      baseDirectory: await fs.mkdtemp(path.join(os.tmpdir(), "coord-rec-")),
+      nowIso: () => "2026-11-17T00:00:00.000Z",
+    });
+    await ledger.recordIntent({
+      messageIdentifier: "m-2",
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-1",
+    });
+    let applyCallCount = 0;
+    const applyMessage = async () => {
+      applyCallCount += 1;
+    };
+
+    const result = await reconcileCoordinationTaskApplications({
+      ledger,
+      isAppliedInAuthoritativeState: async () => false,
+      applyMessage,
+    });
+
+    expect(result.replayedCount).toBe(1);
+    expect(applyCallCount).toBe(1);
+  }, 30_000);
+});
