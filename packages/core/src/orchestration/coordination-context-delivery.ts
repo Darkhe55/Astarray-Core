@@ -131,6 +131,64 @@ function readSummaryText(payload: unknown): string {
  * - 邮箱的 `contextDeliveryState = "delivered"`（对外状态视图）；
  * - 准入回执的 `deliveredAtIso/deliveryRequestIdentifier`（投递证据）。
  */
+/**
+ * WIRING-04-02（2026-11-17）：**启动补写投影**。
+ *
+ * 投递顺序是"先回执、后邮箱投影"。若投影写失败，邮箱仍是 `pending`，
+ * 但准入回执已记下 delivered 与请求标识 ⇒ 启动时按回执补写邮箱状态，
+ * **不重发模型请求**、也不产生新的投递证据。
+ */
+export async function reconcileContextDeliveryProjection(input: {
+  readonly journal: {
+    listRecipientIds(): Promise<string[]>;
+    loadDocument(recipientId: string): Promise<{
+      messages: ReadonlyArray<{
+        messageId: string;
+        contextDeliveryState?: string;
+      }>;
+    } | null>;
+    setContextDeliveryState(input: {
+      recipientId: string;
+      messageId: string;
+      contextDeliveryState: "not-required" | "pending" | "delivered" | "unknown";
+    }): Promise<void>;
+  };
+  readonly admissionController: {
+    readInjectionReceipt(input: {
+      partitionKey: string;
+      messageIdentifier: string;
+    }): Promise<{ deliveredAtIso: string | null } | null>;
+  };
+  readonly partitionKey: string;
+}): Promise<{ backfilledMessageCount: number }> {
+  let backfilledMessageCount = 0;
+  for (const recipientId of await input.journal.listRecipientIds()) {
+    const document = await input.journal.loadDocument(recipientId);
+    if (document === null) {
+      continue;
+    }
+    for (const message of document.messages) {
+      if (message.contextDeliveryState === "delivered") {
+        continue;
+      }
+      const receipt = await input.admissionController.readInjectionReceipt({
+        partitionKey: input.partitionKey,
+        messageIdentifier: message.messageId,
+      });
+      if (receipt?.deliveredAtIso === null || receipt?.deliveredAtIso === undefined) {
+        continue;
+      }
+      await input.journal.setContextDeliveryState({
+        recipientId,
+        messageId: message.messageId,
+        contextDeliveryState: "delivered",
+      });
+      backfilledMessageCount += 1;
+    }
+  }
+  return { backfilledMessageCount };
+}
+
 export function createCoordinationContextDeliveryPort(input: {
   readonly journal: MailboxJournal;
   readonly admissionController: ContextAdmissionController;
@@ -167,11 +225,13 @@ export function createCoordinationContextDeliveryPort(input: {
     },
     async markDelivered(markInput) {
       for (const messageIdentifier of markInput.messageIdentifiers) {
-        await input.journal.setContextDeliveryState({
-          recipientId: markInput.recipientId,
-          messageId: messageIdentifier,
-          contextDeliveryState: "delivered",
-        });
+        /**
+         * WIRING-04-02：**先写可恢复的请求确认记录（准入回执），再更新邮箱投影**。
+         *
+         * 反过来的顺序会产生"邮箱说 delivered、回执却没有"的不可恢复状态
+         * （本轮实测踩到：回执写失败被吞掉）。现在即使投影失败，
+         * 启动时也能按回执补写邮箱状态。
+         */
         await input.admissionController.recordDelivered({
           partitionKey: input.partitionKey,
           messageIdentifier,
@@ -179,6 +239,11 @@ export function createCoordinationContextDeliveryPort(input: {
           ...(markInput.payloadFingerprint === undefined
             ? {}
             : { payloadFingerprint: markInput.payloadFingerprint }),
+        });
+        await input.journal.setContextDeliveryState({
+          recipientId: markInput.recipientId,
+          messageId: messageIdentifier,
+          contextDeliveryState: "delivered",
         });
       }
     },

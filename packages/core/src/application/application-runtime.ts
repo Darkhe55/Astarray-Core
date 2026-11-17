@@ -132,7 +132,10 @@ import {
 import { createPlatformSandboxExecutionBackend } from "../execution/platform-sandbox-backend.js";
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
-import { createCoordinationContextDeliveryPort } from "../orchestration/coordination-context-delivery.js";
+import {
+  createCoordinationContextDeliveryPort,
+  reconcileContextDeliveryProjection,
+} from "../orchestration/coordination-context-delivery.js";
 import { migrateLegacyAppliedMessagesWithoutIntent } from "../orchestration/coordination-legacy-migration.js";
 import {
   reconcileCoordinationTaskApplications,
@@ -5248,6 +5251,18 @@ const runStartupRecovery = async (): Promise<{
        * 消费已 applied 但权威状态没写（意图 pending），或业务写了但回执没写（仍 pending），
        * 都要在启动恢复里重放一次；业务更新幂等 ⇒ 不会重复释放槽位或派发。
        */
+      /**
+       * WIRING-04-02：**投递投影补写**（2026-11-17）。
+       *
+       * 投递顺序是"先回执、后邮箱投影"；若投影写失败，邮箱仍是未投递，
+       * 但回执已记下 delivered ⇒ 启动时按回执补写，不重发模型请求。
+       */
+      await reconcileContextDeliveryProjection({
+        journal: coordinationMailboxJournal,
+        admissionController: coordinationContextAdmission,
+        partitionKey: coordinationPartitionKey,
+      }).catch(() => undefined);
+
       /**
        * WIRING-04-01：**一次性旧状态迁移**（2026-11-17）。
        *

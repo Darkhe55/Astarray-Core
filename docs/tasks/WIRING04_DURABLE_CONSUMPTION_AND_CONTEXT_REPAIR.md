@@ -432,3 +432,34 @@ mission task ──精确映射(missionTaskSequenceMapStore)──▶ 序列节�
 ### 门禁
 
 **821 files / 5417 passed + 3 skipped，exit 0**。
+
+## 16. 施工记录：WIRING-04-02 第三步（2026-11-17）
+
+### 投递顺序修正 + 启动补写
+
+| 项 | 内容 |
+|---|---|
+| 顺序 | `markDelivered` 改为**先写入准回执、再更新邮箱投影** |
+| 理由 | 反序会产生"邮箱说 delivered、回执却没有"的**不可恢复**状态（本轮实测踩到：回执写失败被吞） |
+| 补写 | 新增 `reconcileContextDeliveryProjection`：按回执补写邮箱状态；**无回执证据的消息不补** |
+| 接线 | `runStartupRecovery` 在旧状态迁移之前执行（失败不阻塞启动） |
+
+### 反例
+
+`tests/core/integration/wiring04-delivery-projection.test.ts`：
+
+- ① 投影写抛错 ⇒ 回执已落（含 `payloadFingerprint`）、邮箱仍未投递；启动补写后邮箱变 delivered；
+- ② 无回执证据 ⇒ **不**补写成 delivered（保持未投递）。
+
+### 仍未完成
+
+| 必做项 | 现状 |
+|---|---|
+| 多次模型迭代**各自独立**落账 | 未做（一次运行仍只落一份最终回执） |
+| mission↔序列精确映射写入方 | **阻塞**（只写 `*` 通配） |
+| 01 的 revision/执行尝试核验 | **阻塞**（消息无字段） |
+| 01 的原子提交单元 | 需设计 |
+
+### 门禁
+
+**822 files / 5419 passed + 3 skipped，exit 0**。
