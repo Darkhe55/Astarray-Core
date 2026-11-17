@@ -367,6 +367,33 @@ export const BUILTIN_TOOL_DESCRIPTORS: ToolDescriptor[] = [
       },
     },
   },
+  /**
+   * WIRING-04-05：**按需回访已关闭节点**（只读，不改任何状态）。
+   *
+   * 卡内裁决：Agent 经已有读取权限发起请求，无需每次人工确认；
+   * 调用者身份由 harness 注入（模型参数里的同名字段会被拒绝）。
+   */
+  {
+    name: "recallClosedContext",
+    summary: "按节点标识与固定 revision 读取已关闭上下文（只读，不重开节点）",
+    category: "readonly",
+    mutationKind: "none",
+    backupPolicy: "not-required",
+    authorizationPolicy: "standard",
+    supportedTaskTypes: ["data", "doc", "code"],
+    isIdempotent: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        contextNodeIdentifier: { type: "string" },
+        sourceRevision: { type: "number" },
+        reasonCode: { type: "string" },
+        maximumTokenCount: { type: "number" },
+      },
+      required: ["contextNodeIdentifier", "sourceRevision", "reasonCode"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export async function executeBuiltinTool(

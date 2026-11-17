@@ -145,6 +145,7 @@ import { CoordinationTaskApplicationLedger } from "../orchestration/coordination
 import { applyCoordinationMessageToTaskState, resolveCoordinationTaskStatus } from "../orchestration/coordination-task-state.js";
 import { resolveReviewStateForCoordination } from "../orchestration/coordination-completion-gate.js";
 import { evaluateAuthoritativeCompletion } from "../orchestration/authoritative-completion.js";
+import { executeRecallToolCall } from "../orchestration/recall-tool-call.js";
 import { computeContextPackContentHash } from "../orchestration/context-pack-resolution.js";
 import { PendingWriteTracker } from "../orchestration/pending-write-tracker.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
@@ -4625,6 +4626,41 @@ const controller = new MainController({
           taskChainIdentifier: missionIdentifier ?? "unknown-mission",
           customToolHandlers: new Map([
             [GOAL_PROPOSAL_TOOL_NAME, goalProposalHandler],
+            /**
+             * WIRING-04-05：**回访工具**。调用者身份取 harness 注入的 agentInstanceId；
+             * 模型参数里的同名字段由 `executeRecallToolCall` 拒绝。
+             */
+            [
+              "recallClosedContext",
+              async (argumentsJson: string, callId: string) => {
+                const recallOutcome = await executeRecallToolCall({
+                  callerAgentInstanceId: agentInstanceId ?? "",
+                  argumentsJson,
+                  recall: async (recallInput) => {
+                    const recallController = contextRecallControllerFactory(
+                      recallInput.callerAgentInstanceId,
+                    );
+                    return await recallController.recall(recallInput);
+                  },
+                });
+                return recallOutcome.isOk
+                  ? {
+                      kind: "success" as const,
+                      callId,
+                      outputText: recallOutcome.contentText,
+                      isSideEffectFree: true,
+                    }
+                  : {
+                      kind: "error" as const,
+                      callId,
+                      errorCode: "context-recall-refused",
+                      errorMessage: recallOutcome.contentText,
+                      /** 只读拒绝：确定没有进入副作用通道。 */
+                      isIdempotencyConfirmed: true,
+                      sideEffectStatus: "none" as const,
+                    };
+              },
+            ],
             /**
              * CLUSTER-01 §5：聚类工具走**同一套**策略包装（不新建第二套门禁）。
              * 只有注册表登记且被允许列表放行的调用才会到达这里。

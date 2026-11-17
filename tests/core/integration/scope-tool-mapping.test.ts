@@ -61,7 +61,7 @@ function createCountingToolPort(): { port: ToolPort; executionCount: () => numbe
   return { port, executionCount: () => executionCount };
 }
 
-const LOCAL_READONLY_ALLOWLIST = ["factVerification", "taskSequenceStatus"];
+const LOCAL_READONLY_ALLOWLIST = ["factVerification", "taskSequenceStatus", "recallClosedContext"];
 
 describe("GOV-02c 工具 → 操作映射闭合", () => {
   it("全部内置工具要么显式映射、要么在本地只读白名单内（无隐式未受门禁工具）", () => {

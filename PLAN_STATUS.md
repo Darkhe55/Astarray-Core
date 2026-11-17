@@ -6387,3 +6387,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `applyCoordinationMessageToTaskState` 的 `done` 现在同样要求权威校验凭证，缺凭证抛 `completion-not-authorized`；
 > 运行时在门禁通过后传递。守卫增至 4 条，行为反例 2 条；全量门禁 **824 files / 5429 passed，exit 0**。
 > 说明：全量首跑 7 红中 4 条为既有用例缺凭证参数（已补），3 条为负载抖动（隔离通过）。
+
+> **WIRING-04-05 第二步（2026-11-17）：回访工具落地**
+>
+> 新增只读工具 `recallClosedContext`（descriptor + `project.read` 权限映射 + 本地只读范围分类 + 运行时处理器），
+> 调用者身份由 harness 注入，模型自带身份被拒；结果只进工具响应（不重复注入）。
+> 反例 5 条；全量门禁 **825 files / 5434 passed，exit 0**。
+> 未完成：候选索引数据源；04 映射写入方与 01 核验/原子单元仍阻塞或待设计。

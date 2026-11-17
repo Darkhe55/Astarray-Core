@@ -587,3 +587,43 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 ### 门禁
 
 **824 files / 5429 passed + 3 skipped，exit 0**。
+
+## 21. 施工记录：WIRING-04-05 第二步（2026-11-17）
+
+### 回访工具已落地（解除"没有入口"的阻塞）
+
+| 组成 | 位置 |
+|---|---|
+| 工具描述符 `recallClosedContext`（readonly / mutation none / standard 授权） | `tools/builtins.ts` |
+| 权限映射（复用 `project.read`） | `tools/permission-capability-catalog.ts` |
+| 范围门禁分类（本地只读、不触达项目文件路径） | `tools/scope-authorization-gate.ts` |
+| 调用适配层（身份由 harness 注入；模型自带身份即拒绝） | `orchestration/recall-tool-call.ts` |
+| 运行时处理器（调 `ContextRecallController.recall`，只读结果进工具响应） | `application/application-runtime.ts` |
+
+### 反例
+
+`tests/core/unit/recall-tool-call.test.ts`（5 条）：身份透传、模型自带身份被拒、非法 JSON 明确拒绝、
+空身份拒绝、控制器拒绝原样返回（不包装成成功）。
+
+### 卡内要求逐条对照
+
+| 要求 | 状态 |
+|---|---|
+| 运行中临时历史需求经工具请求 | ✅ 工具已注册 |
+| 调用者身份由 harness 注入 | ✅（模型参数同名字段被拒） |
+| 绑定节点 + 固定 revision + 原因码 + 预算 | ✅（schema 强制，控制器再校验） |
+| 结果进工具响应，不两处重复注入 | ✅ 只进工具响应（未同时写 `recalledContextBlocks`） |
+| 不重开节点 / 不恢复任务 / 不改档案 | ✅ 只读 + `sideEffectStatus: "none"` |
+
+### 仍未完成
+
+| 项 | 现状 |
+|---|---|
+| 候选索引（显式引用/依赖/产物关联）供模型发现可回访节点 | 未做（策略层已有 `buildClosedNodeRecallCandidateIndex`，未接数据源） |
+| 04 精确映射写入方 | 阻塞（只写 `*` 通配） |
+| 01 revision/执行尝试核验 | 阻塞（消息无字段） |
+| 01 原子提交单元 | 待设计 |
+
+### 门禁
+
+**825 files / 5434 passed + 3 skipped，exit 0**。

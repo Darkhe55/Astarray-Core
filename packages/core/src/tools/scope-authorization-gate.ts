@@ -765,6 +765,9 @@ export function describeToolOperation(
     // 本地只读、无目标路径且不触达项目文件范围：显式白名单（不受范围门禁约束）。
     case "factVerification":
     case "taskSequenceStatus":
+    /** WIRING-04-05：回访只读自身可见的已关闭胶囊，不触达项目文件路径 ⇒ 与本地只读同类。 */
+    // eslint-disable-next-line no-fallthrough
+    case "recallClosedContext":
       return null;
     /**
      * EXEC-01-01（2026-11-09）：受控进程执行族。

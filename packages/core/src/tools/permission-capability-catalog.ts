@@ -114,6 +114,8 @@ const DEFAULT_TOOL_CAPABILITY_MAPPINGS: Record<string, string[]> = {
   /** CLUSTER-01：混合读写工具按**最严格**能力登记（构建），action 级判定另行收窄。 */
   diagnosticClusters: ["diagnostic.clusters.read", "diagnostic.clusters.build"],
   readFile: ["project.read"],
+  /** WIRING-04-05：按需回访已关闭节点是**只读**操作，复用项目读取权限。 */
+  recallClosedContext: ["project.read"],
   listDirectory: ["project.read"],
   writeFileTemporary: ["project.create"],
   // 仅新建（不覆盖）：Assist 下 project.create 默认 ask，需显式授权
