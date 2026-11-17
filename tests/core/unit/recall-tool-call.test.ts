@@ -88,3 +88,41 @@ describe("WIRING-04-05：回访工具调用", () => {
     expect(outcome.contentText).toContain("超出任务回访预算");
   }, 30_000);
 });
+
+describe("WIRING-04-05：候选索引（仅标识与 revision）", () => {
+  it("⑥ 节点找不到 ⇒ 附候选（最多 5 条，且不含正文）", async () => {
+    const outcome = await executeRecallToolCall({
+      callerAgentInstanceId: "worker-1",
+      argumentsJson: JSON.stringify({ contextNodeIdentifier: "node-x", sourceRevision: 1 }),
+      recall: async () => ({ status: "not-found" } as never),
+      listCandidateReferences: async () => [
+        { contextNodeIdentifier: "node-1", sourceRevision: 4 },
+        { contextNodeIdentifier: "node-2", sourceRevision: 5 },
+        { contextNodeIdentifier: "node-3", sourceRevision: 6 },
+        { contextNodeIdentifier: "node-4", sourceRevision: 7 },
+        { contextNodeIdentifier: "node-5", sourceRevision: 8 },
+        { contextNodeIdentifier: "node-6", sourceRevision: 9 },
+      ],
+    });
+    expect(outcome.isOk).toBe(false);
+    const parsed = JSON.parse(outcome.contentText) as {
+      candidates: Array<{ contextNodeIdentifier: string; sourceRevision: number; text?: string }>;
+    };
+    expect(parsed.candidates).toHaveLength(5);
+    expect(parsed.candidates[0]).toEqual({ contextNodeIdentifier: "node-1", sourceRevision: 4 });
+    expect(parsed.candidates.some((candidate) => candidate.text !== undefined)).toBe(false);
+  }, 30_000);
+
+  it("⑦ 成功回访 ⇒ 不附候选（候选只在找不到时给）", async () => {
+    const outcome = await executeRecallToolCall({
+      callerAgentInstanceId: "worker-1",
+      argumentsJson: "{}",
+      recall: async () => OK_RESULT,
+      listCandidateReferences: async () => [
+        { contextNodeIdentifier: "node-1", sourceRevision: 4 },
+      ],
+    });
+    expect(outcome.isOk).toBe(true);
+    expect(outcome.contentText).not.toContain("candidates");
+  }, 30_000);
+});

@@ -4642,6 +4642,16 @@ const controller = new MainController({
                     );
                     return await recallController.recall(recallInput);
                   },
+                  /** WIRING-04-05：候选只来自**该调用者自己的**已关闭胶囊（个体隔离）。 */
+                  listCandidateReferences: async (callerAgentInstanceId) => {
+                    const capsules = await contextClosureCapsuleStore
+                      .listCapsules(callerAgentInstanceId)
+                      .catch(() => []);
+                    return capsules.map((capsule) => ({
+                      contextNodeIdentifier: capsule.contextNodeIdentifier,
+                      sourceRevision: capsule.contextGraphRevision,
+                    }));
+                  },
                 });
                 return recallOutcome.isOk
                   ? {

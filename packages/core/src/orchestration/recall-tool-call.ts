@@ -26,6 +26,17 @@ export async function executeRecallToolCall(input: {
     callerAgentInstanceId: string;
     request: unknown;
   }) => Promise<ContextRecallResult>;
+  /**
+   * WIRING-04-05：**最小候选引用**（只给标识与固定 revision，**不给正文**）。
+   *
+   * 仅当节点找不到时随拒绝一起返回，让 Agent 用已有读取权限重试，
+   * 而不是让模型自己猜节点名。
+   */
+  readonly listCandidateReferences?: (
+    callerAgentInstanceId: string,
+  ) => Promise<
+    ReadonlyArray<{ readonly contextNodeIdentifier: string; readonly sourceRevision: number }>
+  >;
 }): Promise<RecallToolCallOutcome> {
   if (input.callerAgentInstanceId.trim() === "") {
     return {
@@ -78,6 +89,20 @@ export async function executeRecallToolCall(input: {
     callerAgentInstanceId: input.callerAgentInstanceId,
     request: parsedArguments,
   });
+  if (result.status === "not-found" && input.listCandidateReferences !== undefined) {
+    /** 找不到 ⇒ 附**最小候选引用**（标识 + revision），正文仍必须另行请求。 */
+    const candidateReferences = await input
+      .listCandidateReferences(input.callerAgentInstanceId)
+      .catch(() => []);
+    return {
+      isOk: false,
+      contentText: JSON.stringify({
+        status: "not-found",
+        candidates: candidateReferences.slice(0, 5),
+        hint: "候选只给标识与 revision；正文需再次请求并说明原因码",
+      }),
+    };
+  }
   return {
     isOk: result.status === "ok" || result.status === "repeat-receipt",
     contentText: JSON.stringify(result),
