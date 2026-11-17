@@ -200,6 +200,7 @@ import { MissionRelationIndexStore } from "../orchestration/mission-relation-ind
 import { RecoveryCenterController } from "../orchestration/recovery-center-controller.js";
 import { CrossAgentContextAttachmentController } from "../orchestration/cross-agent-attachment-controller.js";
 import { GlobalDecisionStore } from "../orchestration/global-decision-store.js";
+import { deferUnselectedGlobalDecisions } from "../orchestration/global-decision-selector.js";
 import { GlobalContextBudgetStore } from "../orchestration/global-context-budget-store.js";
 import {
   ScopedSettingsStore,
@@ -3149,6 +3150,16 @@ export async function createApplicationRuntime(
       },
       modelInputSpaceTokens: options.modelInputSpaceTokens,
       runtimeEventSink: (event) => contextRuntimeEventStore.append(event),
+      deferredContextWriter: async (input) => {
+        await deferUnselectedGlobalDecisions({
+          baseDirectory: stateDirectory,
+          ownerAgentInstanceId: input.agentInstanceId,
+          missionId: input.missionId,
+          sourceContextNodeIdentifier: input.task.id,
+          sourceNodeRevision: 1,
+          decisions: [...input.decisions],
+        });
+      },
     });
 
   // GUIDE-01-04：运行中指导控制队列与长工具检查点（来源由本地控制面注册，模型无法注入）。

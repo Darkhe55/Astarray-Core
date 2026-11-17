@@ -91,6 +91,8 @@ export type DomainErrorCode =
   | "task-sequence-not-found"
   | "task-priority-denied"
   | "context-pack-invalid"
+  | "context-budget-insufficient"
+  | "context-budget-invalid"
   | "task-bundle-invalid"
   | "task-sequence-permission-denied"
   | "sensitive-content-read-denied"

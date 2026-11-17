@@ -5,7 +5,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createContextPromptProvider,
@@ -76,6 +76,38 @@ describe("T09A-R1-02：预算与选择缓存", () => {
     });
     expect(notReduced.effectiveMaximumGlobalContextTokenCount).toBe(4096);
     expect(notReduced.budgetReductionReason).toBeNull();
+  });
+
+  it("最高优先级决策放不下时阻塞，并先把未选中决策交给延后写入器", async () => {
+    const globalDecisionStore = new GlobalDecisionStore({ baseDirectory: stateDirectory });
+    await globalDecisionStore.promoteCandidate({
+      decisionSummary: "MANDATORY-BUDGETED-DECISION-WITH-LONG-TEXT",
+      keyRationale: "必须保留的当前任务约束",
+      appliesToScope: "T-BUDGET",
+      informationSource: { sourceType: "user" },
+      sourceRevision: 1,
+    });
+    const deferredContextWriter = vi.fn(async () => undefined);
+    const provider = createContextPromptProvider({
+      globalDecisionStore,
+      graphStore: new LocalContextGraphStore({ baseDirectory: stateDirectory }),
+      maximumGlobalContextTokenCount: 5,
+      deferredContextWriter,
+    });
+    await expect(
+      provider({
+        missionId: "mission-budget",
+        agentInstanceId: "agent-budget",
+        task: {
+          id: "T-BUDGET",
+          description: "probe",
+          dependsOn: [],
+          taskType: "data",
+          toolNames: [],
+        } as never,
+      }),
+    ).rejects.toMatchObject({ errorCode: "context-budget-insufficient" });
+    expect(deferredContextWriter).toHaveBeenCalledTimes(1);
   });
 
   it("中文估算按字符数/4 且至少 1 token", () => {

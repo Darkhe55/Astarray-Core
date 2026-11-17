@@ -8,8 +8,10 @@
  * - 必要条件缺失时报告给调用方阻塞，不静默执行。
  */
 import type { TaskDependencyNode } from "../core/types.js";
+import { DomainError } from "../core/errors.js";
 import { buildPromptActiveFrontier } from "./context-closure-capsule-store.js";
 import type { GlobalDecisionStore } from "./global-decision-store.js";
+import type { GlobalDecisionRecord } from "./context-closure-schemas.js";
 import { selectGlobalDecisionsForTask } from "./global-decision-selector.js";
 import { estimateRecallTokenCount } from "./context-recall-controller.js";
 import type { ContextAssemblyRuntimeEvent } from "./context-runtime-metrics.js";
@@ -21,6 +23,7 @@ import {
 } from "../tools/read-side-content-scan.js";
 import { recordPromptContentScan } from "./prompt-scan-journal.js";
 import { renderContextPacks, validateContextPack } from "./context-pack.js";
+import { planContextCapacity } from "./context-capacity-planner.js";
 
 /** 系统规则文本（独立于可选全局记录，任何预算下都进入提示词）。 */
 export const APPLICATION_CONTEXT_SYSTEM_RULES = [
@@ -283,6 +286,17 @@ export interface ContextPromptProviderOptions {
   }>;
   /** T09A-R1-02：Provider 可用输入空间（token）；配置超出时取较小有效值。 */
   modelInputSpaceTokens?: number | null;
+  /** P1：系统规则、当前任务、工具说明、协议与输出预留的 token 总量。 */
+  reservedInputTokens?: number | undefined;
+  /** P2：未进入提示词的全局决策写入按 Agent/任务隔离的延后上下文。 */
+  deferredContextWriter?: (
+    input: {
+      readonly missionId: string;
+      readonly agentInstanceId: string;
+      readonly task: TaskDependencyNode;
+      readonly decisions: readonly GlobalDecisionRecord[];
+    },
+  ) => Promise<void> | void;
   /** T09A-R1-04：真实装配事件接收器（原始事件 → 指标复算）。 */
   runtimeEventSink?: ((event: ContextAssemblyRuntimeEvent) => void | Promise<void>) | null;
   /** T09A-R1-04：时钟（测试可注入）。 */
@@ -301,21 +315,19 @@ export function resolveContextBudget(input: {
   configuredMaximumGlobalContextTokenCount: number;
   budgetPolicyRevision: number;
   modelInputSpaceTokens?: number | null;
+  /** Tokens already reserved for system rules, task, tools, protocol and output. */
+  reservedInputTokens?: number | undefined;
 }): ContextBudgetResolution {
-  const modelSpace = input.modelInputSpaceTokens;
-  if (modelSpace === undefined || modelSpace === null || modelSpace >= input.configuredMaximumGlobalContextTokenCount) {
-    return {
-      configuredMaximumGlobalContextTokenCount: input.configuredMaximumGlobalContextTokenCount,
-      effectiveMaximumGlobalContextTokenCount: input.configuredMaximumGlobalContextTokenCount,
-      budgetPolicyRevision: input.budgetPolicyRevision,
-      budgetReductionReason: null,
-    };
-  }
+  const capacity = planContextCapacity({
+    configuredHistoryTokenCount: input.configuredMaximumGlobalContextTokenCount,
+    modelInputSpaceTokens: input.modelInputSpaceTokens,
+    reservedInputTokens: input.reservedInputTokens ?? 0,
+  });
   return {
-    configuredMaximumGlobalContextTokenCount: input.configuredMaximumGlobalContextTokenCount,
-    effectiveMaximumGlobalContextTokenCount: modelSpace,
+    configuredMaximumGlobalContextTokenCount: capacity.configuredHistoryTokenCount,
+    effectiveMaximumGlobalContextTokenCount: capacity.effectiveHistoryTokenCount,
     budgetPolicyRevision: input.budgetPolicyRevision,
-    budgetReductionReason: "Provider 可用输入空间不足，按较小值生效",
+    budgetReductionReason: capacity.budgetReductionReason,
   };
 }
 
@@ -339,6 +351,7 @@ export function createContextPromptProvider(
         options.maximumGlobalContextTokenCount,
       budgetPolicyRevision: policy?.globalContextBudgetPolicyRevision ?? 0,
       modelInputSpaceTokens: options.modelInputSpaceTokens,
+      reservedInputTokens: options.reservedInputTokens,
     });
     const records = await options.globalDecisionStore.listRecords();
     const recordsFingerprint = records
@@ -383,6 +396,29 @@ export function createContextPromptProvider(
           budget.effectiveMaximumGlobalContextTokenCount,
       });
       selectionCache.set(cacheKey, selection);
+    }
+    if (
+      budget.effectiveMaximumGlobalContextTokenCount > 0 &&
+      selection.unselectedRelatedDecisions.length > 0 &&
+      options.deferredContextWriter !== undefined
+    ) {
+      await options.deferredContextWriter({
+        missionId: input.missionId,
+        agentInstanceId: input.agentInstanceId,
+        task: input.task,
+        decisions: selection.unselectedRelatedDecisions,
+      });
+    }
+    if (
+      budget.effectiveMaximumGlobalContextTokenCount > 0 &&
+      selection.budgetInsufficient
+    ) {
+      throw new DomainError(
+        "context-budget-insufficient",
+        "最高优先级全局决策无法在有效预算内装入；请拆分任务或提高全局上下文预算" +
+          `（task=${input.task.id}, budget=${budget.effectiveMaximumGlobalContextTokenCount}` +
+          `, unmet=${selection.highestPriorityUnmetTokenCount ?? "unknown"}）`,
+      );
     }
     const graph = await options.graphStore.readGraph(
       input.agentInstanceId,
