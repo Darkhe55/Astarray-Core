@@ -70,6 +70,16 @@ process.on("message", async (message) => {
       reply({ requestId: message.requestId, result: state });
       return;
     }
+    if (message.command === "read-verdict") {
+      const result = await entry.readVerdictSummary(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "save-verdict") {
+      const result = await entry.saveVerdictIfAbsent(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
     if (message.command === "read-receipt") {
       const result = await entry.readReceiptSummary(message);
       reply({ requestId: message.requestId, result });
@@ -369,6 +379,41 @@ async function main() {
       throw new Error(`收据应保留 B 的内容，实际 ${String(receiptFinal.result.artifactPath)}`);
     }
     console.log("two-process-receipt-ok: A 的覆盖被拒 journal-corrupted，B 的收据保持");
+
+    /** 7) 独立裁决：同样是不可变首次创建。 */
+    const verdictByB = await workerB.request("save-verdict", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-001",
+      verdict: "accepted",
+      deciderAgentInstanceIdentifier: "reviewer-1",
+    });
+    if (verdictByB.result.outcome !== "written") {
+      throw new Error(`B 的裁决应首次写入成功，实际 ${verdictByB.result.outcome}`);
+    }
+
+    const verdictByA = await workerA.request("save-verdict", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-001",
+      verdict: "rejected",
+      deciderAgentInstanceIdentifier: "reviewer-2",
+    });
+    if (verdictByA.result.outcome !== "rejected" || verdictByA.result.errorCode !== "journal-corrupted") {
+      throw new Error(
+        `A 的裁决应被拒 journal-corrupted，实际 ${verdictByA.result.outcome} / ${String(verdictByA.result.errorCode)}`,
+      );
+    }
+
+    const verdictFinal = await workerA.request("read-verdict", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-001",
+    });
+    if (verdictFinal.result.verdict !== "accepted") {
+      throw new Error(`裁决应保留 B 的 accepted，实际 ${String(verdictFinal.result.verdict)}`);
+    }
+    console.log("two-process-verdict-ok: A 的改写被拒 journal-corrupted，B 的 accepted 保持");
   } finally {
     await Promise.all([workerA.close(), workerB.close()]);
     await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });

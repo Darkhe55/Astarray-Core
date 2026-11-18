@@ -6660,3 +6660,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例：`completion-receipt-immutability.test.ts`（摘掉互斥即红；同内容重复写入仍幂等）+
 > `verify:two-process-stale-write` 场景 3（真两进程：A 覆盖被拒，B 的收据保持）。
 > 全量门禁 **852 files / 5519 passed + 4 skipped，exit 0**。
+
+> **WIRING-04 §36.3：独立裁决不可变首次创建（2026-11-19）**
+>
+> `CompletionVerdictStore.save` 加跨进程临界区（锁内重读）：并发写入不同裁决时只有一个落盘，
+> 另一个拿 `journal-corrupted`，已落盘的验收结论**不会被静默改写**；同内容重复写入仍幂等。
+> 反例：`completion-verdict-immutability.test.ts`（摘掉互斥即红）+
+> `verify:two-process-stale-write` 场景 4（真两进程：A 改写被拒，B 的 accepted 保持）。
+> 至此 §36.3 的两处不可变回执（完成收据、独立裁决）都已具备原子首次创建语义。
+> 全量门禁 **853 files / 5521 passed + 4 skipped，exit 0**。

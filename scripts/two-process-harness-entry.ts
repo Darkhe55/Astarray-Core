@@ -181,3 +181,49 @@ export async function saveReceiptIfAbsent(input: {
     };
   }
 }
+
+/**
+ * §36.3 逐存储反例：独立完成裁决（`completion-verdicts/<mission>/<task>.json`）。
+ */
+import { CompletionVerdictStore } from "../packages/core/src/orchestration/completion-verdict-store.js";
+
+export function openVerdictStore(stateDirectory: string): CompletionVerdictStore {
+  return new CompletionVerdictStore({ baseDirectory: stateDirectory });
+}
+
+export async function readVerdictSummary(input: {
+  stateDirectory: string;
+  missionIdentifier: string;
+  taskIdentifier: string;
+}): Promise<{ verdict: string | null; decider: string | null }> {
+  const record = await openVerdictStore(input.stateDirectory).read(
+    input.missionIdentifier,
+    input.taskIdentifier,
+  );
+  return { verdict: record?.verdict ?? null, decider: record?.deciderAgentInstanceIdentifier ?? null };
+}
+
+export async function saveVerdictIfAbsent(input: {
+  stateDirectory: string;
+  missionIdentifier: string;
+  taskIdentifier: string;
+  verdict: "accepted" | "rejected";
+  deciderAgentInstanceIdentifier: string;
+}): Promise<{ outcome: "written" | "idempotent" | "rejected"; errorCode: string | null }> {
+  try {
+    const result = await openVerdictStore(input.stateDirectory).save({
+      missionIdentifier: input.missionIdentifier,
+      taskIdentifier: input.taskIdentifier,
+      verdict: input.verdict,
+      reasons: input.verdict === "accepted" ? [] : ["证据不足"],
+      deciderAgentInstanceIdentifier: input.deciderAgentInstanceIdentifier,
+      decidedAtIso: "2026-11-18T00:00:00.000Z",
+    });
+    return { outcome: result.didWrite ? "written" : "idempotent", errorCode: null };
+  } catch (error) {
+    return {
+      outcome: "rejected",
+      errorCode: (error as { errorCode?: string }).errorCode ?? "unknown",
+    };
+  }
+}
