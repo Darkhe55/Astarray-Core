@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 
 /**
  * COORD-01-03（卡 §3）：**稳定重试身份**。
@@ -69,6 +70,11 @@ export class CoordinationSubmissionIdentityStore {
     return readResult.content as CoordinationSubmissionDocument;
   }
 
+  /** 跨实例：同一分区并发提交会互相覆盖（丢记录 ⇒ 同一请求被重复受理）。 */
+  private withPartitionLock<T>(partitionKey: string, action: () => Promise<T>): Promise<T> {
+    return withFileLock({ lockFilePath: `${this.filePathFor(partitionKey)}.lock` }, action);
+  }
+
   private async saveDocument(document: CoordinationSubmissionDocument): Promise<void> {
     await fs.mkdir(this.stateDirectory, { recursive: true });
     await writeAtomicJson(this.filePathFor(document.partitionKey), document);
@@ -93,6 +99,7 @@ export class CoordinationSubmissionIdentityStore {
       return { outcome: "invalid", reason: "缺少内容指纹（不得以空值判等）" };
     }
 
+    return this.withPartitionLock(input.partitionKey, async () => {
     const document = await this.loadDocument(input.partitionKey);
     const requestIdentifier = input.requestIdentifier;
 
@@ -128,6 +135,7 @@ export class CoordinationSubmissionIdentityStore {
       },
     });
     return { outcome: "created", record };
+    });
   }
 
   /** 凭恢复令牌找回提交记录（进程恢复 / 响应丢失场景）。 */

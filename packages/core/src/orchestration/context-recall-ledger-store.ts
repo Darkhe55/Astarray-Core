@@ -7,6 +7,7 @@ import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 import type {
   ContextRecallLedgerPort,
   RecallLedgerEntry,
@@ -39,9 +40,12 @@ export class FileContextRecallLedgerStore implements ContextRecallLedgerPort {
 
   async writeEntry(ledgerKey: string, entry: RecallLedgerEntry): Promise<void> {
     await this.writeLock.runExclusive(async () => {
+      /** 跨实例：并发写回访账本会互相覆盖（预算/去重记录丢失 ⇒ 可绕过限额重放）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       document.entriesByLedgerKey[ledgerKey] = entry;
       await writeAtomicJson(this.filePath, document);
+      });
     });
   }
 
@@ -52,9 +56,11 @@ export class FileContextRecallLedgerStore implements ContextRecallLedgerPort {
 
   async writeTaskRecallCount(taskExecutionId: string, count: number): Promise<void> {
     await this.writeLock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       document.countByTaskExecution[taskExecutionId] = count;
       await writeAtomicJson(this.filePath, document);
+      });
     });
   }
 

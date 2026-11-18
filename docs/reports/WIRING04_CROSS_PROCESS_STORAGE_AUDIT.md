@@ -19,6 +19,8 @@
 | `orchestration/deferred-insertion-queue.ts` | `enqueue` / `markConsumed` | 40 条只剩 **20 条** |
 | `orchestration/mission-sequence-binding-store.ts` | `bind` | 40 条绑定只剩 **20 条** |
 | `orchestration/mission-relation-index.ts` | `upsert` | 同一 mission 的并发成员追加互相抹掉 |
+| `orchestration/context-recall-ledger-store.ts` | `writeEntry` / `writeTaskRecallCount` | 40 条只剩 **30 条** |
+| `orchestration/coordination-submission-identity.ts` | `submit` | 40 条只剩 **1 条** |
 
 ## B. 复核后**不需要**加锁（已有并发保护，故意不动）
 
@@ -38,8 +40,6 @@
 
 - `goal-requirement-mapping-store`
 - `coordination-retry-store`
-- `coordination-submission-identity`
-- `context-recall-ledger-store`
 - `remote-delivery-outbox`
 - `goal-dispatch-verdict-journal`
 - `task-ledger-divergence-journal`

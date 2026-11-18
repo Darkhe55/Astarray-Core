@@ -6593,3 +6593,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **反例都会红**：摘掉锁 ⇒ 40 条绑定只剩 **20 条**；同一 mission 的并发成员追加会互相抹掉。
 > 审计报告已把这两处从 C1 移到"已加锁"。
 > 全量门禁 **843 files / 5500 passed + 4 skipped，exit 0**。
+
+> **回访账本与提交身份接入文件锁（2026-11-18）**
+>
+> - `FileContextRecallLedgerStore.writeEntry` / `writeTaskRecallCount`：加锁后 40 条全在；
+>   **反例会红**：摘掉锁 ⇒ 只剩 **30 条**（回访预算/去重记录丢失 ⇒ 可绕过限额重放）。
+> - `CoordinationSubmissionIdentityStore.submit`：加锁后 40 条全在；
+>   **反例会红**：摘掉锁 ⇒ 只剩 **1 条**（并发提交互相覆盖，同一请求可被重复受理）。
+> 审计报告已把两处移入"已加锁"（A 类累计 12 处）。
+> 全量门禁 **845 files / 5502 passed + 4 skipped，exit 0**。
