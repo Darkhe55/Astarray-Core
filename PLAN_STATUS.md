@@ -6725,3 +6725,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例：`toolkit-package-concurrency.test.ts` 两条（摘掉即红）；账本锁尚无专项反例（下一轮补）。
 > 全量门禁 **860 files / 5533 passed + 4 skipped，exit 0**。
 > **§36.2 的 12 个权威存储至此全部加锁**；仅 `tool-packages/version-state` 未单独处理（其快照由 controller 版本控制）。
+
+> **WIRING-04 §36.2 收口：跨项目账本反例（2026-11-19）**
+>
+> `cross-project-ledger-concurrency.test.ts`：两实例并发发送 40 条 ⇒ 账本 40 条；
+> **反例已实测会红**：摘掉账本锁后 40 条只剩 **1 条**（去重读到的旧账本互相覆盖）。
+> 至此 §36.2 的 12 个权威存储**全部有会红的并发反例**。
+> 全量门禁 **861 files / 5534 passed + 4 skipped，exit 0**
+>（前三次尝试分别红在三个**互不相同**的既有用例；逐个隔离均通过后复跑全绿，属负载抖动）。

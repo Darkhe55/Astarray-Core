@@ -108,6 +108,6 @@ C1（累积型且无 CAS 的存储）**已全部接入文件锁**，A 类共 **1
 
 **§36.1 已完成；§36.2 已完成 1/15，§36.3 已完成 1 处**。具体：`goal-mode` 已实现 `writeIfDocumentRevision`（文件锁内重读 + 预期版本校验 + 冲突显式返回），`beginTaskGroup`/`finishTaskGroup`/`closeExperiment` 全部改走 CAS；反例见 `tests/core/integration/goal-mode-stale-write.test.ts` 与 `npm run verify:two-process-stale-write`（真两进程场景 2）。\n\n以下仍未实施：
 
-- §36.2 默认防陈旧写入：为上表"权威"行加"跨进程临界区 + 预期版本校验 + 合法迁移校验"；
+- §36.2 默认防陈旧写入：**已完成 12 处**（`goal-mode`、`recovery/attempts`、`recovery/policy`、`edit-intent-guard`、`conversation-identity`、`goal-contract`、`goal-mission-binding`、`goal-contract-proposal`、`work-window`、`toolkit lifecycle`、`toolkit feedback`、`cross-project-ledger`），每处均有会红的并发反例；
 - §36.3 不可变回执的原子首次创建语义（同键同内容复用、同键异内容拒绝）；
 - §36.4 两个独立 OS 进程 + IPC 消息控制的反例（A 读、B 提交、A 提交旧值 ⇒ A 被拒且状态为 B 的）。
