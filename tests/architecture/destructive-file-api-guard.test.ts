@@ -22,6 +22,15 @@ const TOKEN_PATTERN = new RegExp(
 /** 相对 packages/ 路径 → 允许的破坏性令牌（理由见注释/任务卡盘点表）。 */
 const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }> = {
   /**
+   * 跨进程文件锁（2026-11-18）：`open(wx)` 创建锁文件、写入持有者标识、释放时 `unlink`。
+   * 理由：锁文件只含"pid@host + 时间戳"，**不含用户内容**，删除无数据风险；
+   * 陈旧锁必须能被清理，否则进程崩溃会永久卡死后续写入。
+   */
+  "core/src/infra/file-lock.ts": {
+    tokens: ["writeFile", "unlink"],
+    reason: "跨进程锁文件的创建/释放：只写持有者标识与时间戳，不含用户内容",
+  },
+  /**
    * CLUSTER-01（2026-11-11）：派生索引快照的原子写（临时文件 + 同目录 rename）。
    * 理由：只写应用状态目录下的派生索引，不覆盖项目源码；写失败不会留下半截文件。
    */

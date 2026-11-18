@@ -5,6 +5,8 @@
  */
 
 export type DomainErrorCode =
+  /** 跨进程文件锁等待超时（不是静默失败）。 */
+  | "lock-timeout"
   | "invalid-task-chain"
   | "dag-cycle"
   | "dependency-not-found"

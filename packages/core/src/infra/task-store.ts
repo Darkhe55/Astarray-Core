@@ -11,6 +11,7 @@ import { taskChainSchema } from "../core/schemas.js";
 import { TASK_CHAIN_SCHEMA_VERSION } from "../core/types.js";
 import type { TaskChainDocument, TaskStorePort } from "../core/types.js";
 import { AsyncMutex } from "./async-mutex.js";
+import { withFileLock } from "./file-lock.js";
 import {
   backupExistingFile,
   cleanStaleTempFiles,
@@ -36,6 +37,10 @@ export class TaskStore implements TaskStorePort {
 
   private chainFilePath(missionId: string): string {
     return path.join(this.missionDirectoryPath(missionId), "task-chain.json");
+  }
+
+  private lockFilePath(missionId: string): string {
+    return path.join(this.missionDirectoryPath(missionId), "task-chain.lock");
   }
 
   private backupFilePath(missionId: string): string {
@@ -82,7 +87,10 @@ export class TaskStore implements TaskStorePort {
 
   async writeTaskChain(document: TaskChainDocument): Promise<void> {
     await this.getMissionLock(document.missionId).runExclusive(async () => {
-      await this.writeChainInternal(document);
+      /** 跨进程：另一个实例可能同时在写同一份链（进程内锁管不到它）。 */
+      await withFileLock({ lockFilePath: this.lockFilePath(document.missionId) }, () =>
+        this.writeChainInternal(document),
+      );
     });
   }
 
@@ -95,10 +103,16 @@ export class TaskStore implements TaskStorePort {
     updater: (current: TaskChainDocument | null) => TaskChainDocument,
   ): Promise<TaskChainDocument> {
     return this.getMissionLock(missionId).runExclusive(async () => {
-      const current = await this.readChainInternal(missionId);
-      const next = updater(current);
-      await this.writeChainInternal(next);
-      return next;
+      /**
+       * 跨进程：读-改-写必须在**文件锁**内完成，否则两个实例会互相覆盖
+       * （各自的进程内锁互不可见）。
+       */
+      return withFileLock({ lockFilePath: this.lockFilePath(missionId) }, async () => {
+        const current = await this.readChainInternal(missionId);
+        const next = updater(current);
+        await this.writeChainInternal(next);
+        return next;
+      });
     });
   }
 
