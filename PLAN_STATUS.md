@@ -6669,3 +6669,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `verify:two-process-stale-write` 场景 4（真两进程：A 改写被拒，B 的 accepted 保持）。
 > 至此 §36.3 的两处不可变回执（完成收据、独立裁决）都已具备原子首次创建语义。
 > 全量门禁 **853 files / 5521 passed + 4 skipped，exit 0**。
+
+> **WIRING-04 §36.2 第 2 个权威存储：启动恢复尝试计数（2026-11-19）**
+>
+> `StartupRecoveryAttemptStore.recordAttempt` / `resetAttempt` 加跨进程临界区（锁内重读）：
+> 并发失败不再互相覆盖，计数不会把"还要不要自动恢复"判错。
+> 反例：`startup-recovery-attempts-concurrency.test.ts`（两条，摘掉互斥即红）+
+> `verify:two-process-stale-write` 场景 5（两个真进程各记一次失败 ⇒ 计数为 2）。
+> 全量门禁 **854 files / 5523 passed + 4 skipped，exit 0**。

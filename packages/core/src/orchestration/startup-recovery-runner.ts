@@ -14,6 +14,7 @@ import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { cleanStaleTempFiles, readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import type { StartupRecoveryPolicy } from "./startup-recovery-policy.js";
 import type {
@@ -71,6 +72,8 @@ export class StartupRecoveryAttemptStore {
     readonly attemptedAtIso: string;
   }): Promise<StartupRecoveryAttemptRecord> {
     return this.writeLock.runExclusive(async () => {
+      /** WIRING-04 §36.2：跨进程临界区 + 锁内重读（计数不会因并发互相覆盖）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       const previous = document.attempts[input.missionIdentifier];
       const attemptCount = input.outcome === "failed" ? (previous?.attemptCount ?? 0) + 1 : 0;
@@ -89,11 +92,13 @@ export class StartupRecoveryAttemptStore {
       await cleanStaleTempFiles(this.directoryPath, "attempts.json");
       await writeAtomicJson(this.filePath, next);
       return record;
+      });
     });
   }
 
   async resetAttempt(missionIdentifier: string): Promise<boolean> {
     return this.writeLock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       if (!(missionIdentifier in document.attempts)) return false;
       const attempts = { ...document.attempts };
@@ -102,6 +107,7 @@ export class StartupRecoveryAttemptStore {
       await cleanStaleTempFiles(this.directoryPath, "attempts.json");
       await writeAtomicJson(this.filePath, { schemaVersion: 1, attempts });
       return true;
+      });
     });
   }
 }

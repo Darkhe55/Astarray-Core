@@ -70,6 +70,16 @@ process.on("message", async (message) => {
       reply({ requestId: message.requestId, result: state });
       return;
     }
+    if (message.command === "record-startup-failure") {
+      const result = await entry.recordStartupFailure(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "read-startup-failure") {
+      const result = await entry.readStartupFailureCount(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
     if (message.command === "read-verdict") {
       const result = await entry.readVerdictSummary(message);
       reply({ requestId: message.requestId, result });
@@ -414,6 +424,24 @@ async function main() {
       throw new Error(`裁决应保留 B 的 accepted，实际 ${String(verdictFinal.result.verdict)}`);
     }
     console.log("two-process-verdict-ok: A 的改写被拒 journal-corrupted，B 的 accepted 保持");
+
+    /** 8) 启动恢复尝试计数：两个进程各记一次失败 ⇒ 计数必须是 2（不丢一次）。 */
+    await workerA.request("record-startup-failure", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+    });
+    await workerB.request("record-startup-failure", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+    });
+    const startupCount = await workerA.request("read-startup-failure", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+    });
+    if (startupCount.result.attemptCount !== 2) {
+      throw new Error(`启动恢复失败计数应为 2，实际 ${String(startupCount.result.attemptCount)}`);
+    }
+    console.log("two-process-startup-attempts-ok: 两个进程的失败都被计数（2）");
   } finally {
     await Promise.all([workerA.close(), workerB.close()]);
     await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });

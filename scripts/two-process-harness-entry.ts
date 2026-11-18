@@ -227,3 +227,33 @@ export async function saveVerdictIfAbsent(input: {
     };
   }
 }
+
+/**
+ * §36.2 逐存储反例：启动恢复尝试计数（`startup-recovery/attempts.json`）。
+ */
+import { StartupRecoveryAttemptStore } from "../packages/core/src/orchestration/startup-recovery-runner.js";
+
+export async function recordStartupFailure(input: {
+  stateDirectory: string;
+  missionIdentifier: string;
+}): Promise<{ attemptCount: number }> {
+  const record = await new StartupRecoveryAttemptStore({
+    baseDirectory: input.stateDirectory,
+  }).recordAttempt({
+    missionIdentifier: input.missionIdentifier,
+    outcome: "failed",
+    reason: "恢复失败",
+    attemptedAtIso: "2026-11-18T00:00:00.000Z",
+  });
+  return { attemptCount: record.attemptCount };
+}
+
+export async function readStartupFailureCount(input: {
+  stateDirectory: string;
+  missionIdentifier: string;
+}): Promise<{ attemptCount: number }> {
+  const record = await new StartupRecoveryAttemptStore({
+    baseDirectory: input.stateDirectory,
+  }).readAttempt(input.missionIdentifier);
+  return { attemptCount: record?.attemptCount ?? 0 };
+}
