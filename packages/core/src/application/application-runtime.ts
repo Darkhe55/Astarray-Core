@@ -153,7 +153,9 @@ import { executeRecallToolCall } from "../orchestration/recall-tool-call.js";
 import {
   classifyContextPackMapping,
   computeContextPackContentHash,
+  shouldBackfillDeclaredMapping,
 } from "../orchestration/context-pack-resolution.js";
+import { bindExactMissionTaskMapping } from "../orchestration/mission-task-sequence-map-store.js";
 import { PendingWriteTracker } from "../orchestration/pending-write-tracker.js";
 import { ProcessExecutionController } from "../execution/process-execution-controller.js";
 import type { SandboxExecutionBackend } from "../execution/process-execution-controller.js";
@@ -3215,7 +3217,7 @@ export async function createApplicationRuntime(
         const declaredNode = missionChainForMapping?.tasks.find(
           (candidate) => candidate.id === missionTaskIdentifier,
         );
-        const mappingClassification = classifyContextPackMapping({
+        let mappingClassification = classifyContextPackMapping({
           missionTaskIdentifier,
           entries: mapEntries,
           declaredSource:
@@ -3230,6 +3232,48 @@ export async function createApplicationRuntime(
                     declaredNode.sourceSequenceOwnerAgentInstanceIdentifier,
                 },
         });
+        /**
+         * WIRING-04-04 自愈：节点声明了完整来源、但**完全没有**该任务的映射项时，
+         * 按声明补写一次精确映射（创建时绑定可能已失败）。只补"缺失"，不覆盖"不一致"。
+         */
+        const declaredSourceForResolution =
+          declaredNode?.sourceSequenceTaskIdentifier === undefined ||
+          declaredNode.sourceSequenceIdentifier === undefined ||
+          declaredNode.sourceSequenceOwnerAgentInstanceIdentifier === undefined
+            ? null
+            : {
+                sequenceTaskIdentifier: declaredNode.sourceSequenceTaskIdentifier,
+                sequenceIdentifier: declaredNode.sourceSequenceIdentifier,
+                ownerAgentInstanceIdentifier:
+                  declaredNode.sourceSequenceOwnerAgentInstanceIdentifier,
+              };
+        if (
+          mappingClassification.kind === "declared-missing" &&
+          shouldBackfillDeclaredMapping({
+            missionTaskIdentifier,
+            declaredSource: declaredSourceForResolution,
+            entries: mapEntries,
+          }) &&
+          declaredSourceForResolution !== null
+        ) {
+          const backfillOutcome = await bindExactMissionTaskMapping({
+            store: missionTaskSequenceMapStore,
+            missionIdentifier,
+            missionTaskIdentifier,
+            ...declaredSourceForResolution,
+          }).catch(() => null);
+          if (backfillOutcome?.outcome === "bound") {
+            const refreshedEntries = await missionTaskSequenceMapStore.listForMission({
+              missionIdentifier,
+              sequenceIdentifier,
+            });
+            mappingClassification = classifyContextPackMapping({
+              missionTaskIdentifier,
+              entries: refreshedEntries,
+              declaredSource: declaredSourceForResolution,
+            });
+          }
+        }
         if (mappingClassification.kind === "declared-missing") {
           return {
             kind: "declared-but-missing" as const,

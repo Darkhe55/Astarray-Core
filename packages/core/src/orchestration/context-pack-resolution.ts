@@ -117,6 +117,40 @@ export function classifyContextPackMapping(input: {
       };
 }
 
+/**
+ * WIRING-04-04 自愈判定：**声明了完整来源、但该任务没有任何映射项**时，
+ * 可以按节点声明的三元组补写精确映射（绑定写入可能因创建时异常失败）。
+ *
+ * 边界：只在"完全缺失"时补；"映射存在但与声明不一致"⇒ **不补**（那是真冲突，必须阻塞）。
+ */
+export function shouldBackfillDeclaredMapping(input: {
+  readonly missionTaskIdentifier: string;
+  readonly declaredSource: {
+    readonly sequenceTaskIdentifier?: string;
+    readonly sequenceIdentifier?: string;
+    readonly ownerAgentInstanceIdentifier?: string;
+  } | null;
+  readonly entries: ReadonlyArray<{ readonly missionTaskIdentifier: string }>;
+}): boolean {
+  const declared = input.declaredSource;
+  if (declared === null) {
+    return false;
+  }
+  const isComplete =
+    typeof declared.sequenceTaskIdentifier === "string" &&
+    declared.sequenceTaskIdentifier.trim() !== "" &&
+    typeof declared.sequenceIdentifier === "string" &&
+    declared.sequenceIdentifier.trim() !== "" &&
+    typeof declared.ownerAgentInstanceIdentifier === "string" &&
+    declared.ownerAgentInstanceIdentifier.trim() !== "";
+  if (!isComplete) {
+    return false;
+  }
+  return !input.entries.some(
+    (entry) => entry.missionTaskIdentifier === input.missionTaskIdentifier,
+  );
+}
+
 export type ContextPackResolution =
   | { readonly kind: "no-pack-declared" }
   | {

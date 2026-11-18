@@ -166,3 +166,57 @@ describe("WIRING-04-04：按是否声明来源决定严格度", () => {
     expect(missing.kind).toBe("missing");
   }, 30_000);
 });
+
+describe("WIRING-04-04：缺失精确映射的自愈判定", () => {
+  const declared = {
+    sequenceTaskIdentifier: "seq-task-7",
+    sequenceIdentifier: "sequence-1",
+    ownerAgentInstanceIdentifier: "agent-1",
+  };
+
+  it("⑩ 完整声明 + 无任何映射项 ⇒ 可以补写（创建时绑定失败的恢复路径）", async () => {
+    const { shouldBackfillDeclaredMapping } = await import(
+      "../../../packages/core/src/orchestration/context-pack-resolution.js"
+    );
+    expect(
+      shouldBackfillDeclaredMapping({
+        missionTaskIdentifier: "T-003",
+        declaredSource: declared,
+        entries: [],
+      }),
+    ).toBe(true);
+  }, 30_000);
+
+  it("⑪ 已存在该任务映射项（即便不一致）⇒ **不补**，交给阻塞分支", async () => {
+    const { shouldBackfillDeclaredMapping } = await import(
+      "../../../packages/core/src/orchestration/context-pack-resolution.js"
+    );
+    expect(
+      shouldBackfillDeclaredMapping({
+        missionTaskIdentifier: "T-003",
+        declaredSource: declared,
+        entries: [{ missionTaskIdentifier: "T-003" }],
+      }),
+    ).toBe(false);
+  }, 30_000);
+
+  it("⑫ 未声明来源或声明不完整 ⇒ 不补（不猜）", async () => {
+    const { shouldBackfillDeclaredMapping } = await import(
+      "../../../packages/core/src/orchestration/context-pack-resolution.js"
+    );
+    expect(
+      shouldBackfillDeclaredMapping({
+        missionTaskIdentifier: "T-003",
+        declaredSource: null,
+        entries: [],
+      }),
+    ).toBe(false);
+    expect(
+      shouldBackfillDeclaredMapping({
+        missionTaskIdentifier: "T-003",
+        declaredSource: { sequenceTaskIdentifier: "seq-task-7" },
+        entries: [],
+      }),
+    ).toBe(false);
+  }, 30_000);
+});
