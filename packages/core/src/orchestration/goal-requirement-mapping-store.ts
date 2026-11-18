@@ -16,6 +16,7 @@ import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { DomainError } from "../core/errors.js";
 
 export interface GoalRequirementTaskMapping {
@@ -104,6 +105,10 @@ export class GoalRequirementMappingStore {
       ),
     ];
     return await this.writeLock.runExclusive(async () => {
+      /** 跨实例：同一 goal 的并发要求映射会互相覆盖（丢映射 ⇒ 要求判定缺入口）。 */
+      return withFileLock(
+        { lockFilePath: `${this.filePath(input.goalIdentifier)}.lock` },
+        async () => {
       const existing = await this.read(input.goalIdentifier);
       const otherMappings = (existing?.mappings ?? []).filter(
         (mapping) => mapping.requirementIdentifier !== input.requirementIdentifier,
@@ -128,6 +133,8 @@ export class GoalRequirementMappingStore {
       };
       await writeAtomicJson(this.filePath(input.goalIdentifier), next);
       return next;
+        },
+      );
     });
   }
 

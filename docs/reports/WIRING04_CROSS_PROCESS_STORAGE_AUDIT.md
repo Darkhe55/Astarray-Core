@@ -21,6 +21,8 @@
 | `orchestration/mission-relation-index.ts` | `upsert` | 同一 mission 的并发成员追加互相抹掉 |
 | `orchestration/context-recall-ledger-store.ts` | `writeEntry` / `writeTaskRecallCount` | 40 条只剩 **30 条** |
 | `orchestration/coordination-submission-identity.ts` | `submit` | 40 条只剩 **1 条** |
+| `orchestration/coordination-retry-store.ts` | `recordFailure` / `recordSuccess` | 并发失败记录互相覆盖（计数与退避丢失） |
+| `orchestration/goal-requirement-mapping-store.ts` | `setMapping` | 40 条映射只剩 **20 条** |
 
 ## B. 复核后**不需要**加锁（已有并发保护，故意不动）
 
@@ -38,8 +40,6 @@
 
 **C1. 累积型（丢更新 = 功能不可见，优先）**
 
-- `goal-requirement-mapping-store`
-- `coordination-retry-store`
 - `remote-delivery-outbox`
 - `goal-dispatch-verdict-journal`
 - `task-ledger-divergence-journal`

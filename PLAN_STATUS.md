@@ -6602,3 +6602,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   **反例会红**：摘掉锁 ⇒ 只剩 **1 条**（并发提交互相覆盖，同一请求可被重复受理）。
 > 审计报告已把两处移入"已加锁"（A 类累计 12 处）。
 > 全量门禁 **845 files / 5502 passed + 4 skipped，exit 0**。
+
+> **重试记录与目标要求映射接入文件锁（2026-11-18）**
+>
+> - `CoordinationRetryStore.recordFailure` / `recordSuccess`：并发失败记录不再互相覆盖
+>   （丢记录会让自动重试上限与退避失效）。
+> - `GoalRequirementMappingStore.setMapping`：**反例会红**：摘掉锁 ⇒ 40 条映射只剩 **20 条**。
+> 审计报告 A 类累计 **14** 处；C1 剩 4 处（`remote-delivery-outbox`、`goal-dispatch-verdict-journal`、
+> `task-ledger-divergence-journal`、`prompt-scan-journal-store`）。
+> 全量门禁 **847 files / 5505 passed + 4 skipped，exit 0**。

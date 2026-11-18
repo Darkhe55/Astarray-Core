@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 
 /**
  * COORD-01-02（卡 §4.7）：**应用失败的持久退避**。
@@ -61,6 +62,10 @@ export class CoordinationRetryStore {
     return readResult.content as CoordinationRetryDocument;
   }
 
+  private withPartitionLock<T>(partitionKey: string, action: () => Promise<T>): Promise<T> {
+    return withFileLock({ lockFilePath: `${this.filePathFor(partitionKey)}.lock` }, action);
+  }
+
   private async saveDocument(document: CoordinationRetryDocument): Promise<void> {
     await fs.mkdir(this.stateDirectory, { recursive: true });
     await writeAtomicJson(this.filePathFor(document.partitionKey), document);
@@ -96,6 +101,8 @@ export class CoordinationRetryStore {
     messageIdentifier: string;
     reason: string;
   }): Promise<CoordinationRetryRecord> {
+    /** 跨实例：并发记录失败会互相覆盖（丢退避记录 ⇒ 自动重试失控/漏重试）。 */
+    return this.withPartitionLock(input.partitionKey, async () => {
     const document = await this.loadDocument(input.partitionKey);
     const existing = document.records.find(
       (record) => record.messageIdentifier === input.messageIdentifier,
@@ -121,16 +128,19 @@ export class CoordinationRetryStore {
       records: [...document.records.filter((candidate) => candidate.messageIdentifier !== input.messageIdentifier), record],
     });
     return record;
+    });
   }
 
   /** 应用成功 ⇒ 清除该消息的失败记录。 */
   async recordSuccess(input: { partitionKey: string; messageIdentifier: string }): Promise<void> {
+    return this.withPartitionLock(input.partitionKey, async () => {
     const document = await this.loadDocument(input.partitionKey);
     const remaining = document.records.filter(
       (record) => record.messageIdentifier !== input.messageIdentifier,
     );
     if (remaining.length === document.records.length) return;
     await this.saveDocument({ ...document, records: remaining });
+    });
   }
 
   /** 人工/有权控制器显式重试：清空该消息计数，允许开始新一轮自动尝试。 */
