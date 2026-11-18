@@ -138,7 +138,7 @@ FeedbackMessage 字段（core/types.ts:513）
 
 ### 仍未做（不得据此宣布全链已授权）
 
-- **生产盖章**：发送入口尚未把权威 `authorizationIdentifier` 写进入箱消息（当前由调用方提供，缺省 null 会被正确拒绝）；
+- ~~**生产盖章**~~：**已实现**——`enqueueWithAuthoritativeStamp` 只从权威存储取章（见 §11）；
 - ~~**装配点接线**~~：**已接线**——`CollaborationInboxDeliveryService` 新增 `resolveAuthoritativeAuthorizationEpoch` 端口，投递循环逐条复核（见 §10）。
 - 发件箱/反馈映射的**关系标识**透传（代际已在透传）。
 
@@ -169,3 +169,25 @@ transport 只被调用 **1** 次，落盘后 `m-ok=delivered` 而 `m-revoked`、
 ### 门禁
 
 **863 files / 5540 passed + 4 skipped，exit 0**。
+## 11. 施工记录：§7 第四部分（生产侧盖章，2026-11-19）
+
+| §7 要求 | 实现 |
+|---|---|
+| 本地可信入口从同一权威版本取关系标识与代际 | `resolveAuthorizationStamp` / `enqueueWithAuthoritativeStamp` |
+| 不得接纳模型自报的章 | 入箱时**忽略**调用方给的 `authorizationEpoch` / `authorizationIdentifier`，一律用权威值 |
+| 撤销 / 过期 / 查不到 / 不可读 | 拒绝盖章：`authorization-revoked` / `authorization-expired` / `authorization-missing` / `authorization-unreadable`，**不入箱** |
+| 到期即使数字相同也拒绝 | 过期检查先于盖章返回 |
+
+### 反例（`authorization-stamping-producer.test.ts`，4 条）
+
+① 调用方伪造代 99 + 伪关系 ⇒ 入箱仍是权威 `authorization-1` / 代 **1**（**承重**：改成采信调用方值即红）；
+② 已撤销 ⇒ 拒绝且不入箱；③ 已过期 ⇒ `authorization-expired`；④ 查不到 ⇒ `authorization-missing`。
+
+### 仍未做
+
+- 发件箱 / 反馈映射的**关系标识**透传（代际已透传；需扩展信封 schema）；
+- 真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`。
+
+### 门禁
+
+**864 files / 5544 passed + 4 skipped，exit 0**。

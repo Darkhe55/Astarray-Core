@@ -6758,3 +6758,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 报告新增 `skippedUnauthorizedCount`。未提供端口时保持旧行为。
 > 反例：三条消息（通过/撤销/旧代）⇒ 只投递 1 条；**短路端口即红**（3 条全投）。
 > 全量门禁 **863 files / 5540 passed + 4 skipped，exit 0**。
+
+> **COORD-02 §7 第四部分：生产侧盖章（2026-11-19）**
+>
+> `enqueueWithAuthoritativeStamp` / `resolveAuthorizationStamp`：章只从权威存储取；
+> 调用方自报的代际/关系标识被忽略；撤销/过期/查不到/不可读 ⇒ 拒绝入箱。
+> 反例 4 条（**采信调用方值即红**）。全量门禁 **864 files / 5544 passed + 4 skipped，exit 0**。
+> 至此 §7 的"权威来源 / 建立与变更 / 生产盖章 / 消费复核 / 投递通道接线"五段全部实现；
+> 仅剩"发件箱/反馈映射的关系标识透传"与"真实 fork 链路调用盖章入口"未做。
