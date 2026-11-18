@@ -4,6 +4,7 @@
  * 只记录已登记的产物，不扫描目录；工具/任务成功路径应显式 register。
  */
 import path from "node:path";
+import { withFileLock } from "../infra/file-lock.js";
 
 import { DomainError } from "../core/errors.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
@@ -89,6 +90,8 @@ export class ArtifactRecordStore {
       }
     }
     return this.lock.runExclusive(async () => {
+      /** 跨实例：读-改-写必须在文件锁内，否则并发登记会丢记录。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const current = await this.read();
       const existing = current.records.find(
         (record) =>
@@ -119,6 +122,7 @@ export class ArtifactRecordStore {
       await writeAtomicJson(this.filePath, next);
       await backupExistingFile(this.filePath, this.backupFilePath);
       return record;
+      });
     });
   }
 
@@ -127,6 +131,8 @@ export class ArtifactRecordStore {
     status: ArtifactVerificationStatus;
   }): Promise<ArtifactRecord> {
     return this.lock.runExclusive(async () => {
+      /** 跨实例：读-改-写必须在文件锁内，否则并发登记会丢记录。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const current = await this.read();
       const record = current.records.find(
         (candidate) => candidate.artifactIdentifier === input.artifactIdentifier,
@@ -145,6 +151,7 @@ export class ArtifactRecordStore {
       await writeAtomicJson(this.filePath, next);
       await backupExistingFile(this.filePath, this.backupFilePath);
       return updated;
+      });
     });
   }
 }

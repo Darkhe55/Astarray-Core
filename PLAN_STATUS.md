@@ -6560,3 +6560,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 子进程 worker（`tests/support/cross-process-lock-worker.test.ts`）未设环境变量时**跳过**，不进入全量门禁。
 > 仍**未做**：跨平台（Linux/macOS）证据。
 > 全量门禁 **838 files / 5491 passed + 4 skipped，exit 0**。
+
+> **成果登记接入跨进程文件锁（2026-11-18）**
+>
+> `ArtifactRecordStore.register` / `verify` 的读-改-写现在都在文件锁内。
+> **反例会红**：临时让每次取锁路径随机（等于不互斥）⇒ 40 个产物只登记上 **27 条**；加锁后 40 条齐全。
+> 第二条反例：同一产物并发登记 ⇒ 只留一条（幂等）。
+> 全量门禁 **839 files / 5493 passed + 4 skipped，exit 0**。
+> 未加锁（已记录，无会红反例故未动）：任务摘要 `summary.json`、裁决存储等单文件"最后写入者胜"的存储。
