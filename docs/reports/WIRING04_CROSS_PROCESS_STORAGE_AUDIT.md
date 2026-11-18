@@ -106,7 +106,7 @@ C1（累积型且无 CAS 的存储）**已全部接入文件锁**，A 类共 **1
 
 ## G. §36.2–36.4 实施状态（2026-11-18）
 
-**本轮只完成 §36.1（逐项审计）**。以下三项尚未实施，卡内不得视为完成：
+**§36.1 已完成；§36.2 已开始（第 1/15 个权威存储）**。具体：`goal-mode` 已实现 `writeIfDocumentRevision`（文件锁内重读 + 预期版本校验 + 冲突显式返回），`beginTaskGroup`/`finishTaskGroup`/`closeExperiment` 全部改走 CAS；反例见 `tests/core/integration/goal-mode-stale-write.test.ts` 与 `npm run verify:two-process-stale-write`（真两进程场景 2）。\n\n以下仍未实施：
 
 - §36.2 默认防陈旧写入：为上表"权威"行加"跨进程临界区 + 预期版本校验 + 合法迁移校验"；
 - §36.3 不可变回执的原子首次创建语义（同键同内容复用、同键异内容拒绝）；

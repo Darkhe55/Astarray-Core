@@ -55,3 +55,78 @@ export async function submitStaleOrFresh(input: {
     };
   }
 }
+
+/**
+ * §36.2 逐存储反例：目标模式状态（`goal-mode/<goal>.json`）。
+ */
+import { GoalModeStateStore } from "../packages/core/src/orchestration/goal-mode-store.js";
+
+export function openGoalModeStore(stateDirectory: string): GoalModeStateStore {
+  return new GoalModeStateStore({ baseDirectory: stateDirectory });
+}
+
+export async function seedGoalState(input: {
+  stateDirectory: string;
+  goalIdentifier: string;
+  documentRevision: number;
+  pauseReason: string;
+}): Promise<{ written: boolean }> {
+  const store = openGoalModeStore(input.stateDirectory);
+  const result = await store.writeIfDocumentRevision({
+    state: {
+      schemaVersion: 1,
+      documentRevision: input.documentRevision,
+      goalIdentifier: input.goalIdentifier,
+      contractRevision: 1,
+      ownerIdentifier: "user-1",
+      sourceRequestReference: "request-1",
+      requirementBases: [],
+      lastPotentialValue: null,
+      currentTaskGroupIdentifier: null,
+      currentTaskGroupStartedAtIso: null,
+      consumedToolCalls: 0,
+      evidenceGaps: [],
+      requiresReplanning: false,
+      pauseReason: input.pauseReason,
+      isExperimentClosed: false,
+      closedAtIso: null,
+      updatedAtIso: "2026-11-18T00:00:00.000Z",
+    } as never,
+    expectedDocumentRevision: 0,
+  });
+  return { written: result.outcome === "written" };
+}
+
+export async function readGoalStateRevision(input: {
+  stateDirectory: string;
+  goalIdentifier: string;
+}): Promise<{ documentRevision: number; pauseReason: string | null }> {
+  const state = await openGoalModeStore(input.stateDirectory).read(input.goalIdentifier);
+  return {
+    documentRevision: state?.documentRevision ?? 0,
+    pauseReason: state?.pauseReason ?? null,
+  };
+}
+
+export async function submitGoalStateCas(input: {
+  stateDirectory: string;
+  goalIdentifier: string;
+  expectedDocumentRevision: number;
+  pauseReason: string;
+}): Promise<{ outcome: "written" | "conflict"; currentDocumentRevision: number }> {
+  const store = openGoalModeStore(input.stateDirectory);
+  const current = await store.read(input.goalIdentifier);
+  const base = current ?? null;
+  if (base === null) {
+    return { outcome: "conflict", currentDocumentRevision: 0 };
+  }
+  return store.writeIfDocumentRevision({
+    state: {
+      ...base,
+      documentRevision: input.expectedDocumentRevision + 1,
+      pauseReason: input.pauseReason,
+      updatedAtIso: "2026-11-18T00:00:01.000Z",
+    },
+    expectedDocumentRevision: input.expectedDocumentRevision,
+  });
+}

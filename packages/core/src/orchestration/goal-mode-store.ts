@@ -14,6 +14,7 @@
 import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 import type { GoalContract, GoalRequirementEvidence } from "./goal-contract.js";
@@ -152,9 +153,71 @@ export class GoalModeStateStore {
     return content as PersistedGoalModeState;
   }
 
+  /**
+   * 无 CAS 的整文档写入（**最后写入者胜**）。
+   *
+   * WIRING-04 §36.2：权威状态应改用 `writeIfDocumentRevision`；
+   * 本方法保留只为兼容既有调用点，并在文件锁内串行（至少不撕裂）。
+   */
   async write(state: PersistedGoalModeState): Promise<void> {
     await this.lock.runExclusive(async () => {
-      await writeAtomicJson(this.stateFilePath(state.goalIdentifier), state);
+      await withFileLock(
+        { lockFilePath: `${this.stateFilePath(state.goalIdentifier)}.lock` },
+        async () => {
+          await writeAtomicJson(this.stateFilePath(state.goalIdentifier), state);
+        },
+      );
+    });
+  }
+
+  /**
+   * WIRING-04 §36.2：**跨进程临界区 + 预期版本校验**的权威写入。
+   *
+   * 锁内重读当前状态：`documentRevision` 必须等于调用方持有的预期值，
+   * 否则返回 `conflict`（不盲写、不重试覆盖）。文件不存在 ⇒ 预期值为 0。
+   */
+  /** CAS 写入的便捷封装：冲突即抛 `stale-revision`（不盲重试、不覆盖）。 */
+  private async writeCasOrThrow(
+    state: PersistedGoalModeState,
+    expectedDocumentRevision: number,
+  ): Promise<void> {
+    const result = await this.writeIfDocumentRevision({
+      state,
+      expectedDocumentRevision,
+    });
+    if (result.outcome === "conflict") {
+      throw new DomainError(
+        "stale-revision",
+        `目标状态已被并发更新（现有 ${String(
+          result.currentDocumentRevision,
+        )}，期望 ${String(expectedDocumentRevision)}）：拒绝用旧状态覆盖。`,
+      );
+    }
+  }
+
+  async writeIfDocumentRevision(input: {
+    readonly state: PersistedGoalModeState;
+    readonly expectedDocumentRevision: number;
+  }): Promise<{
+    readonly outcome: "written" | "conflict";
+    readonly currentDocumentRevision: number;
+  }> {
+    return this.lock.runExclusive(async () => {
+      return withFileLock(
+        { lockFilePath: `${this.stateFilePath(input.state.goalIdentifier)}.lock` },
+        async () => {
+          const current = await this.read(input.state.goalIdentifier);
+          const currentRevision = current?.documentRevision ?? 0;
+          if (currentRevision !== input.expectedDocumentRevision) {
+            return { outcome: "conflict" as const, currentDocumentRevision: currentRevision };
+          }
+          await writeAtomicJson(this.stateFilePath(input.state.goalIdentifier), input.state);
+          return {
+            outcome: "written" as const,
+            currentDocumentRevision: input.state.documentRevision,
+          };
+        },
+      );
     });
   }
 
@@ -171,7 +234,7 @@ export class GoalModeStateStore {
       currentTaskGroupStartedAtIso: input.startedAtIso,
       updatedAtIso: input.startedAtIso,
     };
-    await this.write(next);
+    await this.writeCasOrThrow(next, input.state.documentRevision);
     return next;
   }
 
@@ -224,7 +287,7 @@ export class GoalModeStateStore {
         input.gateSnapshot.requiresReplanning || current.requiresReplanning,
       updatedAtIso: input.finishedAtIso,
     };
-    await this.write(next);
+    await this.writeCasOrThrow(next, current.documentRevision);
     return next;
   }
 
@@ -308,7 +371,7 @@ export class GoalModeStateStore {
       pauseReason: `实验已关闭（${input.reason}）`,
       updatedAtIso: input.closedAtIso,
     };
-    await this.write(next);
+    await this.writeCasOrThrow(next, state.documentRevision);
     return next;
   }
 

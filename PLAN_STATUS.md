@@ -6643,3 +6643,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 实测输出：`two-process-stale-write-ok`。
 > 下一步：把该 harness 复用到审计表里的权威 C2 存储（逐个加 CAS + 跨进程临界区）。
 > 全量门禁 **850 files / 5515 passed + 4 skipped，exit 0**（首轮红在已知抖动用例，隔离通过后复跑绿）。
+
+> **WIRING-04 §36.2 第 1 个存储：目标模式状态 CAS（2026-11-19）**
+>
+> `GoalModeStateStore.writeIfDocumentRevision`：文件锁内重读 + 预期版本校验 + 冲突显式返回（不盲写、不重试覆盖）；
+> `beginTaskGroup` / `finishTaskGroup` / `closeExperiment` 全部改走 CAS；旧 `write` 保留但标注"最后写入者胜"。
+> 反例：`goal-mode-stale-write.test.ts`（2 条，摘掉版本校验即红）+
+> `verify:two-process-stale-write` 场景 2（两个真进程、IPC 消息驱动：A 读 → B 提交 → A 旧值 ⇒ 冲突，B 的结果保留）。
+> 审计表第 1 行（`goal-mode`）因此从"权威·待实施"变为"权威·已实施"；其余 14 行仍待做。
+> 全量门禁 **851 files / 5517 passed + 4 skipped，exit 0**。

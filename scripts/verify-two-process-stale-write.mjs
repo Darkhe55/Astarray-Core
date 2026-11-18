@@ -70,6 +70,21 @@ process.on("message", async (message) => {
       reply({ requestId: message.requestId, result: state });
       return;
     }
+    if (message.command === "seed-goal") {
+      const result = await entry.seedGoalState(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "read-goal") {
+      const result = await entry.readGoalStateRevision(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "commit-goal") {
+      const result = await entry.submitGoalStateCas(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
     if (message.command === "commit") {
       const result = await entry.submitStaleOrFresh({
         stateDirectory: message.stateDirectory,
@@ -243,6 +258,63 @@ async function main() {
     console.log(
       "two-process-stale-write-ok: A(旧 revision 3) 被拒 stale-revision，B 的 revision 4/done 保持",
     );
+
+    /** 5) 同一 harness 复用到 §36.2 的权威存储：目标模式状态。 */
+    const goalSeed = await workerA.request("seed-goal", {
+      stateDirectory,
+      goalIdentifier: "goal-1",
+      documentRevision: 1,
+      pauseReason: "初始",
+    });
+    if (goalSeed?.error !== undefined || goalSeed.result.written !== true) {
+      throw new Error(`目标状态预置失败：${String(goalSeed?.error ?? "未写入")}`);
+    }
+
+    /** A 先读：拿到 documentRevision 1。 */
+    const goalReadByA = await workerA.request("read-goal", {
+      stateDirectory,
+      goalIdentifier: "goal-1",
+    });
+    if (goalReadByA.result.documentRevision !== 1) {
+      throw new Error(`期望读到 documentRevision 1，实际 ${String(goalReadByA.result.documentRevision)}`);
+    }
+
+    /** B 提交 1 → 2（最终裁决）。 */
+    const goalCommitByB = await workerB.request("commit-goal", {
+      stateDirectory,
+      goalIdentifier: "goal-1",
+      expectedDocumentRevision: 1,
+      pauseReason: "B 的裁决",
+    });
+    if (goalCommitByB.result.outcome !== "written") {
+      throw new Error(`B 的目标状态提交应成功，实际 ${goalCommitByB.result.outcome}`);
+    }
+
+    /** A 用旧的 1 提交：必须冲突。 */
+    const goalStaleByA = await workerA.request("commit-goal", {
+      stateDirectory,
+      goalIdentifier: "goal-1",
+      expectedDocumentRevision: 1,
+      pauseReason: "A 的旧状态",
+    });
+    if (goalStaleByA.result.outcome !== "conflict") {
+      throw new Error(`目标状态的陈旧写入未被拒绝：${goalStaleByA.result.outcome}`);
+    }
+
+    /** 磁盘仍是 B 的裁决。 */
+    const goalFinal = await workerA.request("read-goal", {
+      stateDirectory,
+      goalIdentifier: "goal-1",
+    });
+    if (goalFinal.result.documentRevision !== 2 || goalFinal.result.pauseReason !== "B 的裁决") {
+      throw new Error(
+        `目标状态应为 revision 2 / B 的裁决，实际 ${String(goalFinal.result.documentRevision)} / ${String(
+          goalFinal.result.pauseReason,
+        )}`,
+      );
+    }
+
+    console.log("two-process-goal-state-ok: A(旧 revision 1) 冲突，B 的 revision 2 保持");
   } finally {
     await Promise.all([workerA.close(), workerB.close()]);
     await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });
