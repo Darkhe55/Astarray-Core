@@ -6634,3 +6634,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 其中 15 行判为**权威**（默认防陈旧写入），仅 `startup-recovery/last-report.json` 为"待证快照例外"，
 > 因未证明可重建 ⇒ 本轮同样按权威处理。
 > §36.2（CAS + 跨进程临界区）、§36.3（不可变回执首次创建）、§36.4（双进程 IPC 反例）**尚未实施**。
+
+> **WIRING-04 §36.4 骨架落地：两个真进程 + IPC 反例（2026-11-19）**
+>
+> `npm run verify:two-process-stale-write`：tsup 现场打包测试入口 → 起**两个独立 node 进程**（带 IPC 通道）：
+> A 先读（revision 3）→ B 提交（3→4，done，成为最终裁决）→ A 用**旧的 3** 提交；
+> 断言 A 被拒 `stale-revision`、磁盘仍是 4/done。顺序完全由进程消息驱动，**不使用睡眠**。
+> 实测输出：`two-process-stale-write-ok`。
+> 下一步：把该 harness 复用到审计表里的权威 C2 存储（逐个加 CAS + 跨进程临界区）。
+> 全量门禁 **850 files / 5515 passed + 4 skipped，exit 0**（首轮红在已知抖动用例，隔离通过后复跑绿）。
