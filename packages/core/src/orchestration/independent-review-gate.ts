@@ -166,6 +166,26 @@ export class IndependentReviewGate {
   }
 
   /**
+   * 2026-11-18：**只读**任命快照（含任命时绑定的任务版本）。
+   *
+   * 裁决必须绑定**任命时**的版本，而不是裁决到达时的最新链版本——
+   * 审查任务本身会把链推进一格，用最新版会与任命永远不一致。
+   */
+  readAppointment(appointmentIdentifier: string): {
+    readonly boundTaskIdentifier: string;
+    readonly boundTaskRevision: number;
+  } | null {
+    const appointment = this.appointmentRegistry.getAppointment(appointmentIdentifier);
+    if (appointment === null) {
+      return null;
+    }
+    return {
+      boundTaskIdentifier: appointment.boundTaskIdentifier,
+      boundTaskRevision: appointment.boundTaskRevision,
+    };
+  }
+
+  /**
    * 记录独立验收裁决。
    *
    * 三层拒绝：① 裁决者必须是任命的验收者（既有门禁）；② 裁决者不得等于实现/测试者

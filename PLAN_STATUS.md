@@ -6500,3 +6500,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （`errorCode: stale-revision`）；拒绝后链上仍是胜出的内容（不被静默覆盖）；递增更新仍正常。
 > 这是**确认既有保护**并钉住它，不是修缺陷。单实例互斥锁不覆盖跨进程，本条只保证"旧 revision 不会静默赢"。
 > 全量门禁 **832 files / 5473 passed，exit 0**。
+
+> **独立验收不再伪造任务版本（2026-11-18）**
+>
+> `onTaskCompletedForIndependentReview` 与两处裁决落点此前写死 `taskRevision: 1` / `boundTaskRevision: 1`。
+> 现在：任命绑定**权威任务链 revision**（读不到就不任命）；裁决绑定**任命时快照**
+> （审查任务会把链推进一格，用最新版会与任命永久不一致——这一点是实测才发现的）。
+> 新增 `independent-review-appointment-decision`（3 条反例）。全量门禁 **833 files / 5476 passed，exit 0**。
+> 仍余：`standalone-workflow-runner` 的摘要 `boundTaskRevision: 1`（实验独立工作流，无任务链，未动）。

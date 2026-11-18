@@ -6,6 +6,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { bindExactMissionTaskMapping } from "./mission-task-sequence-map-store.js";
+import { decideIndependentReviewAppointment } from "./independent-review-appointment-decision.js";
 import { stampDeclaredSequenceSources } from "./task-sequence-source-stamping.js";
 import type { CoordinationContextDeliveryPort } from "./coordination-context-delivery.js";
 // G1 Step 3（2026-11-08 第 261 轮）：受控合并的五门禁评估（纯函数）。
@@ -3102,12 +3103,28 @@ export class MainController {
                   registeredAtIso: new Date().toISOString(),
                 });
               }
+              /**
+               * 2026-11-18 返修：**版本取权威任务链**，读不到就不任命（不回退 1、不猜）。
+               * 此前写死 `taskRevision: 1` = 伪造版本。
+               */
+              const taskChainForAppointment = await this.options.taskStore
+                .readTaskChain(input.missionId)
+                .catch(() => null);
+              const appointmentDecision =
+                decideIndependentReviewAppointment(taskChainForAppointment);
+              if (appointmentDecision.kind === "refused") {
+                this.options.streamOutput(
+                  null,
+                  `[独立验收] 未任命：${appointmentDecision.reason}（mission ${input.missionId} / 任务 ${input.taskId}）`,
+                );
+                return;
+              }
               const appointmentIdentifier = `appointment:${input.missionId}:${input.taskId}`;
               this.appointExecutionAndReview({
                 appointmentIdentifier,
                 missionIdentifier: input.missionId,
                 taskIdentifier: input.taskId,
-                taskRevision: 1,
+                taskRevision: appointmentDecision.taskRevision,
                 riskLevel: "low",
                 appointingSecondaryAgentInstanceIdentifier:
                   input.responsibleSecondaryAgentInstanceId,
@@ -3167,12 +3184,25 @@ export class MainController {
                   }),
                 };
               }
+              /**
+               * 2026-11-18 返修：裁决绑定**任命时**的任务版本（此前写死 1）。
+               * 任命缺失 ⇒ 不落裁决（如实上报），不伪造。
+               */
+              const appointmentForVerdict =
+                this.resolveIndependentReviewGate().readAppointment(appointmentIdentifier);
+              if (appointmentForVerdict === null) {
+                this.options.streamOutput(
+                  null,
+                  `[独立验收] 未记录裁决：任命不存在（${appointmentIdentifier}）`,
+                );
+                return;
+              }
               await this.recordAcceptanceVerdict({
                 appointmentIdentifier,
                 verdict: {
                   acceptingAgentInstanceIdentifier: reviewerAgentInstanceId,
                   boundTaskIdentifier: input.taskId,
-                  boundTaskRevision: 1,
+                  boundTaskRevision: appointmentForVerdict.boundTaskRevision,
                   boundCommitHash: null,
                   verdict: "rework",
                   evidenceReferences: [...artifactPrecondition.evidenceReferences],
@@ -3234,12 +3264,26 @@ export class MainController {
                           : parseReviewArtifactPathsFromDescription(reviewNode.description);
                       })(),
                     });
+              /**
+               * 2026-11-18 返修：审查裁决同样绑定**任命时**的版本。
+               * 审查任务会把链推进一格，用最新版会与任命永久不一致。
+               */
+              const reviewAppointment = this.resolveIndependentReviewGate().readAppointment(
+                `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
+              );
+              if (reviewAppointment === null) {
+                this.options.streamOutput(
+                  null,
+                  `[独立验收] 未记录裁决：任命不存在（mission ${reviewInput.missionId}）`,
+                );
+                return;
+              }
               await this.recordAcceptanceVerdict({
                 appointmentIdentifier: `appointment:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
                 verdict: {
                   acceptingAgentInstanceIdentifier: `reviewer:${reviewInput.missionId}:${reviewedTaskIdentifier}`,
                   boundTaskIdentifier: reviewedTaskIdentifier,
-                  boundTaskRevision: 1,
+                  boundTaskRevision: reviewAppointment.boundTaskRevision,
                   boundCommitHash: null,
                   verdict: resolvedVerdict.verdict,
                   evidenceReferences: [...resolvedVerdict.evidenceReferences],
