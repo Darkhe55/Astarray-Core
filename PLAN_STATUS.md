@@ -6508,3 +6508,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （审查任务会把链推进一格，用最新版会与任命永久不一致——这一点是实测才发现的）。
 > 新增 `independent-review-appointment-decision`（3 条反例）。全量门禁 **833 files / 5476 passed，exit 0**。
 > 仍余：`standalone-workflow-runner` 的摘要 `boundTaskRevision: 1`（实验独立工作流，无任务链，未动）。
+
+> **没有任务链就不写占位版本（2026-11-18 裁决 B）**
+>
+> `secondaryUserFacingSummarySchema.boundTaskRevision` 改为**可选**；独立侦察工作流不再写占位 `1`，
+> 而是省略字段（下游按"版本未知"处理）。摘要索引端口改为接受 `number | null`。
+> 反例 3 条（省略合法 / 真实版本可读 / 非法版本仍拒绝）。全量门禁 **834 files / 5479 passed，exit 0**。

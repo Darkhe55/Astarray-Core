@@ -115,7 +115,10 @@ export class StandaloneWorkflowRunner {
         summaryId: `summary-${input.missionIdentifier}`,
         secondaryAgentInstanceId: "secondary-1",
         boundTaskIdentifier: input.missionIdentifier,
-        boundTaskRevision: 1,
+        /**
+         * 2026-11-18 用户裁决 B：本工作流**没有任务链** ⇒ 版本未知，
+         * 省略字段而不是写占位的 1。
+         */
         goal: input.scopeQuery,
         currentProgress: "侦察摘要已生成",
         keyResults: [

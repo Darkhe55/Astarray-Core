@@ -88,7 +88,14 @@ export const secondaryUserFacingSummarySchema = z.object({
   secondaryAgentInstanceId: z.string().min(1),
   /** 绑定任务/序列标识（revision 供主 Agent 追问时定向查询）。 */
   boundTaskIdentifier: z.string().min(1),
-  boundTaskRevision: z.number().int().min(1),
+  /**
+   * 绑定任务的权威版本（2026-11-18 用户裁决 B）。
+   *
+   * **可选**：没有任务链的工作流（如独立侦察工作流）没有版本可言，
+   * 此时**省略**该字段 ⇒ 下游按"版本未知"处理；
+   * 不得写占位的 1 冒充版本。
+   */
+  boundTaskRevision: z.number().int().min(1).optional(),
   goal: z.string().min(1),
   currentProgress: z.string().min(1),
   /** 主要结果（含证据引用；不带来源不得冒充主 Agent 发现）。 */

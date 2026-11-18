@@ -22,7 +22,8 @@ export interface MainAgentReportIndexWritePort {
     summaryId: string;
     secondaryAgentInstanceId: string;
     boundTaskIdentifier: string;
-    boundTaskRevision: number;
+    /** 版本未知时传 null（不做占位）。 */
+    boundTaskRevision: number | null;
     goal: string;
     currentProgress: string;
     keyResultsSummary: string;
@@ -104,7 +105,7 @@ export class SecondaryUserFacingSummaryController {
       summaryId: summary.summaryId,
       secondaryAgentInstanceId: summary.secondaryAgentInstanceId,
       boundTaskIdentifier: summary.boundTaskIdentifier,
-      boundTaskRevision: summary.boundTaskRevision,
+      boundTaskRevision: summary.boundTaskRevision ?? null,
       goal: summary.goal,
       currentProgress: summary.currentProgress,
       keyResultsSummary: summary.keyResults
