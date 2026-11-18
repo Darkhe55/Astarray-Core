@@ -6531,3 +6531,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例 3 条；破坏性文件 API 白名单新增该模块（理由：锁文件只含 pid@host + 时间戳）。
 > 全量门禁 **835 files / 5485 passed，exit 0**。
 > 未覆盖：真实双进程 spawn（仍是进程内两实例模拟）；台账（ledger）尚未接入该锁。
+
+> **台账接入跨进程文件锁（2026-11-18）**
+>
+> `CoordinationTaskApplicationLedger` 的 `recordIntent` 与 `updateEntry` 现在都在文件锁内做读-改-写。
+> **反例真的会红**：临时摘掉锁后，两个实例并发记录 40 条只剩 **1 条**（丢 39 条）；
+> 加锁后 40 条全部落盘、状态均为 pending。第二条反例：同一消息并发记录 ⇒ 只有 1 条。
+> 全量门禁 **836 files / 5487 passed，exit 0**。

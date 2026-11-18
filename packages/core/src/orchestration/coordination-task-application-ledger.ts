@@ -22,6 +22,7 @@
  * **权威状态仍然只有一处**（任务链 + 调度器）；台账只记"这件事做到哪一步"，不存业务结论。
  */
 import { promises as fs } from "node:fs";
+import { withFileLock } from "../infra/file-lock.js";
 import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
@@ -112,6 +113,17 @@ export class CoordinationTaskApplicationLedger {
     readonly missionIdentifier: string;
     readonly taskIdentifier: string | null;
     /** 内容指纹：同键异内容必须拒绝，不能"复用"成另一件事。 */
+    readonly contentFingerprint?: string;
+    readonly executionAttemptIdentifier?: string | null;
+  }): Promise<{ readonly outcome: "recorded" | "reused" | "conflict"; readonly reason?: string }> {
+    /** 跨实例：读-改-写必须在文件锁内，否则并发记录会互相覆盖。 */
+    return this.withLedgerLock(() => this.recordIntentUnlocked(input));
+  }
+
+  private async recordIntentUnlocked(input: {
+    readonly messageIdentifier: string;
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string | null;
     readonly contentFingerprint?: string;
     readonly executionAttemptIdentifier?: string | null;
   }): Promise<{ readonly outcome: "recorded" | "reused" | "conflict"; readonly reason?: string }> {
@@ -208,7 +220,19 @@ export class CoordinationTaskApplicationLedger {
     return backupPath;
   }
 
+  /** 台账级别的跨进程互斥（文件锁）。 */
+  private withLedgerLock<T>(action: () => Promise<T>): Promise<T> {
+    return withFileLock({ lockFilePath: `${this.filePath}.lock` }, action);
+  }
+
   private async updateEntry(
+    messageIdentifier: string,
+    updater: (entry: CoordinationTaskApplicationEntry) => CoordinationTaskApplicationEntry,
+  ): Promise<void> {
+    return this.withLedgerLock(() => this.updateEntryUnlocked(messageIdentifier, updater));
+  }
+
+  private async updateEntryUnlocked(
     messageIdentifier: string,
     updater: (entry: CoordinationTaskApplicationEntry) => CoordinationTaskApplicationEntry,
   ): Promise<void> {
