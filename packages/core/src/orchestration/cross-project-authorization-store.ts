@@ -269,6 +269,14 @@ export interface CrossProjectAuthorizationRecord {
   receivingAgentInstanceId?: string | null;
   state: "active" | "revoked";
   revokedReason: string | null;
+  /**
+   * COORD-02 §7（2026-11-18）：**授权代际**。
+   *
+   * 关系首次有效为 1；撤销/收窄/替换在**同一次持久化提交**内递增；
+   * 同一变更重放不重复递增；进程重启不重置（从磁盘读回）。
+   * 旧记录没有该字段 ⇒ 载入时初始化为 1（只初始化当前权威关系，不给历史消息补章）。
+   */
+  authorizationEpoch?: number;
   /** 派生深度：0=用户直接授权；>0 为任务内缩权派生。 */
   derivationDepth: number;
   parentAuthorizationIdentifier: string | null;
@@ -335,6 +343,17 @@ export class CrossProjectAuthorizationStore {
         return;
       }
       for (const authorization of parsed.authorizations ?? []) {
+        /**
+         * 旧记录迁移（COORD-02 §7）：缺省代际初始化为 **1**。
+         * 只初始化权威关系本身，不给历史消息补章。
+         */
+        if (
+          typeof authorization.authorizationEpoch !== "number" ||
+          !Number.isInteger(authorization.authorizationEpoch) ||
+          authorization.authorizationEpoch <= 0
+        ) {
+          authorization.authorizationEpoch = 1;
+        }
         this.authorizationsByIdentifier.set(authorization.authorizationIdentifier, authorization);
       }
       for (const receipt of parsed.copyReceipts ?? []) {
@@ -380,6 +399,43 @@ export class CrossProjectAuthorizationStore {
     return nextWrite;
   }
 
+  /**
+   * 关系标识：项目 + 授权主体 + 收发个体 + 操作种类 + 范围指纹。
+   *
+   * 同一关系重新授权必须取得更高代际；关系变化（换项目/换主体/换接收者/换范围）
+   * 视为**另一条关系**，各自从 1 开始——否则会把无关授权串成一个代际序列。
+   */
+  private buildRelationshipKey(input: {
+    sourceProjectIdentifier: string;
+    targetProjectIdentifier: string;
+    grantedByUserId: string | null;
+    receivingAgentInstanceId?: string | null;
+    operationKind: CrossProjectOperationKind;
+    resourceScope: CrossProjectResourceScope;
+  }): string {
+    return [
+      input.sourceProjectIdentifier,
+      input.targetProjectIdentifier,
+      input.grantedByUserId ?? "",
+      input.receivingAgentInstanceId ?? "",
+      input.operationKind,
+      [...input.resourceScope.pathPrefixes].sort().join(","),
+      [...input.resourceScope.realPaths].sort().join(","),
+    ].join("|");
+  }
+
+  /** 该关系当前已用的最高代际（含已撤销记录）。 */
+  private readHighestEpochForRelationship(relationshipKey: string): number {
+    let highestEpoch = 0;
+    for (const existing of this.authorizationsByIdentifier.values()) {
+      if (this.buildRelationshipKey(existing) !== relationshipKey) {
+        continue;
+      }
+      highestEpoch = Math.max(highestEpoch, existing.authorizationEpoch ?? 1);
+    }
+    return highestEpoch;
+  }
+
   async grantAuthorization(input: {
     authorizationIdentifier: string;
     sourceProjectIdentifier: string;
@@ -400,8 +456,14 @@ export class CrossProjectAuthorizationStore {
     if (input.grantedByUserId === null || input.grantedByUserId.trim() === "") {
       return { outcome: "rejected-not-authenticated-user", record: null };
     }
+    /**
+     * COORD-02 §7：同一关系重新授权 ⇒ 取更高代际（新=1）；关系不同 ⇒ 从 1 开始。
+     */
+    const relationshipKey = this.buildRelationshipKey(input);
+    const highestEpochForRelationship = this.readHighestEpochForRelationship(relationshipKey);
     const record: CrossProjectAuthorizationRecord = {
       authorizationIdentifier: input.authorizationIdentifier,
+      authorizationEpoch: highestEpochForRelationship + 1,
       sourceProjectIdentifier: input.sourceProjectIdentifier,
       sourceProjectRevision: input.sourceProjectRevision,
       targetProjectIdentifier: input.targetProjectIdentifier,
@@ -434,8 +496,16 @@ export class CrossProjectAuthorizationStore {
     if (record === undefined) {
       return;
     }
+    /**
+     * COORD-02 §7：撤销与**代际递增**在同一次持久化提交内完成；
+     * 同一撤销重放（同记录、同理由）不重复递增。
+     */
+    if (record.state === "revoked" && record.revokedReason === revokedReason) {
+      return;
+    }
     record.state = "revoked";
     record.revokedReason = revokedReason;
+    record.authorizationEpoch = (record.authorizationEpoch ?? 1) + 1;
     await this.enqueuePersist();
   }
 

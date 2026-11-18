@@ -6620,3 +6620,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > C1（累积型且无 CAS）**已清空**；A 类共 **18** 处，均有反例。
 > 全量门禁 **849 files / 5509 passed + 4 skipped，exit 0**。
 > 剩余：C2 策略（需裁决）、COORD-02 `authorizationEpoch`（需产品定义）、跨平台证据（环境）。
+
+> **COORD-02 §7 第一部分（2026-11-18）**
+>
+> 授权代际落在**权威授权关系记录**上（`authorizationEpoch`）：首次 1、撤销与递增同一次提交、重放不重复、
+> 重启不重置、同一关系重新授权取更高代际、旧记录载入补 1。反例 6 条全过。
+> 生产盖章 / 传输透传 / 消费复核**尚未接线**，卡状态为 `implemented-unverified`。
+> 全量门禁 **850 files / 5515 passed + 4 skipped，exit 0**。
