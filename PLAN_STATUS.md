@@ -6652,3 +6652,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > `verify:two-process-stale-write` 场景 2（两个真进程、IPC 消息驱动：A 读 → B 提交 → A 旧值 ⇒ 冲突，B 的结果保留）。
 > 审计表第 1 行（`goal-mode`）因此从"权威·待实施"变为"权威·已实施"；其余 14 行仍待做。
 > 全量门禁 **851 files / 5517 passed + 4 skipped，exit 0**。
+
+> **WIRING-04 §36.3：完成收据不可变首次创建（2026-11-19）**
+>
+> `CompletionReceiptStore.save` 加跨进程临界区（锁内重读）：两个实例并发写入**不同内容**时，
+> 只有一个落盘，另一个拿到 `journal-corrupted`，已写入的完成证据**不会被静默覆盖**。
+> 反例：`completion-receipt-immutability.test.ts`（摘掉互斥即红；同内容重复写入仍幂等）+
+> `verify:two-process-stale-write` 场景 3（真两进程：A 覆盖被拒，B 的收据保持）。
+> 全量门禁 **852 files / 5519 passed + 4 skipped，exit 0**。

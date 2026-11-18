@@ -130,3 +130,54 @@ export async function submitGoalStateCas(input: {
     expectedDocumentRevision: input.expectedDocumentRevision,
   });
 }
+
+/**
+ * §36.3 逐存储反例：完成收据（`completion-receipts/<mission>/<task>.json`）。
+ */
+import { CompletionReceiptStore } from "../packages/core/src/orchestration/completion-receipt-store.js";
+
+export function openReceiptStore(stateDirectory: string): CompletionReceiptStore {
+  return new CompletionReceiptStore({ baseDirectory: stateDirectory });
+}
+
+export async function readReceiptSummary(input: {
+  stateDirectory: string;
+  missionIdentifier: string;
+  taskIdentifier: string;
+}): Promise<{ toolCallCount: number | null; artifactPath: string | null }> {
+  const receipt = await openReceiptStore(input.stateDirectory).read(
+    input.missionIdentifier,
+    input.taskIdentifier,
+  );
+  return {
+    toolCallCount: (receipt as unknown as { toolCallCount?: number } | null)?.toolCallCount ?? null,
+    artifactPath:
+      (receipt as unknown as { artifactPaths?: string[] } | null)?.artifactPaths?.[0] ?? null,
+  };
+}
+
+export async function saveReceiptIfAbsent(input: {
+  stateDirectory: string;
+  missionIdentifier: string;
+  taskIdentifier: string;
+  toolCallCount: number;
+  artifactPath: string;
+}): Promise<{ outcome: "written" | "idempotent" | "rejected"; errorCode: string | null }> {
+  try {
+    const result = await openReceiptStore(input.stateDirectory).save({
+      missionIdentifier: input.missionIdentifier,
+      taskIdentifier: input.taskIdentifier,
+      toolCallCount: input.toolCallCount,
+      artifactPaths: [input.artifactPath],
+      hasVerifiedCompletionControlEvent: true,
+      claimedStatus: "complete",
+      taskSequenceRevision: 1,
+    } as never);
+    return { outcome: result.didWrite ? "written" : "idempotent", errorCode: null };
+  } catch (error) {
+    return {
+      outcome: "rejected",
+      errorCode: (error as { errorCode?: string }).errorCode ?? "unknown",
+    };
+  }
+}

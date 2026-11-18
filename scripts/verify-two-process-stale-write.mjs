@@ -70,6 +70,16 @@ process.on("message", async (message) => {
       reply({ requestId: message.requestId, result: state });
       return;
     }
+    if (message.command === "read-receipt") {
+      const result = await entry.readReceiptSummary(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "save-receipt") {
+      const result = await entry.saveReceiptIfAbsent(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
     if (message.command === "seed-goal") {
       const result = await entry.seedGoalState(message);
       reply({ requestId: message.requestId, result });
@@ -315,6 +325,50 @@ async function main() {
     }
 
     console.log("two-process-goal-state-ok: A(旧 revision 1) 冲突，B 的 revision 2 保持");
+
+    /** 6) 完成收据：不可变首次创建（另一个写入者必须被拒，不得静默覆盖）。 */
+    const receiptReadByA = await workerA.request("read-receipt", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-001",
+    });
+    if (receiptReadByA.result.toolCallCount !== null) {
+      throw new Error("完成收据应尚不存在");
+    }
+
+    const receiptByB = await workerB.request("save-receipt", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-001",
+      toolCallCount: 2,
+      artifactPath: "out/b.md",
+    });
+    if (receiptByB.result.outcome !== "written") {
+      throw new Error(`B 的收据应首次写入成功，实际 ${receiptByB.result.outcome}`);
+    }
+
+    const receiptByA = await workerA.request("save-receipt", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-001",
+      toolCallCount: 1,
+      artifactPath: "out/a.md",
+    });
+    if (receiptByA.result.outcome !== "rejected" || receiptByA.result.errorCode !== "journal-corrupted") {
+      throw new Error(
+        `A 的收据应被拒 journal-corrupted，实际 ${receiptByA.result.outcome} / ${String(receiptByA.result.errorCode)}`,
+      );
+    }
+
+    const receiptFinal = await workerA.request("read-receipt", {
+      stateDirectory,
+      missionIdentifier: "mission-1",
+      taskIdentifier: "T-001",
+    });
+    if (receiptFinal.result.artifactPath !== "out/b.md") {
+      throw new Error(`收据应保留 B 的内容，实际 ${String(receiptFinal.result.artifactPath)}`);
+    }
+    console.log("two-process-receipt-ok: A 的覆盖被拒 journal-corrupted，B 的收据保持");
   } finally {
     await Promise.all([workerA.close(), workerB.close()]);
     await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });

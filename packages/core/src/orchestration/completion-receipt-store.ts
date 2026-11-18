@@ -15,6 +15,7 @@
 import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 import { evaluateCompletionReceipt } from "./completion-receipt.js";
@@ -69,6 +70,19 @@ export class CompletionReceiptStore {
       );
     }
     return await this.writeLock.runExclusive(async () => {
+      /**
+       * WIRING-04 §36.3：不可变回执的**原子首次创建**。
+       * 跨进程临界区 + 锁内重读 ⇒ 并发写入不同内容时只有一个能落盘，
+       * 另一个拿到 `journal-corrupted`，不会静默覆盖已写入的完成证据。
+       */
+      return withFileLock(
+        {
+          lockFilePath: `${this.receiptFilePath(
+            receipt.missionIdentifier,
+            receipt.taskIdentifier,
+          )}.lock`,
+        },
+        async () => {
       const existing = await this.read(
         receipt.missionIdentifier,
         receipt.taskIdentifier,
@@ -93,6 +107,8 @@ export class CompletionReceiptStore {
         receipt,
       } satisfies StoredCompletionReceipt);
       return { didWrite: true };
+        },
+      );
     });
   }
 
