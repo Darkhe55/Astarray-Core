@@ -6493,3 +6493,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 卡片校正：COORD-02 → `partially-unblocked`（字段与门禁已就绪，仍缺 `authorizationEpoch` 与生产侧盖章）；
 > COORD-03 → `implemented`（已接入提供者、回访工具端到端可执行；真实会话验收未做）。
 > 全量门禁 **831 files / 5470 passed，exit 0**。
+
+> **巡检轮（2026-11-18 12:00）：跨实例旧 revision 覆盖保护**
+>
+> 新增 `task-chain-stale-write-guard`（3 条）：第二个 `TaskStore` 实例拿旧 revision 写入 ⇒ 被拒
+> （`errorCode: stale-revision`）；拒绝后链上仍是胜出的内容（不被静默覆盖）；递增更新仍正常。
+> 这是**确认既有保护**并钉住它，不是修缺陷。单实例互斥锁不覆盖跨进程，本条只保证"旧 revision 不会静默赢"。
+> 全量门禁 **832 files / 5473 passed，exit 0**。
