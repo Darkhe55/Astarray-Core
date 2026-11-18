@@ -6568,3 +6568,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 第二条反例：同一产物并发登记 ⇒ 只留一条（幂等）。
 > 全量门禁 **839 files / 5493 passed + 4 skipped，exit 0**。
 > 未加锁（已记录，无会红反例故未动）：任务摘要 `summary.json`、裁决存储等单文件"最后写入者胜"的存储。
+
+> **精确映射与投递记录接入文件锁（2026-11-18）**
+>
+> - `MissionTaskSequenceMapStore.bind` / `removeForMissionTask`：加锁后并发绑定不再丢；
+>   **反例会红**：摘掉锁 ⇒ 40 条映射只剩 **20 条**（解析层会因此判"必要输入不可得"）。
+> - `CommDeliveredMessageStore.recordDelivery`：加锁后并发登记 40 条齐全；
+>   **反例会红**：摘掉锁 ⇒ 只剩 **20 条**（丢记录 ⇒ 同一消息可能被重复执行）。
+> - 复核后**未改**：`AgentTaskSequenceStore.updateSequence` 已用 `expectedRevision`
+>   做乐观并发（跨进程冲突会显式报 `stale-revision`，不静默丢），故未加锁。
+> 全量门禁 **841 files / 5496 passed + 4 skipped，exit 0**。
+> 仍待评估（有 revision 但无 stale 守卫）：`collaboration-inbox-store`、`deferred-insertion-queue`。

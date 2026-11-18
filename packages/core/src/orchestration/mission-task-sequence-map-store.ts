@@ -13,6 +13,7 @@
 import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 
@@ -137,6 +138,8 @@ export class MissionTaskSequenceMapStore {
     readonly missionTaskIdentifier: string;
   }): Promise<{ readonly removedCount: number }> {
     return this.writeLock.runExclusive(async () => {
+      /** 跨实例：并发绑定会互相覆盖（丢映射 ⇒ 解析层判"必要输入不可得"）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const kept = document.maps.filter(
         (entry) =>
@@ -155,6 +158,7 @@ export class MissionTaskSequenceMapStore {
         maps: kept,
       } satisfies MissionTaskSequenceMapDocument);
       return { removedCount };
+      });
     });
   }
   /** 按 mission+sequence 列出映射（写回提案使用）。 */
@@ -179,6 +183,8 @@ export class MissionTaskSequenceMapStore {
     readonly mappedAtIso?: string;
   }): Promise<{ readonly didWrite: boolean }> {
     return this.writeLock.runExclusive(async () => {
+      /** 跨实例：并发绑定会互相覆盖（丢映射 ⇒ 解析层判"必要输入不可得"）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const existing = document.maps.find(
         (entry) =>
@@ -208,6 +214,7 @@ export class MissionTaskSequenceMapStore {
         maps: [...document.maps, entry],
       } satisfies MissionTaskSequenceMapDocument);
       return { didWrite: true };
+      });
     });
   }
 }

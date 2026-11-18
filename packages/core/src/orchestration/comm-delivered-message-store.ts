@@ -15,6 +15,7 @@ import path from "node:path";
 import { DomainError } from "../core/errors.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 import {
   type DeliveredMessageRecord,
   type ReplayDedupeOutcome,
@@ -90,6 +91,8 @@ export class CommDeliveredMessageStore {
     readonly deliveredAtIso: string;
   }): Promise<ReplayDedupeOutcome> {
     return await this.lock.runExclusive(async () => {
+      /** 跨实例：并发登记会互相覆盖（丢记录 ⇒ 重复投递）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const { document, isHistoryTrustworthy } = await this.read();
       if (!isHistoryTrustworthy) {
         throw new DomainError(
@@ -119,7 +122,7 @@ export class CommDeliveredMessageStore {
         records,
       } satisfies CommDeliveredMessageDocument);
       return outcome;
+      });
     });
   }
-
 }
