@@ -11,6 +11,7 @@ import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { cleanStaleTempFiles, readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 
 export const STARTUP_RECOVERY_POLICY_SCHEMA_VERSION = 1;
@@ -187,13 +188,70 @@ export class StartupRecoveryPolicyStore {
     return { policy: parseStartupRecoveryPolicy(result.content), isPersisted: true };
   }
 
+  /** 读取策略文档的**策略版本**（旧文件没有该字段 ⇒ 0）。 */
+  async readPolicyRevision(): Promise<number> {
+    const result = await readJsonWithBackupRecovery(
+      this.filePath,
+      `${this.filePath}.bak`,
+    ).catch(() => null);
+    if (result === null) {
+      return 0;
+    }
+    const record = result.content as { policyRevision?: unknown } | null;
+    return typeof record?.policyRevision === "number" && Number.isInteger(record.policyRevision)
+      ? record.policyRevision
+      : 0;
+  }
+
+  /**
+   * 无 CAS 的整文档写入（**最后写入者胜**）。
+   *
+   * WIRING-04 §36.2：用户策略属权威状态，调用方应改用 `writePolicyIfRevision`；
+   * 本方法保留兼容，并在文件锁内串行、同时递增策略版本。
+   */
   async writePolicy(policy: StartupRecoveryPolicy): Promise<StartupRecoveryPolicy> {
     const validated = parseStartupRecoveryPolicy(policy);
     return this.writeLock.runExclusive(async () => {
-      await fs.mkdir(this.directoryPath, { recursive: true });
-      await cleanStaleTempFiles(this.directoryPath, "policy.json");
-      await writeAtomicJson(this.filePath, validated);
-      return validated;
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
+        const currentRevision = await this.readPolicyRevision();
+        await fs.mkdir(this.directoryPath, { recursive: true });
+        await cleanStaleTempFiles(this.directoryPath, "policy.json");
+        await writeAtomicJson(this.filePath, {
+          ...validated,
+          policyRevision: currentRevision + 1,
+        });
+        return validated;
+      });
+    });
+  }
+
+  /**
+   * WIRING-04 §36.2：**跨进程临界区 + 预期策略版本校验**的权威写入。
+   *
+   * 版本不符 ⇒ 返回 `conflict`（不盲写、不重试覆盖）；文件不存在 ⇒ 预期 0。
+   */
+  async writePolicyIfRevision(input: {
+    readonly policy: StartupRecoveryPolicy;
+    readonly expectedRevision: number;
+  }): Promise<{
+    readonly outcome: "written" | "conflict";
+    readonly currentRevision: number;
+  }> {
+    const validated = parseStartupRecoveryPolicy(input.policy);
+    return this.writeLock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
+        const currentRevision = await this.readPolicyRevision();
+        if (currentRevision !== input.expectedRevision) {
+          return { outcome: "conflict" as const, currentRevision };
+        }
+        await fs.mkdir(this.directoryPath, { recursive: true });
+        await cleanStaleTempFiles(this.directoryPath, "policy.json");
+        await writeAtomicJson(this.filePath, {
+          ...validated,
+          policyRevision: currentRevision + 1,
+        });
+        return { outcome: "written" as const, currentRevision: currentRevision + 1 };
+      });
     });
   }
 }

@@ -6677,3 +6677,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例：`startup-recovery-attempts-concurrency.test.ts`（两条，摘掉互斥即红）+
 > `verify:two-process-stale-write` 场景 5（两个真进程各记一次失败 ⇒ 计数为 2）。
 > 全量门禁 **854 files / 5523 passed + 4 skipped，exit 0**。
+
+> **WIRING-04 §36.2 第 3 个权威存储：启动恢复策略（2026-11-19）**
+>
+> `StartupRecoveryPolicyStore.writePolicyIfRevision`：文件锁内重读**策略版本**（文档新增 `policyRevision`，
+> 旧文件按 0），版本不符 ⇒ `conflict`；兼容入口 `writePolicy` 也递增版本，不制造回退。
+> 反例：`startup-policy-stale-write.test.ts`（摘掉版本校验即红）+
+> `verify:two-process-stale-write` 场景 6（真两进程：A 旧版本被拒，B 的策略保持）。
+> 全量门禁 **855 files / 5525 passed + 4 skipped，exit 0**。

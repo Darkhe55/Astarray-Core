@@ -70,6 +70,16 @@ process.on("message", async (message) => {
       reply({ requestId: message.requestId, result: state });
       return;
     }
+    if (message.command === "read-startup-policy") {
+      const result = await entry.readStartupPolicyRevision(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "commit-startup-policy") {
+      const result = await entry.submitStartupPolicyCas(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
     if (message.command === "record-startup-failure") {
       const result = await entry.recordStartupFailure(message);
       reply({ requestId: message.requestId, result });
@@ -442,6 +452,35 @@ async function main() {
       throw new Error(`启动恢复失败计数应为 2，实际 ${String(startupCount.result.attemptCount)}`);
     }
     console.log("two-process-startup-attempts-ok: 两个进程的失败都被计数（2）");
+
+    /** 9) 启动恢复策略：陈旧写入必须冲突，磁盘保留 B 的策略。 */
+    const policyReadByA = await workerA.request("read-startup-policy", { stateDirectory });
+    if (policyReadByA.result.documentRevision !== 0) {
+      throw new Error(`策略版本应为 0，实际 ${String(policyReadByA.result.documentRevision)}`);
+    }
+    const policyByB = await workerB.request("commit-startup-policy", {
+      stateDirectory,
+      expectedRevision: 0,
+      maximumResumePerStartup: 5,
+    });
+    if (policyByB.result.outcome !== "written") {
+      throw new Error(`B 的策略提交应成功，实际 ${policyByB.result.outcome}`);
+    }
+    const policyByA = await workerA.request("commit-startup-policy", {
+      stateDirectory,
+      expectedRevision: 0,
+      maximumResumePerStartup: 3,
+    });
+    if (policyByA.result.outcome !== "conflict") {
+      throw new Error(`A 的陈旧策略写入未被拒绝：${policyByA.result.outcome}`);
+    }
+    const policyFinal = await workerA.request("read-startup-policy", { stateDirectory });
+    if (policyFinal.result.maximumResumePerStartup !== 5) {
+      throw new Error(
+        `策略应保留 B 的 5，实际 ${String(policyFinal.result.maximumResumePerStartup)}`,
+      );
+    }
+    console.log("two-process-startup-policy-ok: A 的旧版本被拒，B 的策略保持");
   } finally {
     await Promise.all([workerA.close(), workerB.close()]);
     await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });

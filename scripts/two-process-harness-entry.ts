@@ -257,3 +257,35 @@ export async function readStartupFailureCount(input: {
   }).readAttempt(input.missionIdentifier);
   return { attemptCount: record?.attemptCount ?? 0 };
 }
+
+/**
+ * §36.2 逐存储反例：启动恢复策略（`startup-recovery/policy.json`）。
+ */
+import {
+  DEFAULT_STARTUP_RECOVERY_POLICY,
+  StartupRecoveryPolicyStore,
+} from "../packages/core/src/orchestration/startup-recovery-policy.js";
+
+export async function readStartupPolicyRevision(input: {
+  stateDirectory: string;
+}): Promise<{ documentRevision: number; maximumResumePerStartup: number | null }> {
+  const store = new StartupRecoveryPolicyStore({ baseDirectory: input.stateDirectory });
+  const revision = await store.readPolicyRevision();
+  const { policy, isPersisted } = await store.readPolicy();
+  return {
+    documentRevision: revision,
+    maximumResumePerStartup: isPersisted ? policy.maximumResumePerStartup : null,
+  };
+}
+
+export async function submitStartupPolicyCas(input: {
+  stateDirectory: string;
+  expectedRevision: number;
+  maximumResumePerStartup: number;
+}): Promise<{ outcome: "written" | "conflict"; currentRevision: number }> {
+  const store = new StartupRecoveryPolicyStore({ baseDirectory: input.stateDirectory });
+  return store.writePolicyIfRevision({
+    policy: { ...DEFAULT_STARTUP_RECOVERY_POLICY, maximumResumePerStartup: input.maximumResumePerStartup },
+    expectedRevision: input.expectedRevision,
+  });
+}
