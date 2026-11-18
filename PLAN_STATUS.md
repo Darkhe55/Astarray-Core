@@ -6579,3 +6579,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   做乐观并发（跨进程冲突会显式报 `stale-revision`，不静默丢），故未加锁。
 > 全量门禁 **841 files / 5496 passed + 4 skipped，exit 0**。
 > 仍待评估（有 revision 但无 stale 守卫）：`collaboration-inbox-store`、`deferred-insertion-queue`。
+
+> **推迟插入队列加锁 + 跨进程写保护审计（2026-11-18）**
+>
+> `DeferredInsertionQueueStore.enqueue` / `markConsumed` 接入文件锁；**反例会红**：摘掉锁 ⇒ 40 条只剩 **20 条**。
+> 新增审计报告 `docs/reports/WIRING04_CROSS_PROCESS_STORAGE_AUDIT.md`：已有锁的 8 处、复核后不需要锁的 3 处（CAS/乐观并发已足够）、
+> 仍待评估的按"累积型 / 单文档整写"分级列出。
+> 全量门禁 **842 files / 5498 passed + 4 skipped，exit 0**。

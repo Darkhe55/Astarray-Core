@@ -14,6 +14,7 @@ import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { DomainError } from "../core/errors.js";
 
 export interface DeferredInsertionEntry {
@@ -118,6 +119,8 @@ export class DeferredInsertionQueueStore {
       );
     }
     return await this.writeLock.runExclusive(async () => {
+      /** 跨实例：并发入队/消费会互相覆盖（丢条目 ⇒ 推迟插入永久丢失）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const existing = document.pending.find(
         (candidate) =>
@@ -144,6 +147,7 @@ export class DeferredInsertionQueueStore {
         consumed: document.consumed,
       } satisfies DeferredInsertionQueueDocument);
       return { didEnqueue: true };
+      });
     });
   }
 
@@ -167,6 +171,8 @@ export class DeferredInsertionQueueStore {
     readonly consumedByGroupIdentifier: string;
   }): Promise<{ readonly didConsume: boolean; readonly droppedCount: number }> {
     return await this.writeLock.runExclusive(async () => {
+      /** 跨实例：并发入队/消费会互相覆盖（丢条目 ⇒ 推迟插入永久丢失）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const target = document.pending.find(
         (candidate) =>
@@ -198,6 +204,7 @@ export class DeferredInsertionQueueStore {
         consumed: nextConsumed.slice(-this.maximumConsumedEntries),
       } satisfies DeferredInsertionQueueDocument);
       return { didConsume: true, droppedCount };
+      });
     });
   }
 }
