@@ -6707,3 +6707,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **反例已实测会红**：摘掉锁 ⇒ 40 条绑定只剩 **20 条**（任务会被挂到错误目标下）。
 > 全量门禁 **858 files / 5529 passed + 4 skipped，exit 0**。
 > §36.2 剩余：`goal-contract-proposal`、`cross-project-ledger`、`work-window-deferred`、`tool-packages` ×3。
+
+> **WIRING-04 §36.2 第 8–9 个权威存储：契约提案确认 + 工作时段推迟队列（2026-11-19）**
+>
+> - `GoalContractProposalStore.save` / `markConfirmed`：跨进程临界区；确认是**一次性**语义
+>   （同一提案并发确认到不同目标 ⇒ 恰一个成功，另一个 `journal-corrupted`）。
+> - `WorkWindowDeferredMissionStore.record` / `remove`：锁内重读；并发登记 40 个 mission 不再丢条目。
+> 反例：`proposal-window-concurrency.test.ts` 两条（摘掉锁即红）。
+> 全量门禁 **859 files / 5531 passed + 4 skipped，exit 0**。
+> §36.2 剩余：`cross-project-ledger`、`tool-packages` ×3。

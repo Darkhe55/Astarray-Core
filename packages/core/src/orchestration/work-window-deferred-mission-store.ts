@@ -16,6 +16,7 @@ import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 
 export const WORK_WINDOW_DEFERRED_SCHEMA_VERSION = 1;
 
@@ -155,6 +156,8 @@ export class WorkWindowDeferredMissionStore {
       return;
     }
     await this.writeLock.runExclusive(async () => {
+      /** WIRING-04 §36.2：跨进程临界区 + 锁内重读（推迟任务不被丢失）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       const nowIso = this.nowIso();
       const existing = document.records.find(
@@ -176,11 +179,14 @@ export class WorkWindowDeferredMissionStore {
           record,
         ],
       } satisfies DeferredDocument);
+      });
     });
   }
 
   async remove(missionIdentifier: string): Promise<void> {
     await this.writeLock.runExclusive(async () => {
+      /** WIRING-04 §36.2：跨进程临界区 + 锁内重读（推迟任务不被丢失）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       const remaining = document.records.filter(
         (record) => record.missionIdentifier !== missionIdentifier,
@@ -192,6 +198,7 @@ export class WorkWindowDeferredMissionStore {
         schemaVersion: 1,
         records: remaining,
       } satisfies DeferredDocument);
+      });
     });
   }
 }

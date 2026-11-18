@@ -9,6 +9,7 @@
  * 本模块只含纯函数与提案存储；不读任务链、不派发、不联网。
  */
 import path from "node:path";
+import { withFileLock } from "../infra/file-lock.js";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
@@ -182,7 +183,13 @@ export class GoalContractProposalStore {
 
   async save(proposal: GoalContractProposal): Promise<void> {
     await this.writeLock.runExclusive(async () => {
-      await writeAtomicJson(this.filePath(proposal.proposalIdentifier), proposal);
+      /** WIRING-04 §36.2：跨进程临界区（同一提案文件不被并发覆盖）。 */
+      await withFileLock(
+        { lockFilePath: `${this.filePath(proposal.proposalIdentifier)}.lock` },
+        async () => {
+          await writeAtomicJson(this.filePath(proposal.proposalIdentifier), proposal);
+        },
+      );
     });
   }
 
@@ -197,6 +204,13 @@ export class GoalContractProposalStore {
     readonly confirmedAtIso: string;
   }): Promise<GoalContractProposal> {
     return await this.writeLock.runExclusive(async () => {
+      /**
+       * WIRING-04 §36.2：确认是**一次性**语义（一份提案不能生出两个目标），
+       * 必须在跨进程临界区内做"读-判-写"。
+       */
+      return withFileLock(
+        { lockFilePath: `${this.filePath(input.proposalIdentifier)}.lock` },
+        async () => {
       const existing = await this.read(input.proposalIdentifier);
       if (existing === null) {
         throw new DomainError(
@@ -220,6 +234,8 @@ export class GoalContractProposalStore {
       };
       await writeAtomicJson(this.filePath(next.proposalIdentifier), next);
       return next;
+        },
+      );
     });
   }
 }
