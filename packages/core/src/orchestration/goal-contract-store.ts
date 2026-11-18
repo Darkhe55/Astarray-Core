@@ -12,6 +12,7 @@
 import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 import { validateGoalContract } from "./goal-contract.js";
@@ -40,7 +41,44 @@ export class GoalContractStore {
       );
     }
     await this.writeLock.runExclusive(async () => {
-      await writeAtomicJson(this.contractFilePath(contract.goalIdentifier), contract);
+      await withFileLock(
+        { lockFilePath: `${this.contractFilePath(contract.goalIdentifier)}.lock` },
+        async () => {
+          await writeAtomicJson(this.contractFilePath(contract.goalIdentifier), contract);
+        },
+      );
+    });
+  }
+
+  /**
+   * WIRING-04 §36.2：**跨进程临界区 + 预期契约版本校验**的权威写入。
+   *
+   * 契约 revision 决定验收判定；旧版本覆盖必须显式冲突。
+   */
+  async saveIfRevision(input: {
+    readonly contract: GoalContract;
+    readonly expectedRevision: number;
+  }): Promise<{ readonly outcome: "written" | "conflict"; readonly currentRevision: number }> {
+    const validation = validateGoalContract(input.contract);
+    if (!validation.isValid) {
+      throw new DomainError(
+        "invalid-task-chain",
+        `目标契约非法，拒绝落盘: ${validation.reasons.join("；")}`,
+      );
+    }
+    return this.writeLock.runExclusive(async () => {
+      return withFileLock(
+        { lockFilePath: `${this.contractFilePath(input.contract.goalIdentifier)}.lock` },
+        async () => {
+          const current = await this.read(input.contract.goalIdentifier);
+          const currentRevision = current?.revision ?? 0;
+          if (currentRevision !== input.expectedRevision) {
+            return { outcome: "conflict" as const, currentRevision };
+          }
+          await writeAtomicJson(this.contractFilePath(input.contract.goalIdentifier), input.contract);
+          return { outcome: "written" as const, currentRevision: input.contract.revision };
+        },
+      );
     });
   }
 

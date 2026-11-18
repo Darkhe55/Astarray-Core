@@ -32,6 +32,7 @@ import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import {
   backupExistingFile,
   readJsonWithBackupRecovery,
@@ -316,6 +317,8 @@ export class ConversationIdentityStore {
    */
   async beginRun(input: BeginRunInput): Promise<ConversationRunRecord> {
     return this.lock.runExclusive(async () => {
+      /** WIRING-04 §36.2：跨进程临界区 + 锁内重读（并发开跑不丢登记）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       const record = document.conversations[input.conversationIdentifier];
       if (record === undefined) {
@@ -375,6 +378,7 @@ export class ConversationIdentityStore {
         },
       });
       return runRecord;
+      });
     });
   }
 

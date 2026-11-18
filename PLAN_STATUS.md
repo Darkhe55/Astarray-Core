@@ -6692,3 +6692,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > （此前连进程内互斥都没有）。并发记录 40 个路径基线不再丢条目——**反例已证**：摘掉锁后条目数明显减少。
 > 反例：`edit-intent-baseline-concurrency.test.ts`。
 > 全量门禁 **856 files / 5526 passed + 4 skipped，exit 0**。
+
+> **WIRING-04 §36.2 第 5–6 个权威存储：会话运行登记 + 目标契约（2026-11-19）**
+>
+> - `ConversationIdentityStore.beginRun`：跨进程临界区 + 锁内重读（并发开跑不再互相覆盖）。
+> - `GoalContractStore.saveIfRevision`：锁内重读契约 revision，旧版本 ⇒ `conflict`；`save` 也加锁。
+> 反例（都会红，已实测）：`identity-contract-concurrency.test.ts` 两条。
+> 全量门禁 **857 files / 5528 passed + 4 skipped，exit 0**。
+> 以上两处尚未接入双进程 harness 场景（下一轮补齐）。
