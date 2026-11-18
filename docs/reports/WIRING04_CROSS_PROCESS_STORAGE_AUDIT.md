@@ -110,4 +110,4 @@ C1（累积型且无 CAS 的存储）**已全部接入文件锁**，A 类共 **1
 
 - §36.2 默认防陈旧写入：**已完成 12 处**（`goal-mode`、`recovery/attempts`、`recovery/policy`、`edit-intent-guard`、`conversation-identity`、`goal-contract`、`goal-mission-binding`、`goal-contract-proposal`、`work-window`、`toolkit lifecycle`、`toolkit feedback`、`cross-project-ledger`），每处均有会红的并发反例；
 - §36.3 不可变回执的原子首次创建语义（同键同内容复用、同键异内容拒绝）；
-- §36.4 两个独立 OS 进程 + IPC 消息控制的反例（A 读、B 提交、A 提交旧值 ⇒ A 被拒且状态为 B 的）。
+- §36.4 两个独立 OS 进程 + IPC 消息控制的反例：**已完成 10 个存储**（task-chain / goal-mode / 收据 / 裁决 / 恢复计数 / 恢复策略 / 契约 / 会话 / 提案 / 工具包反馈）；其余 4 处已有进程内双实例反例。

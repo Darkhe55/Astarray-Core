@@ -70,6 +70,36 @@ process.on("message", async (message) => {
       reply({ requestId: message.requestId, result: state });
       return;
     }
+    if (message.command === "read-goal-contract") {
+      const result = await entry.readGoalContractSummary(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "commit-goal-contract") {
+      const result = await entry.submitGoalContractCas(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "open-conversation") {
+      const result = await entry.openConversationIfNeeded(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "begin-conversation-run") {
+      const result = await entry.beginConversationRun(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "propose-and-confirm") {
+      const result = await entry.saveProposalAndConfirm(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
+    if (message.command === "append-toolkit-feedback") {
+      const result = await entry.appendToolkitFeedback(message);
+      reply({ requestId: message.requestId, result });
+      return;
+    }
     if (message.command === "read-startup-policy") {
       const result = await entry.readStartupPolicyRevision(message);
       reply({ requestId: message.requestId, result });
@@ -481,6 +511,88 @@ async function main() {
       );
     }
     console.log("two-process-startup-policy-ok: A 的旧版本被拒，B 的策略保持");
+
+    /** 10) 目标契约：旧 revision 必须冲突。 */
+    const contractByB = await workerB.request("commit-goal-contract", {
+      stateDirectory,
+      expectedRevision: 0,
+      revision: 1,
+      objectiveText: "B 的契约",
+    });
+    if (contractByB.result.outcome !== "written") {
+      throw new Error(`B 的契约应写入成功，实际 ${contractByB.result.outcome}`);
+    }
+    const contractByA = await workerA.request("commit-goal-contract", {
+      stateDirectory,
+      expectedRevision: 0,
+      revision: 1,
+      objectiveText: "A 的旧契约",
+    });
+    if (contractByA.result.outcome !== "conflict") {
+      throw new Error(`A 的陈旧契约未被拒绝：${contractByA.result.outcome}`);
+    }
+    const contractFinal = await workerA.request("read-goal-contract", { stateDirectory });
+    if (contractFinal.result.objectiveText !== "B 的契约") {
+      throw new Error(`契约应保留 B 的内容，实际 ${String(contractFinal.result.objectiveText)}`);
+    }
+    console.log("two-process-goal-contract-ok: A 的旧 revision 被拒，B 的契约保持");
+
+    /** 11) 会话运行登记：两个进程各开一次，两条都在。 */
+    await workerA.request("open-conversation", {
+      stateDirectory,
+      conversationIdentifier: "conversation-1",
+    });
+    await workerA.request("begin-conversation-run", {
+      stateDirectory,
+      conversationIdentifier: "conversation-1",
+      missionIdentifier: "mission-a",
+    });
+    await workerB.request("begin-conversation-run", {
+      stateDirectory,
+      conversationIdentifier: "conversation-1",
+      missionIdentifier: "mission-b",
+    });
+    const runsAfterB = await workerA.request("begin-conversation-run", {
+      stateDirectory,
+      conversationIdentifier: "conversation-1",
+      missionIdentifier: "mission-c",
+    });
+    if (runsAfterB.result.runCount !== 3) {
+      throw new Error(`会话运行登记应为 3 条，实际 ${String(runsAfterB.result.runCount)}`);
+    }
+    console.log("two-process-conversation-runs-ok: 三个进程侧的运行登记都保留");
+
+    /** 12) 提案确认：一次性语义，第二个确认必须冲突。 */
+    const proposalByB = await workerB.request("propose-and-confirm", {
+      stateDirectory,
+      proposalIdentifier: "proposal-1",
+      confirmedGoalIdentifier: "goal-b",
+      createIfMissing: true,
+    });
+    if (proposalByB.result.outcome !== "written") {
+      throw new Error(`B 的提案确认应成功，实际 ${proposalByB.result.outcome}`);
+    }
+    const proposalByA = await workerA.request("propose-and-confirm", {
+      stateDirectory,
+      proposalIdentifier: "proposal-1",
+      confirmedGoalIdentifier: "goal-a",
+      createIfMissing: false,
+    });
+    if (proposalByA.result.outcome !== "idempotent" && proposalByA.result.outcome !== "conflict") {
+      throw new Error(`A 的重复确认应幂等或冲突，实际 ${proposalByA.result.outcome}`);
+    }
+    console.log("two-process-proposal-confirm-ok: 提案不会被两个目标重复确认");
+
+    /** 13) 工具包反馈：两个进程各追加，记录不丢。 */
+    await workerA.request("append-toolkit-feedback", { stateDirectory, detail: "a" });
+    const feedbackAfterB = await workerB.request("append-toolkit-feedback", {
+      stateDirectory,
+      detail: "b",
+    });
+    if (feedbackAfterB.result.recordCount !== 2) {
+      throw new Error(`工具包反馈应为 2 条，实际 ${String(feedbackAfterB.result.recordCount)}`);
+    }
+    console.log("two-process-toolkit-feedback-ok: 两条反馈都保留");
   } finally {
     await Promise.all([workerA.close(), workerB.close()]);
     await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10 });

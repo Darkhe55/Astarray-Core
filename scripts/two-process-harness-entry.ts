@@ -289,3 +289,165 @@ export async function submitStartupPolicyCas(input: {
     expectedRevision: input.expectedRevision,
   });
 }
+
+/**
+ * §36.2 逐存储反例（第二批）：目标契约、会话运行、提案确认、工具包反馈。
+ */
+import { GoalContractStore } from "../packages/core/src/orchestration/goal-contract-store.js";
+import { GOAL_CONTRACT_SCHEMA_VERSION } from "../packages/core/src/orchestration/goal-contract.js";
+import { ConversationIdentityStore } from "../packages/core/src/orchestration/conversation-identity-store.js";
+import { GoalContractProposalStore } from "../packages/core/src/orchestration/goal-contract-proposal.js";
+import { ToolPackageOperationFeedbackStore } from "../packages/core/src/toolkit/tool-package-operation-control.js";
+
+function buildContractFixture(revision: number, objectiveText: string) {
+  return {
+    schemaVersion: GOAL_CONTRACT_SCHEMA_VERSION,
+    goalIdentifier: "goal-1",
+    revision,
+    ownerIdentifier: "user-1",
+    sourceRequestReference: "request-1",
+    objectiveText,
+    scope: { projectIdentifiers: [], allowedToolNames: null },
+    nonViolableInvariants: [],
+    requirements: [
+      {
+        requirementIdentifier: "req-1",
+        description: "写完说明",
+        weight: 1,
+        completionPredicateKind: "deterministic-check",
+      },
+    ],
+    resourceLimits: {
+      maximumToolCalls: null,
+      maximumWallClockSeconds: null,
+      maximumCostUnits: null,
+    },
+    deadlineIso: null,
+    pauseConditions: [],
+    supersedesRevision: null,
+  } as never;
+}
+
+export async function readGoalContractSummary(input: {
+  stateDirectory: string;
+}): Promise<{ revision: number; objectiveText: string | null }> {
+  const contract = await new GoalContractStore({
+    baseDirectory: input.stateDirectory,
+  }).read("goal-1");
+  return {
+    revision: contract?.revision ?? 0,
+    objectiveText: contract?.objectiveText ?? null,
+  };
+}
+
+export async function submitGoalContractCas(input: {
+  stateDirectory: string;
+  expectedRevision: number;
+  revision: number;
+  objectiveText: string;
+}): Promise<{ outcome: "written" | "conflict"; currentRevision: number }> {
+  return new GoalContractStore({ baseDirectory: input.stateDirectory }).saveIfRevision({
+    contract: buildContractFixture(input.revision, input.objectiveText),
+    expectedRevision: input.expectedRevision,
+  });
+}
+
+export async function openConversationIfNeeded(input: {
+  stateDirectory: string;
+  conversationIdentifier: string;
+}): Promise<{ opened: boolean }> {
+  const store = new ConversationIdentityStore({ baseDirectory: input.stateDirectory });
+  const existing = await store.getConversation(input.conversationIdentifier);
+  if (existing !== null) {
+    return { opened: false };
+  }
+  await store.openConversation({
+    projectIdentifier: "project-alpha",
+    conversationIdentifier: input.conversationIdentifier,
+    mainAgentInstanceIdentifier: "main-agent-1",
+  });
+  return { opened: true };
+}
+
+export async function beginConversationRun(input: {
+  stateDirectory: string;
+  conversationIdentifier: string;
+  missionIdentifier: string;
+}): Promise<{ runCount: number }> {
+  const store = new ConversationIdentityStore({ baseDirectory: input.stateDirectory });
+  await store.beginRun({
+    conversationIdentifier: input.conversationIdentifier,
+    missionIdentifier: input.missionIdentifier,
+    userMessageReference: `message-${input.missionIdentifier}`,
+  });
+  const conversation = await store.getConversation(input.conversationIdentifier);
+  return { runCount: conversation?.runs.length ?? 0 };
+}
+
+export async function saveProposalAndConfirm(input: {
+  stateDirectory: string;
+  proposalIdentifier: string;
+  confirmedGoalIdentifier: string;
+  createIfMissing: boolean;
+}): Promise<{ outcome: "written" | "conflict" | "idempotent"; errorCode: string | null }> {
+  const store = new GoalContractProposalStore({ baseDirectory: input.stateDirectory });
+  if (input.createIfMissing) {
+    await store.save({
+      schemaVersion: 1,
+      proposalIdentifier: input.proposalIdentifier,
+      sourceRequestReference: "request-1",
+      draft: {
+        objectiveText: "把文档补完",
+        requirements: [],
+        scope: { projectIdentifiers: [], allowedToolNames: null },
+        nonViolableInvariants: [],
+        resourceLimits: {
+          maximumToolCalls: null,
+          maximumWallClockSeconds: null,
+          maximumCostUnits: null,
+        },
+        deadlineIso: null,
+        pauseConditions: [],
+      },
+      createdAtIso: "2026-11-18T00:00:00.000Z",
+      expiresAtIso: "2026-12-31T00:00:00.000Z",
+      confirmedAtIso: null,
+      confirmedGoalIdentifier: null,
+    } as never);
+  }
+  try {
+    const existing = await store.read(input.proposalIdentifier);
+    if (existing?.confirmedAtIso !== null && existing?.confirmedAtIso !== undefined) {
+      return { outcome: "idempotent", errorCode: null };
+    }
+    await store.markConfirmed({
+      proposalIdentifier: input.proposalIdentifier,
+      confirmedGoalIdentifier: input.confirmedGoalIdentifier,
+      confirmedAtIso: "2026-11-18T00:00:01.000Z",
+    });
+    return { outcome: "written", errorCode: null };
+  } catch (error) {
+    return {
+      outcome: "conflict",
+      errorCode: (error as { errorCode?: string }).errorCode ?? "unknown",
+    };
+  }
+}
+
+export async function appendToolkitFeedback(input: {
+  stateDirectory: string;
+  detail: string;
+}): Promise<{ recordCount: number }> {
+  const store = new ToolPackageOperationFeedbackStore({ stateDirectory: input.stateDirectory });
+  await store.appendRecord({
+    toolPackageId: "package-1",
+    projectIdentifier: "project-alpha",
+    requestingAgentInstanceId: "agent-1",
+    actionKind: "enable",
+    revision: 1,
+    outcome: "succeeded",
+    detail: input.detail,
+  } as never);
+  const records = await store.listRecords();
+  return { recordCount: records.length };
+}

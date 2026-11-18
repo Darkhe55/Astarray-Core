@@ -6733,3 +6733,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 至此 §36.2 的 12 个权威存储**全部有会红的并发反例**。
 > 全量门禁 **861 files / 5534 passed + 4 skipped，exit 0**
 >（前三次尝试分别红在三个**互不相同**的既有用例；逐个隔离均通过后复跑全绿，属负载抖动）。
+
+> **WIRING-04 §36.4：双进程反例扩到 10 个存储（2026-11-19）**
+>
+> `npm run verify:two-process-stale-write` 现覆盖：task-chain、goal-mode、完成收据、独立裁决、
+> 启动恢复计数、启动策略、目标契约、会话运行登记、提案确认、工具包反馈。
+> 全部由 IPC 消息驱动顺序（A 读 → B 提交 → A 旧值/重复提交），共 10 行 `-ok` 输出。
+> 全量门禁 **861 files / 5534 passed + 4 skipped，exit 0**。
+> 仍未接 harness 的已加锁存储：`edit-intent-guard`、`goal-mission-binding`、`work-window`、`cross-project-ledger`
+>（前两者与后两者都已有进程内双实例反例；harness 覆盖留待后续）。
