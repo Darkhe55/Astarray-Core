@@ -38,6 +38,8 @@
     "verify:mutation-kills": "node scripts/verify-mutation-kills.mjs",
     "verify:read-format-package": "node scripts/verify-read-format-package.mjs",
     "verify:entry-runtime-selection": "node scripts/verify-entry-runtime-selection.mjs",
+    "verify:cross-process-lock": "node scripts/verify-cross-process-file-lock.mjs",
+    "verify:tarball-install": "node scripts/verify-tarball-isolation-install.mjs",
     "verify:provider-tool-protocol": "node scripts/verify-provider-tool-protocol.mjs",
     "verify:provider-live-request": "node scripts/verify-provider-request-against-endpoint.mjs",
     "verify:t07d-r2-04-live": "node scripts/verify-t07d-r2-04-live-write.mjs",

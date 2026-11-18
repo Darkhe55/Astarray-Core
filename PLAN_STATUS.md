@@ -6547,3 +6547,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   **反例会红**：临时让每次取锁路径随机（等于不互斥）⇒ 40 条只落 20 条。
 > - 变异锚点 `comm-journal-no-serialization` 随源码同步（`runWithLock` 单行锚点），自检 **313/313** 有效。
 > 全量门禁 **838 files / 5491 passed，exit 0**（前两次全量分别红在已知抖动用例，隔离全部通过）。
+
+> **真实进程与 tarball 验证补齐（2026-11-18）**
+>
+> 两条此前只靠"实例模拟"的验证，现在有了可复跑的脚本：
+>
+> | 脚本 | 证据 |
+> |---|---|
+> | `npm run verify:cross-process-lock` | 起 **两个独立 vitest 进程**并发更新同一任务链 ⇒ `revision=41`（进程内模拟换成真进程） |
+> | `npm run verify:tarball-install` | `npm pack` → 空目录安装 → 安装后的 `dist/cli.js --version` 输出 `0.1.0` |
+>
+> 子进程 worker（`tests/support/cross-process-lock-worker.test.ts`）未设环境变量时**跳过**，不进入全量门禁。
+> 仍**未做**：跨平台（Linux/macOS）证据。
+> 全量门禁 **838 files / 5491 passed + 4 skipped，exit 0**。
