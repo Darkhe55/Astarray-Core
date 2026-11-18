@@ -76,3 +76,38 @@ C1（累积型且无 CAS 的存储）**已全部接入文件锁**，A 类共 **1
 `goal-dispatch-verdict-journal`、`remote-delivery-outbox`。
 
 **仍待用户裁决**：C2（17 处单文档整写）是否也统一加锁。
+
+## F. §36.1 C2 逐项审计（2026-11-18）
+
+按 §36.1 要求展开：每个实际存储一行。**读者/用途**取该存储自身的导入点与职责说明；
+**判定**按 §36.2：默认按权威状态处理，只有能证明"可重建的展示快照"才允许最后写入者胜。
+
+| # | 存储键（文件） | 生产写入口 | 读者与用途 | 覆盖策略 | 已有保护 | 测试/调用点 | §36 判定 |
+|---|---|---|---|---|---|---|---|
+| 1 | `goal-mode/<goal>.json` | `GoalModeStateStore.write` / `beginTaskGroup` / `finishTaskGroup` | `application-runtime`、目标门禁缓存：决定目标是否激活与任务组状态 | 整文档覆盖 | 进程内互斥 | 目标模式相关测试 | **权威**：激活状态丢更新会改变执行资格 |
+| 2 | `goal-mode/contracts/<goal>.json` | `GoalContractStore.save` / `saveActivated` | `application-runtime`、目标门禁：契约 revision 与验收要求 | 整文档覆盖 | 无 | 目标契约测试 | **权威**：契约 revision 决定验收判定 |
+| 3 | `goal-mode/proposals/<goal>.json` | `GoalContractProposalStore.save` | `application-runtime`、契约提案流程 | 整文档覆盖 | 无 | 提案测试 | **权威**：提案被旧值覆盖会丢失待裁决项 |
+| 4 | `goal-mode/mission-bindings.json` | `GoalMissionBindingStore`（写入方法未在扫描中命中，需在实施时补读） | `application-runtime`、门禁缓存：mission↔目标归属 | 单文档累积 | 无 | 目标绑定测试 | **权威**：归属错乱会错判任务所属目标 |
+| 5 | `startup-recovery/policy.json` | `StartupRecoveryPolicyStore.writePolicy` | `application-runtime`、启动恢复：恢复策略（用户策略） | 整文档覆盖 | 无 | 启动恢复测试 | **权威**：覆盖用户策略 |
+| 6 | `startup-recovery/last-report.json` | `StartupRecoveryReportStore.writeReport` | `application-runtime`：上次恢复结果展示 | 整文档覆盖 | 无 | 启动恢复测试 | **待证快照例外**：需证明"可由重跑恢复生成"，否则按权威 |
+| 7 | `startup-recovery/attempts.json` | `StartupRecoveryAttemptStore.recordAttempt` / `resetAttempt` | `application-runtime`：恢复尝试计数（决定是否再试） | 单文档累积 | 无 | 启动恢复测试 | **权威**：计数丢失会无限重试或不再重试 |
+| 8 | `conversation-identity/conversations.json` | `ConversationIdentityStore.beginRun`（`writeDocument`） | `application-runtime`、`main-controller`：会话↔运行登记 | 单文档累积 | 无 | 会话身份测试 | **权威**：身份/归属记录 |
+| 9 | `agent-memory/**/edit-intent*.json`（由 `AgentEditIntentGuard` 构造） | `recordReadBaseline` / `recordOwnWrite` | `application-runtime`：读基线/自写判定（防越权改他人内容） | 按个体分文件 | 无 | 守卫测试 | **权威**：基线被旧值覆盖会让越权写入被误判合法 |
+| 10 | `collaboration/cross-project-ledger.json` | `sendCrossProjectMessage`（`writeAtomicJson`） | 跨项目协作：发送账本与去重 | 单文档累积 | 无 | 跨项目协作测试 | **权威**：丢失会让同一消息被重复发送 |
+| 11 | `completion-receipts/**` | `CompletionReceiptStore.save` | `main-controller`、`mission-orchestrator`：完成收据（门禁依据） | 按任务分文件 | 无 | 完成门禁反例 | **权威**：收据即完成证明 |
+| 12 | `completion-verdicts/**` | `CompletionVerdictStore.save` | `main-controller`、验收/目标要求评估：独立验收裁决 | 按任务分文件 | 无 | ALIGN-03 反例 | **权威**：裁决逆转会改变 accepted/rework |
+| 13 | `work-window/deferred-missions.json` | `WorkWindowDeferredMissionStore.record` | `application-runtime`：工作时段外推迟的 mission | 单文档累积 | 无 | 工作时段测试 | **权威**：丢记录 ⇒ 推迟任务永不执行 |
+| 14 | `tool-packages/lifecycle.json` | `ToolPackageLifecycleService.persist` | `application-runtime`：工具包生命周期状态 | 整文档覆盖 | 无 | 工具包测试 | **权威**：生命周期逆转会放行已停用包 |
+| 15 | `tool-packages/**`（操作反馈） | `ToolPackageOperationFeedbackStore.appendRecord` | `public-sdk`：工具包操作反馈 | 追加 | 无 | 工具包测试 | **权威**：追加丢失 ⇒ 操作无审计 |
+| 16 | `tool-packages/**`（版本状态） | `ToolPackageVersionStateStore.saveController` | `public-sdk`：版本选择控制 | 整文档覆盖 | 无 | 工具包测试 | **权威**：版本控制状态 |
+
+> 说明：第 6 行是唯一可能属于"可重建展示快照"的候选，但 §36.2 要求**证明**可重建且无执行/授权/恢复决策依赖；
+> 本轮未证明，因此**按权威处理**（与其它行同等对待）。
+
+## G. §36.2–36.4 实施状态（2026-11-18）
+
+**本轮只完成 §36.1（逐项审计）**。以下三项尚未实施，卡内不得视为完成：
+
+- §36.2 默认防陈旧写入：为上表"权威"行加"跨进程临界区 + 预期版本校验 + 合法迁移校验"；
+- §36.3 不可变回执的原子首次创建语义（同键同内容复用、同键异内容拒绝）；
+- §36.4 两个独立 OS 进程 + IPC 消息控制的反例（A 读、B 提交、A 提交旧值 ⇒ A 被拒且状态为 B 的）。
