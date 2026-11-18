@@ -18,6 +18,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 
 export type ContextAdmissionClass = "requires-model-decision" | "archive-only";
 
@@ -95,6 +96,11 @@ export class ContextAdmissionController {
     this.nowUnixMilliseconds = options.nowUnixMilliseconds ?? (() => Date.now());
   }
 
+  /** 同一分区的跨实例互斥（进程内锁管不到另一个进程）。 */
+  private withPartitionLock<T>(partitionKey: string, action: () => Promise<T>): Promise<T> {
+    return withFileLock({ lockFilePath: `${this.filePathFor(partitionKey)}.lock` }, action);
+  }
+
   private filePathFor(partitionKey: string): string {
     return path.join(this.stateDirectory, `${sanitizeFileName(partitionKey)}.json`);
   }
@@ -137,36 +143,41 @@ export class ContextAdmissionController {
         isResumeRequested: false,
       };
     }
-    const document = await this.loadDocument(input.partitionKey);
-    if (document.receipts.some((receipt) => receipt.messageIdentifier === input.messageIdentifier)) {
+    /** 跨实例：读-改-写必须在文件锁内，否则并发准入会丢回执。 */
+    return this.withPartitionLock(input.partitionKey, async () => {
+      const document = await this.loadDocument(input.partitionKey);
+      if (
+        document.receipts.some((receipt) => receipt.messageIdentifier === input.messageIdentifier)
+      ) {
+        return {
+          outcome: "duplicate-admission-ignored",
+          isAdmitted: false,
+          isDelivered: false,
+          isResumeRequested: false,
+        };
+      }
+      await this.saveDocument({
+        ...document,
+        receipts: [
+          ...document.receipts,
+          {
+            messageIdentifier: input.messageIdentifier,
+            recipientIdentifier: input.recipientIdentifier,
+            admissionClass: input.admissionClass,
+            admittedAtIso: new Date(this.nowUnixMilliseconds()).toISOString(),
+            isResumeRequested: false,
+            deliveredAtIso: null,
+            deliveryRequestIdentifier: null,
+          },
+        ],
+      });
       return {
-        outcome: "duplicate-admission-ignored",
-        isAdmitted: false,
+        outcome: "admitted",
+        isAdmitted: true,
         isDelivered: false,
         isResumeRequested: false,
       };
-    }
-    await this.saveDocument({
-      ...document,
-      receipts: [
-        ...document.receipts,
-        {
-          messageIdentifier: input.messageIdentifier,
-          recipientIdentifier: input.recipientIdentifier,
-          admissionClass: input.admissionClass,
-          admittedAtIso: new Date(this.nowUnixMilliseconds()).toISOString(),
-          isResumeRequested: false,
-          deliveredAtIso: null,
-          deliveryRequestIdentifier: null,
-        },
-      ],
     });
-    return {
-      outcome: "admitted",
-      isAdmitted: true,
-      isDelivered: false,
-      isResumeRequested: false,
-    };
   }
 
   /**
@@ -190,6 +201,8 @@ export class ContextAdmissionController {
     if (input.requestIdentifier.trim() === "") {
       throw new Error("记录投递必须给出 requestIdentifier（投递证据不可缺失）");
     }
+    /** 跨实例：投递留痕同样在文件锁内（并发投递不能丢 attempt）。 */
+    return this.withPartitionLock(input.partitionKey, async () => {
     const document = await this.loadDocument(input.partitionKey);
     const target = document.receipts.find(
       (receipt) => receipt.messageIdentifier === input.messageIdentifier,
@@ -248,6 +261,7 @@ export class ContextAdmissionController {
       ),
     });
     return { outcome: "delivered", receipt: deliveredReceipt };
+    });
   }
 
   /** 只读查询：该消息的准入/投递回执（与 journal 的应用状态互相独立）。 */

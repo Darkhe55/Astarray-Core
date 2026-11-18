@@ -6538,3 +6538,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **反例真的会红**：临时摘掉锁后，两个实例并发记录 40 条只剩 **1 条**（丢 39 条）；
 > 加锁后 40 条全部落盘、状态均为 pending。第二条反例：同一消息并发记录 ⇒ 只有 1 条。
 > 全量门禁 **836 files / 5487 passed，exit 0**。
+
+> **准入回执与邮箱日志接入跨进程文件锁（2026-11-18）**
+>
+> - `ContextAdmissionController.admit` / `recordDelivered`：按分区文件加锁；
+>   **反例会红**：摘掉锁后两个实例并发准入 40 条、以及并发记录同一投递，两条用例都红。
+> - `MailboxJournal`：`runExclusive` 内叠加文件锁（进程内队列 + 跨进程互斥），`setContextDeliveryState` 也走该队列；
+>   **反例会红**：临时让每次取锁路径随机（等于不互斥）⇒ 40 条只落 20 条。
+> - 变异锚点 `comm-journal-no-serialization` 随源码同步（`runWithLock` 单行锚点），自检 **313/313** 有效。
+> 全量门禁 **838 files / 5491 passed，exit 0**（前两次全量分别红在已知抖动用例，隔离全部通过）。

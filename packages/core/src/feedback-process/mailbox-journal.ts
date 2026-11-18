@@ -3,6 +3,7 @@
  * 每个接收者一个 journal 文件；投递成功并收到 ack 后才从未投递集合消费。
  * 写入使用原子替换；损坏时走备份恢复，绝不静默覆盖。
  */
+import { withFileLock } from "../infra/file-lock.js";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -112,7 +113,16 @@ export class MailboxJournal {
   private operationQueue: Promise<void> = Promise.resolve();
 
   private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.operationQueue.then(operation, operation);
+    /**
+     * 跨进程：队列只在本实例内串行；另一个进程可能同时改同一份邮箱文件。
+     * 这里用文件锁把"进程内队列 + 跨进程互斥"合在一起（粗粒度，按邮箱目录）。
+     */
+    const runWithLock = () =>
+      withFileLock(
+        { lockFilePath: path.join(this.journalDirectoryPath, ".journal.lock") },
+        operation,
+      );
+    const result = this.operationQueue.then(runWithLock, runWithLock);
     this.operationQueue = result.then(
       () => undefined,
       () => undefined,
@@ -545,6 +555,14 @@ export class MailboxJournal {
 
   /** COORD-01-03 §5：上下文注入状态写入点（与 applicationState 分开）。 */
   async setContextDeliveryState(input: {
+    recipientId: string;
+    messageId: string;
+    contextDeliveryState: MailboxContextDeliveryStateName;
+  }): Promise<void> {
+    return this.runExclusive(() => this.setContextDeliveryStateExclusive(input));
+  }
+
+  private async setContextDeliveryStateExclusive(input: {
     recipientId: string;
     messageId: string;
     contextDeliveryState: MailboxContextDeliveryStateName;

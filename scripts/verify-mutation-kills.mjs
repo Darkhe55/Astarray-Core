@@ -557,7 +557,7 @@ export const MUTATIONS = [
   {
     mutationIdentifier: "comm-journal-no-serialization",
     targetFile: "packages/core/src/feedback-process/mailbox-journal.ts",
-    find: "    const result = this.operationQueue.then(operation, operation);",
+    find: "    const result = this.operationQueue.then(runWithLock, runWithLock);",
     replace: "    const result = operation();",
     testFiles: ["tests/core/unit/comm03-journal-concurrency.test.ts"],
     expectedFailingTestNames: ["① 并发入池 3 条"],
