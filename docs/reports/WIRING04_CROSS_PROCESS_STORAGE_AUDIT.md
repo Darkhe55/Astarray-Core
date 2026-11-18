@@ -111,3 +111,11 @@ C1（累积型且无 CAS 的存储）**已全部接入文件锁**，A 类共 **1
 - §36.2 默认防陈旧写入：**已完成 12 处**（`goal-mode`、`recovery/attempts`、`recovery/policy`、`edit-intent-guard`、`conversation-identity`、`goal-contract`、`goal-mission-binding`、`goal-contract-proposal`、`work-window`、`toolkit lifecycle`、`toolkit feedback`、`cross-project-ledger`），每处均有会红的并发反例；
 - §36.3 不可变回执的原子首次创建语义（同键同内容复用、同键异内容拒绝）；
 - §36.4 两个独立 OS 进程 + IPC 消息控制的反例：**已完成 10 个存储**（task-chain / goal-mode / 收据 / 裁决 / 恢复计数 / 恢复策略 / 契约 / 会话 / 提案 / 工具包反馈）；其余 4 处已有进程内双实例反例。
+
+## H. 收口（2026-11-19）
+
+- A 类（累积型/权威状态）**12 处**全部加跨进程锁，且每处都有"摘掉锁 ⇒ 反例变红"的实测记录；
+- §36.3 的两处不可变回执（完成收据、独立裁决）具备原子首次创建语义；
+- §36.4 的双进程 + IPC harness 覆盖 **10 个存储**（`npm run verify:two-process-stale-write`）；
+- B 类 3 处（CAS/fencing 已有同等语义）按"不重复包装"未动；
+- 例外未处理：`tool-packages/version-state`（controller 版本控制承载）。
