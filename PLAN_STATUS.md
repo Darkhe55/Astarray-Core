@@ -6716,3 +6716,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例：`proposal-window-concurrency.test.ts` 两条（摘掉锁即红）。
 > 全量门禁 **859 files / 5531 passed + 4 skipped，exit 0**。
 > §36.2 剩余：`cross-project-ledger`、`tool-packages` ×3。
+
+> **WIRING-04 §36.2 第 10–12 个权威存储：工具包生命周期 / 操作反馈 / 跨项目账本（2026-11-19）**
+>
+> - `ToolPackageLifecycleService.persist`：新增 `documentRevision` + 锁内比对 ⇒ 旧快照落盘抛 `stale-revision`。
+> - `ToolPackageOperationFeedbackStore.appendRecord`：锁内重读（并发追加不丢审计）。
+> - `sendCrossProjectMessage`：整段读-改-写放进账本文件锁（`sendCrossProjectMessageLocked`）。
+> 反例：`toolkit-package-concurrency.test.ts` 两条（摘掉即红）；账本锁尚无专项反例（下一轮补）。
+> 全量门禁 **860 files / 5533 passed + 4 skipped，exit 0**。
+> **§36.2 的 12 个权威存储至此全部加锁**；仅 `tool-packages/version-state` 未单独处理（其快照由 controller 版本控制）。

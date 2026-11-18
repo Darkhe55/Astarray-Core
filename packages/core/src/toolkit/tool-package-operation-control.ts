@@ -17,6 +17,7 @@
  */
 
 import { DomainError } from "../core/errors.js";
+import { withFileLock } from "../infra/file-lock.js";
 import type { ToolUpgradeAuthorizationController } from "./tool-upgrade-authorization-grant.js";
 import { ToolPackageVersionStateStore } from "./tool-package-version-state-store.js";
 
@@ -267,6 +268,8 @@ export class ToolPackageOperationFeedbackStore {
         );
       }
     }
+    /** WIRING-04 §36.2：跨进程临界区 + 锁内重读（追加记录不被并发覆盖）。 */
+    return withFileLock({ lockFilePath: `${this.feedbackFilePath}.lock` }, async () => {
     const existingRecords = await this.listRecords();
     const record: ToolPackageOperationFeedbackRecord = {
       ...input,
@@ -280,6 +283,7 @@ export class ToolPackageOperationFeedbackStore {
       records: [...existingRecords, record],
     });
     return record;
+    });
   }
 }
 

@@ -15,6 +15,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 import type { MailboxJournal } from "../feedback-process/mailbox-journal.js";
 import {
   evaluateCrossProjectDelivery,
@@ -99,7 +100,7 @@ async function loadLedger(
 }
 
 /** 发送一条跨项目消息（只读协作）。 */
-export async function sendCrossProjectMessage(input: {
+export interface SendCrossProjectMessageInput {
   readonly baseDirectory: string;
   readonly journal: MailboxJournal;
   readonly envelope: CrossProjectEnvelope;
@@ -107,7 +108,24 @@ export async function sendCrossProjectMessage(input: {
   readonly nowIso: string;
   readonly targetLifecycle?: CrossProjectTargetLifecycle;
   readonly targetRoleIdentifiers?: ReadonlyArray<string>;
-}): Promise<CrossProjectSendOutcome> {
+}
+
+export async function sendCrossProjectMessage(
+  input: SendCrossProjectMessageInput,
+): Promise<CrossProjectSendOutcome> {
+  /**
+   * WIRING-04 §36.2：账本是**读-改-写**（先读去重、再追加），
+   * 必须在跨进程临界区内完成，否则并发发送会丢条目/重复发送。
+   */
+  return withFileLock(
+    { lockFilePath: `${ledgerFilePath(input.baseDirectory)}.lock` },
+    () => sendCrossProjectMessageLocked(input),
+  );
+}
+
+async function sendCrossProjectMessageLocked(
+  input: SendCrossProjectMessageInput,
+): Promise<CrossProjectSendOutcome> {
   /**
    * COMM-01（2026-11-14 用户裁决第 1 条）：**先取账本，再判定**。
    *
