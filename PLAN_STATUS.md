@@ -6586,3 +6586,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 新增审计报告 `docs/reports/WIRING04_CROSS_PROCESS_STORAGE_AUDIT.md`：已有锁的 8 处、复核后不需要锁的 3 处（CAS/乐观并发已足够）、
 > 仍待评估的按"累积型 / 单文档整写"分级列出。
 > 全量门禁 **842 files / 5498 passed + 4 skipped，exit 0**。
+
+> **mission 序列绑定与关系索引接入文件锁（2026-11-18）**
+>
+> `MissionSequenceBindingStore.bind`、`MissionRelationIndexStore.upsert` 加锁；
+> **反例都会红**：摘掉锁 ⇒ 40 条绑定只剩 **20 条**；同一 mission 的并发成员追加会互相抹掉。
+> 审计报告已把这两处从 C1 移到"已加锁"。
+> 全量门禁 **843 files / 5500 passed + 4 skipped，exit 0**。

@@ -14,6 +14,7 @@
 import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 
@@ -82,6 +83,8 @@ export class MissionSequenceBindingStore {
       );
     }
     return await this.writeLock.runExclusive(async () => {
+      /** 跨实例：同一文档累积绑定，并发登记会互相覆盖。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const existing = document.bindings.find(
         (binding) => binding.missionIdentifier === input.missionIdentifier,
@@ -107,6 +110,7 @@ export class MissionSequenceBindingStore {
         bindings: [...document.bindings, binding],
       } satisfies MissionSequenceBindingDocument);
       return { didWrite: true, binding };
+      });
     });
   }
 

@@ -17,6 +17,7 @@ import path from "node:path";
 
 import { DomainError } from "../core/errors.js";
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import {
   backupExistingFile,
   cleanStaleTempFiles,
@@ -134,6 +135,10 @@ export class MissionRelationIndexStore {
       throw new DomainError("invalid-task-chain", "任务关系必须绑定非空 mission 标识。");
     }
     return this.lock.runExclusive(async () => {
+      /** 跨实例：并发 upsert 会互相覆盖（成员数组被旧快照抹掉）。 */
+      return withFileLock(
+        { lockFilePath: `${this.relationFilePath(input.missionIdentifier)}.lock` },
+        async () => {
       const current = await this.read(input.missionIdentifier);
       const nowIso = this.nowIso();
       const next: MissionRelationRecord = {
@@ -172,6 +177,8 @@ export class MissionRelationIndexStore {
         this.backupFilePath(input.missionIdentifier),
       );
       return next;
+        },
+      );
     });
   }
 

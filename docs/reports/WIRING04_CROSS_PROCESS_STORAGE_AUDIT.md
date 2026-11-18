@@ -17,6 +17,8 @@
 | `orchestration/mission-task-sequence-map-store.ts` | `bind` / `removeForMissionTask` | 40 条映射只剩 **20 条** |
 | `orchestration/comm-delivered-message-store.ts` | `recordDelivery` | 40 条只剩 **20 条** |
 | `orchestration/deferred-insertion-queue.ts` | `enqueue` / `markConsumed` | 40 条只剩 **20 条** |
+| `orchestration/mission-sequence-binding-store.ts` | `bind` | 40 条绑定只剩 **20 条** |
+| `orchestration/mission-relation-index.ts` | `upsert` | 同一 mission 的并发成员追加互相抹掉 |
 
 ## B. 复核后**不需要**加锁（已有并发保护，故意不动）
 
@@ -34,8 +36,6 @@
 
 **C1. 累积型（丢更新 = 功能不可见，优先）**
 
-- `mission-relation-index`
-- `mission-sequence-binding-store`
 - `goal-requirement-mapping-store`
 - `coordination-retry-store`
 - `coordination-submission-identity`
