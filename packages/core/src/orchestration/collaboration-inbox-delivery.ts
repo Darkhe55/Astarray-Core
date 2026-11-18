@@ -25,6 +25,16 @@ export interface CollaborationInboxTransportPort {
   }>;
 }
 
+/**
+ * COORD-02 §7：消费侧权威复核端口。
+ *
+ * 由上层接到**权威授权存储**（`CrossProjectAuthorizationStore`），
+ * 逐条消息解析当前代际；拒绝则**不投递、不确认已消费**。
+ */
+export type AuthoritativeEpochResolution =
+  | { readonly kind: "authorized"; readonly epoch: number }
+  | { readonly kind: "rejected"; readonly code: string; readonly detail: string };
+
 export interface CollaborationInboxDeliveryReport {
   readonly outcome:
     | "no-inbox"
@@ -38,6 +48,11 @@ export interface CollaborationInboxDeliveryReport {
   readonly retriedCount: number;
   readonly exhaustedCount: number;
   readonly skippedStaleCount: number;
+  /**
+   * COORD-02 §7：因权威授权复核未通过（缺章/查不到/撤销/不可读/旧代）而未投递的条数。
+   * 这些消息保持 `received`（pending），可诊断、不确认已消费。
+   */
+  readonly skippedUnauthorizedCount?: number;
   readonly reason: string;
 }
 
@@ -45,6 +60,14 @@ export interface CollaborationInboxDeliveryOptions {
   readonly maximumPendingPerRecipient: number;
   readonly maximumDeliveryAttempts: number;
   readonly baseRetryBackoffSeconds?: number;
+  /**
+   * COORD-02 §7：提供时，投递前逐条回权威存储复核当前代际。
+   *
+   * 未提供 ⇒ 保持旧行为（只比较调用方给的 `currentAuthorizationEpoch`）。
+   */
+  readonly resolveAuthoritativeAuthorizationEpoch?: (
+    message: CollaborationInboxMessage,
+  ) => Promise<AuthoritativeEpochResolution>;
 }
 
 export class CollaborationInboxDeliveryService {
@@ -120,8 +143,27 @@ export class CollaborationInboxDeliveryService {
     let retriedCount = 0;
     let exhaustedCount = 0;
     let skippedStaleCount = 0;
+    let skippedUnauthorizedCount = 0;
 
     for (const message of pending) {
+      /**
+       * COORD-02 §7：先按**权威授权**复核。拒绝 ⇒ 记录交付尝试并保持 pending，
+       * 绝不进入投递、也不确认已消费。
+       */
+      let authoritativeEpoch: number | undefined;
+      if (this.options.resolveAuthoritativeAuthorizationEpoch !== undefined) {
+        const resolution = await this.options.resolveAuthoritativeAuthorizationEpoch(message);
+        if (resolution.kind === "rejected") {
+          inbox.recordDeliveryFailure(message.messageIdentifier, input.nowIso);
+          skippedUnauthorizedCount += 1;
+          continue;
+        }
+        authoritativeEpoch = resolution.epoch;
+        if (message.authorizationEpoch !== authoritativeEpoch) {
+          skippedStaleCount += 1;
+          continue;
+        }
+      }
       if (
         input.currentAuthorizationEpoch !== undefined &&
         input.currentAuthorizationEpoch !== message.authorizationEpoch
@@ -131,7 +173,13 @@ export class CollaborationInboxDeliveryService {
       }
       const result = await this.transport.send(message);
       if (result.isDelivered) {
-        inbox.markDelivered(message.messageIdentifier, input.nowIso);
+        inbox.markDelivered(
+          message.messageIdentifier,
+          input.nowIso,
+          authoritativeEpoch === undefined
+            ? {}
+            : { currentAuthorizationEpoch: authoritativeEpoch },
+        );
         deliveredCount += 1;
         continue;
       }
@@ -154,6 +202,7 @@ export class CollaborationInboxDeliveryService {
           retriedCount: 0,
           exhaustedCount: 0,
           skippedStaleCount,
+          skippedUnauthorizedCount,
           reason:
             "落盘时发现 revision 冲突（可能被其他写入者更新）：本次投递结果未提交，请重试。",
         };
@@ -173,6 +222,7 @@ export class CollaborationInboxDeliveryService {
       retriedCount,
       exhaustedCount,
       skippedStaleCount,
+      skippedUnauthorizedCount,
       reason:
         "投递完成：成功 " +
         String(deliveredCount) +

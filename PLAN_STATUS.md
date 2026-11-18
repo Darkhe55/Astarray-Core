@@ -6750,3 +6750,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例 5 条全过；**承重证明**：同时摘掉两层代际检查 ⇒ 旧代被放行（用例④变红）。
 > **未做**：生产侧写入权威关系标识、真实模型请求装配点接线（已写入卡内"仍未做"）。
 > 全量门禁 **862 files / 5539 passed + 4 skipped，exit 0**。
+
+> **COORD-02 §7 第三部分：投递通道逐条权威复核（2026-11-19）**
+>
+> `CollaborationInboxDeliveryService` 新增 `resolveAuthoritativeAuthorizationEpoch` 端口：
+> 投递循环内逐条复核；被拒 ⇒ **不调用 transport**、只记交付尝试、状态保持 `received`；
+> 报告新增 `skippedUnauthorizedCount`。未提供端口时保持旧行为。
+> 反例：三条消息（通过/撤销/旧代）⇒ 只投递 1 条；**短路端口即红**（3 条全投）。
+> 全量门禁 **863 files / 5540 passed + 4 skipped，exit 0**。

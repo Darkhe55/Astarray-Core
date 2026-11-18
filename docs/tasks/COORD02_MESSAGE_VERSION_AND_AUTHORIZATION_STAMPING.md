@@ -139,9 +139,33 @@ FeedbackMessage 字段（core/types.ts:513）
 ### 仍未做（不得据此宣布全链已授权）
 
 - **生产盖章**：发送入口尚未把权威 `authorizationIdentifier` 写进入箱消息（当前由调用方提供，缺省 null 会被正确拒绝）；
-- **装配点接线**：真实模型请求装配尚未调用 `deliverWithAuthoritativeAuthorization`；
+- ~~**装配点接线**~~：**已接线**——`CollaborationInboxDeliveryService` 新增 `resolveAuthoritativeAuthorizationEpoch` 端口，投递循环逐条复核（见 §10）。
 - 发件箱/反馈映射的**关系标识**透传（代际已在透传）。
 
 ### 门禁
 
 **862 files / 5539 passed + 4 skipped，exit 0**。
+## 10. 施工记录：§7 第三部分（投递通道逐条复核，2026-11-19）
+
+| §7 要求 | 实现 |
+|---|---|
+| 在组装/投递前按当前授权复核 | `CollaborationInboxDeliveryService` 新增端口 `resolveAuthoritativeAuthorizationEpoch`，在**投递循环内逐条**调用 |
+| 拒绝时不投递 | 被拒消息 `continue`：**不调用 transport**，只 `recordDeliveryFailure` |
+| 不确认已消费 | 状态保持 `received`（pending），落盘后仍可重试/查阅 |
+| 可诊断 | 报告新增 `skippedUnauthorizedCount`；交付尝试计数随消息落盘 |
+| 旧代 | 复核通过但代际不一致 ⇒ `skippedStaleCount`（同样不投递） |
+| 向后兼容 | 未提供端口 ⇒ 保持旧行为（只比较调用方给的 `currentAuthorizationEpoch`） |
+
+### 反例（`authoritative-delivery-assembly.test.ts`）
+
+三条待投递（通过 / 已撤销 / 旧代）⇒ 报告 `delivered=1, skippedUnauthorized=1, skippedStale=1`，
+transport 只被调用 **1** 次，落盘后 `m-ok=delivered` 而 `m-revoked`、`m-stale` 仍是 `received`。
+**承重证明**：把端口分支短路 ⇒ 三条全部被投递（`deliveredCount` 从 1 变 3），用例变红。
+
+### 仍未做
+
+- 生产侧把权威 `authorizationIdentifier` 写入消息（发送入口），以及发件箱/反馈映射的关系标识透传。
+
+### 门禁
+
+**863 files / 5540 passed + 4 skipped，exit 0**。
