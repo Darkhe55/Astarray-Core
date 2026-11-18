@@ -6611,3 +6611,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 审计报告 A 类累计 **14** 处；C1 剩 4 处（`remote-delivery-outbox`、`goal-dispatch-verdict-journal`、
 > `task-ledger-divergence-journal`、`prompt-scan-journal-store`）。
 > 全量门禁 **847 files / 5505 passed + 4 skipped，exit 0**。
+
+> **C1 清空：四个追加型日志接入文件锁（2026-11-18）**
+>
+> `PromptScanJournalStore.append`、`TaskLedgerDivergenceJournal.append`、
+> `GoalDispatchVerdictJournal.record`、`RemoteDeliveryOutbox.enqueue` / `updateState` 全部加锁；
+> 四处**反例都会红**（摘掉锁 ⇒ 40 条只剩 20 条 / 相互覆盖）。
+> C1（累积型且无 CAS）**已清空**；A 类共 **18** 处，均有反例。
+> 全量门禁 **849 files / 5509 passed + 4 skipped，exit 0**。
+> 剩余：C2 策略（需裁决）、COORD-02 `authorizationEpoch`（需产品定义）、跨平台证据（环境）。

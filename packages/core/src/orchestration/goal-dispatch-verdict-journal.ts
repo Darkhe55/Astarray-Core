@@ -16,6 +16,7 @@ import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 
 export interface GoalDispatchVerdictEntry {
   readonly missionIdentifier: string;
@@ -182,6 +183,7 @@ export class GoalDispatchVerdictJournal {
     entry: GoalDispatchVerdictEntry,
   ): Promise<{ readonly droppedRecordCount: number; readonly archivedRecordCount: number }> {
     return await this.writeLock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const nextRecords = [...document.records, entry];
       const overflowCount = Math.max(0, nextRecords.length - this.maximumRecords);
@@ -228,6 +230,7 @@ export class GoalDispatchVerdictJournal {
             : overflowRecords.length,
         archivedRecordCount,
       };
+      });
     });
   }
 

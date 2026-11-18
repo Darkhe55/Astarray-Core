@@ -19,6 +19,7 @@ import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { DomainError } from "../core/errors.js";
 
 export type RemoteDeliveryOperationState =
@@ -179,6 +180,7 @@ export class RemoteDeliveryOutbox {
       );
     }
     return await this.lock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       const existing = document.operations.find(
         (candidate) =>
@@ -211,6 +213,7 @@ export class RemoteDeliveryOutbox {
         operations: [...document.operations, enqueued],
       });
       return { wasEnqueued: true, operation: enqueued };
+      });
     });
   }
 
@@ -222,6 +225,7 @@ export class RemoteDeliveryOutbox {
     readonly observedAtIso: string;
   }): Promise<RemoteDeliveryOperation> {
     return await this.lock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.readDocument();
       let updated: RemoteDeliveryOperation | null = null;
       const operations = document.operations.map((operation) => {
@@ -250,6 +254,7 @@ export class RemoteDeliveryOutbox {
         operations,
       });
       return updated;
+      });
     });
   }
 

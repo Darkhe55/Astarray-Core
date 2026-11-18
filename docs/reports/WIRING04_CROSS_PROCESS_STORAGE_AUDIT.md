@@ -63,3 +63,16 @@
 |---|---|---|
 | 两个**真进程**并发更新任务链 | `npm run verify:cross-process-lock` | `revision=41`（无丢更新） |
 | tarball 隔离安装 | `npm run verify:tarball-install` | 安装后 CLI 输出版本号 |
+
+## E. 2026-11-18 收尾状态
+
+C1（累积型且无 CAS 的存储）**已全部接入文件锁**，A 类共 **18 处**，每处都有"摘掉锁会红"的反例：
+
+`task-store`、`coordination-task-application-ledger`、`context-admission`、`mailbox-journal`、
+`artifact-record-store`、`mission-task-sequence-map-store`、`comm-delivered-message-store`、
+`deferred-insertion-queue`、`mission-sequence-binding-store`、`mission-relation-index`、
+`context-recall-ledger-store`、`coordination-submission-identity`、`coordination-retry-store`、
+`goal-requirement-mapping-store`、`prompt-scan-journal-store`、`task-ledger-divergence-journal`、
+`goal-dispatch-verdict-journal`、`remote-delivery-outbox`。
+
+**仍待用户裁决**：C2（17 处单文档整写）是否也统一加锁。

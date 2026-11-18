@@ -11,6 +11,7 @@ import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 
 export const TASK_LEDGER_DIVERGENCE_JOURNAL_SCHEMA_VERSION = 1;
 export const MAXIMUM_TASK_LEDGER_DIVERGENCE_ENTRIES = 200;
@@ -94,6 +95,7 @@ export class TaskLedgerDivergenceJournal {
     entry: TaskLedgerDivergenceEntry,
   ): Promise<{ readonly recorded: boolean; readonly reason: string }> {
     return await this.lock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const lastEntry = document.entries[document.entries.length - 1];
       if (lastEntry !== undefined && lastEntry.divergenceHash === entry.divergenceHash) {
@@ -109,6 +111,7 @@ export class TaskLedgerDivergenceJournal {
         entries,
       } satisfies TaskLedgerDivergenceJournalDocument);
       return { recorded: true, reason: "已记录差异快照。" };
+      });
     });
   }
 

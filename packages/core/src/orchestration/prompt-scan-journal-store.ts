@@ -12,6 +12,7 @@ import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
+import { withFileLock } from "../infra/file-lock.js";
 
 export interface PersistedPromptScanRecord {
   readonly missionIdentifier: string;
@@ -100,6 +101,7 @@ export class PromptScanJournalStore {
   /** 追加一条；超过上限时挤出最旧并累计丢弃计数。 */
   async append(record: PersistedPromptScanRecord): Promise<void> {
     await this.writeLock.runExclusive(async () => {
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const combined = [...document.records, record];
       const overflow = Math.max(0, combined.length - document.maximumRecords);
@@ -110,6 +112,7 @@ export class PromptScanJournalStore {
         droppedRecordCount: document.droppedRecordCount + overflow,
         records: combined.slice(overflow),
       } satisfies PromptScanJournalDocument);
+      });
     });
   }
 }
