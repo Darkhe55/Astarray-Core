@@ -12,6 +12,7 @@
 import path from "node:path";
 
 import { AsyncMutex } from "../infra/async-mutex.js";
+import { withFileLock } from "../infra/file-lock.js";
 import { readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import { DomainError } from "../core/errors.js";
 
@@ -74,6 +75,8 @@ export class GoalMissionBindingStore {
       );
     }
     return await this.writeLock.runExclusive(async () => {
+      /** WIRING-04 §36.2：跨进程临界区 + 锁内重读（归属绑定不被旧快照覆盖）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const existing = document.bindings.find(
         (binding) => binding.missionIdentifier === input.missionIdentifier,
@@ -98,6 +101,7 @@ export class GoalMissionBindingStore {
         bindings: [...document.bindings, binding],
       } satisfies GoalMissionBindingDocument);
       return binding;
+      });
     });
   }
 
@@ -116,6 +120,8 @@ export class GoalMissionBindingStore {
 
   async unbind(missionIdentifier: string): Promise<boolean> {
     return await this.writeLock.runExclusive(async () => {
+      /** WIRING-04 §36.2：跨进程临界区 + 锁内重读（归属绑定不被旧快照覆盖）。 */
+      return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
       const document = await this.read();
       const nextBindings = document.bindings.filter(
         (binding) => binding.missionIdentifier !== missionIdentifier,
@@ -129,6 +135,7 @@ export class GoalMissionBindingStore {
         bindings: nextBindings,
       } satisfies GoalMissionBindingDocument);
       return true;
+      });
     });
   }
 }

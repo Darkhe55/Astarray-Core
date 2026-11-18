@@ -6700,3 +6700,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例（都会红，已实测）：`identity-contract-concurrency.test.ts` 两条。
 > 全量门禁 **857 files / 5528 passed + 4 skipped，exit 0**。
 > 以上两处尚未接入双进程 harness 场景（下一轮补齐）。
+
+> **WIRING-04 §36.2 第 7 个权威存储：mission↔目标归属绑定（2026-11-19）**
+>
+> `GoalMissionBindingStore.bind` / `unbind`：跨进程临界区 + 锁内重读（并发绑定不再互相覆盖）。
+> **反例已实测会红**：摘掉锁 ⇒ 40 条绑定只剩 **20 条**（任务会被挂到错误目标下）。
+> 全量门禁 **858 files / 5529 passed + 4 skipped，exit 0**。
+> §36.2 剩余：`goal-contract-proposal`、`cross-project-ledger`、`work-window-deferred`、`tool-packages` ×3。
