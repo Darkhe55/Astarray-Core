@@ -6685,3 +6685,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例：`startup-policy-stale-write.test.ts`（摘掉版本校验即红）+
 > `verify:two-process-stale-write` 场景 6（真两进程：A 旧版本被拒，B 的策略保持）。
 > 全量门禁 **855 files / 5525 passed + 4 skipped，exit 0**。
+
+> **WIRING-04 §36.2 第 4 个权威存储：Agent 编辑意图基线（2026-11-19）**
+>
+> `AgentEditIntentGuard.recordReadBaseline` / `recordOwnWrite` 现在整段在**跨进程文件锁**内做读-改-写
+> （此前连进程内互斥都没有）。并发记录 40 个路径基线不再丢条目——**反例已证**：摘掉锁后条目数明显减少。
+> 反例：`edit-intent-baseline-concurrency.test.ts`。
+> 全量门禁 **856 files / 5526 passed + 4 skipped，exit 0**。

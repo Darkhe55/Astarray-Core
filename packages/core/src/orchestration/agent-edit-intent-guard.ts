@@ -22,6 +22,7 @@
  */
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { withFileLock } from "../infra/file-lock.js";
 
 import { backupExistingFile, readJsonWithBackupRecovery, writeAtomicJson } from "../infra/atomic-json.js";
 import {
@@ -134,7 +135,17 @@ export class AgentEditIntentGuard implements AgentEditIntentGuardPort {
     });
   }
 
+  /**
+   * WIRING-04 §36.2：同一个个体的意图文档是**读-改-写**，必须在跨进程临界区内完成。
+   * 并发记录基线若互相覆盖，会让"人工改动"被误判为合法基线（越权覆盖）。
+   */
   async recordReadBaseline(input: RecordReadBaselineInput): Promise<void> {
+    return this.withGuardLock(input.agentInstanceId, () =>
+      this.recordReadBaselineUnlocked(input),
+    );
+  }
+
+  private async recordReadBaselineUnlocked(input: RecordReadBaselineInput): Promise<void> {
     /**
      * 先观察人工工作树（失败不阻塞写入：观察是旁路证据，不是写入门禁）。
      */
@@ -188,6 +199,12 @@ export class AgentEditIntentGuard implements AgentEditIntentGuardPort {
   }
 
   async recordOwnWrite(input: RecordOwnWriteInput): Promise<void> {
+    return this.withGuardLock(input.agentInstanceId, () =>
+      this.recordOwnWriteUnlocked(input),
+    );
+  }
+
+  private async recordOwnWriteUnlocked(input: RecordOwnWriteInput): Promise<void> {
     /**
      * 先观察人工工作树（失败不阻塞写入：观察是旁路证据，不是写入门禁）。
      */
@@ -260,6 +277,14 @@ export class AgentEditIntentGuard implements AgentEditIntentGuardPort {
     return new Date(
       this.nowUnixMilliseconds() + AGENT_EDIT_INTENT_VALIDITY_MILLISECONDS,
     ).toISOString();
+  }
+
+  /** 同一个个体的跨进程互斥（文件锁）。 */
+  private withGuardLock<T>(agentInstanceId: string, action: () => Promise<T>): Promise<T> {
+    return withFileLock(
+      { lockFilePath: `${this.filePathForAgent(agentInstanceId)}.lock` },
+      action,
+    );
   }
 
   private filePathForAgent(agentInstanceId: string): string {
