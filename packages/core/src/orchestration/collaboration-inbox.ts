@@ -61,6 +61,13 @@ export interface CollaborationInboxMessage {
   readonly receivedAtIso: string;
   /** 入箱时的授权代（授权撤销/关系变更后旧代消息不得投递）。 */
   readonly authorizationEpoch: number;
+  /**
+   * COORD-02 §7：**权威授权关系标识**。
+   *
+   * 消费者必须用它回到权威存储复核当前代际；消息自称的章不算证据。
+   * 缺省（历史消息）⇒ 视为"缺章"，不得投递。
+   */
+  readonly authorizationIdentifier?: string | null;
   state: CollaborationInboxState;
   deliveryAttemptCount: number;
   lastFailureAtIso: string | null;
@@ -151,6 +158,10 @@ export class CollaborationInbox {
     readonly originalSourceAgentInstanceId?: string;
     readonly isRelayedRequest?: boolean;
     readonly authorizationEpoch?: number;
+    /**
+     * COORD-02 §7：由本地可信入口写入的**权威关系标识**（不是模型自报）。
+     */
+    readonly authorizationIdentifier?: string | null;
     readonly relayChain?: CollaborationRelayChain;
     /** COMM-01-02 修正：回复携带的原任务产物引用（可选）。 */
     readonly artifactReferences?: ReadonlyArray<{
@@ -280,6 +291,7 @@ export class CollaborationInbox {
       summary: input.summary,
       receivedAtIso: input.receivedAtIso,
       authorizationEpoch: input.authorizationEpoch ?? 0,
+      authorizationIdentifier: input.authorizationIdentifier ?? null,
       state: "received",
       deliveryAttemptCount: 0,
       lastFailureAtIso: null,

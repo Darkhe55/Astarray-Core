@@ -6742,3 +6742,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 全量门禁 **861 files / 5534 passed + 4 skipped，exit 0**。
 > 仍未接 harness 的已加锁存储：`edit-intent-guard`、`goal-mission-binding`、`work-window`、`cross-project-ledger`
 >（前两者与后两者都已有进程内双实例反例；harness 覆盖留待后续）。
+
+> **COORD-02 §7 第二部分：消费侧权威复核（2026-11-19）**
+>
+> 新增 `deliverWithAuthoritativeAuthorization`：投递前回**权威授权存储**复核当前代；
+> 缺章/查不到/已撤销/旧代/入箱代 0 一律拒绝，只记录交付尝试，消息保持 `received`（pending）。
+> 反例 5 条全过；**承重证明**：同时摘掉两层代际检查 ⇒ 旧代被放行（用例④变红）。
+> **未做**：生产侧写入权威关系标识、真实模型请求装配点接线（已写入卡内"仍未做"）。
+> 全量门禁 **862 files / 5539 passed + 4 skipped，exit 0**。

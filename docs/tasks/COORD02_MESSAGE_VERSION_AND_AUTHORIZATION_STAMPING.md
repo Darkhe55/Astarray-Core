@@ -113,3 +113,35 @@ FeedbackMessage 字段（core/types.ts:513）
 ### 门禁
 
 **850 files / 5515 passed + 4 skipped，exit 0**。
+## 9. 施工记录：§7 第二部分（消费侧权威复核，2026-11-19）
+
+### 已实现
+
+| §7 要求 | 实现 |
+|---|---|
+| 在组装请求前按当前授权复核 | `deliverWithAuthoritativeAuthorization`：投递前回权威存储复核 |
+| 缺章 / 缺关系标识 | 拒绝：`authorization-missing` |
+| 关系查不到 | 拒绝：`authorization-missing` |
+| 权威存储不可读 | 拒绝：`authorization-unreadable`（不忙轮询） |
+| 已撤销 | 拒绝：`authorization-revoked` |
+| 旧代 / 错关系 | 拒绝：`authorization-epoch-stale` |
+| 入箱代 0（历史缺章） | 拒绝：`authorization-epoch-absent`（**不因数字相同放行**） |
+| 不确认已消费 | 拒绝时只 `recordDeliveryFailure`，消息保持 `received`（pending） |
+| 消息携带权威关系标识 | `CollaborationInboxMessage.authorizationIdentifier`（缺省 null ⇒ 缺章） |
+
+### 反例（`authoritative-delivery-consumer.test.ts`，5 条）
+
+① 当前代 ⇒ 投递；② 缺关系标识 ⇒ 拒绝且保持 pending；③ 查不到 ⇒ 拒绝；
+④ 撤销 ⇒ 拒绝，重新授权后代际升到 3，带旧代的**新关系**消息仍被拒；
+⑤ 入箱代 0 ⇒ 拒绝。
+**承重证明**：同时摘掉本模块的代际比较与 `markDelivered` 的代际参数 ⇒ 用例④变红（旧代被放行）。
+
+### 仍未做（不得据此宣布全链已授权）
+
+- **生产盖章**：发送入口尚未把权威 `authorizationIdentifier` 写进入箱消息（当前由调用方提供，缺省 null 会被正确拒绝）；
+- **装配点接线**：真实模型请求装配尚未调用 `deliverWithAuthoritativeAuthorization`；
+- 发件箱/反馈映射的**关系标识**透传（代际已在透传）。
+
+### 门禁
+
+**862 files / 5539 passed + 4 skipped，exit 0**。
