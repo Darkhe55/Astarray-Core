@@ -305,8 +305,11 @@ astarray: 反馈进程拒绝非法消息（schema 校验失败）: Invalid UUID 
 - **仓内没有协作消息的生产调用方**：`CollaborationInbox` 只被测试与 SDK 暴露，`inbox deliver` CLI
   只做"投递已有的箱内消息"。决定"协作请求从哪个入口发起（工具 / CLI / 宿主装配）"属于产品形态，
   不能凭空新增入口。**SDK 盖章入口 + 可用的 fork 链路已就绪，宿主接线即可。**
-- 永久性拒绝（schema/身份不合法）的消息会留在补送 outbox 里按 ≤60s 退避**无限重试**（设计上不丢消息）；
-  是否需要"拒绝即归档/告警"待裁决。
+- ~~永久性拒绝（schema/身份不合法）的消息会留在补送 outbox 里按 ≤60s 退避**无限重试**~~：
+  **已裁决并实现（2026-11-21，用户裁决 C）**——子进程回传 `rejectionCode`，永久类转死信并移出补送、
+  暂时类保留退避；见 [ADR-0060 §6](../adr/0060-feedback-idempotent-journal-and-outbox.md)。
+- 协作请求的**读取出口**已按用户裁决 A 接到 `taskSequenceStatus`（同一次读取同时返回
+  `pendingCollaboration`，只读、身份隔离、授权过滤、分页），见 [COORD-04](COORD04_COLLABORATION_INBOX_READ_OUTLET.md)。
 - ~~`feedbackMessageSchema` 仍未登记 `missionIdentifier` / `replyToMessageIdentifier` / `taskRevision` /
   `executionAttempt` 等既有信封字段~~：**同轮已补**（另加 `projectIdentifier` / `taskIdentifier`）。
   反例⑥（往返后字段仍在）在摘掉登记时变红。

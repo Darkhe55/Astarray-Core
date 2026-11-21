@@ -13,7 +13,10 @@ import { DeliveryWorker } from "./delivery-worker.js";
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
 import { TaskStore } from "../infra/task-store.js";
-import type { FeedbackIpcMessage } from "./ipc-protocol.js";
+import type {
+  FeedbackEnqueueRejectionCode,
+  FeedbackIpcMessage,
+} from "./ipc-protocol.js";
 import {
   FEEDBACK_PROTOCOL_VERSION,
   isProtocolVersionSupported,
@@ -119,16 +122,29 @@ export function runFeedbackProcessEntry(
     registeredAgentInstanceIds.add(agentInstanceId);
   }
 
-  async function handleEnqueue(message: FeedbackMessage): Promise<boolean> {
+  async function handleEnqueue(message: FeedbackMessage): Promise<{
+    readonly accepted: boolean;
+    readonly rejectionCode?: FeedbackEnqueueRejectionCode;
+    readonly rejectionReason?: string;
+  }> {
     if (journal === null || deliveryWorker === null) {
-      return false;
+      return {
+        accepted: false,
+        rejectionCode: "journal-unavailable",
+        rejectionReason: "反馈进程尚未就绪（journal 或投递器缺失）。",
+      };
     }
     const parsed = feedbackMessageSchema.safeParse(message);
     if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
       writeStderr(
         `astarray: 反馈进程拒绝非法消息（schema 校验失败）: ${parsed.error.message}\n`,
       );
-      return false;
+      return {
+        accepted: false,
+        rejectionCode: "invalid-message",
+        rejectionReason: firstIssue?.message ?? "schema 校验失败",
+      };
     }
     const validatedMessage = parsed.data;
     if (
@@ -138,12 +154,16 @@ export function runFeedbackProcessEntry(
       writeStderr(
         `astarray: 反馈进程拒绝未注册 Agent 来源的消息: ${validatedMessage.source.agentInstanceId}\n`,
       );
-      return false;
+      return {
+        accepted: false,
+        rejectionCode: "source-not-registered",
+        rejectionReason: `来源未注册: ${validatedMessage.source.agentInstanceId}`,
+      };
     }
     await journal.enqueue(validatedMessage);
     deliveryWorker.resetBackoff(validatedMessage.recipientId);
     scheduleDeliveryAttempt(validatedMessage.recipientId, 0);
-    return true;
+    return { accepted: true };
   }
 
   function scheduleDeliveryAttempt(
@@ -307,11 +327,17 @@ export function runFeedbackProcessEntry(
         break;
       case "enqueue":
         void handleEnqueue(message.message)
-          .then((accepted) => {
+          .then((result) => {
             sendToParent({
               type: "enqueued",
               requestId: message.requestId,
-              accepted,
+              accepted: result.accepted,
+              ...(result.rejectionCode === undefined
+                ? {}
+                : { rejectionCode: result.rejectionCode }),
+              ...(result.rejectionReason === undefined
+                ? {}
+                : { rejectionReason: result.rejectionReason }),
             });
           })
           .catch(() => {
@@ -319,6 +345,8 @@ export function runFeedbackProcessEntry(
               type: "enqueued",
               requestId: message.requestId,
               accepted: false,
+              rejectionCode: "journal-unavailable",
+              rejectionReason: "反馈进程处理入队时发生内部错误。",
             });
           });
         break;

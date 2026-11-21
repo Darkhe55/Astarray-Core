@@ -14,7 +14,7 @@ vi.setConfig({ testTimeout: 60_000 });
 
 
 import type { ChildProcess } from "node:child_process";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { FeedbackMessage } from "../../../packages/core/src/core/types.js";
@@ -201,7 +201,7 @@ describe("ForkFeedbackClient", () => {
     await expect(enqueuePromise).resolves.toBeUndefined();
   });
 
-  it("子进程明确拒绝（accepted=false）⇒ enqueue 抛错且补送文件保留", async () => {
+  it("子进程拒绝但未给原因码 ⇒ 按暂时处理：保留补送文件（兼容旧协议）", async () => {
     const baseDirectory = await mkdtemp(path.join(os.tmpdir(), "feedback-client-reject-"));
     try {
       const fakeChild = new FakeChildProcess();
@@ -228,7 +228,7 @@ describe("ForkFeedbackClient", () => {
       /**
        * 2026-11-21：此前这里 **静默成功** —— 子进程 schema/身份校验拒绝、回 `accepted:false`，
        * 客户端却照样删除补送文件并让调用方以为"已入队"（消息就此丢失）。
-       * 拒绝必须作为失败上抛，补送文件保留（后续补送仍会被拒，但账目不再撒谎）。
+       * 拒绝必须作为失败上抛；没有原因码时按"暂时"保留补送（旧协议兼容）。
        */
       await expect(enqueuePromise).rejects.toMatchObject({
         errorCode: "feedback-message-rejected",
@@ -237,6 +237,163 @@ describe("ForkFeedbackClient", () => {
         await readdir(path.join(baseDirectory, "feedback-client-outbox"))
       ).filter((name) => name.endsWith(".json"));
       expect(outboxFiles).toHaveLength(1);
+    } finally {
+      await rm(baseDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * 用户裁决 C（2026-11-21）：**永久性拒绝**（schema/身份不合法）不得无限重试。
+   * 必须转死信并移出补送队列；死信保留原因与原文，供人工查阅/重放。
+   */
+  it("永久性拒绝（invalid-message）⇒ 进死信、移出补送、不再重试", async () => {
+    const baseDirectory = await mkdtemp(path.join(os.tmpdir(), "feedback-client-dead-"));
+    try {
+      const fakeChild = new FakeChildProcess();
+      const client = createWiredClient(fakeChild);
+      client.sendHello(baseDirectory, 5_000);
+      fakeChild.emitInbound({
+        type: "ready",
+        protocolVersion: FEEDBACK_PROTOCOL_VERSION,
+        processPid: 99,
+      });
+      await client.waitUntilReady();
+
+      const message = makeMessage("scheduler-1", "key-dead");
+      const enqueuePromise = client.enqueue(message);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const enqueueRequest = fakeChild.sentMessages.find(
+        (candidate) => candidate.type === "enqueue",
+      );
+      fakeChild.emitInbound({
+        type: "enqueued",
+        requestId: (enqueueRequest as { requestId: string }).requestId,
+        accepted: false,
+        rejectionCode: "invalid-message",
+        rejectionReason: "Invalid UUID",
+      });
+
+      await expect(enqueuePromise).rejects.toMatchObject({
+        errorCode: "feedback-message-rejected",
+        rejectionCode: "invalid-message",
+      });
+
+      const outboxFiles = (
+        await readdir(path.join(baseDirectory, "feedback-client-outbox"))
+      ).filter((name) => name.endsWith(".json"));
+      expect(outboxFiles).toHaveLength(0);
+
+      const deadLetterDirectory = path.join(baseDirectory, "feedback-client-dead-letter");
+      const deadLetterFiles = (await readdir(deadLetterDirectory)).filter((name) =>
+        name.endsWith(".json"),
+      );
+      expect(deadLetterFiles).toHaveLength(1);
+      const deadLetter = JSON.parse(
+        await readFile(path.join(deadLetterDirectory, deadLetterFiles[0] as string), "utf8"),
+      ) as { rejectionCode?: string; rejectionReason?: string; messageId?: string };
+      expect(deadLetter.rejectionCode).toBe("invalid-message");
+      expect(deadLetter.rejectionReason).toContain("Invalid UUID");
+      expect(deadLetter.messageId).toBe(message.messageId);
+    } finally {
+      await rm(baseDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * 暂时性拒绝（journal-unavailable）必须保留补送文件，且**不进死信**——
+   * 否则进程刚起时的正常抖动会把消息永久判死。
+   */
+  it("暂时性拒绝（journal-unavailable）⇒ 保留补送文件、不进死信", async () => {
+    const baseDirectory = await mkdtemp(path.join(os.tmpdir(), "feedback-client-transient-"));
+    try {
+      const fakeChild = new FakeChildProcess();
+      const client = createWiredClient(fakeChild);
+      client.sendHello(baseDirectory, 5_000);
+      fakeChild.emitInbound({
+        type: "ready",
+        protocolVersion: FEEDBACK_PROTOCOL_VERSION,
+        processPid: 99,
+      });
+      await client.waitUntilReady();
+
+      const enqueuePromise = client.enqueue(makeMessage("scheduler-1", "key-transient"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const enqueueRequest = fakeChild.sentMessages.find(
+        (candidate) => candidate.type === "enqueue",
+      );
+      fakeChild.emitInbound({
+        type: "enqueued",
+        requestId: (enqueueRequest as { requestId: string }).requestId,
+        accepted: false,
+        rejectionCode: "journal-unavailable",
+        rejectionReason: "进程未就绪",
+      });
+
+      await expect(enqueuePromise).rejects.toMatchObject({
+        errorCode: "feedback-message-rejected",
+        rejectionCode: "journal-unavailable",
+      });
+      const outboxFiles = (
+        await readdir(path.join(baseDirectory, "feedback-client-outbox"))
+      ).filter((name) => name.endsWith(".json"));
+      expect(outboxFiles).toHaveLength(1);
+      await expect(
+        readdir(path.join(baseDirectory, "feedback-client-dead-letter")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(baseDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("补送遇到永久性拒绝 ⇒ 本轮转死信并计数，不再退回退避队列", async () => {
+    const baseDirectory = await mkdtemp(path.join(os.tmpdir(), "feedback-client-flush-dead-"));
+    try {
+      const fakeChild = new FakeChildProcess();
+      const client = createWiredClient(fakeChild);
+      client.sendHello(baseDirectory, 5_000);
+      fakeChild.emitInbound({
+        type: "ready",
+        protocolVersion: FEEDBACK_PROTOCOL_VERSION,
+        processPid: 99,
+      });
+      await client.waitUntilReady();
+
+      // 先制造一条"暂时失败"留下补送文件。
+      const enqueuePromise = client.enqueue(makeMessage("scheduler-1", "key-flush-dead"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const firstRequest = fakeChild.sentMessages.find(
+        (candidate) => candidate.type === "enqueue",
+      );
+      fakeChild.emitInbound({
+        type: "enqueued",
+        requestId: (firstRequest as { requestId: string }).requestId,
+        accepted: false,
+        rejectionCode: "journal-unavailable",
+        rejectionReason: "进程未就绪",
+      });
+      await expect(enqueuePromise).rejects.toMatchObject({
+        errorCode: "feedback-message-rejected",
+      });
+
+      const flushPromise = client.flushPendingOutbox();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const secondRequest = fakeChild.sentMessages
+        .filter((candidate) => candidate.type === "enqueue")
+        .at(-1);
+      fakeChild.emitInbound({
+        type: "enqueued",
+        requestId: (secondRequest as { requestId: string }).requestId,
+        accepted: false,
+        rejectionCode: "invalid-message",
+        rejectionReason: "Invalid UUID",
+      });
+      const report = await flushPromise;
+      expect(report.deadLetteredCount).toBe(1);
+      expect(report.remainingCount).toBe(0);
+      const deadLetterFiles = (
+        await readdir(path.join(baseDirectory, "feedback-client-dead-letter"))
+      ).filter((name) => name.endsWith(".json"));
+      expect(deadLetterFiles).toHaveLength(1);
     } finally {
       await rm(baseDirectory, { recursive: true, force: true });
     }

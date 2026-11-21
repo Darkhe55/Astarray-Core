@@ -175,6 +175,9 @@ import {
   SessionShutdownCoordinator,
 } from "../tools/session-shutdown-and-export.js";
 import { RegisteredAgentDirectory } from "../orchestration/registered-agent-directory.js";
+import { CollaborationInboxStore } from "../orchestration/collaboration-inbox-store.js";
+import { CrossProjectAuthorizationStore } from "../orchestration/cross-project-authorization-store.js";
+import { createCollaborationInboxReadPort } from "../orchestration/collaboration-inbox-read.js";
 import type { ProjectReconnaissanceController } from "../orchestration/project-reconnaissance-controller.js";
 import { StandaloneWorkflowRunner } from "../orchestration/standalone-workflow-runner.js";
 import type {
@@ -1569,6 +1572,16 @@ export async function createApplicationRuntime(
    */
   const sequenceStatusController =
     new sequenceControllerModule.TaskSequenceStatusController(agentTaskSequenceStore);
+  /**
+   * 2026-11-21（用户裁决 A）：协作收件箱的**只读读取端口**。
+   *
+   * 与 `taskSequenceStatus` 共用同一读取出口：读取不改变消息状态，也不代替投递；
+   * 授权复核用只读判定（不改状态）。
+   */
+  const collaborationInboxReadPort = createCollaborationInboxReadPort({
+    inboxStore: new CollaborationInboxStore({ baseDirectory: stateDirectory }),
+    authorizationStore: new CrossProjectAuthorizationStore({ baseDirectory: stateDirectory }),
+  });
   const conversationTaskInsertionController = new ConversationTaskInsertionController({
     manageController: sequenceManageController,
     authenticatedUserId,
@@ -3717,6 +3730,13 @@ export async function createApplicationRuntime(
       workspaceBoundary: taskWorkspaceBoundary,
       temporaryDirectoryPath,
       workerAllowedToolNames: input.allowedToolNames,
+      /**
+       * 2026-11-21（用户裁决 A）：把**任务序列只读控制面**与**协作收件箱只读端口**
+       * 接进工具执行上下文 —— `taskSequenceStatus` 是 Agent 读取"任务列表 + 待处理协作请求"
+       * 的统一出口；不接线时该工具在生产路径恒报"控制面未装配"。
+       */
+      taskSequenceStatusController: sequenceStatusController,
+      collaborationInboxReadPort,
       /** REPAIR（T07E-04）：把任务链预算透传给策略包装层（未传则不生效）。 */
       ...(input.taskChainCumulativeBudget === undefined
         ? {}

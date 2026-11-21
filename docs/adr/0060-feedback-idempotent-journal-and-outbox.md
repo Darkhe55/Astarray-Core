@@ -67,3 +67,27 @@ supervisor 心跳
 
 **implemented-unverified**：未编写/未运行测试、未做人工验收。
 已执行：`npm run typecheck` exit 0、`npx eslint <本批文件>` exit 0、`npm run build` 成功。
+
+## 6. 更新（2026-11-21，用户裁决 C）：永久性拒绝分类
+
+§4 第一条"补送无上限"对**永久性**拒绝（schema 非法、来源未登记）等于无限重试：
+同一份内容永远不会通过，却每 ≤60 秒占一次 IPC、刷一次子进程日志。
+
+**决定与实现**：
+
+- 子进程 `enqueued` 应答新增 `rejectionCode`：
+  `invalid-message` / `source-not-registered` / `journal-unavailable`；
+- 父进程按码分类：
+  - **永久**（前两者）⇒ 原子写 `<state>/feedback-client-dead-letter/<sha256(idempotencyKey)>.json`
+    （含 `rejectionCode` / `rejectionReason` / 原文 / 时间），随后**移出补送队列**；
+  - **暂时**（`journal-unavailable`、超时、断开、旧协议无码）⇒ 保留补送，继续 1s→…→60s 退避；
+- `flushPendingOutbox()` 新增 `deadLetteredCount`；
+- 死信写入失败时**不删** outbox 文件（宁可继续重试，也不丢消息）。
+
+**反例**（`tests/core/unit/feedback-client.test.ts`）：
+① 永久拒绝 ⇒ 抛错、outbox 清空、死信含原因与消息标识；
+② 暂时拒绝 ⇒ 保留 outbox、不产生死信目录；
+③ 补送遇到永久拒绝 ⇒ `deadLetteredCount=1`、`remainingCount=0`；
+④ 无原因码（旧协议）⇒ 按暂时处理（兼容）。
+
+**仍未做**：死信的**人工重放/清理入口**；`flushPendingOutbox()` 计数的 UI/日志消费（§4 第二条仍未做）。

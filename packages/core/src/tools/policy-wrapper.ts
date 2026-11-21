@@ -24,6 +24,7 @@ import type { EvidenceSearchAgentPort } from "./evidence-search-agent-port.js";
 import type { EvidenceQueryGuard } from "./evidence-search-agent-port.js";
 import type { EvidenceBundleBuilder } from "./evidence-bundle-builder.js";
 import type { TaskSequenceStatusController } from "../orchestration/task-sequence-controllers.js";
+import type { CollaborationInboxReadPort } from "../orchestration/collaboration-inbox-read.js";
 import type { AgentEditIntentGuardPort } from "../orchestration/agent-edit-intent-guard.js";
 import type { LocalToolPolicyEngine } from "./local-tool-policy-engine.js";
 import { InstallationGateGuard } from "./installation-gate-guard.js";
@@ -87,6 +88,8 @@ export interface PolicyWrapperOptions {
   protectedStoragePolicy: ProtectedStoragePolicy;
   /** T05C：任务序列状态控制面（只读工具；未装配时该工具调用报错）。 */
   taskSequenceStatusController?: TaskSequenceStatusController | null;
+  /** 2026-11-21（裁决 A）：协作收件箱只读端口（装配后随任务快照一起读出）。 */
+  collaborationInboxReadPort?: CollaborationInboxReadPort | null;
   /**
    * T06C / ADR-0018：敏感内容禁读策略。装配后所有读通道在返回内容前执行
    * 路径身份 + 内容 DLP 检查；**未装配即放行**，因此生产装配必须注入。
@@ -450,6 +453,8 @@ export class PolicyWrapper implements ToolPort {
           protectedStoragePolicy: this.options.protectedStoragePolicy,
           taskSequenceStatusController:
             this.options.taskSequenceStatusController ?? null,
+          collaborationInboxReadPort:
+            this.options.collaborationInboxReadPort ?? null,
           sensitiveContentAccessPolicy:
             this.options.sensitiveContentAccessPolicy ?? null,
           /** SEC-02-03：把"生产必须要求策略"透传给内置工具执行上下文。 */

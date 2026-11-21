@@ -57,48 +57,15 @@ export async function deliverWithAuthoritativeAuthorization(input: {
     };
   };
 
-  const authorizationIdentifier = message.authorizationIdentifier ?? null;
-  if (authorizationIdentifier === null || authorizationIdentifier.trim() === "") {
-    /** 历史消息/缺字段：不能把"没有章"当作免验。 */
-    return reject("authorization-missing", "消息缺少权威授权关系标识：不投递。");
+  const verdict = await evaluateAuthoritativeAuthorization({
+    authorizationStore: input.authorizationStore,
+    authorizationIdentifier: message.authorizationIdentifier ?? null,
+    authorizationEpoch: message.authorizationEpoch,
+  });
+  if (!verdict.isAuthorized) {
+    return reject(verdict.rejectionCode, verdict.reason);
   }
-
-  let record: Awaited<ReturnType<CrossProjectAuthorizationStore["getAuthorization"]>>;
-  try {
-    await input.authorizationStore.ensureLoaded();
-    record = await input.authorizationStore.getAuthorization(authorizationIdentifier);
-  } catch {
-    return reject("authorization-unreadable", "权威授权存储暂不可读：不投递（不忙轮询）。");
-  }
-
-  if (record === null) {
-    return reject(
-      "authorization-missing",
-      `权威存储中查不到授权关系 ${authorizationIdentifier}：不投递。`,
-    );
-  }
-  if (record.state === "revoked") {
-    return reject(
-      "authorization-revoked",
-      `授权关系 ${authorizationIdentifier} 已被撤销（${String(
-        record.revokedReason ?? "无理由",
-      )}）：不投递。`,
-    );
-  }
-
-  const currentEpoch = record.authorizationEpoch ?? 1;
-  /** 入箱代 0 / 缺省 ⇒ 视作缺章（历史消息不得因数字相同被放行）。 */
-  if (message.authorizationEpoch <= 0) {
-    return reject("authorization-epoch-absent", "消息授权代为 0（缺章）：不投递。");
-  }
-  if (message.authorizationEpoch !== currentEpoch) {
-    return reject(
-      "authorization-epoch-stale",
-      `授权代已变更（入箱 ${String(message.authorizationEpoch)}，当前 ${String(
-        currentEpoch,
-      )}）：在途旧消息不得落入新任务。`,
-    );
-  }
+  const currentEpoch = verdict.authorizationEpoch;
 
   const delivered = input.inbox.markDelivered(input.messageIdentifier, input.deliveredAtIso, {
     currentAuthorizationEpoch: currentEpoch,
@@ -111,4 +78,88 @@ export async function deliverWithAuthoritativeAuthorization(input: {
     authorizationEpoch: currentEpoch,
     reason: delivered.reason,
   };
+}
+
+/** 授权复核的拒绝码（`message-missing` 只属于投递路径，不在此列）。 */
+export type AuthoritativeAuthorizationRejectionCode = Exclude<
+  AuthoritativeDeliveryRejectionCode,
+  "message-missing"
+>;
+
+export type AuthoritativeAuthorizationVerdict =
+  | { readonly isAuthorized: true; readonly authorizationEpoch: number }
+  | {
+      readonly isAuthorized: false;
+      readonly rejectionCode: AuthoritativeAuthorizationRejectionCode;
+      readonly reason: string;
+    };
+
+/**
+ * 2026-11-21（用户裁决 A）：**只读**的权威授权判定。
+ *
+ * 与投递前的复核使用同一套规则，但**不记录交付失败、不改变消息状态**——
+ * 协作消息的"读取出口"必须无副作用（读取 ≠ 投递 ≠ 确认）。
+ */
+export async function evaluateAuthoritativeAuthorization(input: {
+  readonly authorizationStore: CrossProjectAuthorizationStore;
+  readonly authorizationIdentifier: string | null | undefined;
+  readonly authorizationEpoch: number;
+}): Promise<AuthoritativeAuthorizationVerdict> {
+  const authorizationIdentifier = input.authorizationIdentifier ?? null;
+  if (authorizationIdentifier === null || authorizationIdentifier.trim() === "") {
+    /** 历史消息/缺字段：不能把"没有章"当作免验。 */
+    return {
+      isAuthorized: false,
+      rejectionCode: "authorization-missing",
+      reason: "消息缺少权威授权关系标识：不视为已授权。",
+    };
+  }
+
+  let record: Awaited<ReturnType<CrossProjectAuthorizationStore["getAuthorization"]>>;
+  try {
+    await input.authorizationStore.ensureLoaded();
+    record = await input.authorizationStore.getAuthorization(authorizationIdentifier);
+  } catch {
+    return {
+      isAuthorized: false,
+      rejectionCode: "authorization-unreadable",
+      reason: "权威授权存储暂不可读（不忙轮询）。",
+    };
+  }
+
+  if (record === null) {
+    return {
+      isAuthorized: false,
+      rejectionCode: "authorization-missing",
+      reason: `权威存储中查不到授权关系 ${authorizationIdentifier}。`,
+    };
+  }
+  if (record.state === "revoked") {
+    return {
+      isAuthorized: false,
+      rejectionCode: "authorization-revoked",
+      reason: `授权关系 ${authorizationIdentifier} 已被撤销（${String(
+        record.revokedReason ?? "无理由",
+      )}）。`,
+    };
+  }
+
+  const currentEpoch = record.authorizationEpoch ?? 1;
+  if (input.authorizationEpoch <= 0) {
+    return {
+      isAuthorized: false,
+      rejectionCode: "authorization-epoch-absent",
+      reason: "消息授权代为 0（缺章）。",
+    };
+  }
+  if (input.authorizationEpoch !== currentEpoch) {
+    return {
+      isAuthorized: false,
+      rejectionCode: "authorization-epoch-stale",
+      reason: `授权代已变更（入箱 ${String(input.authorizationEpoch)}，当前 ${String(
+        currentEpoch,
+      )}）。`,
+    };
+  }
+  return { isAuthorized: true, authorizationEpoch: currentEpoch };
 }

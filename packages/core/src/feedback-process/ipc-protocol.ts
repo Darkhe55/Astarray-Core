@@ -4,6 +4,19 @@
  * 所有消息必须携带 protocolVersion 与 requestId（指令类）。
  */
 import type { AgentStatus, FeedbackMessage, TransportHealth } from "../core/types.js";
+
+/**
+ * 入队拒绝原因（2026-11-21）：父进程按它区分永久/暂时。
+ *
+ * - `invalid-message`：schema/构造非法 ⇒ **永久**，重试同样的内容永远不会通过；
+ * - `source-not-registered`：来源身份未登记 ⇒ **永久**（旧消息不因事后登记自动获得合法性；
+ *   需要时由人从死信重放，而不是无限重试）；
+ * - `journal-unavailable`：进程未就绪/journal 不可用 ⇒ **暂时**，保留补送继续退避。
+ */
+export type FeedbackEnqueueRejectionCode =
+  | "invalid-message"
+  | "source-not-registered"
+  | "journal-unavailable";
 import { FEEDBACK_PROTOCOL_VERSION } from "../core/types.js";
 
 export type FeedbackIpcMessage =
@@ -54,6 +67,12 @@ export type FeedbackIpcMessage =
       type: "enqueued";
       requestId: string;
       accepted: boolean;
+      /**
+       * 2026-11-21（用户裁决 C）：拒绝时回传**可分类的原因**，父进程据此区分
+       * "永久性拒绝"（进死信，不再重试）与"暂时不可用"（保留补送、继续退避）。
+       */
+      rejectionCode?: FeedbackEnqueueRejectionCode;
+      rejectionReason?: string;
     }
   | {
       type: "deliver";

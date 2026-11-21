@@ -31,6 +31,7 @@ import { executeDiagnosticClusterAction } from "../orchestration/diagnostic-clus
 import type { ProtectedStoragePolicy } from "./protected-storage-policy.js";
 import type { GenericToolFileOperation } from "./protected-storage-policy.js";
 import type { TaskSequenceStatusController } from "../orchestration/task-sequence-controllers.js";
+import type { CollaborationInboxReadPort } from "../orchestration/collaboration-inbox-read.js";
 import type { LocalToolPolicyEngine } from "./local-tool-policy-engine.js";
 import type { SensitiveContentAccessPolicy } from "./sensitive-content-access-policy.js";
 import type { ReadSuppressionLedger } from "./read-suppression-ledger.js";
@@ -88,6 +89,13 @@ export interface BuiltinToolExecutionContext {
    * 他人 ID 获得他人视图。
    */
   taskSequenceStatusController?: TaskSequenceStatusController | null;
+  /**
+   * 2026-11-21（用户裁决 A）：**协作收件箱只读端口**。
+   *
+   * 装配后，`taskSequenceStatus` 在返回任务快照的同时返回 `pendingCollaboration`
+   * （只读、身份隔离、授权过滤、分页）。未装配 ⇒ 不返回该字段（旧行为不变）。
+   */
+  collaborationInboxReadPort?: CollaborationInboxReadPort | null;
   /**
    * T06B：Ponder 本地只读边界（Ponder 专属工具注入；未装配时调用报错）。
    */
@@ -292,7 +300,8 @@ export const BUILTIN_TOOL_DESCRIPTORS: ToolDescriptor[] = [
   },
   {
     name: "taskSequenceStatus",
-    summary: "只读查看本 Agent 待办任务序列快照（ready set/顺序解释/任务包状态）",
+    summary:
+      "只读查看本 Agent 待办任务序列快照（ready set/顺序解释/任务包状态；装配后同时返回待处理协作请求）",
     category: "readonly",
     mutationKind: "none",
     backupPolicy: "not-required",
@@ -301,7 +310,12 @@ export const BUILTIN_TOOL_DESCRIPTORS: ToolDescriptor[] = [
     isIdempotent: true,
     inputSchema: {
       type: "object",
-      properties: { sequenceId: { type: "string" } },
+      properties: {
+        sequenceId: { type: "string" },
+        /** 2026-11-21（裁决 A）：同一读取出口返回待处理协作请求，可分子页读取。 */
+        collaborationPageSize: { type: "integer", minimum: 1, maximum: 50 },
+        collaborationCursor: { type: "string" },
+      },
     },
   },
   {
@@ -811,8 +825,45 @@ export async function executeBuiltinTool(
           actorId: executionContext.requestingAgentInstanceId,
         },
       });
+      /**
+       * 2026-11-21（用户裁决 A）：**同一读取出口**返回待处理协作请求。
+       * 只读（不投递、不确认）；未装配端口时不输出该字段（旧行为不变）。
+       */
+      const rawPageSize = args["collaborationPageSize"];
+      const rawCursor = args["collaborationCursor"];
+      if (
+        rawPageSize !== undefined &&
+        (typeof rawPageSize !== "number" ||
+          !Number.isInteger(rawPageSize) ||
+          rawPageSize < 1 ||
+          rawPageSize > 50)
+      ) {
+        throw new Error("taskSequenceStatus 参数 collaborationPageSize 必须是 1..50 的整数");
+      }
+      if (
+        rawCursor !== undefined &&
+        (typeof rawCursor !== "string" || rawCursor.trim() === "")
+      ) {
+        throw new Error("taskSequenceStatus 参数 collaborationCursor 必须是非空字符串");
+      }
+      const output: Record<string, unknown> = { ...(snapshot as object) };
+      const collaborationReadPort = executionContext.collaborationInboxReadPort;
+      if (collaborationReadPort !== null && collaborationReadPort !== undefined) {
+        try {
+          output["pendingCollaboration"] = await collaborationReadPort.readPendingCollaboration({
+            requestingAgentInstanceId: executionContext.requestingAgentInstanceId,
+            ...(rawPageSize === undefined ? {} : { pageSize: rawPageSize }),
+            ...(rawCursor === undefined ? {} : { cursor: rawCursor }),
+          });
+        } catch {
+          output["pendingCollaboration"] = {
+            isAvailable: false,
+            reason: "协作收件箱读取失败（不影响任务快照）。",
+          };
+        }
+      }
       return {
-        outputText: JSON.stringify(snapshot),
+        outputText: JSON.stringify(output),
         isSideEffectFree: true,
       };
     }

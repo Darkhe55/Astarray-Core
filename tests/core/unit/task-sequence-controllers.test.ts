@@ -503,6 +503,97 @@ describe("taskSequenceStatus 内置工具（harness 注入身份）", () => {
       ),
     ).rejects.toThrowError(/未装配/);
   });
+
+  /**
+   * 用户裁决 A（2026-11-21）：协作请求跟随**任务列表的统一读取出口**读出。
+   * 只读、身份由 harness 注入、可分子页；未装配端口时旧行为不变。
+   */
+  it("装配协作只读端口 ⇒ 同一出口返回 pendingCollaboration，且身份/分页参数被透传", async () => {
+    const store = new AgentTaskSequenceStore({ baseDirectory: temporaryDirectory });
+    const manageController = new TaskSequenceManageController(store);
+    const statusController = new TaskSequenceStatusController(store);
+    await manageController.publishSequence({
+      ownerAgentInstanceId: "agent-owner",
+      actor: { sourceKind: "agent", actorId: "agent-owner" },
+      sequenceId: "seq-1",
+      firstTask: { taskId: "t1", title: "首任务", priorityTier: null, externalReference: null },
+    });
+    const readCalls: Array<{ requestingAgentInstanceId: string; pageSize?: number }> = [];
+    const baseContext = {
+      workspaceBoundary: new WorkspaceBoundary(path.join(temporaryDirectory, "workspace")),
+      temporaryDirectoryPath: path.join(temporaryDirectory, "temp"),
+      requestingAgentInstanceId: "agent-owner",
+      backupServicePort: null,
+      vault: null,
+      deletionController: null,
+      protectedStoragePolicy: new ProtectedStoragePolicy({
+        stateDirectoryPath: temporaryDirectory,
+      }),
+      taskSequenceStatusController: statusController,
+    };
+    const contextWithPort = {
+      ...baseContext,
+      collaborationInboxReadPort: {
+        readPendingCollaboration: async (input: { requestingAgentInstanceId: string; pageSize?: number }) => {
+          readCalls.push(input);
+          return {
+            isAvailable: true as const,
+            items: [
+              {
+                messageIdentifier: "m-1",
+                correlationIdentifier: "corr-1",
+                senderAgentInstanceId: "agent-a1",
+                originalSourceAgentInstanceId: "agent-a1",
+                isRelayedRequest: false,
+                taskIdentifier: "task-1",
+                missionIdentifier: null,
+                replyToMessageIdentifier: null,
+                summary: "请查询状态",
+                receivedAtIso: "2026-11-21T00:00:00.000Z",
+                state: "received" as const,
+                artifactReferenceStatus: "not-provided" as const,
+                authorizationEpoch: 1,
+              },
+            ],
+            totalPendingCount: 1,
+            skippedUnauthorizedCount: 0,
+            nextCursor: null,
+            isTruncated: false,
+            readOnlyNotice: "只读：读取不改变消息状态。",
+          };
+        },
+      },
+    };
+
+    const result = await executeBuiltinTool(
+      "taskSequenceStatus",
+      JSON.stringify({ sequenceId: "seq-1", collaborationPageSize: 5 }),
+      contextWithPort,
+    );
+    const parsed = JSON.parse(result.outputText) as {
+      pendingCollaboration?: { items: Array<{ messageIdentifier: string }> };
+    };
+    expect(parsed.pendingCollaboration?.items[0]?.messageIdentifier).toBe("m-1");
+    expect(readCalls[0]).toMatchObject({
+      requestingAgentInstanceId: "agent-owner",
+      pageSize: 5,
+    });
+
+    const withoutPort = await executeBuiltinTool(
+      "taskSequenceStatus",
+      JSON.stringify({ sequenceId: "seq-1" }),
+      { ...contextWithPort, collaborationInboxReadPort: null },
+    );
+    expect(JSON.parse(withoutPort.outputText)).not.toHaveProperty("pendingCollaboration");
+
+    await expect(
+      executeBuiltinTool(
+        "taskSequenceStatus",
+        JSON.stringify({ sequenceId: "seq-1", collaborationPageSize: 0 }),
+        contextWithPort,
+      ),
+    ).rejects.toThrowError(/collaborationPageSize/);
+  });
 });
 
 describe("ALIGN-02-05 运行中状态", () => {

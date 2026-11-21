@@ -8069,6 +8069,27 @@ export {
   type AuthorizationStampOutcome,
 } from "./orchestration/collaboration-authorization-stamping.js";
 
+/**
+ * 2026-11-21（用户裁决 A）：**协作收件箱的只读读取出口**。
+ *
+ * 与 `taskSequenceStatus` 共用同一读出点（任务列表 + 待处理协作请求）；
+ * 只读、身份隔离、授权过滤、分页。宿主也可直接用它自建读取入口。
+ */
+export {
+  COLLABORATION_INBOX_READ_DEFAULT_PAGE_SIZE,
+  COLLABORATION_INBOX_READ_MAXIMUM_PAGE_SIZE,
+  buildPendingCollaborationView,
+  createCollaborationInboxReadPort,
+  type CollaborationInboxReadItem,
+  type CollaborationInboxReadPort,
+  type PendingCollaborationReadOutcome,
+  type PendingCollaborationUnavailable,
+  type PendingCollaborationView,
+} from "./orchestration/collaboration-inbox-read.js";
+
+/** 2026-11-21（用户裁决 C）：带原因分类的拒绝错误（宿主/调用方可判永久或暂时）。 */
+export { FeedbackMessageRejectedError } from "./feedback-process/transport.js";
+
 // EVENT-01（2026-10-24）：控制通道（模型/工具门禁、取消能力、分阶段确认、崩溃重放）。
 export {
   EventControlChannel,

@@ -6787,3 +6787,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 信封 schema 补齐：`missionIdentifier` / `replyToMessageIdentifier` / `projectIdentifier` / `taskIdentifier` / `taskRevision` / `executionAttempt` 全部登记（摘掉登记 ⇒ 反例⑥变红）。
 > - **阻塞**：仓内没有协作消息的生产调用方（发起入口属产品形态；SDK 盖章入口 + fork 链路已就绪）；永久性拒绝消息的"无限补送"语义待裁决。
 > - 本机全量：**867 files（862 passed / 3 failed / 2 skipped），5561 tests（5551 passed / 3 failed / 7 skipped）**；3 条失败均为已复现的本机环境问题。
+
+> **COORD-04：协作收件箱只读读取出口 + 永久拒绝补送分类（2026-11-21）**
+>
+> - 用户裁决：**A**（协作消息跟随任务列表的统一读取出口）与 **C**（永久性拒绝分类，不无限重试）。
+> - A：新增 `collaboration-inbox-read.ts`（纯视图 + 生产读取端口）；`taskSequenceStatus` 同一出口返回
+>   `pendingCollaboration`（只读、身份由 harness 注入、授权只读复核、分页 1..50）；抽出
+>   `evaluateAuthoritativeAuthorization` 供读取与投递共用（投递行为不变）；装配 `PolicyWrapper` 时
+>   补上此前未接的序列状态控制面。反例：视图 7 条 + 工具 1 条；**读取两次状态仍是 received、交付尝试 0**。
+> - C：子进程回传 `rejectionCode`（invalid-message / source-not-registered / journal-unavailable）；
+>   **永久** ⇒ 死信 `<state>/feedback-client-dead-letter/`（含原因与原文）并移出补送，**暂时** ⇒ 保留补送退避；
+>   `flushPendingOutbox` 新增 `deadLetteredCount`。反例：feedback-client 4 条（含旧协议无码按暂时兼容）。
+> - 本机全量：**868 files（863 passed / 3 failed / 2 skipped），5572 tests（5562 passed / 3 failed / 7 skipped）**；
+>   3 条失败均为已复现的本机环境问题。`typecheck` / `lint` exit 0。

@@ -9,8 +9,12 @@ import path from "node:path";
 import type { ChildProcess } from "node:child_process";
 
 import { DomainError } from "../core/errors.js";
+import { writeAtomicJson } from "../infra/atomic-json.js";
 import { isProtocolVersionSupported } from "./ipc-protocol.js";
-import type { FeedbackIpcMessage } from "./ipc-protocol.js";
+import type {
+  FeedbackEnqueueRejectionCode,
+  FeedbackIpcMessage,
+} from "./ipc-protocol.js";
 import type {
   AgentStatus,
   FeedbackMessage,
@@ -29,6 +33,34 @@ type PendingRequest = {
   reject: (error: Error) => void;
   timeoutHandle: NodeJS.Timeout;
 };
+
+/**
+ * 子进程明确拒绝（2026-11-21，用户裁决 C）。
+ *
+ * 带回 `rejectionCode` 供补送路径分类：
+ * - `invalid-message` / `source-not-registered` ⇒ **永久**，进死信、不再重试；
+ * - 其余（含 `journal-unavailable`、超时/断开）⇒ **暂时**，保留补送继续退避。
+ */
+export class FeedbackMessageRejectedError extends DomainError {
+  constructor(
+    readonly rejectionCode: FeedbackEnqueueRejectionCode | null,
+    reason: string,
+    messageId: string,
+  ) {
+    super(
+      "feedback-message-rejected",
+      `反馈进程拒绝消息 ${messageId}：${reason}${rejectionCode === null ? "" : `（${rejectionCode}）`}`,
+      false,
+    );
+  }
+
+  get isPermanent(): boolean {
+    return (
+      this.rejectionCode === "invalid-message" ||
+      this.rejectionCode === "source-not-registered"
+    );
+  }
+}
 
 export class ForkFeedbackClient implements FeedbackTransportPort {
   private readonly pendingRequests = new Map<string, PendingRequest>();
@@ -109,8 +141,14 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
     await this.waitUntilReady();
     /**
      * 发送失败时**保留 outbox 文件**（交给补送路径），错误如实上抛 —— 不静默吞。
+     * 永久性拒绝（schema/身份）不重试：转死信后仍抛错给调用方（用户裁决 C）。
      */
-    await this.requestEnqueue(message);
+    try {
+      await this.requestEnqueue(message);
+    } catch (error) {
+      await this.deadLetterIfPermanent(message, error);
+      throw error;
+    }
     await this.removeOutboxMessage(message);
   }
 
@@ -119,20 +157,76 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
    *
    * 此前无论 `accepted` 真假都当成功、随后删除补送文件 —— schema/身份校验失败的消息
    * 被**静默丢弃**（`comm02-inbox-feedback-process` 因此一直"绿"却从未真正入池）。
-   * 只有显式 `accepted: false` 才算拒绝；旧协议没有该字段时保持兼容。
+   * 现在同时带回 `rejectionCode`，用于区分永久/暂时（用户裁决 C）。
    */
   private async requestEnqueue(message: FeedbackMessage): Promise<void> {
     const requestId = randomUUID();
     const result = (await this.requestResponse(
       { type: "enqueue", requestId, message },
       requestId,
-    )) as { readonly accepted?: boolean } | null;
+    )) as {
+      readonly accepted?: boolean;
+      readonly rejectionCode?: FeedbackEnqueueRejectionCode;
+      readonly rejectionReason?: string;
+    } | null;
     if (result !== null && result.accepted === false) {
-      throw new DomainError(
-        "feedback-message-rejected",
-        `反馈进程拒绝消息 ${message.messageId}（schema 或身份校验失败），未入队。`,
+      throw new FeedbackMessageRejectedError(
+        result.rejectionCode ?? null,
+        result.rejectionReason ?? "schema 或身份校验失败",
+        message.messageId,
       );
     }
+  }
+
+  /**
+   * 永久性拒绝 ⇒ 写入死信目录并从补送 outbox 移除（不再无限重试）。
+   *
+   * 写死信失败时**不动** outbox 文件：宁可继续重试，也不能丢消息。
+   * 返回是否已成功转死信（供补送统计使用）。
+   */
+  private async deadLetterIfPermanent(
+    message: FeedbackMessage,
+    error: unknown,
+  ): Promise<boolean> {
+    if (error instanceof FeedbackMessageRejectedError && !error.isPermanent) {
+      return false;
+    }
+    if (!(error instanceof FeedbackMessageRejectedError)) {
+      return false;
+    }
+    const deadLetterDirectory = this.getDeadLetterDirectoryPath();
+    if (deadLetterDirectory === null) {
+      return false;
+    }
+    const fileName = `${createHash("sha256")
+      .update(message.idempotencyKey)
+      .digest("hex")}.json`;
+    try {
+      await writeAtomicJson(path.join(deadLetterDirectory, fileName), {
+        schemaVersion: 1,
+        rejectedAtIso: new Date().toISOString(),
+        rejectionCode: error.rejectionCode ?? "unknown",
+        rejectionReason: error.message,
+        idempotencyKey: message.idempotencyKey,
+        messageId: message.messageId,
+        message,
+      });
+    } catch {
+      return false;
+    }
+    const outboxFilePath = this.outboxFilePathFor(message);
+    if (outboxFilePath !== null) {
+      await fs.rm(outboxFilePath, { force: true }).catch(() => undefined);
+    }
+    return true;
+  }
+
+  /** 死信目录（与补送目录同级，便于人工查阅/重放）。 */
+  private getDeadLetterDirectoryPath(): string | null {
+    if (this.outboxDirectoryPath === null) {
+      return null;
+    }
+    return path.join(path.dirname(this.outboxDirectoryPath), "feedback-client-dead-letter");
   }
 
   /**
@@ -161,9 +255,17 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
     remainingCount: number;
     /** 因退避而本轮未尝试的条数（可观测积压，不静默）。 */
     deferredCount: number;
+    /** 本轮因**永久性拒绝**转死信的条数（2026-11-21，用户裁决 C）。 */
+    deadLetteredCount: number;
   }> {
     if (this.outboxDirectoryPath === null || this.isFlushingOutbox) {
-      return { attemptedCount: 0, resentCount: 0, remainingCount: 0, deferredCount: 0 };
+      return {
+        attemptedCount: 0,
+        resentCount: 0,
+        remainingCount: 0,
+        deferredCount: 0,
+        deadLetteredCount: 0,
+      };
     }
     this.isFlushingOutbox = true;
     try {
@@ -172,11 +274,18 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
       try {
         entries = await fs.readdir(this.outboxDirectoryPath);
       } catch {
-        return { attemptedCount: 0, resentCount: 0, remainingCount: 0, deferredCount: 0 };
+        return {
+          attemptedCount: 0,
+          resentCount: 0,
+          remainingCount: 0,
+          deferredCount: 0,
+          deadLetteredCount: 0,
+        };
       }
       let attemptedCount = 0;
       let resentCount = 0;
       let deferredCount = 0;
+      let deadLetteredCount = 0;
       const nowMilliseconds = Date.now();
       for (const entryName of entries) {
         if (!entryName.endsWith(".json")) {
@@ -205,8 +314,21 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
           await fs.rm(filePath, { force: true }).catch(() => undefined);
           this.outboxRetryState.delete(entryName);
           resentCount += 1;
-        } catch {
-          /** 失败：按次数指数退避（上限 60 秒），文件保留不删。 */
+        } catch (error) {
+          /**
+           * 永久性拒绝 ⇒ 转死信并移出补送队列（不再无限重试）。
+           * 死信写失败时退回"保留文件继续退避"：宁可重试，也不能丢消息。
+           */
+          if (
+            error instanceof FeedbackMessageRejectedError &&
+            error.isPermanent &&
+            (await this.deadLetterIfPermanent(message, error))
+          ) {
+            this.outboxRetryState.delete(entryName);
+            deadLetteredCount += 1;
+            continue;
+          }
+          /** 暂时失败：按次数指数退避（上限 60 秒），文件保留不删。 */
           const previousAttemptCount = this.outboxRetryState.get(entryName)?.attemptCount ?? 0;
           const nextAttemptCount = previousAttemptCount + 1;
           const backoffMilliseconds = computeOutboxBackoffMilliseconds(nextAttemptCount);
@@ -224,7 +346,7 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
       } catch {
         remainingCount = 0;
       }
-      return { attemptedCount, resentCount, remainingCount, deferredCount };
+      return { attemptedCount, resentCount, remainingCount, deferredCount, deadLetteredCount };
     } finally {
       this.isFlushingOutbox = false;
     }
