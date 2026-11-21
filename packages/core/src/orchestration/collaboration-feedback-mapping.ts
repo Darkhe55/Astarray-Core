@@ -18,6 +18,7 @@ import type {
 } from "../core/types.js";
 import { FEEDBACK_PROTOCOL_VERSION } from "../core/types.js";
 import type { CollaborationInboxMessage } from "./collaboration-inbox.js";
+import { carriedAuthorizationIdentifier } from "./collaboration-authorization-stamping.js";
 
 /** 收件人前缀（用户 2026-10-24 决定 b）。 */
 export const COLLABORATION_RECIPIENT_PREFIX = "agent:";
@@ -41,6 +42,15 @@ export function buildCollaborationFeedbackMessage(input: {
   readonly sourceAgentRole: AgentRole;
   readonly protocolVersion?: number;
 }): FeedbackMessage {
+  /**
+   * COORD-02 §7「生产与传输」：**关系标识**随反馈映射原样传递。
+   *
+   * 只带代际时接收侧无法回权威存储复核（`authorization-missing`）；缺省即不写，
+   * 不补默认值、不把空串当章。
+   */
+  const authorizationIdentifier = carriedAuthorizationIdentifier(
+    input.message.authorizationIdentifier,
+  );
   const payload: FeedbackMessagePayload = {
     kind: "collaboration-request",
     messageIdentifier: input.message.messageIdentifier,
@@ -79,6 +89,7 @@ export function buildCollaborationFeedbackMessage(input: {
     input.message.replyToMessageIdentifier === null
       ? {}
       : { replyToMessageIdentifier: input.message.replyToMessageIdentifier }),
+    ...(authorizationIdentifier === undefined ? {} : { authorizationIdentifier }),
     source: {
       sourceType: "agent",
       agentInstanceId: input.message.senderAgentInstanceId,

@@ -332,6 +332,14 @@ export const feedbackMessageSchema = z
     priority: messagePrioritySchema,
     createdAtIso: z.iso.datetime(),
     idempotencyKey: z.string().min(1),
+    /**
+     * COORD-02 §7（2026-11-21）：授权关系标识随信封传递。
+     *
+     * 必须登记进 schema：zod 默认**丢弃未登记字段**，否则经过反馈进程校验后
+     * 关系标识会被静默抹掉，接收侧只能看到代际、无法复核（`authorization-missing`）。
+     * 空串不是有效章 ⇒ 校验失败（fail-closed），缺省才是"未盖章"。
+     */
+    authorizationIdentifier: z.string().min(1).optional(),
     payload: feedbackMessagePayloadSchema,
   })
   .superRefine((message, context) => {

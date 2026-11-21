@@ -6766,3 +6766,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 反例 4 条（**采信调用方值即红**）。全量门禁 **864 files / 5544 passed + 4 skipped，exit 0**。
 > 至此 §7 的"权威来源 / 建立与变更 / 生产盖章 / 消费复核 / 投递通道接线"五段全部实现；
 > 仅剩"发件箱/反馈映射的关系标识透传"与"真实 fork 链路调用盖章入口"未做。
+
+> **COORD-02 §7 第五部分：传输层关系标识透传（2026-11-21）**
+>
+> - `FeedbackMessage.authorizationIdentifier?` 新增并**登记进 `feedbackMessageSchema`**（不登记会被 zod 静默剥离）；
+>   反馈映射（`buildCollaborationFeedbackMessage`）与发件箱（`CollaborationOutboxTransport`）原样携带；
+>   缺省/空串/空白/null ⇒ 不写（不伪造空章），空串在 schema 层直接拒。
+> - 反例 3 文件 / 8 条（先红：**5 红 / 11 绿**；后绿 **16/16**）；承重：摘掉 schema 登记 ⇒ 透传①③变红。
+> - **顺带发现（未修）**：`feedbackMessageSchema` 仍未登记 mission/replyTo/taskRevision 等既有信封字段（仍会静默剥离）；
+>   协作请求载荷因 `PRIORITY_OF_KIND` 缺项 + `messageId` 非 uuid **过不了**该 schema ⇒ 反馈进程路径对协作消息实际未通
+>   （相关集成用例被 `describe.skipIf` 遮蔽）。需单独立项裁决。
+> - 本机全量：**866 files（860 passed / 4 failed / 2 skipped），5556 tests（5545 passed / 4 failed / 7 skipped）**。
+>   4 条失败均与本次改动无关：2 条 Windows 符号链接环境、1 条隔离执行后端缺失（三者已在基线 HEAD 上复现）、
+>   1 条并发用例负载抖动（隔离复跑 1/1 通过）。

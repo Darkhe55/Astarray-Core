@@ -64,4 +64,33 @@ describe("协作消息的信封标记", () => {
     expect(feedbackMessage.missionIdentifier).toBeUndefined();
     expect(feedbackMessage.replyToMessageIdentifier).toBeUndefined();
   });
+
+  /**
+   * COORD-02 §7「生产与传输」：**关系标识**必须随反馈映射原样传递。
+   *
+   * 只带代际、不带关系标识时，接收侧无法回到权威存储复核（`authorization-missing`），
+   * 于是这条消息永远投不出去——不是可选优化。
+   */
+  it("⑤ 带 authorizationIdentifier ⇒ 信封上带同一关系标识（接收侧才能复核当前代）", () => {
+    const feedbackMessage = buildCollaborationFeedbackMessage({
+      message: buildMessage({ authorizationIdentifier: "authorization-1", authorizationEpoch: 2 }),
+      sourceAgentRole: "secondary",
+    });
+    expect(
+      (feedbackMessage as { authorizationIdentifier?: string }).authorizationIdentifier,
+    ).toBe("authorization-1");
+    expect(feedbackMessage.payload).toMatchObject({ authorizationEpoch: 2 });
+  });
+
+  it("⑥ 缺省 / 空串 / null ⇒ 信封上不出现关系标识（不伪造空章）", () => {
+    for (const value of [undefined, null, "", "   "]) {
+      const feedbackMessage = buildCollaborationFeedbackMessage({
+        message: buildMessage({ authorizationIdentifier: value as string | null | undefined }),
+        sourceAgentRole: "secondary",
+      });
+      expect(
+        (feedbackMessage as { authorizationIdentifier?: string }).authorizationIdentifier,
+      ).toBeUndefined();
+    }
+  });
 });

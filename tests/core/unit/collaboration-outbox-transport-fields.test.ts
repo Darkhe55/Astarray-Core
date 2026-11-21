@@ -73,6 +73,28 @@ describe("协作 outbox 落盘字段", () => {
     expect(document["replyToMessageIdentifier"]).toBeUndefined();
   });
 
+  /**
+   * COORD-02 §7「生产与传输」：**关系标识**必须随发件箱落盘。
+   *
+   * 发件箱是另一条真实投递路径；只落代际、不落关系标识时，读取方无从回权威存储复核。
+   */
+  it("⑤ 带 authorizationIdentifier ⇒ 落盘文件里必须有关系标识（与代际配对）", async () => {
+    const transport = new CollaborationOutboxTransport({ baseDirectory });
+    await transport.send(
+      buildMessage({ authorizationIdentifier: "authorization-1", authorizationEpoch: 2 }),
+    );
+    const document = await readQueuedDocument(transport, "agent-b1");
+    expect(document["authorizationIdentifier"]).toBe("authorization-1");
+    expect(document["authorizationEpoch"]).toBe(2);
+  });
+
+  it("⑥ 未提供关系标识 ⇒ 文件里不写该字段（不写 null、不写空串）", async () => {
+    const transport = new CollaborationOutboxTransport({ baseDirectory });
+    await transport.send(buildMessage({ authorizationIdentifier: "" }));
+    const document = await readQueuedDocument(transport, "agent-b1");
+    expect(document["authorizationIdentifier"]).toBeUndefined();
+  });
+
   it("④ 幂等：同消息重复发送不重复写文件（既有行为未回归）", async () => {
     const transport = new CollaborationOutboxTransport({ baseDirectory });
     const first = await transport.send(buildMessage({ missionIdentifier: "mission-1" }));

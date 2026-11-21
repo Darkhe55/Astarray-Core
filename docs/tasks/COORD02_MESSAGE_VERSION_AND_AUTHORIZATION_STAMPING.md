@@ -1,6 +1,6 @@
 # COORD-02：消息版本与授权标记（生产者前置）
 
-**状态**：`implemented-unverified`（§7 权威来源与建立/变更已实现并有反例；生产盖章、传输透传、消费复核仍待接线）
+**状态**：`implemented-unverified`（§7 五段均已实现并有反例：权威来源、建立/变更、生产盖章、传输透传、消费复核；仍缺真实反馈进程 fork 链路接线，见 §12）
 **立卡日期**：2026-11-17
 **来源**：P1-3 返修时发现的硬前置（见 `COORD01_TASK_FEEDBACK_CONSUMPTION_REPAIR.md` P1-3 要求 7）
 
@@ -140,7 +140,7 @@ FeedbackMessage 字段（core/types.ts:513）
 
 - ~~**生产盖章**~~：**已实现**——`enqueueWithAuthoritativeStamp` 只从权威存储取章（见 §11）；
 - ~~**装配点接线**~~：**已接线**——`CollaborationInboxDeliveryService` 新增 `resolveAuthoritativeAuthorizationEpoch` 端口，投递循环逐条复核（见 §10）。
-- 发件箱/反馈映射的**关系标识**透传（代际已在透传）。
+- ~~发件箱/反馈映射的**关系标识**透传~~：**已实现（2026-11-21，见 §12）**——信封、发件箱、`feedbackMessageSchema` 三处原样携带。
 
 ### 门禁
 
@@ -185,9 +185,73 @@ transport 只被调用 **1** 次，落盘后 `m-ok=delivered` 而 `m-revoked`、
 
 ### 仍未做
 
-- 发件箱 / 反馈映射的**关系标识**透传（代际已透传；需扩展信封 schema）；
-- 真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`。
+- ~~发件箱 / 反馈映射的**关系标识**透传（代际已透传；需扩展信封 schema）~~：**已实现（2026-11-21，见 §12）**；
+- 真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`（依赖 §12「顺带发现」第 2 条的裁决）。
 
 ### 门禁
 
 **864 files / 5544 passed + 4 skipped，exit 0**。
+
+## 12. 施工记录：§7 第五部分（传输层关系标识透传，2026-11-21）
+
+### 要求与实现
+
+| §7 要求 | 实现 |
+|---|---|
+| 收件箱 / 发件箱 / 反馈映射 / 持久化 / 重试**原样传递** | 收件箱早已带 `authorizationIdentifier`；本次补齐**反馈映射**（`buildCollaborationFeedbackMessage` 写入信封）与**发件箱**（`CollaborationOutboxTransport.send` 落盘） |
+| 普通反馈信封及其 schema | `FeedbackMessage.authorizationIdentifier?: string` 新增；`feedbackMessageSchema` **登记**该字段（空串 ⇒ 校验失败）。不登记会被 zod 静默剥离 |
+| 历史 0 / 缺字段 / 查不到权威关系不得成为有效章 | 传输层只做"携带"，不做判定：缺省/空串/空白/null ⇒ **不写**（不伪造空章）；有效性仍由消费侧回权威存储复核。未引入任何默认值 |
+
+传输层携带判定收敛到一处：`carriedAuthorizationIdentifier`（`collaboration-authorization-stamping.ts`），
+只把**非空字符串**视为带章。
+
+### 反例（先红后绿）
+
+| 文件 | 用例 | 实现前 |
+|---|---|---|
+| `tests/core/unit/collaboration-feedback-mapping.test.ts` | ⑤ 信封带同一关系标识且载荷代际不变；⑥ 缺省/null/空串/空白 ⇒ 信封不出现该字段 | ⑤ 红（undefined） |
+| `tests/core/unit/collaboration-outbox-transport-fields.test.ts` | ⑤ 落盘文件带关系标识（与代际配对）；⑥ 空串不落盘 | ⑤ 红（undefined） |
+| `tests/core/unit/collaboration-authorization-stamp-passthrough.test.ts` | ① JSON 往返 + schema 校验后仍带标识；② 缺省不注入；③ 空串校验失败；④ payload 内伪造字段不算章 | ① 红（被 schema 剥离） |
+
+实现前实测：**5 条红 / 11 条既有绿**（16 条中）；实现后 **16/16 通过**。
+
+### 承重证明
+
+摘掉 `feedbackMessageSchema` 里登记的 `authorizationIdentifier` ⇒ 透传用例 ①、③ 立即变红
+（① 字段被 zod 剥离；③ 因字段消失而"通过"）。摘掉映射/发件箱的写出语句 ⇒ 对应 ⑤ 变红，
+已在实现前实测（实现前就是红）。
+
+### 顺带发现（本次**未修**，超出本项范围，需单独立项）
+
+1. `feedbackMessageSchema` 至今**未登记** `missionIdentifier` / `replyToMessageIdentifier` /
+   `taskRevision` / `executionAttempt` / `projectIdentifier` / `taskIdentifier` 等既有信封字段
+   ⇒ 经反馈进程校验后会被静默剥离。本次只补了 `authorizationIdentifier`。
+2. 协作请求载荷目前**过不了** `feedbackMessageSchema`：
+   - `PRIORITY_OF_KIND` 缺 `collaboration-request` ⇒ 期望值为 undefined，任何优先级都被判不一致；
+   - 映射生成的 `messageId` 是 `collaboration:<id>`，不满足 `z.uuid()`。
+   ⇒ "反馈进程投递"这条路径对协作消息实际仍未打通；`comm02-inbox-feedback-process` 用例因
+   `dist` 不存在被 `describe.skipIf` 跳过（属已知遮蔽）。两条都需要产品/架构裁决后再动。
+
+### 仍未做
+
+- 真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`；
+- 上面「顺带发现」两条（协作消息过 schema、其它信封字段登记）。
+
+### 门禁
+
+**866 files（860 passed / 4 failed / 2 skipped），5556 tests（5545 passed / 4 failed / 7 skipped），exit 1**（2026-11-21 本机实跑）。
+
+4 条失败全部**与本次改动无关**，逐条定性：
+
+| 失败 | 定性 | 证据 |
+|---|---|---|
+| `project-scope-boundary` ③ 链接逃逸 | 本机环境（Windows 创建符号链接/联接需特权） | 同一用例在**基线 HEAD（stash 掉本次改动）上同样红** |
+| `tool-registry` 符号链接逃逸（清理 ENOTEMPTY） | 同上 | 同上 |
+| `exec01-02-cli-bootstrap-autodetect` | 本机没有可用的隔离执行后端（测试断言"未装配"文案） | 同上 |
+| `goal-requirement-mapping-concurrency` ①（40 条并发） | **负载抖动** | 隔离复跑 **1/1 通过** |
+
+另有 2 条架构用例（`cli-numeric-option-guards`、`mutation-anchors-live`）在**首次**全量里红，
+原因是本机 `core.autocrlf=true` 检出成 CRLF、而这两条按 LF 文本匹配；把工作树规范为 LF
+（`git config core.autocrlf false`）后 **6/6 通过**，源码未改任何锚点。
+
+定向反例（本次 3 个文件 16 条）：**16/16 通过**；`typecheck` exit 0；`lint` exit 0。

@@ -569,6 +569,13 @@ export interface FeedbackMessage {
    * 且收件人是原消息发起者（见 `in-project-reply-routing.ts`）；不得按当前通信对象推断。
    */
   replyToMessageIdentifier?: string;
+  /**
+   * COORD-02 §7（2026-11-21）：**权威授权关系标识**（与 payload 里的代际配对）。
+   *
+   * 只由生产侧盖章入口从权威存储取得；缺省表示**未盖章**，消费侧按"缺章"拒绝，
+   * 不得据此放行。传输层（反馈映射 / 发件箱 / 信封 schema）必须原样传递，不得改写或补默认值。
+   */
+  authorizationIdentifier?: string;
   payload: FeedbackMessagePayload;
 }
 

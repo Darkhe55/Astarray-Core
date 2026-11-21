@@ -9,6 +9,19 @@
 import type { CollaborationInbox } from "./collaboration-inbox.js";
 import type { CrossProjectAuthorizationStore } from "./cross-project-authorization-store.js";
 
+/**
+ * 传输层"原样携带"的关系标识判定（COORD-02 §7「生产与传输」）。
+ *
+ * 只有**非空字符串**才算带着关系标识；空串/空白/非字符串一律视为**未提供**，
+ * 不写 null、不写空串——把"没有章"伪装成"已盖章"会让消费侧误判。
+ */
+export function carriedAuthorizationIdentifier(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  return value.trim() === "" ? undefined : value;
+}
+
 export type AuthorizationStampOutcome =
   | {
       readonly kind: "stamped";

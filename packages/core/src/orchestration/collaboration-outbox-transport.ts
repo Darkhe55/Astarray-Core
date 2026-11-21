@@ -12,6 +12,7 @@ import path from "node:path";
 import { writeAtomicJson } from "../infra/atomic-json.js";
 import type { CollaborationInboxMessage } from "./collaboration-inbox.js";
 import type { CollaborationInboxTransportPort } from "./collaboration-inbox-delivery.js";
+import { carriedAuthorizationIdentifier } from "./collaboration-authorization-stamping.js";
 
 export const COLLABORATION_OUTBOX_SCHEMA_VERSION = 1;
 
@@ -50,6 +51,11 @@ export class CollaborationOutboxTransport implements CollaborationInboxTransport
     if (existsSync(filePath)) {
       return { isDelivered: true, reason: "队列中已存在同一消息（幂等：不重复写入）。" };
     }
+    /**
+     * COORD-02 §7「生产与传输」：**关系标识**随发件箱落盘（与代际配对）。
+     * 缺省不写；空串不当作章。
+     */
+    const authorizationIdentifier = carriedAuthorizationIdentifier(message.authorizationIdentifier);
     await writeAtomicJson(filePath, {
       schemaVersion: COLLABORATION_OUTBOX_SCHEMA_VERSION,
       messageIdentifier: message.messageIdentifier,
@@ -72,6 +78,7 @@ export class CollaborationOutboxTransport implements CollaborationInboxTransport
         : { replyToMessageIdentifier: message.replyToMessageIdentifier }),
       summary: message.summary,
       authorizationEpoch: message.authorizationEpoch,
+      ...(authorizationIdentifier === undefined ? {} : { authorizationIdentifier }),
       enqueuedAtIso: message.receivedAtIso,
     });
     return { isDelivered: true, reason: "已写入本地 outbox（读取方负责消费）。" };
