@@ -1,6 +1,6 @@
 # COORD-02：消息版本与授权标记（生产者前置）
 
-**状态**：`implemented-unverified`（§7 五段均已实现并有反例；反馈进程 fork 链路已打通并经端到端验证。仍缺仓内生产调用方，见 §13「阻塞」）
+**状态**：`implemented-unverified`（§7 五段均已实现并有反例；反馈进程 fork 链路已端到端验证；生产发送入口已落地（门面 + CLI），剩余 Agent 工具入口与跨项目网络通道）
 **立卡日期**：2026-11-17
 **来源**：P1-3 返修时发现的硬前置（见 `COORD01_TASK_FEEDBACK_CONSUMPTION_REPAIR.md` P1-3 要求 7）
 
@@ -302,9 +302,11 @@ astarray: 反馈进程拒绝非法消息（schema 校验失败）: Invalid UUID 
 
 ### 阻塞（需要产品决策，不是技术缺口）
 
-- **仓内没有协作消息的生产调用方**：`CollaborationInbox` 只被测试与 SDK 暴露，`inbox deliver` CLI
-  只做"投递已有的箱内消息"。决定"协作请求从哪个入口发起（工具 / CLI / 宿主装配）"属于产品形态，
-  不能凭空新增入口。**SDK 盖章入口 + 可用的 fork 链路已就绪，宿主接线即可。**
+- ~~**仓内没有协作消息的生产调用方**~~：**已实现（2026-11-21，用户确认推荐方案）**——
+  `AstarrayApplicationFacade.sendCollaborationRequest` + CLI `astarray collaboration send` 共用同一实现
+  （同项目首次发送自动登记默认关系、跨项目显式授权、三级经直属上级、幂等 `requestIdentifier`）；
+  见 [COORD-04 §9](COORD04_COLLABORATION_INBOX_READ_OUTLET.md)。
+  剩余：**Agent 工具入口**（角色/审批/频率策略待产品裁决，属第二阶段）。
 - ~~永久性拒绝（schema/身份不合法）的消息会留在补送 outbox 里按 ≤60s 退避**无限重试**~~：
   **已裁决并实现（2026-11-21，用户裁决 C）**——子进程回传 `rejectionCode`，永久类转死信并移出补送、
   暂时类保留退避；见 [ADR-0060 §6](../adr/0060-feedback-idempotent-journal-and-outbox.md)。

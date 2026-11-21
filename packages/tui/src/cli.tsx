@@ -154,6 +154,7 @@ import {
 
 import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
 import { executeCollaborationStatusCommand } from "./cli/collaboration-command.js";
+import { executeCollaborationSendCommand } from "./cli/collaboration-send-command.js";
 import {
   executeFeedbackOutboxListCommand,
   executeFeedbackOutboxRemoveCommand,
@@ -2757,6 +2758,66 @@ collaborationCommand
       isJsonOutput: options.json === true,
     });
   });
+collaborationCommand
+  .command("send")
+  .description("发送协作请求（同项目自动登记默认关系；跨项目须 --authorization）")
+  .requiredOption("--from <agent>", "发送者 agent 实例标识（须已登记）")
+  .requiredOption("--to <agent>", "收件人 agent 实例标识（须已登记且未回收）")
+  .requiredOption("--task <identifier>", "任务标识")
+  .requiredOption("--summary <text>", "请求摘要")
+  .option("--mission <identifier>", "mission 标识")
+  .option("--reply-to <messageIdentifier>", "回复指向的原消息")
+  .option("--request-id <identifier>", "幂等请求标识（同标识复用同一消息）")
+  .option("--role <role>", "发送者层级：main|secondary|tertiary|quaternary")
+  .option("--scope <scope>", "同项目/跨项目：same-project|cross-project", "same-project")
+  .option("--authorization <identifier>", "跨项目授权关系标识")
+  .option("--source-project <identifier>", "源项目标识")
+  .option("--target-project <identifier>", "目标项目标识")
+  .option("--state-dir <dir>", "状态目录")
+  .option("--json", "JSON 输出")
+  .action(
+    async (options: {
+      from: string;
+      to: string;
+      task: string;
+      summary: string;
+      mission?: string;
+      replyTo?: string;
+      requestId?: string;
+      role?: string;
+      scope: string;
+      authorization?: string;
+      sourceProject?: string;
+      targetProject?: string;
+      stateDir?: string;
+      json?: boolean;
+    }) => {
+      const scope = options.scope === "cross-project" ? "cross-project" : "same-project";
+      const role =
+        options.role === "main" ||
+        options.role === "secondary" ||
+        options.role === "tertiary" ||
+        options.role === "quaternary"
+          ? options.role
+          : null;
+      process.exitCode = await executeCollaborationSendCommand({
+        stateDirectory: options.stateDir ?? defaultStateDirectory(),
+        fromAgentInstanceId: options.from,
+        toAgentInstanceId: options.to,
+        taskIdentifier: options.task,
+        summary: options.summary,
+        missionIdentifier: options.mission ?? null,
+        replyToMessageIdentifier: options.replyTo ?? null,
+        requestIdentifier: options.requestId ?? null,
+        senderRole: role,
+        projectScope: scope,
+        authorizationIdentifier: options.authorization ?? null,
+        sourceProjectIdentifier: options.sourceProject ?? null,
+        targetProjectIdentifier: options.targetProject ?? null,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
 
 const inboxCommand = program
   .command("inbox")

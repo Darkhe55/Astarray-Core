@@ -6821,3 +6821,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   3 条本机环境 + 1 条已知负载抖动（隔离复跑 3/3 通过）。`typecheck` / `lint` exit 0。
 
 > **推送状态（2026-11-21）**：本机网络不可达，本轮最后一个提交（产品路径证据）**3 次推送均失败**，按纪律留待下次合并推送（本地 HEAD 见 git log）。
+
+> **COORD-04 生产发送入口（2026-11-21，用户确认推荐方案）**
+>
+> - `sendCollaborationRequest`（核心服务，应用门面与 CLI 共用）：地址完整性 → 三级/四级只经直属上级 →
+>   授权章 → 入箱持久化（revision 冲突重试一次）→ 投递（投递前按权威代际复核）；`requestIdentifier` 幂等。
+> - 同项目首次发送**自动登记默认关系**（`relationshipKind: local-default`，epoch 1；用户可撤销，撤销后不复活）；
+>   跨项目仍须显式授权，并核对收件人/项目范围。
+> - 入口：`AstarrayApplicationFacade.sendCollaborationRequest`、`astarray collaboration send`；
+>   反例 7 条（服务）+ 3 条（CLI）。
+> - 本机全量：**873 files（868 passed / 3 failed / 2 skipped），5592 tests（5582 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现的本机环境问题。`typecheck` / `lint` exit 0。
+> - 剩余：**Agent 工具入口**（角色/审批/频率策略待裁决，第二阶段）；跨项目真实网络通道（此前已定本机状态）。

@@ -9,6 +9,13 @@ import { createHash } from "node:crypto";
 import type { ToolPublicDocumentationRegistryEntry } from "./tools/tool-public-documentation-registry.js";
 import { promises as fs } from "node:fs";
 import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
+import type { AgentRole } from "./core/types.js";
+import { CollaborationInboxStore } from "./orchestration/collaboration-inbox-store.js";
+import { CollaborationOutboxTransport } from "./orchestration/collaboration-outbox-transport.js";
+import {
+  sendCollaborationRequest,
+  type CollaborationRequestOutcome,
+} from "./orchestration/collaboration-request-service.js";
 import path from "node:path";
 import type { SessionPermissionElevationRecord } from "./tools/session-permission-elevation.js";
 export { DiagnosticClusterService } from "./orchestration/diagnostic-cluster-service.js";
@@ -7200,6 +7207,92 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   /**
+   * 2026-11-21（用户裁决）：**协作请求的统一生产入口**（门面 / CLI 共用同一实现）。
+   *
+   * - 收件人必须是已登记且未回收的个体；
+   * - 三级/四级只允许发给唯一直属上级（其余由上级代理转达，`relay-required`）；
+   * - 同项目首次发送自动登记默认关系（epoch 1，可撤销、撤销后不复活）；
+   * - 跨项目必须提供显式授权标识，并核对收件人/项目范围；
+   * - 同一 `requestIdentifier` 幂等复用同一 `messageIdentifier`。
+   */
+  async sendCollaborationRequest(input: {
+    readonly senderAgentInstanceIdentifier: string;
+    readonly senderRole?: AgentRole | null;
+    readonly recipientAgentInstanceIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly summary: string;
+    readonly missionIdentifier?: string | null;
+    readonly requestIdentifier?: string | null;
+    readonly replyToMessageIdentifier?: string | null;
+    readonly artifactReferences?: ReadonlyArray<{
+      readonly artifactIdentifier: string;
+      readonly revision: number;
+    }>;
+    readonly projectScope: "same-project" | "cross-project";
+    readonly authorizationIdentifier?: string | null;
+    readonly sourceProjectIdentifier?: string | null;
+    readonly targetProjectIdentifier?: string | null;
+  }): Promise<CollaborationRequestOutcome> {
+    if (this.stateDirectory === null) {
+      throw new PublicApplicationError(
+        "missing-state-directory",
+        "未配置状态目录：无法发送协作请求",
+      );
+    }
+    const registry = new AgentCreationRegistry({ stateDirectory: this.stateDirectory });
+    return sendCollaborationRequest(
+      {
+        inboxStore: new CollaborationInboxStore({ baseDirectory: this.stateDirectory }),
+        authorizationStore: await this.getCrossProjectAuthorizationStore(),
+        transport: new CollaborationOutboxTransport({ baseDirectory: this.stateDirectory }),
+        isRecipientKnown: async (agentInstanceId) => {
+          const record = await registry.getRecord(agentInstanceId);
+          return record !== null && record.recycledAtIso === null;
+        },
+        uniqueParentOf: async (agentInstanceId) => {
+          const record = await registry.getRecord(agentInstanceId);
+          return record?.createdByAgentInstanceId ?? null;
+        },
+      },
+      {
+        senderAgentInstanceId: input.senderAgentInstanceIdentifier,
+        ...(input.senderRole === null || input.senderRole === undefined
+          ? {}
+          : { senderRole: input.senderRole }),
+        recipientAgentInstanceId: input.recipientAgentInstanceIdentifier,
+        taskIdentifier: input.taskIdentifier,
+        summary: input.summary,
+        nowIso: new Date().toISOString(),
+        projectScope: input.projectScope,
+        ...(input.missionIdentifier === null || input.missionIdentifier === undefined
+          ? {}
+          : { missionIdentifier: input.missionIdentifier }),
+        ...(input.requestIdentifier === null || input.requestIdentifier === undefined
+          ? {}
+          : { requestIdentifier: input.requestIdentifier }),
+        ...(input.replyToMessageIdentifier === null ||
+        input.replyToMessageIdentifier === undefined
+          ? {}
+          : { replyToMessageIdentifier: input.replyToMessageIdentifier }),
+        ...(input.artifactReferences === undefined
+          ? {}
+          : { artifactReferences: input.artifactReferences }),
+        ...(input.authorizationIdentifier === null || input.authorizationIdentifier === undefined
+          ? {}
+          : { authorizationIdentifier: input.authorizationIdentifier }),
+        ...(input.sourceProjectIdentifier === null ||
+        input.sourceProjectIdentifier === undefined
+          ? {}
+          : { sourceProjectIdentifier: input.sourceProjectIdentifier }),
+        ...(input.targetProjectIdentifier === null ||
+        input.targetProjectIdentifier === undefined
+          ? {}
+          : { targetProjectIdentifier: input.targetProjectIdentifier }),
+      },
+    );
+  }
+
+  /**
    * 登记一条跨项目授权（**认证控制面**入口，不是模型工具）。
    *
    * 卡内 §8 要求"基础规则协调完成后才能改变生产默认行为"，故此处不新增默认放行路径：
@@ -8097,6 +8190,15 @@ export {
   type FeedbackDeadLetterEntry,
   type FeedbackDeadLetterRecord,
 } from "./feedback-process/dead-letter.js";
+
+/** 2026-11-21（用户裁决）：协作请求发送入口（门面/CLI 共用同一实现）。 */
+export {
+  sendCollaborationRequest,
+  type CollaborationRequestOutcome,
+  type CollaborationRequestRefusalCode,
+  type CollaborationRequestServiceDeps,
+  type SendCollaborationRequestInput,
+} from "./orchestration/collaboration-request-service.js";
 
 // EVENT-01（2026-10-24）：控制通道（模型/工具门禁、取消能力、分阶段确认、崩溃重放）。
 export {

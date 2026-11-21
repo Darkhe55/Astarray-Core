@@ -270,6 +270,14 @@ export interface CrossProjectAuthorizationRecord {
   state: "active" | "revoked";
   revokedReason: string | null;
   /**
+   * 2026-11-21（用户裁决）：**关系种类**。
+   *
+   * - 缺省 / `cross-project-grant`：跨项目授权（必须由目标项目有权个体或用户批准）；
+   * - `local-default`：同项目协作的**默认关系**（首次发送自动登记，不需要逐边审批；
+   *   可被用户/上级撤销，撤销后不自动复活）。
+   */
+  relationshipKind?: "cross-project-grant" | "local-default";
+  /**
    * COORD-02 §7（2026-11-18）：**授权代际**。
    *
    * 关系首次有效为 1；撤销/收窄/替换在**同一次持久化提交**内递增；
@@ -490,8 +498,83 @@ export class CrossProjectAuthorizationStore {
     return { outcome: "granted", record };
   }
 
-  async revokeAuthorization(authorizationIdentifier: string, revokedReason: string): Promise<void> {
+  /**
+   * 2026-11-21（用户裁决）：**同项目协作的默认关系自动登记**。
+   *
+   * 不是"申请授权"（同项目主↔次级默认全连接），而是把"关系"登记下来供**代际检查**使用：
+   * - 首次发送 ⇒ 创建 epoch 1；
+   * - 已存在且未撤销/未过期 ⇒ 复用（不重复递增）；
+   * - 已撤销 ⇒ **拒绝**（不自动复活；重新授权必须显式进行，由用户/上级执行）；
+   * - 已过期 ⇒ 拒绝。
+   *
+   * 关系标识由（发送者, 收件人, 任务）确定性派生：同一关系重试稳定，不同关系互不影响。
+   */
+  async ensureLocalCollaborationRelationship(input: {
+    readonly sourceProjectIdentifier: string;
+    readonly targetProjectIdentifier: string;
+    readonly sourceAgentInstanceId: string;
+    readonly receivingAgentInstanceId: string;
+    readonly taskIdentifier: string;
+    readonly nowIso: string;
+  }): Promise<{
+    readonly outcome: "created" | "existing" | "revoked" | "expired";
+    readonly record: CrossProjectAuthorizationRecord | null;
+  }> {
     await this.loadFromDisk();
+    const authorizationIdentifier =
+      "local-relationship:" +
+      createHash("sha256")
+        .update(
+          `${input.sourceAgentInstanceId}|${input.receivingAgentInstanceId}|${input.taskIdentifier}`,
+        )
+        .digest("hex")
+        .slice(0, 32);
+    const existing = this.authorizationsByIdentifier.get(authorizationIdentifier);
+    if (existing !== undefined) {
+      if (existing.state === "revoked") {
+        return { outcome: "revoked", record: existing };
+      }
+      const expiresAtMilliseconds = Date.parse(existing.expiresAtIso);
+      if (
+        Number.isFinite(expiresAtMilliseconds) &&
+        expiresAtMilliseconds <= Date.parse(input.nowIso)
+      ) {
+        return { outcome: "expired", record: existing };
+      }
+      return { outcome: "existing", record: existing };
+    }
+    const record: CrossProjectAuthorizationRecord = {
+      authorizationIdentifier,
+      authorizationEpoch: 1,
+      sourceProjectIdentifier: input.sourceProjectIdentifier,
+      sourceProjectRevision: 1,
+      targetProjectIdentifier: input.targetProjectIdentifier,
+      targetProjectRevision: 1,
+      operationKind: "read",
+      resourceScope: { pathPrefixes: [], realPaths: [], isDynamicSharedDirectory: false },
+      argumentsHash:
+        "sha256:" +
+        createHash("sha256")
+          .update(`${input.sourceAgentInstanceId}|${input.receivingAgentInstanceId}`)
+          .digest("hex"),
+      /** 本地默认关系无期限（撤销是唯一失效路径）；保留字段以便统一校验。 */
+      expiresAtIso: "9999-12-31T00:00:00.000Z",
+      grantedByUserId: null,
+      taskIdentifier: input.taskIdentifier,
+      receivingAgentInstanceId: input.receivingAgentInstanceId,
+      state: "active",
+      revokedReason: null,
+      derivationDepth: 0,
+      parentAuthorizationIdentifier: null,
+      relationshipKind: "local-default",
+      createdAtIso: input.nowIso,
+    };
+    this.authorizationsByIdentifier.set(record.authorizationIdentifier, record);
+    await this.enqueuePersist();
+    return { outcome: "created", record };
+  }
+
+  async revokeAuthorization(authorizationIdentifier: string, revokedReason: string): Promise<void> {    await this.loadFromDisk();
     const record = this.authorizationsByIdentifier.get(authorizationIdentifier);
     if (record === undefined) {
       return;

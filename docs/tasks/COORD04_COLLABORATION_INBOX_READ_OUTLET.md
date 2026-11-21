@@ -89,3 +89,38 @@ ADR-0060（反馈 outbox 补送；永久拒绝分类见其 §6）。
 | 反例 | `feedback-dead-letter-store.test.ts`（5 条）+ `feedback-outbox-command.test.ts`（4 条） |
 
 纪律：`requeue` **原样**写回（不改内容）；已在补送队列 ⇒ `already-queued` 不重复写；非法文件名 ⇒ 退出码 2。
+
+## 9. 生产发送入口（2026-11-21，用户确认推荐方案）
+
+**形态**：应用门面 `sendCollaborationRequest` + CLI `collaboration send`，共用同一核心实现；
+Agent 工具作为**第二阶段**（需先定角色/审批策略），本卡不做。
+
+**同项目关系**：首次发送**自动登记默认关系**（`relationshipKind: "local-default"`，epoch=1）——
+这是"登记关系"供代际检查，不是逐边审批；用户/上级可撤销，撤销后**不自动复活**。
+跨项目仍必须显式授权，并核对收件人/项目范围。
+
+**入口规则（全部 fail-closed）**：
+
+| 规则 | 结果 |
+|---|---|
+| 收件人未登记 / 已回收 | `recipient-not-a-known-agent` |
+| 发给自己 | `self-addressed` |
+| 三级/四级发给非直属上级 | `relay-required`（附上级标识） |
+| 跨项目缺授权 / 查不到 / 撤销 / 越界 | `authorization-missing` / `authorization-revoked` / `authorization-scope-mismatch` |
+| 同项目关系已撤销 | `authorization-revoked`（不复活） |
+| 同一 `requestIdentifier` 重发 | `duplicate`（复用同一 `messageIdentifier`） |
+| 收件箱损坏/并发冲突 | `inbox-unavailable` / `inbox-rejected` |
+
+**实现位置**：
+
+| 层 | 位置 |
+|---|---|
+| 核心服务（五步：地址 → 层级 → 授权 → 入箱持久化 → 投递） | `packages/core/src/orchestration/collaboration-request-service.ts` |
+| 默认关系自动登记 | `cross-project-authorization-store.ts` 的 `ensureLocalCollaborationRelationship` |
+| SDK 门面 | `public-sdk.ts` `AstarrayApplicationFacade.sendCollaborationRequest` |
+| CLI | `astarray collaboration send --from --to --task --summary [--scope --authorization …]` |
+
+**反例**：`collaboration-request-send.test.ts`（7 条：同项目自动关系/跨项目授权/地址完整性/自我发送/三级转达/幂等/撤销不复活）
+\+ `collaboration-send-command.test.ts`（3 条：成功落盘/未知收件人/幂等 duplicate）。
+
+**仍未做**：Agent 工具入口（角色/审批/频率策略待定）；跨项目真实网络通道（此前已定本机状态）。
