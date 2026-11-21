@@ -6810,3 +6810,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   无法在两次请求之间把协作消息种入该收件人的收件箱。需夹具/契约裁决（COORD-04 §7）。
 > - 本机全量：**870 files（865 passed / 3 failed / 2 skipped），5581 tests（5571 passed / 3 failed / 7 skipped）**；
 >   3 条失败均为已复现的本机环境问题。`typecheck` / `lint` exit 0。
+
+> **COORD-04 产品路径证据（2026-11-21，用户裁决：worker 序列由上级/用户按需创建）**
+>
+> - 证据 `coord04-collaboration-read-product-path`：真实装配链路（facade → orchestrator → worker → 假 Provider 捕获请求体）；
+>   首次请求按裁决以**用户身份**为 worker 建序列 + 种入授权协作消息；模型调 `taskSequenceStatus`；
+>   **第二次请求的工具结果**含 `pendingCollaboration`（消息标识/摘要/只读提示），收件箱仍为 received、交付尝试 0。
+> - 边界：**无序列的 worker 读不到协作段**（符合按需创建）；"无序列也能拉取协作请求"需另立读取入口（待裁决）。
+> - 本机全量：**871 files（865 passed / 4 failed / 2 skipped），5582 tests（5571 passed / 4 failed / 7 skipped）**；
+>   3 条本机环境 + 1 条已知负载抖动（隔离复跑 3/3 通过）。`typecheck` / `lint` exit 0。
+
+> **推送状态（2026-11-21）**：本机网络不可达，本轮最后一个提交（产品路径证据）**3 次推送均失败**，按纪律留待下次合并推送（本地 HEAD 见 git log）。

@@ -55,23 +55,29 @@ ADR-0060（反馈 outbox 补送；永久拒绝分类见其 §6）。
 定向：`collaboration-inbox-read` 7 条 + 工具层 1 条 + 既有投递复核回归 6 条全部通过；
 `typecheck` exit 0、`lint` exit 0。
 
-本机全量：**868 files（863 passed / 3 failed / 2 skipped），5572 tests（5562 passed / 3 failed / 7 skipped），exit 1**。
-3 条失败均为已在基线 HEAD 复现的本机环境问题（Windows 创建符号链接 ×2、无隔离执行后端 ×1），与本次改动无关。
+本机全量：**871 files（865 passed / 4 failed / 2 skipped），5582 tests（5571 passed / 4 failed / 7 skipped），exit 1**。
+4 条失败 = 3 条已基线复现的本机环境问题（Windows 符号链接 ×2、无隔离执行后端 ×1）
+\+ 1 条已知负载抖动（`graph-change-deterministic-drill`，隔离复跑 **3/3 通过**）。
 
-**未做（如实）**：应用装配层的**产品路径证据**（经完整 runtime 捕获"模型请求里读到协作请求"）；
-本卡证据止于工具执行上下文与读取端口本身。阻塞原因见 §7。
+**未做（如实）**：其它读取入口（无序列时如何拉取协作请求）尚无裁决；TUI/GUI 展示与按任务过滤的读取视图未做。
+产品路径证据见 §7（已有反例）。
 
-## 7. 产品路径证据：阻塞（需夹具/契约裁决）
+## 7. 产品路径证据（2026-11-21，按用户裁决）
 
-尝试用既有产品路径夹具（facade → orchestrator → worker → 捕获请求）证明"模型请求里读到协作请求"，被两个**夹具事实**挡住：
+**裁决**：worker 的任务序列**由上级 agent 或用户按需创建**——`submitTask` 不自动建序列。
 
-1. `submitTask` **不创建** Agent 待办序列 ⇒ worker 上 `taskSequenceStatus` 的 `sequenceId` 无对应快照
-   （会先 `task-sequence-not-found`，读不到协作段）；
-2. worker 个体标识是 `worker:<missionId>:<taskId>:<counter>`，`counter` 在运行时分配
-   ⇒ 无法在首次请求前把协作消息种进该收件人的收件箱（不猜身份就无法在两次请求之间插入种子）。
+**证据**：`tests/core/integration/coord04-collaboration-read-product-path.test.ts`，走**真实装配链路**
+（`AstarrayApplicationFacade` → `MissionOrchestrator` → `WorkerAgent` → 假 Provider **捕获请求体**）：
 
-⇒ 需要裁决：要么规定"worker 序列由谁、何时创建"，要么提供"按 mission 解析本轮 worker 身份"的权威读取口。
-不属于本卡可自行决定的范围，故此处**停在阻塞点**。
+1. 首次请求时按裁决以**用户身份**为 worker（`worker:<missionId>:<taskId>:1`）创建序列，
+   并种入一条已授权的协作请求（权威授权存储 + 收件箱文件）；
+2. 假 Provider 返回 `taskSequenceStatus` 工具调用 → 真实权限/执行 → 结果回填；
+3. **第二次请求体**里的工具结果含 `pendingCollaboration.isAvailable=true`、消息标识与摘要，
+   `readOnlyNotice` 明确"读取不改变消息状态"；收件箱状态仍为 `received`、交付尝试 **0**。
+
+**由此裁决直接推出的边界**：**没有序列的 worker 读不到协作段**（工具先取序列快照）。
+这符合"按需创建"——没有任务清单的个体不承担"读任务列表"的职责；发给它的协作消息仍可经
+**投递链路**推送。若产品希望"无序列也能拉取协作请求"，需要另立读取入口（不在本卡默认行为内）。
 
 ## 8. 死信人工入口（同日补，用户裁决 C）
 
