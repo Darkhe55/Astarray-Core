@@ -113,4 +113,33 @@ describe("反馈信封的授权章透传", () => {
     expect(carriedIdentifierOf(parsed.data)).toBe("authorization-1");
     expect(parsed.data.payload).toMatchObject({ authorizationEpoch: 2 });
   });
+
+  /**
+   * 2026-11-21：既有信封字段同样不能被静默剥离。
+   *
+   * `mission/replyTo` 丢失 ⇒ 回复路由失败；`taskRevision/executionAttempt` 丢失 ⇒
+   * "版本不符/旧尝试"永远测不出来。它们此前都没登记进 schema。
+   */
+  it("⑥ mission/task/replyTo/版本/执行尝试经 schema 后仍在", () => {
+    const parsed = feedbackMessageSchema.parse(
+      jsonRoundTrip(
+        buildFeedbackMessage({
+          projectIdentifier: "project-a",
+          missionIdentifier: "mission-1",
+          taskIdentifier: "task-1",
+          replyToMessageIdentifier: "message-0",
+          taskRevision: 3,
+          executionAttempt: 2,
+        }),
+      ),
+    );
+    expect(parsed).toMatchObject({
+      projectIdentifier: "project-a",
+      missionIdentifier: "mission-1",
+      taskIdentifier: "task-1",
+      replyToMessageIdentifier: "message-0",
+      taskRevision: 3,
+      executionAttempt: 2,
+    });
+  });
 });

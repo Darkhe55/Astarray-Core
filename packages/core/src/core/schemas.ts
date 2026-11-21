@@ -339,6 +339,20 @@ export const feedbackMessageSchema = z
     createdAtIso: z.iso.datetime(),
     idempotencyKey: z.string().min(1),
     /**
+     * 2026-11-21：**既有信封字段也必须登记**。
+     *
+     * `FeedbackMessage` 早已声明这些可选字段（归属、回复指向、任务版本、执行尝试），
+     * 但 schema 没登记 ⇒ zod 静默剥离 ⇒ 反馈进程读回时全部丢失（mission/replyTo 丢了，
+     * 回复路由必然失败；版本/尝试丢了，"版本不符"永远测不出来）。
+     * 全部可选，兼容旧消息。
+     */
+    taskRevision: z.number().int().nonnegative().optional(),
+    executionAttempt: z.number().int().nonnegative().optional(),
+    projectIdentifier: z.string().min(1).optional(),
+    missionIdentifier: z.string().min(1).optional(),
+    taskIdentifier: z.string().min(1).optional(),
+    replyToMessageIdentifier: z.string().min(1).optional(),
+    /**
      * COORD-02 §7（2026-11-21）：授权关系标识随信封传递。
      *
      * 必须登记进 schema：zod 默认**丢弃未登记字段**，否则经过反馈进程校验后

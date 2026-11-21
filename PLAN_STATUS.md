@@ -6773,9 +6773,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   反馈映射（`buildCollaborationFeedbackMessage`）与发件箱（`CollaborationOutboxTransport`）原样携带；
 >   缺省/空串/空白/null ⇒ 不写（不伪造空章），空串在 schema 层直接拒。
 > - 反例 3 文件 / 8 条（先红：**5 红 / 11 绿**；后绿 **16/16**）；承重：摘掉 schema 登记 ⇒ 透传①③变红。
-> - **顺带发现（未修）**：`feedbackMessageSchema` 仍未登记 mission/replyTo/taskRevision 等既有信封字段（仍会静默剥离）；
->   协作请求载荷因 `PRIORITY_OF_KIND` 缺项 + `messageId` 非 uuid **过不了**该 schema ⇒ 反馈进程路径对协作消息实际未通
->   （相关集成用例被 `describe.skipIf` 遮蔽）。需单独立项裁决。
+> - **顺带发现（同轮已全部修掉，见下一条）**：`feedbackMessageSchema` 未登记 mission/replyTo/taskRevision 等既有信封字段；
+>   协作请求载荷因 `PRIORITY_OF_KIND` 缺项 + `messageId` 非 uuid 过不了该 schema ⇒ 反馈进程路径对协作消息实际未通。
 > - 本机全量：**866 files（860 passed / 4 failed / 2 skipped），5556 tests（5545 passed / 4 failed / 7 skipped）**。
 >   4 条失败均与本次改动无关：2 条 Windows 符号链接环境、1 条隔离执行后端缺失（三者已在基线 HEAD 上复现）、
 >   1 条并发用例负载抖动（隔离复跑 1/1 通过）。
@@ -6785,5 +6784,6 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 实证"绿的断"：子进程拒绝协作消息（`messageId` 非 uuid + `PRIORITY_OF_KIND` 缺项），客户端却不看 `accepted` ⇒ 静默丢消息、用例仍绿。
 > - 修复：schema 补 `collaboration-request` 优先级；`messageId` 改确定性 UUID（同标识稳定、异标识不同）；客户端 `accepted:false` ⇒ 抛新码 `feedback-message-rejected` 并保留补送文件；SDK 导出盖章入口。
 > - 端到端：`coord02-stamped-fork-link` 跑通 盖章 → 映射 → 真实 fork → 接收侧，章（关系标识 + 代际）原样到达；相关 11 files / 123 tests 全过。
+> - 信封 schema 补齐：`missionIdentifier` / `replyToMessageIdentifier` / `projectIdentifier` / `taskIdentifier` / `taskRevision` / `executionAttempt` 全部登记（摘掉登记 ⇒ 反例⑥变红）。
 > - **阻塞**：仓内没有协作消息的生产调用方（发起入口属产品形态；SDK 盖章入口 + fork 链路已就绪）；永久性拒绝消息的"无限补送"语义待裁决。
-> - 本机全量：**867 files（862 passed / 3 failed / 2 skipped），5560 tests（5550 passed / 3 failed / 7 skipped）**；3 条失败均为已复现的本机环境问题。
+> - 本机全量：**867 files（862 passed / 3 failed / 2 skipped），5561 tests（5551 passed / 3 failed / 7 skipped）**；3 条失败均为已复现的本机环境问题。

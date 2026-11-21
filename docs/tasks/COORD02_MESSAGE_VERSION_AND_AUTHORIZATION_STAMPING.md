@@ -221,11 +221,11 @@ transport 只被调用 **1** 次，落盘后 `m-ok=delivered` 而 `m-revoked`、
 （① 字段被 zod 剥离；③ 因字段消失而"通过"）。摘掉映射/发件箱的写出语句 ⇒ 对应 ⑤ 变红，
 已在实现前实测（实现前就是红）。
 
-### 顺带发现（本次**未修**，超出本项范围，需单独立项）
+### 顺带发现（第 1 条已在 §13 补齐，第 2 条已修）
 
-1. `feedbackMessageSchema` 至今**未登记** `missionIdentifier` / `replyToMessageIdentifier` /
-   `taskRevision` / `executionAttempt` / `projectIdentifier` / `taskIdentifier` 等既有信封字段
-   ⇒ 经反馈进程校验后会被静默剥离。本次只补了 `authorizationIdentifier`。
+1. ~~`feedbackMessageSchema` 未登记~~ `missionIdentifier` / `replyToMessageIdentifier` /
+   `taskRevision` / `executionAttempt` / `projectIdentifier` / `taskIdentifier`
+   ⇒ **已登记（2026-11-21，见 §13）**；摘掉登记时反例⑥会红。
 2. ~~协作请求载荷**过不了** `feedbackMessageSchema`：`PRIORITY_OF_KIND` 缺 `collaboration-request`；
    映射生成的 `messageId` 是 `collaboration:<id>`、不满足 `z.uuid()`~~：**已修（2026-11-21，见 §13）**。
    同时发现并修掉"子进程拒绝被客户端当成功"的静默丢弃（这也是本条此前一直被遮蔽的原因）。
@@ -307,11 +307,12 @@ astarray: 反馈进程拒绝非法消息（schema 校验失败）: Invalid UUID 
   不能凭空新增入口。**SDK 盖章入口 + 可用的 fork 链路已就绪，宿主接线即可。**
 - 永久性拒绝（schema/身份不合法）的消息会留在补送 outbox 里按 ≤60s 退避**无限重试**（设计上不丢消息）；
   是否需要"拒绝即归档/告警"待裁决。
-- `feedbackMessageSchema` 仍未登记 `missionIdentifier` / `replyToMessageIdentifier` / `taskRevision` /
-  `executionAttempt` 等既有信封字段（§12 第 1 条），本轮未动。
+- ~~`feedbackMessageSchema` 仍未登记 `missionIdentifier` / `replyToMessageIdentifier` / `taskRevision` /
+  `executionAttempt` 等既有信封字段~~：**同轮已补**（另加 `projectIdentifier` / `taskIdentifier`）。
+  反例⑥（往返后字段仍在）在摘掉登记时变红。
 
 ### 门禁（本机全量）
 
-**867 files（862 passed / 3 failed / 2 skipped），5560 tests（5550 passed / 3 failed / 7 skipped），exit 1**。
+**867 files（862 passed / 3 failed / 2 skipped），5561 tests（5551 passed / 3 failed / 7 skipped），exit 1**。
 3 条失败与本轮改动无关，且都已在基线 HEAD 上复现：`project-scope-boundary` ③、`tool-registry` 符号链接
 （Windows 创建链接需特权）、`exec01-02-cli-bootstrap-autodetect`（无隔离执行后端）。
