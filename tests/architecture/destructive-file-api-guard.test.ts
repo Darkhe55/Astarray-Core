@@ -199,6 +199,16 @@ const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }>
     reason:
       "反馈进程 IPC 传输：临时请求/响应文件排他写入 + rename 原子发布 + 用完即删；不含用户正文（正文走既有受控通道）",
   },
+  /**
+   * 2026-11-21（用户裁决 C）：死信的人工重放/清除。
+   * 理由：只删除**状态目录**下已归档的死信文件（重放成功后删除原件；
+   * `remove` 需显式文件名且文件名限于 64 位哈希），不触碰项目源码；
+   * 删除失败按 false 返回，不静默称成功。
+   */
+  "core/src/feedback-process/dead-letter.ts": {
+    tokens: ["rm"],
+    reason: "死信归档的人工重放/清除：仅删除状态目录内的死信文件，文件名限哈希，不触碰项目源码",
+  },
   "core/src/orchestration/goal-dispatch-verdict-journal.ts": {
     tokens: ["rename", "unlink"],
     reason:

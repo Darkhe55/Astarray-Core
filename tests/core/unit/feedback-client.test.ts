@@ -294,6 +294,10 @@ describe("ForkFeedbackClient", () => {
       expect(deadLetter.rejectionCode).toBe("invalid-message");
       expect(deadLetter.rejectionReason).toContain("Invalid UUID");
       expect(deadLetter.messageId).toBe(message.messageId);
+      expect(await client.getOutboxStatus()).toMatchObject({
+        pendingCount: 0,
+        deadLetterCount: 1,
+      });
     } finally {
       await rm(baseDirectory, { recursive: true, force: true });
     }

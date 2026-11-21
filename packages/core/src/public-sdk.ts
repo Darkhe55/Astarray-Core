@@ -8090,6 +8090,14 @@ export {
 /** 2026-11-21（用户裁决 C）：带原因分类的拒绝错误（宿主/调用方可判永久或暂时）。 */
 export { FeedbackMessageRejectedError } from "./feedback-process/transport.js";
 
+/** 2026-11-21：死信的人工处置入口（CLI `feedback-outbox` 与宿主共用）。 */
+export {
+  FEEDBACK_DEAD_LETTER_SCHEMA_VERSION,
+  FeedbackDeadLetterStore,
+  type FeedbackDeadLetterEntry,
+  type FeedbackDeadLetterRecord,
+} from "./feedback-process/dead-letter.js";
+
 // EVENT-01（2026-10-24）：控制通道（模型/工具门禁、取消能力、分阶段确认、崩溃重放）。
 export {
   EventControlChannel,

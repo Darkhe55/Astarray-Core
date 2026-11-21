@@ -90,4 +90,9 @@ supervisor 心跳
 ③ 补送遇到永久拒绝 ⇒ `deadLetteredCount=1`、`remainingCount=0`；
 ④ 无原因码（旧协议）⇒ 按暂时处理（兼容）。
 
-**仍未做**：死信的**人工重放/清理入口**；`flushPendingOutbox()` 计数的 UI/日志消费（§4 第二条仍未做）。
+**已补（同日）**：死信**人工入口** —— CLI `feedback-outbox list|requeue|remove`
+（`list` 同时显示补送积压；`requeue` 把死信原样写回补送队列，是否再次被拒由子进程判定；
+`remove` 需显式文件名，非法名退出码 2）；`ForkFeedbackClient.getOutboxStatus()` 提供只读计数；
+`FeedbackDeadLetterStore` 经 SDK 导出。
+
+**仍未做**：补送/死信计数的**自动告警**与 UI 展示（§4 第二条的告警部分仍未做）。

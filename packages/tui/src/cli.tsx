@@ -154,6 +154,11 @@ import {
 
 import { executeSecretaryStatusCommand } from "./cli/secretary-command.js";
 import { executeCollaborationStatusCommand } from "./cli/collaboration-command.js";
+import {
+  executeFeedbackOutboxListCommand,
+  executeFeedbackOutboxRemoveCommand,
+  executeFeedbackOutboxRequeueCommand,
+} from "./cli/feedback-outbox-command.js";
 import { executeInboxDeliverCommand, executeInboxListCommand } from "./cli/inbox-command.js";
 import { executeOnboardingStatusCommand } from "./cli/onboarding-command.js";
 import { executeEventStatusCommand } from "./cli/event-command.js";
@@ -2789,6 +2794,49 @@ inboxCommand
       });
     },
   );
+
+/**
+ * 2026-11-21（用户裁决 C）：反馈补送死信的人工入口。
+ * 永久性拒绝不再无限重试；这里提供只读清点、原样重放与显式清除。
+ */
+const feedbackOutboxCommand = program
+  .command("feedback-outbox")
+  .description("本地反馈补送死信（只读清点 / 人工重放 / 清除）");
+feedbackOutboxCommand
+  .command("list")
+  .description("列出永久性拒绝的死信（只读）")
+  .option("--state-dir <dir>", "状态目录")
+  .option("--json", "JSON 输出")
+  .action(async (options: { stateDir?: string; json?: boolean }) => {
+    process.exitCode = await executeFeedbackOutboxListCommand({
+      stateDirectory: options.stateDir ?? defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+    });
+  });
+feedbackOutboxCommand
+  .command("requeue <file>")
+  .description("把死信原样写回补送队列（是否再次被拒由反馈进程判定）")
+  .option("--state-dir <dir>", "状态目录")
+  .option("--json", "JSON 输出")
+  .action(async (fileName: string, options: { stateDir?: string; json?: boolean }) => {
+    process.exitCode = await executeFeedbackOutboxRequeueCommand({
+      stateDirectory: options.stateDir ?? defaultStateDirectory(),
+      fileName,
+      isJsonOutput: options.json === true,
+    });
+  });
+feedbackOutboxCommand
+  .command("remove <file>")
+  .description("人工清除死信（不可恢复）")
+  .option("--state-dir <dir>", "状态目录")
+  .option("--json", "JSON 输出")
+  .action(async (fileName: string, options: { stateDir?: string; json?: boolean }) => {
+    process.exitCode = await executeFeedbackOutboxRemoveCommand({
+      stateDirectory: options.stateDir ?? defaultStateDirectory(),
+      fileName,
+      isJsonOutput: options.json === true,
+    });
+  });
 
 const secretaryCommand = program
   .command("secretary")

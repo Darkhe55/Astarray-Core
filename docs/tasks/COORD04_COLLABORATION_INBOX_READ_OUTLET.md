@@ -59,4 +59,27 @@ ADR-0060（反馈 outbox 补送；永久拒绝分类见其 §6）。
 3 条失败均为已在基线 HEAD 复现的本机环境问题（Windows 创建符号链接 ×2、无隔离执行后端 ×1），与本次改动无关。
 
 **未做（如实）**：应用装配层的**产品路径证据**（经完整 runtime 捕获"模型请求里读到协作请求"）；
-本卡证据止于工具执行上下文与读取端口本身。
+本卡证据止于工具执行上下文与读取端口本身。阻塞原因见 §7。
+
+## 7. 产品路径证据：阻塞（需夹具/契约裁决）
+
+尝试用既有产品路径夹具（facade → orchestrator → worker → 捕获请求）证明"模型请求里读到协作请求"，被两个**夹具事实**挡住：
+
+1. `submitTask` **不创建** Agent 待办序列 ⇒ worker 上 `taskSequenceStatus` 的 `sequenceId` 无对应快照
+   （会先 `task-sequence-not-found`，读不到协作段）；
+2. worker 个体标识是 `worker:<missionId>:<taskId>:<counter>`，`counter` 在运行时分配
+   ⇒ 无法在首次请求前把协作消息种进该收件人的收件箱（不猜身份就无法在两次请求之间插入种子）。
+
+⇒ 需要裁决：要么规定"worker 序列由谁、何时创建"，要么提供"按 mission 解析本轮 worker 身份"的权威读取口。
+不属于本卡可自行决定的范围，故此处**停在阻塞点**。
+
+## 8. 死信人工入口（同日补，用户裁决 C）
+
+| 能力 | 位置 |
+|---|---|
+| 死信存储（list/read/requeue/remove；文件名只接受 64 位哈希 `.json`；坏文件如实计数） | `packages/core/src/feedback-process/dead-letter.ts` |
+| CLI | `astarray feedback-outbox list|requeue|remove`（`list` 同时显示补送积压） |
+| 计数 | `ForkFeedbackClient.getOutboxStatus()` → `{ pendingCount, deadLetterCount }` |
+| 反例 | `feedback-dead-letter-store.test.ts`（5 条）+ `feedback-outbox-command.test.ts`（4 条） |
+
+纪律：`requeue` **原样**写回（不改内容）；已在补送队列 ⇒ `already-queued` 不重复写；非法文件名 ⇒ 退出码 2。

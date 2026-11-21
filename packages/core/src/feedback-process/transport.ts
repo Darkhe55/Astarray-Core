@@ -352,6 +352,31 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
     }
   }
 
+  /**
+   * 2026-11-21（裁决 C）：本地补送/死信计数（只读；不触发补送）。
+   *
+   * 供健康检查/运维查看"积压多少、死信多少"，不再让计数被调用方丢弃后彻底不可见。
+   */
+  async getOutboxStatus(): Promise<{
+    readonly pendingCount: number;
+    readonly deadLetterCount: number;
+  }> {
+    const countJsonFiles = async (directory: string | null): Promise<number> => {
+      if (directory === null) {
+        return 0;
+      }
+      try {
+        return (await fs.readdir(directory)).filter((name) => name.endsWith(".json")).length;
+      } catch {
+        return 0;
+      }
+    };
+    return {
+      pendingCount: await countJsonFiles(this.outboxDirectoryPath),
+      deadLetterCount: await countJsonFiles(this.getDeadLetterDirectoryPath()),
+    };
+  }
+
   /** 补送文件路径：按幂等键哈希命名（避免非法字符，且天然去重）。 */
   private outboxFilePathFor(message: FeedbackMessage): string | null {
     if (this.outboxDirectoryPath === null) {

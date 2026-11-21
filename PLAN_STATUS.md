@@ -6800,3 +6800,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `flushPendingOutbox` 新增 `deadLetteredCount`。反例：feedback-client 4 条（含旧协议无码按暂时兼容）。
 > - 本机全量：**868 files（863 passed / 3 failed / 2 skipped），5572 tests（5562 passed / 3 failed / 7 skipped）**；
 >   3 条失败均为已复现的本机环境问题。`typecheck` / `lint` exit 0。
+
+> **COORD-04 收尾：死信人工入口 + 产品路径阻塞记录（2026-11-21）**
+>
+> - 用户裁决 C 的收尾：新增 `FeedbackDeadLetterStore`（list/read/requeue/remove；文件名限 64 位哈希防穿越；坏文件如实计数）
+>   + CLI `astarray feedback-outbox list|requeue|remove`（list 同时显示补送积压）+ `ForkFeedbackClient.getOutboxStatus()`；
+>   反例：store 5 条 + CLI 4 条 + client 计数断言；破坏性 API 架构守卫已登记理由。
+> - 产品路径证据**阻塞**：`submitTask` 不创建 worker 待办序列；worker 身份含运行时 counter ⇒
+>   无法在两次请求之间把协作消息种入该收件人的收件箱。需夹具/契约裁决（COORD-04 §7）。
+> - 本机全量：**870 files（865 passed / 3 failed / 2 skipped），5581 tests（5571 passed / 3 failed / 7 skipped）**；
+>   3 条失败均为已复现的本机环境问题。`typecheck` / `lint` exit 0。
