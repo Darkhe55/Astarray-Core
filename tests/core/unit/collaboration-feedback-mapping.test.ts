@@ -93,4 +93,32 @@ describe("协作消息的信封标记", () => {
       ).toBeUndefined();
     }
   });
+
+  /**
+   * 2026-11-21：`messageId` 必须是 **UUID**（`feedbackMessageSchema` 的硬约束）。
+   *
+   * 此前是 `"collaboration:" + messageIdentifier` ⇒ 反馈进程 `safeParse` 直接判非法，
+   * 协作消息从未真正入池。改为从 messageIdentifier **确定性派生** UUID：
+   * - 同一标识重试 ⇒ 同一 messageId（重放去重仍成立）；
+   * - 不同标识 ⇒ 不同 messageId（不会串消息）。
+   */
+  it("⑦ messageId 为确定性 UUID：同标识稳定、不同标识不同", () => {
+    const first = buildCollaborationFeedbackMessage({
+      message: buildMessage(),
+      sourceAgentRole: "secondary",
+    });
+    const again = buildCollaborationFeedbackMessage({
+      message: buildMessage(),
+      sourceAgentRole: "secondary",
+    });
+    const other = buildCollaborationFeedbackMessage({
+      message: buildMessage({ messageIdentifier: "message-2" }),
+      sourceAgentRole: "secondary",
+    });
+    expect(first.messageId).toBe(again.messageId);
+    expect(first.messageId).not.toBe(other.messageId);
+    expect(first.messageId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
 });

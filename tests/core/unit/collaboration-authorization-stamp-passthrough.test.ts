@@ -18,6 +18,8 @@
 import { describe, expect, it } from "vitest";
 
 import { feedbackMessageSchema } from "../../../packages/core/src/core/schemas.js";
+import { buildCollaborationFeedbackMessage } from "../../../packages/core/src/orchestration/collaboration-feedback-mapping.js";
+import type { CollaborationInboxMessage } from "../../../packages/core/src/orchestration/collaboration-inbox.js";
 
 const MESSAGE_ID = "3f1c8a52-6d47-4d0e-9a3b-2c5e7f8a1b64";
 
@@ -73,5 +75,42 @@ describe("反馈信封的授权章透传", () => {
     expect(
       (parsed.payload as unknown as Record<string, unknown>)["authorizationIdentifier"],
     ).toBeUndefined();
+  });
+
+  /**
+   * 2026-11-21：协作映射产出的**整封**消息必须能通过 `feedbackMessageSchema`。
+   *
+   * 此前两处硬冲突把它挡在门外：`PRIORITY_OF_KIND` 没有 `collaboration-request`，
+   * 且 `messageId` 是 `collaboration:<id>` 不满足 uuid。结果是反馈进程逐条拒绝。
+   */
+  it("⑤ 协作映射产出的信封整体通过 schema，且关系标识/代际都在", () => {
+    const inboxMessage = {
+      messageIdentifier: "message-1",
+      correlationIdentifier: "corr-1",
+      recipientAgentInstanceId: "agent-b1",
+      senderAgentInstanceId: "agent-a1",
+      originalSourceAgentInstanceId: "agent-a1",
+      isRelayedRequest: false,
+      taskIdentifier: "task-1",
+      artifactReferenceStatus: "not-provided",
+      summary: "请查询状态",
+      receivedAtIso: "2026-11-21T00:00:00.000Z",
+      authorizationEpoch: 2,
+      authorizationIdentifier: "authorization-1",
+      state: "received",
+      deliveryAttemptCount: 0,
+      lastFailureAtIso: null,
+    } as unknown as CollaborationInboxMessage;
+    const feedbackMessage = buildCollaborationFeedbackMessage({
+      message: inboxMessage,
+      sourceAgentRole: "secondary",
+    });
+    const parsed = feedbackMessageSchema.safeParse(jsonRoundTrip(feedbackMessage));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) {
+      return;
+    }
+    expect(carriedIdentifierOf(parsed.data)).toBe("authorization-1");
+    expect(parsed.data.payload).toMatchObject({ authorizationEpoch: 2 });
   });
 });

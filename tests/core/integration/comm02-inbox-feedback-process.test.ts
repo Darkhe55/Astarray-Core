@@ -68,6 +68,12 @@ describe.skipIf(!hasBuiltEntry)("COMM-01-02 收件箱 ↔ 独立反馈进程", (
     });
     supervisors.push(supervisor);
     const client = await supervisor.start();
+    /**
+     * 2026-11-21：反馈进程按 `setAgentStatus` 登记来源（防伪造来源）。
+     * 此前这里**没登记**也"绿"，是因为客户端把 `accepted:false` 当成功；
+     * 现在拒绝会如实上抛，所以按真实使用方式登记发送者。
+     */
+    client.setAgentStatus("agent-a", "idle");
 
     const store = new CollaborationInboxStore({ baseDirectory });
     const inbox = createMessage();

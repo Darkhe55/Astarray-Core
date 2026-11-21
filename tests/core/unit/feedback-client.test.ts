@@ -14,6 +14,9 @@ vi.setConfig({ testTimeout: 60_000 });
 
 
 import type { ChildProcess } from "node:child_process";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import type { FeedbackMessage } from "../../../packages/core/src/core/types.js";
 import { FEEDBACK_PROTOCOL_VERSION } from "../../../packages/core/src/feedback-process/ipc-protocol.js";
 import type { FeedbackIpcMessage } from "../../../packages/core/src/feedback-process/ipc-protocol.js";
@@ -196,6 +199,47 @@ describe("ForkFeedbackClient", () => {
       accepted: true,
     });
     await expect(enqueuePromise).resolves.toBeUndefined();
+  });
+
+  it("子进程明确拒绝（accepted=false）⇒ enqueue 抛错且补送文件保留", async () => {
+    const baseDirectory = await mkdtemp(path.join(os.tmpdir(), "feedback-client-reject-"));
+    try {
+      const fakeChild = new FakeChildProcess();
+      const client = createWiredClient(fakeChild);
+      client.sendHello(baseDirectory, 5_000);
+      fakeChild.emitInbound({
+        type: "ready",
+        protocolVersion: FEEDBACK_PROTOCOL_VERSION,
+        processPid: 99,
+      });
+      await client.waitUntilReady();
+
+      const enqueuePromise = client.enqueue(makeMessage("scheduler-1", "key-rejected"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const enqueueRequest = fakeChild.sentMessages.find(
+        (message) => message.type === "enqueue",
+      );
+      fakeChild.emitInbound({
+        type: "enqueued",
+        requestId: (enqueueRequest as { requestId: string }).requestId,
+        accepted: false,
+      });
+
+      /**
+       * 2026-11-21：此前这里 **静默成功** —— 子进程 schema/身份校验拒绝、回 `accepted:false`，
+       * 客户端却照样删除补送文件并让调用方以为"已入队"（消息就此丢失）。
+       * 拒绝必须作为失败上抛，补送文件保留（后续补送仍会被拒，但账目不再撒谎）。
+       */
+      await expect(enqueuePromise).rejects.toMatchObject({
+        errorCode: "feedback-message-rejected",
+      });
+      const outboxFiles = (
+        await readdir(path.join(baseDirectory, "feedback-client-outbox"))
+      ).filter((name) => name.endsWith(".json"));
+      expect(outboxFiles).toHaveLength(1);
+    } finally {
+      await rm(baseDirectory, { recursive: true, force: true });
+    }
   });
 
   it("同 idempotencyKey 重复投递只调用 handler 一次并自动 ack", async () => {

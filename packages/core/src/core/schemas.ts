@@ -321,6 +321,12 @@ const PRIORITY_OF_KIND: Record<string, string> = {
   instruction: "instruction",
   "existing-resource-inquiry": "instruction",
   "assist-installation-request": "instruction",
+  /**
+   * 2026-11-21 修正：协作请求此前**没有登记**在这张表里，`expectedPriority` 为 undefined
+   * ⇒ 任何优先级的协作消息都会被 superRefine 判"不一致"。与 `worker-agent` 的
+   * `payloadPriority()`（协作请求 ⇒ instruction）对齐。
+   */
+  "collaboration-request": "instruction",
 };
 
 export const feedbackMessageSchema = z

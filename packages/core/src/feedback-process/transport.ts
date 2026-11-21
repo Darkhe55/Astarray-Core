@@ -107,15 +107,32 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
      */
     await this.persistOutboxMessage(message);
     await this.waitUntilReady();
-    const requestId = randomUUID();
     /**
      * 发送失败时**保留 outbox 文件**（交给补送路径），错误如实上抛 —— 不静默吞。
      */
-    await this.requestResponse(
+    await this.requestEnqueue(message);
+    await this.removeOutboxMessage(message);
+  }
+
+  /**
+   * 2026-11-21：子进程应答里的 `accepted` 必须先看。
+   *
+   * 此前无论 `accepted` 真假都当成功、随后删除补送文件 —— schema/身份校验失败的消息
+   * 被**静默丢弃**（`comm02-inbox-feedback-process` 因此一直"绿"却从未真正入池）。
+   * 只有显式 `accepted: false` 才算拒绝；旧协议没有该字段时保持兼容。
+   */
+  private async requestEnqueue(message: FeedbackMessage): Promise<void> {
+    const requestId = randomUUID();
+    const result = (await this.requestResponse(
       { type: "enqueue", requestId, message },
       requestId,
-    );
-    await this.removeOutboxMessage(message);
+    )) as { readonly accepted?: boolean } | null;
+    if (result !== null && result.accepted === false) {
+      throw new DomainError(
+        "feedback-message-rejected",
+        `反馈进程拒绝消息 ${message.messageId}（schema 或身份校验失败），未入队。`,
+      );
+    }
   }
 
   /**
@@ -183,12 +200,8 @@ export class ForkFeedbackClient implements FeedbackTransportPort {
           // 损坏的补送文件：不静默删除（保留现场），计入未发送
           continue;
         }
-        const requestId = randomUUID();
         try {
-          await this.requestResponse(
-            { type: "enqueue", requestId, message },
-            requestId,
-          );
+          await this.requestEnqueue(message);
           await fs.rm(filePath, { force: true }).catch(() => undefined);
           this.outboxRetryState.delete(entryName);
           resentCount += 1;

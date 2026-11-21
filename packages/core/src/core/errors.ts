@@ -54,6 +54,7 @@ export type DomainErrorCode =
   | "backup-deletion-authorization-invalid"
   | "feedback-protocol-mismatch"
   | "feedback-process-unavailable"
+  | "feedback-message-rejected"
   | "provider-timeout"
   | "provider-cancelled"
   | "provider-protocol-error"

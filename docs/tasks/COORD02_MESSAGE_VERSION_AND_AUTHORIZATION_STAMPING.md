@@ -1,6 +1,6 @@
 # COORD-02：消息版本与授权标记（生产者前置）
 
-**状态**：`implemented-unverified`（§7 五段均已实现并有反例：权威来源、建立/变更、生产盖章、传输透传、消费复核；仍缺真实反馈进程 fork 链路接线，见 §12）
+**状态**：`implemented-unverified`（§7 五段均已实现并有反例；反馈进程 fork 链路已打通并经端到端验证。仍缺仓内生产调用方，见 §13「阻塞」）
 **立卡日期**：2026-11-17
 **来源**：P1-3 返修时发现的硬前置（见 `COORD01_TASK_FEEDBACK_CONSUMPTION_REPAIR.md` P1-3 要求 7）
 
@@ -186,7 +186,7 @@ transport 只被调用 **1** 次，落盘后 `m-ok=delivered` 而 `m-revoked`、
 ### 仍未做
 
 - ~~发件箱 / 反馈映射的**关系标识**透传（代际已透传；需扩展信封 schema）~~：**已实现（2026-11-21，见 §12）**；
-- 真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`（依赖 §12「顺带发现」第 2 条的裁决）。
+- ~~真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`~~：**已打通并经端到端验证（2026-11-21，见 §13）**（当时依赖的 schema 阻塞已同时修掉）。
 
 ### 门禁
 
@@ -226,16 +226,14 @@ transport 只被调用 **1** 次，落盘后 `m-ok=delivered` 而 `m-revoked`、
 1. `feedbackMessageSchema` 至今**未登记** `missionIdentifier` / `replyToMessageIdentifier` /
    `taskRevision` / `executionAttempt` / `projectIdentifier` / `taskIdentifier` 等既有信封字段
    ⇒ 经反馈进程校验后会被静默剥离。本次只补了 `authorizationIdentifier`。
-2. 协作请求载荷目前**过不了** `feedbackMessageSchema`：
-   - `PRIORITY_OF_KIND` 缺 `collaboration-request` ⇒ 期望值为 undefined，任何优先级都被判不一致；
-   - 映射生成的 `messageId` 是 `collaboration:<id>`，不满足 `z.uuid()`。
-   ⇒ "反馈进程投递"这条路径对协作消息实际仍未打通；`comm02-inbox-feedback-process` 用例因
-   `dist` 不存在被 `describe.skipIf` 跳过（属已知遮蔽）。两条都需要产品/架构裁决后再动。
+2. ~~协作请求载荷**过不了** `feedbackMessageSchema`：`PRIORITY_OF_KIND` 缺 `collaboration-request`；
+   映射生成的 `messageId` 是 `collaboration:<id>`、不满足 `z.uuid()`~~：**已修（2026-11-21，见 §13）**。
+   同时发现并修掉"子进程拒绝被客户端当成功"的静默丢弃（这也是本条此前一直被遮蔽的原因）。
 
 ### 仍未做
 
-- 真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`；
-- 上面「顺带发现」两条（协作消息过 schema、其它信封字段登记）。
+- ~~真实跨进程投递链路（反馈进程 fork）里调用 `enqueueWithAuthoritativeStamp`~~：**已打通并经端到端验证（2026-11-21，见 §13）**；仍缺**仓内生产调用方**（属产品决策，见 §13「阻塞」）。
+- ~~上面「顺带发现」两条~~：协作消息过 schema 已修（§13）；其它信封字段登记**仍未做**（§12 §1）。
 
 ### 门禁
 
@@ -255,3 +253,65 @@ transport 只被调用 **1** 次，落盘后 `m-ok=delivered` 而 `m-revoked`、
 （`git config core.autocrlf false`）后 **6/6 通过**，源码未改任何锚点。
 
 定向反例（本次 3 个文件 16 条）：**16/16 通过**；`typecheck` exit 0；`lint` exit 0。
+
+## 13. 施工记录：§7 第六部分（反馈进程链路打通，2026-11-21）
+
+### 先证实"绿的断"
+
+跑 `comm02-inbox-feedback-process` 时，子进程 stderr 明写拒绝：
+
+```text
+astarray: 反馈进程拒绝非法消息（schema 校验失败）: Invalid UUID / priority instruction 与 payload kind collaboration-request 不一致
+```
+
+而用例仍然**通过**（`deliveredCount=1`）。三条独立缺陷叠在一起：
+
+| # | 缺陷 | 后果 |
+|---|---|---|
+| 1 | `PRIORITY_OF_KIND` 缺 `collaboration-request` ⇒ `expectedPriority=undefined` | 任何优先级的协作消息都被判"不一致" |
+| 2 | 映射产出 `messageId = "collaboration:<id>"`，schema 要求 UUID | 合法协作消息永远过不了校验 |
+| 3 | 客户端不看 `enqueued.accepted`，拒绝后照样删补送文件 | **静默丢消息**；`delivered` 是假的 |
+
+### 修复
+
+| 层 | 改动 |
+|---|---|
+| schema | `PRIORITY_OF_KIND` 增 `collaboration-request: "instruction"`（与 `worker-agent.payloadPriority` 对齐） |
+| 映射 | `messageId` 从协作标识**确定性派生 UUID**（v5 形状）：同标识稳定、异标识不同；原标识仍在 `payload.messageIdentifier`（回复路由用它） |
+| 客户端 | 抽出 `requestEnqueue`，`accepted === false` ⇒ 抛新错误码 `feedback-message-rejected`；补送文件保留（不删、不伪装成功） |
+| SDK | 导出 `enqueueWithAuthoritativeStamp` / `resolveAuthorizationStamp` / `carriedAuthorizationIdentifier`，宿主可装配"盖章 → 入箱" |
+
+### 反例（先红后绿）
+
+| 用例 | 实现前 |
+|---|---|
+| `collaboration-feedback-mapping.test.ts` ⑦ messageId 为确定性 UUID | 红 |
+| `feedback-client.test.ts` accepted:false ⇒ 抛错且补送文件保留 | 红（此前静默 resolve） |
+| `collaboration-authorization-stamp-passthrough.test.ts` ⑤ 映射整封过 schema | 红 |
+| `feedback-process.test.ts` 两条"拒绝"用例改为断言**拒绝上抛** | 此前靠静默通过，改后才是真断言 |
+
+### 端到端证据（真实 fork 进程）
+
+`coord02-stamped-fork-link.test.ts`：SDK 盖章入口入箱 → 落盘 → 交付服务 → 反馈映射 →
+`CollaborationFeedbackTransport` → **真实反馈子进程** → 投递回接收侧，断言：
+
+- `messageId` 是 UUID、`priority=instruction`；
+- `authorizationIdentifier=authorization-1`、`payload.authorizationEpoch=1`（章原样到达）。
+
+相关套件复跑 **11 files / 123 tests 全过**；`typecheck` exit 0；`lint` exit 0。
+
+### 阻塞（需要产品决策，不是技术缺口）
+
+- **仓内没有协作消息的生产调用方**：`CollaborationInbox` 只被测试与 SDK 暴露，`inbox deliver` CLI
+  只做"投递已有的箱内消息"。决定"协作请求从哪个入口发起（工具 / CLI / 宿主装配）"属于产品形态，
+  不能凭空新增入口。**SDK 盖章入口 + 可用的 fork 链路已就绪，宿主接线即可。**
+- 永久性拒绝（schema/身份不合法）的消息会留在补送 outbox 里按 ≤60s 退避**无限重试**（设计上不丢消息）；
+  是否需要"拒绝即归档/告警"待裁决。
+- `feedbackMessageSchema` 仍未登记 `missionIdentifier` / `replyToMessageIdentifier` / `taskRevision` /
+  `executionAttempt` 等既有信封字段（§12 第 1 条），本轮未动。
+
+### 门禁（本机全量）
+
+**867 files（862 passed / 3 failed / 2 skipped），5560 tests（5550 passed / 3 failed / 7 skipped），exit 1**。
+3 条失败与本轮改动无关，且都已在基线 HEAD 上复现：`project-scope-boundary` ③、`tool-registry` 符号链接
+（Windows 创建链接需特权）、`exec01-02-cli-bootstrap-autodetect`（无隔离执行后端）。

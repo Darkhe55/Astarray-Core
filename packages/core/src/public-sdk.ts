@@ -8055,6 +8055,20 @@ export { CollaborationFeedbackTransport } from "./orchestration/collaboration-fe
 // COMM-01-02：本地文件队列传输适配器（开发/演示用，幂等写入）。
 export { CollaborationOutboxTransport } from "./orchestration/collaboration-outbox-transport.js";
 
+/**
+ * COORD-02 §7（2026-11-21）：**生产侧盖章入口**。
+ *
+ * 宿主要发协作消息时走这里入箱：关系标识与代际只从 `CrossProjectAuthorizationStore`
+ * 取，调用方/模型自报的章一律被忽略。与 `CollaborationFeedbackTransport`（真实 fork 链路）
+ * 配合即为"盖章 → 映射 → 反馈进程"的完整时序。
+ */
+export {
+  carriedAuthorizationIdentifier,
+  enqueueWithAuthoritativeStamp,
+  resolveAuthorizationStamp,
+  type AuthorizationStampOutcome,
+} from "./orchestration/collaboration-authorization-stamping.js";
+
 // EVENT-01（2026-10-24）：控制通道（模型/工具门禁、取消能力、分阶段确认、崩溃重放）。
 export {
   EventControlChannel,

@@ -6779,3 +6779,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**866 files（860 passed / 4 failed / 2 skipped），5556 tests（5545 passed / 4 failed / 7 skipped）**。
 >   4 条失败均与本次改动无关：2 条 Windows 符号链接环境、1 条隔离执行后端缺失（三者已在基线 HEAD 上复现）、
 >   1 条并发用例负载抖动（隔离复跑 1/1 通过）。
+
+> **COORD-02 §7 第六部分：反馈进程链路打通（2026-11-21）**
+>
+> - 实证"绿的断"：子进程拒绝协作消息（`messageId` 非 uuid + `PRIORITY_OF_KIND` 缺项），客户端却不看 `accepted` ⇒ 静默丢消息、用例仍绿。
+> - 修复：schema 补 `collaboration-request` 优先级；`messageId` 改确定性 UUID（同标识稳定、异标识不同）；客户端 `accepted:false` ⇒ 抛新码 `feedback-message-rejected` 并保留补送文件；SDK 导出盖章入口。
+> - 端到端：`coord02-stamped-fork-link` 跑通 盖章 → 映射 → 真实 fork → 接收侧，章（关系标识 + 代际）原样到达；相关 11 files / 123 tests 全过。
+> - **阻塞**：仓内没有协作消息的生产调用方（发起入口属产品形态；SDK 盖章入口 + fork 链路已就绪）；永久性拒绝消息的"无限补送"语义待裁决。
+> - 本机全量：**867 files（862 passed / 3 failed / 2 skipped），5560 tests（5550 passed / 3 failed / 7 skipped）**；3 条失败均为已复现的本机环境问题。

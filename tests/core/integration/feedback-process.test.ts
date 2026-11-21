@@ -154,7 +154,13 @@ describe.skipIf(!hasBuiltEntry)("独立反馈进程集成（真实 fork）", () 
 
   it("未注册 Agent 来源的消息被拒绝（S2：身份一致性）", async () => {
     const unregisteredMessage = makeMessage("scheduler-1", 99);
-    await client.enqueue(unregisteredMessage);
+    /**
+     * 2026-11-21：拒绝现在**如实上抛**。此前客户端不看 `accepted`，
+     * 子进程拒绝、父进程却当成功并删除补送文件 ⇒ 消息静默丢失。
+     */
+    await expect(client.enqueue(unregisteredMessage)).rejects.toMatchObject({
+      errorCode: "feedback-message-rejected",
+    });
     const healthAfterRejection = await client.queryHealth();
     expect(healthAfterRejectedEnqueue(healthAfterRejection)).toBe(true);
   });
@@ -163,7 +169,9 @@ describe.skipIf(!hasBuiltEntry)("独立反馈进程集成（真实 fork）", () 
     const healthBefore = await client.queryHealth();
     const countBefore = healthBefore.queuedMessageCount;
     const unregisteredMessage = makeMessage("scheduler-1", 100);
-    await client.enqueue(unregisteredMessage);
+    await expect(client.enqueue(unregisteredMessage)).rejects.toMatchObject({
+      errorCode: "feedback-message-rejected",
+    });
     const healthAfter = await client.queryHealth();
     expect(healthAfter.queuedMessageCount).toBe(countBefore);
   });

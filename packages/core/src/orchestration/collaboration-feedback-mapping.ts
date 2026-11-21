@@ -16,12 +16,38 @@ import type {
   FeedbackMessage,
   FeedbackMessagePayload,
 } from "../core/types.js";
+import { createHash } from "node:crypto";
 import { FEEDBACK_PROTOCOL_VERSION } from "../core/types.js";
 import type { CollaborationInboxMessage } from "./collaboration-inbox.js";
 import { carriedAuthorizationIdentifier } from "./collaboration-authorization-stamping.js";
 
 /** 收件人前缀（用户 2026-10-24 决定 b）。 */
 export const COLLABORATION_RECIPIENT_PREFIX = "agent:";
+
+/**
+ * 协作标识 ⇒ 反馈协议 `messageId`（2026-11-21）。
+ *
+ * 协议要求 `messageId` 是 UUID，而协作标识是任意字符串（`"collaboration:<id>"` 形式
+ * 会被 `feedbackMessageSchema` 直接判非法 ⇒ 反馈进程逐条拒绝）。这里从协作标识
+ * **确定性派生** UUID v5 形状：重试得到同一 messageId（重放去重仍成立），
+ * 不同标识得到不同 messageId（不会串消息）；原始协作标识仍保留在
+ * `payload.messageIdentifier`（回复路由用这个，不用 messageId）。
+ */
+function collaborationMessageIdUuid(messageIdentifier: string): string {
+  const digest = createHash("sha1")
+    .update("collaboration:" + messageIdentifier)
+    .digest("hex");
+  const variant = ((Number.parseInt(digest.slice(16, 18), 16) & 0x3f) | 0x80)
+    .toString(16)
+    .padStart(2, "0");
+  return [
+    digest.slice(0, 8),
+    digest.slice(8, 12),
+    "5" + digest.slice(13, 16),
+    variant + digest.slice(18, 20),
+    digest.slice(20, 32),
+  ].join("-");
+}
 
 /** `agentInstanceId` ⇒ 反馈协议里的 recipientId。 */
 export function toCollaborationRecipientId(agentInstanceId: string): string {
@@ -73,7 +99,7 @@ export function buildCollaborationFeedbackMessage(input: {
   };
   return {
     protocolVersion: input.protocolVersion ?? FEEDBACK_PROTOCOL_VERSION,
-    messageId: "collaboration:" + input.message.messageIdentifier,
+    messageId: collaborationMessageIdUuid(input.message.messageIdentifier),
     /** COORD-01-02：把任务归属带到**信封**（不再只放在 payload 里）。 */
     taskIdentifier: input.message.taskIdentifier,
     /**
