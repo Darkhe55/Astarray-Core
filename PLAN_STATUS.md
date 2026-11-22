@@ -7103,3 +7103,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 3 条；变异承重：移除钩子调用 ⇒ ① 红。
 > - 本机全量：**891 files（886 passed / 3 failed / 2 skipped），5709 tests（5699 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+
+> **COORD-05 门面答复入口 + 调度唤醒（2026-11-22）**
+>
+> - `MissionOrchestrator.markDecisionApplied` 登记后 `wake()`，下一轮 ready-set 立即重算（不直接派发）。
+> - `AstarrayApplicationFacade.applyUserDecision`：答复 → 写回任务链 → 通知运行中调度器；
+>   无活动编排器不影响写回。门面反例 2 条 + 调度接线 3 条。
+> - 变异承重：移除 `wake()` ⇒ 调度接线 ② 红。
+> - 本机全量：**892 files（886 passed / 4 failed / 2 skipped），5711 tests（5700 passed / 4 failed / 7 skipped）**；
+>   3 条已复现环境 + 1 条并发负载抖动（mission-task-map-concurrency，隔离复跑通过）。
+>   `typecheck` / `lint` exit 0。

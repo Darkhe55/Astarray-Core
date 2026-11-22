@@ -115,14 +115,17 @@ describe("COORD-05：写回后通知调度器", () => {
     expect(onDecisionApplied).toHaveBeenCalledTimes(1);
   });
 
-  it("② MissionOrchestrator.markDecisionApplied 委托给 DagScheduler", () => {
+  it("② MissionOrchestrator.markDecisionApplied 委托给 DagScheduler 并唤醒调度", () => {
     const orchestrator = Object.create(MissionOrchestrator.prototype) as MissionOrchestrator;
     const markDecisionApplied = vi.fn();
-    (orchestrator as unknown as { dagScheduler: unknown }).dagScheduler = {
+    const wakeResolve = vi.fn();
+    (orchestrator as unknown as { dagScheduler: unknown; wakeResolve: unknown }).dagScheduler = {
       markDecisionApplied,
     };
+    (orchestrator as unknown as { wakeResolve: unknown }).wakeResolve = wakeResolve;
     orchestrator.markDecisionApplied("decision-1");
     expect(markDecisionApplied).toHaveBeenCalledWith("decision-1");
+    expect(wakeResolve).toHaveBeenCalledTimes(1);
   });
 
   it("③ MainController 只对运行中的 mission 登记；无活动编排器返回 false", () => {

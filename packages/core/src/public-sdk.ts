@@ -11,6 +11,10 @@ import { promises as fs } from "node:fs";
 import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
 import type { AgentRole } from "./core/types.js";
 import { CollaborationInboxStore } from "./orchestration/collaboration-inbox-store.js";
+import { TaskStore } from "./infra/task-store.js";
+import { DecisionSubmissionStore } from "./orchestration/decision-submission.js";
+import { DecisionWritebackStore } from "./orchestration/decision-writeback.js";
+import { applyUserDecision as applyUserDecisionUseCase, type ApplyUserDecisionOutcome } from "./orchestration/decision-application.js";
 import {
   EscalationRequestStore,
   EscalationWorkflow,
@@ -7611,6 +7615,49 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     });
   }
 
+  /**
+   * COORD-05（2026-11-22）：**用户答复入口**——校验答复、写回任务链并放行等待步骤。
+   *
+   * 写回成功后通知运行中的 mission 调度器（无活动编排器时由下一次调度从任务链证据读取）；
+   * 步骤推进由调度器下一轮 ready-set 重算完成，不在此处直接启动工具。
+   */
+  async applyUserDecision(input: {
+    readonly submissionIdentifier: string;
+    readonly projectIdentifier: string;
+    readonly answer: string;
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly answeredAtIso?: string;
+    readonly escalationRequestIdentifier?: string | null;
+  }): Promise<ApplyUserDecisionOutcome> {
+    this.assertOpen();
+    const stateDirectory = this.requireStateDirectory();
+    return applyUserDecisionUseCase(
+      {
+        submissionStore: new DecisionSubmissionStore({ baseDirectory: stateDirectory }),
+        writebackStore: new DecisionWritebackStore({ baseDirectory: stateDirectory }),
+        taskStore: new TaskStore({ baseDirectory: stateDirectory }),
+        advanceStep: async () => undefined,
+        onDecisionApplied: ({ missionIdentifier, decisionIdentifier }) => {
+          this.runtime.controller.markDecisionAppliedForMission({
+            missionIdentifier,
+            decisionIdentifier,
+          });
+        },
+      },
+      {
+        submissionIdentifier: input.submissionIdentifier,
+        projectIdentifier: input.projectIdentifier,
+        answer: input.answer,
+        answeredAtIso: input.answeredAtIso ?? new Date().toISOString(),
+        missionIdentifier: input.missionIdentifier,
+        taskIdentifier: input.taskIdentifier,
+        ...(input.escalationRequestIdentifier === undefined
+          ? {}
+          : { escalationRequestIdentifier: input.escalationRequestIdentifier }),
+      },
+    );
+  }
   /** COORD-05：当前处理人追加处置结论（处理人 + 预期版本保护）。 */
   async handleEscalation(input: {
     readonly requestIdentifier: string;

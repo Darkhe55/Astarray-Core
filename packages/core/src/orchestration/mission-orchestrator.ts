@@ -801,6 +801,8 @@ export class MissionOrchestrator {
    */
   markDecisionApplied(decisionIdentifier: string): void {
     this.dagScheduler.markDecisionApplied(decisionIdentifier);
+    /** 唤醒调度循环，让下一轮 ready-set 立刻重算（不直接派发工具）。 */
+    this.wake();
   }
 
   getKnownTaskIdentifiers(): string[] {

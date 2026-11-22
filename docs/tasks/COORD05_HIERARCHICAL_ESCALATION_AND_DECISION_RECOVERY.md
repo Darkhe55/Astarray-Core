@@ -241,3 +241,13 @@ mission 取消、任务链缺失。变异承重：关闭取消守卫 ⇒ ⑤ 红
 
 反例 3 条（`coord05-decision-dispatch-wiring.test.ts`）：通知一次/重复不通知、orchestrator 委托、
 controller 只登记活动 mission。变异承重：移除钩子调用 ⇒ ① 红。
+## 进展（2026-11-22，门面答复入口 + 调度唤醒）
+
+- `MissionOrchestrator.markDecisionApplied` 在登记后调用 `wake()`：下一轮 `scheduleRound` 立即重算
+  ready-set（不直接派发工具）。
+- `AstarrayApplicationFacade.applyUserDecision`：门面完成"答复 → 写回任务链 → 通知运行中调度器"；
+  无活动编排器时返回 false 不影响写回（下一次调度从任务链证据读取）；步骤推进由调度器重算完成。
+- 反例：门面 2 条（写回+幂等、项目不匹配拒绝）+ 调度接线 3 条（含唤醒）。
+  变异承重：移除 `wake()` ⇒ 调度接线 ② 红。
+
+未做：秘书激活状态（产品阻塞）、三条路径的真实运行时端到端。
