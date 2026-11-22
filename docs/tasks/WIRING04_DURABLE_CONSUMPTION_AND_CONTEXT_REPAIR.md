@@ -549,7 +549,7 @@ BUILTIN_TOOL_DESCRIPTORS 中无 recall 条目
 
 | 项 | 现状 |
 |---|---|
-| 非活动 mission 持久状态入口的**行为**反例 | 未补（本次只有静态守卫） |
+| 非活动 mission 持久状态入口的**行为**反例 | **更正（2026-11-22）**：已存在——`coord01-task-state-application.test.ts`「WIRING-04-03：非活动 mission 的 done 需要受控凭证」①无凭证抛错且不改链、②带凭证正常写链；`coordination-completion-gate.test.ts` ⑰ 旧执行尝试 ⇒ `execution-attempt-mismatch`。本节写"未补"时尚未覆盖到这些用例。 |
 | 01 的 revision/执行尝试核验 | 阻塞（消息无字段） |
 | 01 原子提交单元 | 待设计 |
 
@@ -1106,9 +1106,11 @@ Linux/macOS 平台证据（本机只有 Windows）。
 |---|---|---|---|
 | 01 意图先持久化 | 部分 | §8–§12、§33：消费意图先落盘、原子单元/迁移/双进程部分完成 | revision/执行尝试核验阻塞（消息无字段）；跨存储原子性未解 |
 | 02 请求投递事实 | 收口 | §13/§15/§16/§17：适配器生命周期、按迭代落账、回执写失败补写；`request-lifecycle-adapter.test.ts`、`coord01-context-delivery-wiring.test.ts` | 无已知代码缺口 |
-| 03 统一完成门禁 | 第一步完成，缺行为反例 | §19：`completeTaskByTaskIdentifier` 凭证守卫 + 架构守卫测试；运行时仅 done 发凭证 | 非活动 mission 持久状态入口的行为反例未补 |
+| 03 统一完成门禁 | 已实施 + 行为反例 | §19 凭证守卫；`wiring04-completion-authorization-guard.test.ts`（含非活动写链入口）；`coord01-task-state-application.test.ts` ①/②（无凭证拒绝、带凭证写链）；`coordination-completion-gate.test.ts` 18 条 | 无已知代码缺口；缺真实 mission 非活动恢复的产品路径演练 |
 | 04 上下文包映射 | 已实施（方案 C） | §14 + 2026-11-22 九条 `context-pack-resolution` 反例 | 真实任务序列映射端到端 |
 | 05 关闭节点回访 | 第一步已接 | §18 | 卡内剩余的装配/端到端 |
 
 **平台口径**：本机只有 Windows；Linux/macOS 双进程证据缺（沿用 §36/§37 说明）。
 **不得**据本表把 01、03 的剩余项当作完成。
+
+> **核对（2026-11-22）**：上述三个测试文件定向运行 32 条全绿；03 的「缺行为反例」结论已过时。
