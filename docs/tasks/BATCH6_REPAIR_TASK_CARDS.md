@@ -1,6 +1,6 @@
 # Batch 6 高风险功能返修任务卡
 
-> 状态：待执行  
+> 状态：**superseded / implemented-unverified（2026-11-22 校正）**：本卡对应的 T06E/T06F/T06G/T08A 已在 `PLAN_STATUS.md` 阶段决策表中标为 **done（单平台口径）**（B6R-01…B6R-09 返修完成）；原卡"待执行"已过期。本卡要求的"本批控制器进入真实 CLI/TUI/编排与 tarball"仍以 B6R/EXEC 系列证据为准；**跨平台（Linux/macOS）证据仍未提供**，不得据此宣称全平台完成。  
 > 编制日期：2026-08-15  
 > 适用提交：`8eb52e4`、`b0f8866`、`f8c378b`、`ba2242e`  
 > 对应任务：T06E、T06F、T06G、T08A  

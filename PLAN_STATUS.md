@@ -7029,3 +7029,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**886 files（880 passed / 4 failed / 2 skipped），5684 tests（5673 passed / 4 failed / 7 skipped）**；
 >   3 条已复现环境 + 1 条并发负载抖动（`submission-identity-concurrency`，隔离复跑通过）。
 > - 剩余：01 应用装配矩阵仍缺 worker 工具可观测端口；03 生产接线；04「被替代」等价核查。
+
+> **过期卡状态校正（2026-11-22）**
+>
+> - BATCH6_REPAIR：`待执行` 已过期——T06E/T06F/T06G/T08A 在阶段决策表均为 done（单平台口径，B6R-01…09 已返修）；
+>   改为 superseded / implemented-unverified，并保留"跨平台证据仍缺"的如实说明。
+> - WB00 微编辑工作台原型：由 GUI-01-R 接管，标 superseded。
+> - GUI-MVP 卡原本已注明"由 GUI-01-R 接管"，无需改动。
+> - 本轮仅文档校正，无代码变更；门禁沿用上一轮。
