@@ -7113,3 +7113,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**892 files（886 passed / 4 failed / 2 skipped），5711 tests（5700 passed / 4 failed / 7 skipped）**；
 >   3 条已复现环境 + 1 条并发负载抖动（mission-task-map-concurrency，隔离复跑通过）。
 >   `typecheck` / `lint` exit 0。
+
+> **WIRING-04 状态对账（2026-11-22）**
+>
+> - 卡面 `pending` 与卡内 §8–§37 施工记录冲突：02 已收口；03 第一步（静态守卫，缺非活动 mission
+>   行为反例）；04 方案 C 已定并补 9 条解析反例；05 第一步已接；01 仍缺 revision/执行尝试核验（阻塞）。
+> - 更正本轮早先"04-02/03/05 未开始"的误述。
+> - 本轮仅文档变更；门禁沿用上一轮（892 files / 5711 tests，3 环境 + 1 已隔离抖动）。
