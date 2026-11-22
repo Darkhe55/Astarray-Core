@@ -7067,3 +7067,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   3 条已复现环境 + 1 条并发负载抖动（`artifact-registry-concurrency`，隔离复跑通过）。
 
 > **推送状态（2026-11-22 第 18 轮）**：3653076a 3 次推送均失败（连接重置/不可达）；按纪律留待下次合并推送。
+
+> **AUDIT-REPAIR-01 01：取消用例的语义核查（2026-11-22）**
+>
+> - mission 任务状态无 `cancelled`（仅 pending/running/blocked/done/failed）；`cancelled` 属个体任务序列节点，
+>   序列层取消节点不会被映射为待派发任务 ⇒ "取消 ⇒ 不写提案"由派发层保证，worker 工具端口无取消入参可测。
+> - 端口级取消证据需要产品先明确 mission 层"取消"语义；已在该卡记录，不作为代码缺口谎报。

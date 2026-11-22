@@ -722,4 +722,4 @@ wrapper 级"未分配 ⇒ 拒绝且处理器不被调用"与"权限引擎 deny �
 - **已分配但 assist 为 ask** ⇒ 返回 `permission-ask-pending`（未获批准），提案目录零文件。
 
 这补上了此前"只有 handler 级"的空白：证明统一策略/门禁在**装配端口**上先于自定义处理器生效。
-**allow 路径已补**（同日）：目标模式激活（`activateGoalMode` 认证用户显式开启）+ 引擎授予本次参数批准 ⇒ 端口执行 `proposeGoal` 成功，提案目录**恰好一个**文件。空 requirements 会被真实提案校验拒绝（`goal-proposal-invalid`），证明处理器确实执行到存储层。**仍缺**：取消的装配矩阵；ponder 已有 wrapper 级用例。
+**allow 路径已补**（同日）：目标模式激活（`activateGoalMode` 认证用户显式开启）+ 引擎授予本次参数批准 ⇒ 端口执行 `proposeGoal` 成功，提案目录**恰好一个**文件。空 requirements 会被真实提案校验拒绝（`goal-proposal-invalid`），证明处理器确实执行到存储层。**仍缺：取消的装配矩阵**（2026-11-22 核查）——mission 任务状态只有 pending/running/blocked/done/failed（无 cancelled）；`cancelled` 属于**个体任务序列**节点状态，序列层取消节点不会被映射为待派发任务。因此"任务已取消 ⇒ 不写入提案"在当前模型里由**派发层**保证，worker 工具端口没有取消入参可测；若要端口级证据，需要产品先明确"取消"在 mission 层的语义并给出信号。ponder 已有 wrapper 级用例。
