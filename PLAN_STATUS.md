@@ -7021,3 +7021,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   状态由过期的 `pending` 校正为 `implemented-unverified`。剩余：01 应用装配矩阵（缺 worker 工具
 >   可观测端口）、03 生产接线、04"被替代"等价核查。
 > - 本轮为文档纠偏，无代码变更；全量门禁沿用上一轮（886 files / 5682 tests，3 条环境失败）。
+
+> **AUDIT-REPAIR-01 01：wrapper 级门禁反例（2026-11-22）**
+>
+> - `goal-proposal-gate` 增 2 条：任务子集未分配 ⇒ 拒绝且处理器不被调用；权限引擎 deny ⇒
+>   拒绝且处理器不被调用。并更正上轮"全仓无 proposeGoal 引用"的误述（既有 2 个测试文件 7 条用例）。
+> - 全量：**886 files（880 passed / 4 failed / 2 skipped），5684 tests（5673 passed / 4 failed / 7 skipped）**；
+>   3 条已复现环境 + 1 条并发负载抖动（`submission-identity-concurrency`，隔离复跑通过）。
+> - 剩余：01 应用装配矩阵仍缺 worker 工具可观测端口；03 生产接线；04「被替代」等价核查。

@@ -693,6 +693,11 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
 - 提案存储失败 ⇒ 如实报错（不返回成功、不伪造完成）。
 
 变异承重：移除 callId 幂等 ⇒ ④ 红。
+**更正（2026-11-22，同轮）**：上一段"全仓测试无 `proposeGoal` 引用"的表述**有误**——仓库已有
+`goal-proposal-tool.test.ts`（描述符/权限映射/隐藏注册/处理器）与 `goal-proposal-gate.test.ts`
+（ponder 拒绝处理器不被调用、devolve 进入处理器）。本轮实际新增的是：
+wrapper 级"未分配 ⇒ 拒绝且处理器不被调用"与"权限引擎 deny ⇒ 拒绝且处理器不被调用"两条，
+以及 handler 级 7 条（含存储失败与来源引用）。
 
 **仍未验证（如实）**：卡内要求"从应用装配入口"覆盖 deny / 未分配 / ponder / 取消——
 需要走真实 `buildWorkerToolPort` 的装配级夹具（当前无此夹具，handler 级反例不能替代）。

@@ -30,13 +30,15 @@ afterEach(async () => {
 });
 
 function buildWrapper(input: {
-  mode: "ponder" | "devolve";
+  mode: "ponder" | "devolve" | "assist";
   handler: (argumentsJson: string, callId: string) => Promise<{
     kind: "success";
     callId: string;
     outputText: string;
     isSideEffectFree: boolean;
   }>;
+  workerAllowedToolNames?: Set<string>;
+  engine?: unknown;
 }) {
   const registry = new ToolRegistry();
   registry.registerMany(BUILTIN_TOOL_DESCRIPTORS);
@@ -49,11 +51,17 @@ function buildWrapper(input: {
     registry,
     workspaceBoundary: new WorkspaceBoundary(workspaceDirectory),
     temporaryDirectoryPath: path.join(workspaceDirectory, "temp"),
-    workerAllowedToolNames: new Set([GOAL_PROPOSAL_TOOL_NAME]),
+    workerAllowedToolNames: input.workerAllowedToolNames ?? new Set([GOAL_PROPOSAL_TOOL_NAME]),
     nowUnixSeconds: () => Math.floor(Date.now() / 1000),
     getCurrentMode: () => input.mode,
     protectedStoragePolicy: new ProtectedStoragePolicy({ stateDirectoryPath: workspaceDirectory }),
     customToolHandlers: new Map([[GOAL_PROPOSAL_TOOL_NAME, input.handler]]),
+    ...(input.engine === undefined
+      ? {}
+      : {
+          configurablePermissionPolicyEngine: input.engine as never,
+          currentPermissionProfileReference: { kind: "builtin" as const, profileId: "assist" as const },
+        }),
   });
 }
 
@@ -98,5 +106,50 @@ describe("proposeGoal 统一门禁", () => {
     );
     expect(result.kind).toBe("success");
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("未分配（任务子集不含 proposeGoal）⇒ 拒绝且处理器不被调用", async () => {
+    const handler = vi.fn(async (_argumentsJson: string, callId: string) => ({
+      kind: "success" as const,
+      callId,
+      outputText: "不应发生",
+      isSideEffectFree: false,
+    }));
+    const wrapper = buildWrapper({
+      mode: "devolve",
+      handler,
+      workerAllowedToolNames: new Set(["readFile"]),
+    });
+    const result = await wrapper.execute(
+      GOAL_PROPOSAL_TOOL_NAME,
+      validArguments,
+      "call-unassigned-1",
+      new AbortController().signal,
+    );
+    expect(result.kind).toBe("error");
+    expect((result as { errorCode?: string }).errorCode).toBe("tool-permission-denied");
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("权限引擎 deny ⇒ 拒绝且处理器不被调用", async () => {
+    const handler = vi.fn(async (_argumentsJson: string, callId: string) => ({
+      kind: "success" as const,
+      callId,
+      outputText: "不应发生",
+      isSideEffectFree: false,
+    }));
+    const denyEngine = {
+      decide: async () => ({ decision: "deny" as const, reason: "策略拒绝" }),
+    };
+    const wrapper = buildWrapper({ mode: "assist", handler, engine: denyEngine });
+    const result = await wrapper.execute(
+      GOAL_PROPOSAL_TOOL_NAME,
+      validArguments,
+      "call-deny-1",
+      new AbortController().signal,
+    );
+    expect(result.kind).toBe("error");
+    expect((result as { errorCode?: string }).errorCode).toBe("tool-permission-denied");
+    expect(handler).not.toHaveBeenCalled();
   });
 });
