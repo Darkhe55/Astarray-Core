@@ -7232,3 +7232,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   5 失败 = 3 条已复现本机环境 + 2 条已知负载抖动（`graph-change-deterministic-drill`、
 >   `ledger-cross-instance-concurrency`，**两文件隔离复跑 5/5 通过**）。
 > - 本轮无代码变更；文档提交待推（`45b257a6`、`3df074e9` 及本轮附加记录）。
+
+> **卡片数量总览（2026-11-22 第 38 轮）**
+>
+> - 57 个任务卡文件：done 5、implemented-unverified 16、in_progress/部分 13、pending 5、blocked 1、
+>   superseded 2、无状态行 15（索引/矩阵/交接/计划类）。
+> - 已写入 `UNFINISHED_CARDS_2026-11-22.md`；数量级不代表完成率，逐卡剩余见对账表。
+> - 本轮仅文档；门禁沿用第 36 轮 HEAD 复核（892 files / 5711 tests，5 失败均非真实回归）。
+
+> **推送状态（2026-11-22 第 38 轮）**：`753f048d` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **推送状态（2026-11-22 第 39 轮）**：`ea3adfe4` 3 次推送仍失败（网络不可达）；留待下次合并推送。
