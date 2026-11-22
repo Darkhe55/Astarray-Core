@@ -6953,3 +6953,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**880 files（875 passed / 3 failed / 2 skipped），5651 tests（5641 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：动态进度写入、任务链/移交文档真实装配接线；05-06。
+
+> **COORD-05 05-06：上下文与观测（2026-11-22）**
+>
+> - `escalation-context-observation.ts`：工具结果/通知为引用投影（摘要+决定 ID+步骤+文档引用+revision，
+>   不复制全文）；按（个体, 文档, revision）判定未变版本重复读取；账本记录分层注入量、有效证据/解除阻塞回访、
+>   跨层次数（缓存命中率单项不作通过证据）。
+> - 反例 5 条；变异承重：关闭重复读取判定 ⇒ ③ 红。
+> - 本机全量：**881 files（876 passed / 3 failed / 2 skipped），5656 tests（5646 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：真实请求体统计/文档读取的装配接线；COORD-05 整卡端到端。
