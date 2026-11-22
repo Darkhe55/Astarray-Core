@@ -1,6 +1,6 @@
 # AR-07 最终验收台账（进行中）
 
-> 状态：`in_progress`  
+> 状态：`in_progress`（2026-11-22 对账：批次 10 的两项真实缺口已收口；**Linux 平台证据已取得**（2026-11-08 WSL2），**macOS 证据仍缺**；按"不填绿"原则仍不判通过）  
 > 依据：`AUDIT_REMEDIATION_TASKS.md` AR-07 与“最终安全验收清单”（51 项）  
 > 关联：`PLAN_STATUS.md`、`DELIVERY_REPORT.md` §10
 
