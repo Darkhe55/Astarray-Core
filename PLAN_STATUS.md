@@ -6919,3 +6919,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 未做：处置记录持久化存储、控制面服务装配与多层端到端；05-01/04/05/06。
 
 > **推送状态（2026-11-22 第 5 轮）**：40c3d65e 3 次推送均失败（网络中断/连接重置）；按纪律留待下次合并推送。
+
+> **COORD-05 05-04：呈交与答复（2026-11-22）**
+>
+> - `decision-submission.ts`：先持久化待呈交记录再发送；每次读取秘书实际激活状态选择唯一通道；
+>   `pending-record → submitted → answered`；已呈交/已答复 ⇒ duplicate；重启恢复与无回执时的通道切换；
+>   答复必须与原项目/原请求匹配且幂等；存档损坏拒绝覆盖。
+> - 反例 7 条；变异承重：关闭 duplicate 守卫后 ④/⑤ 红。
+> - 本机全量：**878 files（872 passed / 4 failed / 2 skipped），5638 tests（5627 passed / 4 failed / 7 skipped）**；
+>   3 条已复现本机环境 + 1 条已知负载抖动（`graph-change-deterministic-drill`，隔离复跑 3/3 通过）。
+>   `typecheck` / `lint` exit 0。
+> - 未做：真实秘书/用户通道装配；05-05 决定写回与步骤恢复；05-01/05-06。
