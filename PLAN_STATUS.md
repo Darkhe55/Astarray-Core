@@ -7224,3 +7224,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 两卡仍缺真实界面/执行接线、人工体验与包级复现证据；不标 done。本轮仅文档。
 
 > **推送状态（2026-11-22 第 35 轮）**：`45b257a6`、`06e9573a` 未推送（本轮 3 次均失败）；留待下次合并推送。
+
+> **HEAD 全量门禁复核（2026-11-22 第 36 轮）**
+>
+> - `typecheck` 0，`lint` 0。
+> - 全量：**892 files（885 passed / 5 failed / 2 skipped），5711 tests（5699 passed / 5 failed / 7 skipped）**；
+>   5 失败 = 3 条已复现本机环境 + 2 条已知负载抖动（`graph-change-deterministic-drill`、
+>   `ledger-cross-instance-concurrency`，**两文件隔离复跑 5/5 通过**）。
+> - 本轮无代码变更；文档提交待推（`45b257a6`、`3df074e9` 及本轮附加记录）。
