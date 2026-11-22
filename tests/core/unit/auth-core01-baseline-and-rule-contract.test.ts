@@ -8,9 +8,13 @@
  *    整 action 规则（无 match）是合法形态。
  */
 import { describe, expect, it } from "vitest";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import {
   PARAMETER_AUTHORIZATION_SETTINGS_SCHEMA_VERSION,
+  ParameterAuthorizationSettingsStore,
   validateSettingsDocument,
   type ParameterAuthorizationSettingsDocument,
 } from "../../../packages/core/src/tools/parameter-authorization-settings-store.js";
@@ -129,6 +133,78 @@ describe("AUTH-CORE-01：规则 match 契约统一校验", () => {
     );
     expect(wholeAction.isValid).toBe(true);
   });
+
+  it("⑥b 整工具规则的工具存在性：给出运行时注册表时未知工具被拒，已知工具放行", () => {
+    const rule: ParameterAuthorizationRule = {
+      ruleIdentifier: "rule-whole-tool",
+      toolName: "ghostTool",
+      action: "",
+      decision: "ask",
+      explanation: "未知工具的整工具规则",
+    };
+    const withRegistry = validateSettingsDocument(documentWithRules([rule]), {
+      knownToolNames: new Set(["taskSequenceStatus", "createProjectFile"]),
+    });
+    expect(withRegistry.isValid).toBe(false);
+    expect(withRegistry.reason ?? "").toContain("未在运行时注册");
+
+    const known = validateSettingsDocument(
+      documentWithRules([{ ...rule, toolName: "taskSequenceStatus" }]),
+      { knownToolNames: new Set(["taskSequenceStatus"]) },
+    );
+    expect(known.isValid).toBe(true);
+
+    /** 无注册表上下文（旧构造方）⇒ 保持旧行为，不拒绝。 */
+    const withoutRegistry = validateSettingsDocument(documentWithRules([rule]));
+    expect(withoutRegistry.isValid).toBe(true);
+  });
+
+  it("⑥c 设置存储：provider 存在时保存整工具规则会查询注册表", async () => {
+    const baseDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-authcore01-"));
+    try {
+      const settings = {
+        isParameterAuthorizationEnabled: true,
+        isParameterRulesEnabled: true,
+      };
+      const rejectingStore = new ParameterAuthorizationSettingsStore({
+        stateDirectory: baseDirectory,
+        knownToolNamesProvider: () => new Set(["taskSequenceStatus"]),
+      });
+      const rejected = await rejectingStore.writeSettings({
+        settings,
+        rules: [
+          {
+            ruleIdentifier: "r-ghost",
+            toolName: "ghostTool",
+            action: "",
+            decision: "ask",
+            explanation: "未知工具",
+          },
+        ],
+      });
+      expect(rejected.isValid).toBe(false);
+
+      const acceptingStore = new ParameterAuthorizationSettingsStore({
+        stateDirectory: baseDirectory,
+        knownToolNamesProvider: () => new Set(["taskSequenceStatus"]),
+      });
+      const accepted = await acceptingStore.writeSettings({
+        settings,
+        rules: [
+          {
+            ruleIdentifier: "r-known",
+            toolName: "taskSequenceStatus",
+            action: "",
+            decision: "ask",
+            explanation: "已知工具",
+          },
+        ],
+      });
+      expect(accepted.isValid).toBe(true);
+    } finally {
+      await fs.rm(baseDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    }
+  });
 });
 
 describe("AUTH-CORE-01：工具基线优先级（显式决定 vs 能力映射）", () => {
@@ -208,8 +284,7 @@ describe("AUTH-CORE-01：工具基线优先级（显式决定 vs 能力映射）
     expect((await decide(engine, "createProjectFile", "create")).decision).toBe("deny");
   });
 
-  it("⑩ 整工具规则（空 action）对该工具的所有 action 生效", async () => {
-    const engine = buildEngine({
+  it("⑩ 整工具规则（空 action）对该工具的所有 action 生效", async () => {    const engine = buildEngine({
       capabilityDecisions: { "task.read": "allow" },
       rules: [
         {
@@ -222,5 +297,18 @@ describe("AUTH-CORE-01：工具基线优先级（显式决定 vs 能力映射）
     });
     expect((await decide(engine, "taskSequenceStatus", "state-query")).decision).toBe("ask");
     expect((await decide(engine, "taskSequenceStatus", "other-query")).decision).toBe("ask");
+  });
+
+  it("⑪ 未知 action 在工具执行入口即被拒绝（先于任何副作用）", async () => {
+    const { executeBuiltinTool } = await import(
+      "../../../packages/core/src/tools/builtins.js"
+    );
+    await expect(
+      executeBuiltinTool(
+        "processExecution",
+        JSON.stringify({ action: "not-a-real-action" }),
+        {} as never,
+      ),
+    ).rejects.toThrow(/未知的族名\/别名与 action 组合/);
   });
 });

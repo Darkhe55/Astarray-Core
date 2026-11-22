@@ -6858,3 +6858,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：空 action 规则的 toolName 存在性（需运行时注册表注入）、未知 action 执行前拒绝、
 >   陈旧批准与规则版本绑定、并发保存、重启恢复端到端。
+
+> **AUTH-CORE-01 第 3 片：整工具规则目标校验（2026-11-22）**
+>
+> - 保存层新增可选 `knownToolNamesProvider`，门面接入权限工具概览的 `isRegistered` 集合；
+>   未知/拼错工具的整工具规则拒绝保存（旧实现静默保存、永不生效）。缺省或概览不可读 ⇒ 跳过，不阻断合法保存。
+> - 未知 action 在工具执行入口即拒绝（先于副作用），补 ⑪ 反例。
+> - 反例 ⑥b/⑥c 旧实现红；承重：暂存 settings-store 后 2 条变红，恢复后绿。
+> - 本机全量：**874 files（866 passed / 6 failed / 2 skipped），5609 tests（5596 passed / 6 failed / 7 skipped）**；
+>   3 条已复现本机环境 + 3 条并发负载抖动（`context-runtime-wiring`、`feedback-process-default-path`、
+>   `t12a06-cli-wiring`，隔离复跑 14/14 通过）。`typecheck` / `lint` exit 0。
+> - 未做：陈旧批准与 action/规则版本绑定、并发保存、重启恢复端到端。

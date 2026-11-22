@@ -45,6 +45,14 @@ export interface ParameterAuthorizationSettingsDocument {
 
 export interface ParameterAuthorizationSettingsStoreOptions {
   stateDirectory: string;
+  /**
+   * AUTH-CORE-01 第 3 项（2026-11-22）：**运行时已知工具集**。
+   *
+   * 整工具规则（空 action）无法用 `resolveToolAction` 校验"工具是否存在"，
+   * 保存层因此需要运行时注册表给出已知工具名。缺省 ⇒ 跳过该检查（兼容旧构造方）；
+   * 返回 null（注册表暂不可读）同样跳过——不能因为诊断不可用就阻断合法保存。
+   */
+  knownToolNamesProvider?: () => Promise<ReadonlySet<string> | null> | ReadonlySet<string> | null;
 }
 
 export interface ParameterAuthorizationSettingsWriteResult {
@@ -68,9 +76,11 @@ function buildDefaultDocument(): ParameterAuthorizationSettingsDocument {
 export class ParameterAuthorizationSettingsStore {
   private readonly stateDirectory: string;
   private readonly writeLock = new AsyncMutex();
+  private readonly knownToolNamesProvider: ParameterAuthorizationSettingsStoreOptions["knownToolNamesProvider"];
 
   constructor(options: ParameterAuthorizationSettingsStoreOptions) {
     this.stateDirectory = options.stateDirectory;
+    this.knownToolNamesProvider = options.knownToolNamesProvider;
   }
 
   private get settingsFilePath(): string {
@@ -150,7 +160,11 @@ export class ParameterAuthorizationSettingsStore {
       /** 保留调用方提供的配置 revision（缺省 0），不静默丢弃。 */
       configurationRevision: document.configurationRevision ?? 0,
     };
-    const validation = validateSettingsDocument(candidate);
+    const knownToolNames =
+      this.knownToolNamesProvider === undefined
+        ? null
+        : await Promise.resolve(this.knownToolNamesProvider()).catch(() => null);
+    const validation = validateSettingsDocument(candidate, { knownToolNames });
     if (!validation.isValid) {
       return validation;
     }
@@ -170,6 +184,14 @@ export class ParameterAuthorizationSettingsStore {
  */
 export function validateSettingsDocument(
   document: ParameterAuthorizationSettingsDocument,
+  options?: {
+    /**
+     * AUTH-CORE-01 第 3 项：运行时已知工具名；给出时整工具规则（空 action）
+     * 必须指向已注册工具，否则拒绝保存（该规则永远不会生效）。
+     * 缺省/null ⇒ 跳过该检查（保存层无注册表上下文时保持旧行为）。
+     */
+    readonly knownToolNames?: ReadonlySet<string> | null;
+  },
 ): ParameterAuthorizationSettingsWriteResult {
   if (
     document === null ||
@@ -304,6 +326,21 @@ export function validateSettingsDocument(
      * 会被静默保存 —— 用户以为配了策略，实际什么都没发生。故显式拒绝。
      */
     const declaredAction = ruleRecord["action"] as string;
+    const knownToolNames = options?.knownToolNames ?? null;
+    if (
+      declaredAction === "" &&
+      knownToolNames !== null &&
+      !knownToolNames.has(ruleRecord["toolName"] as string)
+    ) {
+      return {
+        isValid: false,
+        reason:
+          "规则的 toolName 未在运行时注册（整工具规则将永不生效）: " +
+          ruleIdentifier +
+          " tool=" +
+          String(ruleRecord["toolName"]),
+      };
+    }
     const knownAction = declaredAction === ""
       ? null
       : resolveToolAction({

@@ -4691,6 +4691,20 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
     return new ParameterAuthorizationSettingsStore({
       stateDirectory: this.stateDirectory,
+      /**
+       * AUTH-CORE-01 第 3 项：整工具规则的工具存在性由**运行时注册表**给出。
+       * 概览不可读 ⇒ null（跳过该检查），不因诊断不可用阻断合法保存。
+       */
+      knownToolNamesProvider: async () => {
+        try {
+          const overview = await this.runtime.controller.listPermissionToolOverview();
+          return new Set(
+            overview.filter((entry) => entry.isRegistered).map((entry) => entry.toolName),
+          );
+        } catch {
+          return null;
+        }
+      },
     });
   }
 
