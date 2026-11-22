@@ -42,8 +42,7 @@ function makeWrapper(overrides: Partial<ConstructorParameters<typeof PolicyWrapp
   });
 }
 
-describe("PolicyWrapper 缺口分支", () => {
-  it("grantConfigurableSessionAuthorization：引擎未装配 → 拒绝（232）", async () => {
+describe("PolicyWrapper 缺口分支", () => {  it("grantConfigurableSessionAuthorization：引擎未装配 → 拒绝（232）", async () => {
     const wrapper = makeWrapper();
     await expect(
       wrapper.grantConfigurableSessionAuthorization({
@@ -120,5 +119,37 @@ describe("PolicyWrapper 缺口分支", () => {
       expect(result.errorCode).toBe("tool-permission-denied");
       expect(result.sideEffectStatus).toBe("none");
     }
+  });
+
+  /**
+   * AUTH-CORE-01（2026-11-22）：**生产裁决必须把本次调用的 action 传给引擎**。
+   *
+   * 旧缺陷：`policy-wrapper` 调 `engine.decide` 时不传 action ⇒ 逐 action 能力映射
+   * 与参数规则的 action 绑定在生产路径上全部失效（只有显式传 action 的测试能看到效果）。
+   */
+  it("执行前裁决把声明的 action 传给引擎（缺参会静默退化为整工具映射）", async () => {
+    const seen: Array<{ toolName: string; action?: string; argumentsJson: string }> = [];
+    const stubEngine = {
+      decide: async (input: { toolName: string; action?: string; argumentsJson: string }) => {
+        seen.push(input);
+        return { decision: "deny" as const, reason: "测试拒绝（不执行工具）" };
+      },
+    } as never;
+    const registry = new ToolRegistry();
+    registry.registerMany(BUILTIN_TOOL_DESCRIPTORS);
+    const wrapper = makeWrapper({
+      registry,
+      configurablePermissionPolicyEngine: stubEngine,
+      currentPermissionProfileReference: { kind: "builtin", profileId: "assist" },
+    });
+    const result = await wrapper.execute(
+      "processExecution",
+      JSON.stringify({ action: "start", environmentIdentifier: "env-1", executableIdentifier: "x" }),
+      "call-action-1",
+      new AbortController().signal,
+    );
+    expect(result.kind).toBe("error");
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.action).toBe("start");
   });
 });

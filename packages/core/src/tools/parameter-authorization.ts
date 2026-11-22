@@ -76,11 +76,21 @@ function readField(parsedArguments: Record<string, unknown>, field: string): unk
  */
 function doesRuleMatch(input: {
   rule: ParameterAuthorizationRule;
+  toolName: string;
   action: string;
   parsedArguments: Record<string, unknown> | null;
 }): boolean {
-  const { rule, action, parsedArguments } = input;
-  if (rule.toolName === "" || rule.action === "" || rule.action !== action) {
+  const { rule, toolName, action, parsedArguments } = input;
+  /**
+   * 2026-11-22（AUTH-CORE-01）：**先按规范工具 ID 隔离候选规则**。
+   *
+   * 旧实现只比 action：另一个工具同名 action 的规则会套到本次调用上
+   * （同 action 异工具串规则）。工具不同 ⇒ 永远不匹配。
+   */
+  if (rule.toolName === "" || rule.toolName !== toolName) {
+    return false;
+  }
+  if (rule.action === "" || rule.action !== action) {
     return false;
   }
   if (rule.match === undefined) {
@@ -166,7 +176,7 @@ export function evaluateParameterAuthorization(input: {
 
   const parsedArguments = parseArguments(input.argumentsJson);
   const matchingRules = input.rules.filter((rule) =>
-    doesRuleMatch({ rule, action: input.action, parsedArguments }),
+    doesRuleMatch({ rule, toolName: input.toolName, action: input.action, parsedArguments }),
   );
   if (matchingRules.length === 0) {
     // 未匹配 ⇒ 回退基线。

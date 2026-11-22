@@ -6833,3 +6833,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**873 files（868 passed / 3 failed / 2 skipped），5592 tests（5582 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现的本机环境问题。`typecheck` / `lint` exit 0。
 > - 剩余：**Agent 工具入口**（角色/审批/频率策略待裁决，第二阶段）；跨项目真实网络通道（此前已定本机状态）。
+
+> **AUTH-CORE-01 第 1 片：参数规则隔离与裁决顺序（2026-11-22）**
+>
+> - 规则先按 `toolName` 隔离（同 action 异工具不再串规则）；匹配规则决定本次调用（含 `ask`），
+>   无命中回退基线；**基线 allow + 规则 ask ⇒ ask**（旧实现被基线 allow 短路吞掉）。
+> - 生产裁决传声明的 `action`（旧实现不传 ⇒ 逐 action 能力映射在生产路径失效）。
+> - 反例：⑪ 纯函数隔离、⑫ 基线 allow + ask 规则、wrapper 捕获 decide 入参；前三条旧实现红。
+>   承重：暂存 3 个源文件后 ⑪/⑫/wrapper 变红，恢复后全绿。
+> - 本机全量：**873 files（866 passed / 5 failed / 2 skipped），5596 tests（5584 passed / 5 failed / 7 skipped）**；
+>   3 条已复现本机环境 + 2 条并发负载抖动（`completion-verdict-immutability`、`journal-cross-instance-concurrency`，
+>   隔离复跑 4/4 通过）。`typecheck` / `lint` exit 0。
+> - 未做：规范工具 ID/别名与未知 action、显式 deny 与派生基线区分、规则契约统一校验、陈旧批准/并发/重启端到端。

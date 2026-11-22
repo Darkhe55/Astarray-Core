@@ -88,13 +88,15 @@ export class ConfigurablePermissionPolicyEngine {
     return this.profileStore.readProfile(reference);
   }
 
-  /** 评估工具在该 profile 下的基础决定（最严格结果）。 */
+  /** 评估工具在该 profile 下的基础决定（最严格结果；支持**逐 action** 能力映射）。 */
   evaluateToolDecision(input: {
     toolName: string;
+    action?: string | null;
     profile: PermissionProfileDocument;
   }): PermissionDecision {
     return this.catalog.evaluateToolPermission({
       toolName: input.toolName,
+      ...(input.action === undefined ? {} : { action: input.action }),
       capabilityDecisions: input.profile.capabilityDecisions,
     });
   }
@@ -126,18 +128,16 @@ export class ConfigurablePermissionPolicyEngine {
     const profile = await this.profileStore.readProfile(input.profileReference);
     const baseDecision = this.evaluateToolDecision({
       toolName: input.toolName,
+      ...(input.action === undefined ? {} : { action: input.action }),
       profile,
     });
-    if (baseDecision === "deny") {
-      return { decision: "deny", reason: "操作不可用" };
-    }
     /**
-     * MERGE-01：参数级授权（仅当注入配置时参与）。
+     * MERGE-01 / AUTH-CORE-01（2026-11-22）：**先隔离候选规则并匹配参数**，
+     * 已匹配的规则决定本次调用；无命中才回退工具基线。
      *
-     * 语义（卡内 §1.3）：已匹配参数规则覆盖工具基线；未匹配回退基线；
-     * 基线 deny 已是总拒绝（上面已返回）；多规则冲突 deny>ask>allow 由纯函数保证。
-     * 结果仍需与会话授权等更外层上限**求交**，因此这里只把 allow/deny 定案，
-     * `ask` 继续走下面的既有会话授权路径。
+     * 旧实现的缺陷：基线 `allow` 时先返回 allow，**参数规则判 `ask` 被吞掉**
+     * （基线 allow + 规则 ask 必须进入询问）。现在 ask 一律进入询问路径，
+     * 由会话授权（用户批准）细化。
      */
     const parameterOutcome = this.evaluateParameterAuthorizationForCall({
       toolName: input.toolName,
@@ -145,19 +145,20 @@ export class ConfigurablePermissionPolicyEngine {
       argumentsJson: input.argumentsJson,
       baselineDecision: baseDecision,
     });
-    if (parameterOutcome !== null) {
-      if (parameterOutcome.decision === "deny") {
-        return {
-          decision: "deny",
-          reason: parameterOutcome.appliedRuleExplanation ?? "参数规则拒绝",
-        };
-      }
-      if (parameterOutcome.decision === "allow") {
-        return { decision: "allow" };
-      }
-      // 参数规则判 ask ⇒ 继续走既有 ask 路径（可被会话授权细化）。
+    const effectiveDecision: PermissionDecision =
+      parameterOutcome !== null && parameterOutcome.source === "parameter-rule"
+        ? parameterOutcome.decision
+        : baseDecision;
+    if (effectiveDecision === "deny") {
+      return {
+        decision: "deny",
+        reason:
+          parameterOutcome !== null && parameterOutcome.source === "parameter-rule"
+            ? (parameterOutcome.appliedRuleExplanation ?? "参数规则拒绝")
+            : "操作不可用",
+      };
     }
-    if (baseDecision === "allow") {
+    if (effectiveDecision === "allow") {
       return { decision: "allow" };
     }
     // ask：绑定 profile revision 的授权

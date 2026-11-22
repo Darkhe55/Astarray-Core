@@ -193,6 +193,25 @@ export function isExecutionRefusalErrorCode(errorCode: string): boolean {
   );
 }
 
+/**
+ * AUTH-CORE-01（2026-11-22）：从**参数本身**读取本次调用声明的 action。
+ *
+ * 只接受字符串形态；参数不是合法 JSON 或没有 action ⇒ 空串（按整工具映射裁决，
+ * 不猜测）。未知 action 的合法性由执行前的参数校验拒绝。
+ */
+function readDeclaredToolAction(argumentsJson: string): string {
+  try {
+    const parsed = JSON.parse(argumentsJson) as unknown;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "";
+    }
+    const action = (parsed as Record<string, unknown>)["action"];
+    return typeof action === "string" ? action : "";
+  } catch {
+    return "";
+  }
+}
+
 export class PolicyWrapper implements ToolPort {
   private readonly operationClassifier = new LocalSensitiveOperationClassifier();
 
@@ -366,10 +385,19 @@ export class PolicyWrapper implements ToolPort {
       profileReference !== null &&
       profileReference !== undefined
     ) {
+      const declaredAction = readDeclaredToolAction(argumentsJson);
       const decision = await configurableEngine.decide({
         toolName: descriptor.name,
         profileReference,
         argumentsJson,
+        /**
+         * AUTH-CORE-01（2026-11-22）：把**本次调用声明的 action** 交给引擎。
+         *
+         * 旧实现不传 action ⇒ 逐 action 能力映射与参数规则 action 绑定在生产裁决中
+         * 全部失效（只有显式传 action 的测试能看到效果）。取值只来自参数本身，
+         * 不做猜测；没有 action 的工具按整工具映射裁决。
+         */
+        ...(declaredAction === "" ? {} : { action: declaredAction }),
       });
       if (decision.decision === "deny") {
         return "deny";

@@ -343,4 +343,106 @@ describe("MERGE-01：参数级规则在权限引擎裁决中生效", () => {
       "依赖参数的规则在参数不可解析时必须回退基线（不得凭不可解析的参数放行）",
     ).toBe("ask");
   });
+
+  /**
+   * AUTH-CORE-01（2026-11-22）：**先按规范工具 ID 与 action 隔离候选规则**。
+   *
+   * 旧缺陷：判定器只比 action，不比 toolName ⇒ 同 action 的**另一个工具**的规则
+   * 会套到本次调用上。这里同时钉纯函数与引擎两层。
+   */
+  it("⑪ 纯函数：同 action 但不同工具的规则不得套用", () => {
+    const outcome = evaluateParameterAuthorization({
+      toolName: "taskSequenceStatus",
+      action: "state-query",
+      argumentsJson: JSON.stringify({ sequenceId: "s-1" }),
+      baselineDecision: "allow",
+      settings: enabledSettings,
+      rules: [
+        {
+          toolName: "createProjectFile",
+          action: "state-query",
+          decision: "ask",
+          explanation: "另一个工具的同名 action 规则",
+        },
+      ],
+    });
+    expect(outcome.source).toBe("tool-baseline");
+    expect(outcome.decision).toBe("allow");
+  });
+
+  it("⑫ 引擎：基线 allow + 命中规则 ask ⇒ 必须进入询问（不得被基线 allow 吞掉）", async () => {
+    const baseDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-merge01-authcore-"));
+    try {
+      const catalog = new PermissionCapabilityCatalog();
+      const profileStore = new PermissionProfileStore({ baseDirectory, catalog });
+      const engine = new ConfigurablePermissionPolicyEngine({
+        catalog,
+        profileStore,
+        parameterAuthorization: {
+          settings: enabledSettings,
+          rules: [
+            {
+              toolName: "taskSequenceStatus",
+              action: "state-query",
+              decision: "ask",
+              explanation: "本工具明确要求逐次确认",
+            },
+          ],
+        },
+      });
+      const profileReference = { kind: "builtin" as const, profileId: "assist" as const };
+
+      /** 对照：没有规则时（基线 allow）确实放行。 */
+      const control = new ConfigurablePermissionPolicyEngine({ catalog, profileStore });
+      const baseline = await control.decide({
+        toolName: "taskSequenceStatus",
+        action: "state-query",
+        profileReference,
+        argumentsJson: JSON.stringify({ sequenceId: "s-1" }),
+      });
+      expect(baseline.decision).toBe("allow");
+
+      const outcome = await engine.decide({
+        toolName: "taskSequenceStatus",
+        action: "state-query",
+        profileReference,
+        argumentsJson: JSON.stringify({ sequenceId: "s-1" }),
+      });
+      expect(outcome.decision).toBe("ask");
+    } finally {
+      await fs.rm(baseDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    }
+  });
+
+  it("⑬ 引擎：另一个工具的同 action 规则不生效（仍按本工具基线 allow）", async () => {
+    const baseDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "astarray-merge01-authcore2-"));
+    try {
+      const catalog = new PermissionCapabilityCatalog();
+      const profileStore = new PermissionProfileStore({ baseDirectory, catalog });
+      const engine = new ConfigurablePermissionPolicyEngine({
+        catalog,
+        profileStore,
+        parameterAuthorization: {
+          settings: enabledSettings,
+          rules: [
+            {
+              toolName: "createProjectFile",
+              action: "state-query",
+              decision: "ask",
+              explanation: "另一个工具的同名 action 规则",
+            },
+          ],
+        },
+      });
+      const outcome = await engine.decide({
+        toolName: "taskSequenceStatus",
+        action: "state-query",
+        profileReference: { kind: "builtin", profileId: "assist" },
+        argumentsJson: JSON.stringify({ sequenceId: "s-1" }),
+      });
+      expect(outcome.decision).toBe("allow");
+    } finally {
+      await fs.rm(baseDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    }
+  });
 });
