@@ -6845,3 +6845,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   3 条已复现本机环境 + 2 条并发负载抖动（`completion-verdict-immutability`、`journal-cross-instance-concurrency`，
 >   隔离复跑 4/4 通过）。`typecheck` / `lint` exit 0。
 > - 未做：规范工具 ID/别名与未知 action、显式 deny 与派生基线区分、规则契约统一校验、陈旧批准/并发/重启端到端。
+
+> **AUTH-CORE-01 第 2 片：规则契约校验与基线优先级反例（2026-11-22）**
+>
+> - 保存时校验 match 形状：`numeric-range` 有限且 `minimum <= maximum`、`allowed-values` 非空字符串、
+>   `path-prefix` 前缀非空、`field` 非空、`fixed-value` 为字符串；旧实现只校验"种类"，
+>   永不生效的规则会被静默保存。
+> - 补工具基线优先级回归：显式 allow 覆盖映射 ask、映射 deny 不可放宽、显式 deny 立即终止、
+>   整工具规则（空 action）对该工具所有 action 生效。
+> - 反例 ①–④ 旧实现红；承重：暂存 settings-store 后 4 条变红，恢复后全绿。
+> - 本机全量：**874 files（869 passed / 3 failed / 2 skipped），5606 tests（5596 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：空 action 规则的 toolName 存在性（需运行时注册表注入）、未知 action 执行前拒绝、
+>   陈旧批准与规则版本绑定、并发保存、重启恢复端到端。

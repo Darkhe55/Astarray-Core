@@ -262,6 +262,17 @@ export function validateSettingsDocument(
             "规则的匹配种类未知（不得使用正则等可执行匹配）: " + String(matchKind),
         };
       }
+      /**
+       * AUTH-CORE-01 第 3 项（2026-11-22）：**匹配契约统一校验**。
+       *
+       * 仅认可种类不够：`{kind:"numeric-range", minimum:5, maximum:1}`、
+       * 空 `values`、空 `prefix` 都是"永不生效"或"意外全匹配"的规则，
+       * 保存后用户以为配了策略。这里逐字段校验（与判定器读取的字段一致）。
+       */
+      const matchIssue = validateParameterRuleMatchShape(match);
+      if (matchIssue !== null) {
+        return { isValid: false, reason: matchIssue + ": " + ruleIdentifier };
+      }
     }
     /**
      * 综合校验：把规则交给判定器实测。这样"设置里存了判定器不认识的东西"
@@ -320,6 +331,63 @@ const KNOWN_MATCH_KINDS = [
   "fixed-value",
   "numeric-range",
 ] as const;
+
+/**
+ * AUTH-CORE-01 第 3 项：按**判定器实际读取的字段**校验一条 match 的形状。
+ *
+ * 返回 `null` 表示合法，否则返回人可读原因（调用方附上规则 ID）。
+ * 不做"试算"推断：试算只能证明"此刻不匹配"，证明不了"字段/区间本身有效"。
+ */
+function validateParameterRuleMatchShape(match: unknown): string | null {
+  if (match === null || typeof match !== "object") {
+    return "规则 match 非法";
+  }
+  const record = match as Record<string, unknown>;
+  const field = record["field"];
+  if (typeof field !== "string" || field === "") {
+    return "规则的 match.field 必须是非空字符串";
+  }
+  switch (record["kind"]) {
+    case "path-prefix": {
+      const prefix = record["prefix"];
+      if (typeof prefix !== "string" || prefix === "") {
+        return "path-prefix 的 prefix 必须是非空字符串";
+      }
+      return null;
+    }
+    case "allowed-values": {
+      const values = record["values"];
+      if (!Array.isArray(values) || values.length === 0) {
+        return "allowed-values 的 values 必须是非空数组（否则永不生效）";
+      }
+      if (!values.every((value) => typeof value === "string" && value !== "")) {
+        return "allowed-values 的 values 必须全为非空字符串";
+      }
+      return null;
+    }
+    case "fixed-value": {
+      return typeof record["value"] === "string"
+        ? null
+        : "fixed-value 的 value 必须是字符串";
+    }
+    case "numeric-range": {
+      const minimum = record["minimum"];
+      const maximum = record["maximum"];
+      if (typeof minimum !== "number" || !Number.isFinite(minimum)) {
+        return "numeric-range 的 minimum 必须是有限数值";
+      }
+      if (typeof maximum !== "number" || !Number.isFinite(maximum)) {
+        return "numeric-range 的 maximum 必须是有限数值";
+      }
+      if (minimum > maximum) {
+        return "numeric-range 的 minimum 不得大于 maximum（否则永不生效）";
+      }
+      return null;
+    }
+    default:
+      return "规则的匹配种类未知（不得使用正则等可执行匹配）: " + String(record["kind"]);
+  }
+}
 
 /* ────────── MERGE-01 §1.3：关闭细分**不得静默扩大权限** ────────── */
 
