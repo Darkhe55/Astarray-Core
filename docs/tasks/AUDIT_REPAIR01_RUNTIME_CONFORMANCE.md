@@ -722,4 +722,4 @@ wrapper 级"未分配 ⇒ 拒绝且处理器不被调用"与"权限引擎 deny �
 - **已分配但 assist 为 ask** ⇒ 返回 `permission-ask-pending`（未获批准），提案目录零文件。
 
 这补上了此前"只有 handler 级"的空白：证明统一策略/门禁在**装配端口**上先于自定义处理器生效。
-**仍缺**：allow 路径（需目标模式激活 + 批准）与取消/ponder 的装配矩阵；ponder 已有 wrapper 级用例。
+**allow 路径已补**（同日）：目标模式激活（`activateGoalMode` 认证用户显式开启）+ 引擎授予本次参数批准 ⇒ 端口执行 `proposeGoal` 成功，提案目录**恰好一个**文件。空 requirements 会被真实提案校验拒绝（`goal-proposal-invalid`），证明处理器确实执行到存储层。**仍缺**：取消的装配矩阵；ponder 已有 wrapper 级用例。

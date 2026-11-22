@@ -7056,3 +7056,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**888 files（883 passed / 3 failed / 2 skipped），5695 tests（5685 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 仍缺：allow 路径（需激活 + 批准）、取消/ponder 的装配矩阵（ponder 已有 wrapper 级）。
+
+> **AUDIT-REPAIR-01 01：装配矩阵 allow 路径（2026-11-22）**
+>
+> - 目标模式激活（认证用户显式开启）+ 引擎授予本次参数批准 ⇒ 装配端口执行 `proposeGoal` 成功，
+>   提案目录**恰好一个**文件；空 requirements 被真实提案校验拒绝（`goal-proposal-invalid`），
+>   证明处理器确实执行到存储层。
+> - 装配矩阵：未分配 ⇒ denied；assist ask 未批准 ⇒ ask-pending；激活+批准 ⇒ success。仍缺"取消"。
+> - 全量：**888 files（882 passed / 4 failed / 2 skipped），5696 tests（5685 passed / 4 failed / 7 skipped）**；
+>   3 条已复现环境 + 1 条并发负载抖动（`artifact-registry-concurrency`，隔离复跑通过）。
+
+> **推送状态（2026-11-22 第 18 轮）**：3653076a 3 次推送均失败（连接重置/不可达）；按纪律留待下次合并推送。
