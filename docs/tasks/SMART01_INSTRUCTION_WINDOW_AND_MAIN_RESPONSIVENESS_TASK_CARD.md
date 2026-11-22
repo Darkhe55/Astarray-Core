@@ -1,6 +1,11 @@
 # SMART-01：智能指令窗口与主 Agent 响应期限
 
 日期：2026-10-01；2026-10-10 对账状态：in_progress。02/03 队列与分类组件已有证据；04 已于 2026-10-10 补上 **SDK 入口真实接线**（`acceptUserInstruction` / `queryInstructionWindow` / `evaluateInstructionHandlingDeadline`，反例先红后绿），但 **CLI/TUI/GUI 三入口、包级验收与"真实运行"持续接收证据仍未完成**，故整体仍 in_progress。计划状态修改：必须，继承 IMPLEMENTATION_PLAN §8.4 用户授权。
+**2026-11-22 核对更正**：卡面写"CLI/TUI/GUI 三入口未完成"，实际 **CLI 入口已存在**——
+`packages/tui/src/cli/commands.ts` 中的 `executeInstructionAcceptCommand` / `executeInstructionDeadlineCommand` /
+`executeInstructionListCommand` 已注册为 `instruction accept|deadline|list`（`cli.tsx` 接线）。
+**真正剩余**：TUI/GUI 两个入口（仓库内无 instruction 窗口 UI）、包级验收与"真实运行"持续接收证据。
+复核时不得再以"三入口未完成"为由把 CLI 算作缺失。
 
 ## 1. 目标与关联
 
