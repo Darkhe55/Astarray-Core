@@ -2277,6 +2277,8 @@ export class MainController {
       actions: Array<{ action: string; capabilityIds: string[] }>;
       baselineDecision: PermissionDecision | null;
       baselineSource: "profile-capabilities" | "unknown";
+      isRegistered: boolean;
+      isExecutable: boolean;
     }>
   > {
     const capabilityCatalog = this.options.permissionCapabilityCatalog;
@@ -2294,9 +2296,12 @@ export class MainController {
     };
     const wholeTools = capabilityCatalog.listToolMappings();
     const actionMappings = capabilityCatalog.listToolActionMappings();
+    const registry = this.options.registry;
+    const registeredNames = registry.listRegisteredNames();
     const toolNames = new Set<string>([
       ...wholeTools.map((entry) => entry.toolName),
       ...actionMappings.map((entry) => entry.toolName),
+      ...registeredNames,
     ]);
     return [...toolNames].sort().map((toolName) => {
       const whole = wholeTools.find((entry) => entry.toolName === toolName);
@@ -2315,6 +2320,9 @@ export class MainController {
         actions,
         baselineDecision: strictest(capabilityIds),
         baselineSource: profile === null ? ("unknown" as const) : ("profile-capabilities" as const),
+        // 注册即可调用（执行端口按注册表装配）；未注册 = 目录已映射但当前内核不可调用。
+        isRegistered: registry.isRegistered(toolName),
+        isExecutable: registry.isRegistered(toolName),
       };
     });
   }

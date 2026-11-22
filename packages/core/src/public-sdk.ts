@@ -4372,6 +4372,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       actions: Array<{ action: string; capabilityIds: string[] }>;
       baselineDecision: "allow" | "ask" | "deny" | null;
       baselineSource: "profile-capabilities" | "unknown";
+      isRegistered: boolean;
+      isExecutable: boolean;
     }>
   > {
     this.assertOpen();

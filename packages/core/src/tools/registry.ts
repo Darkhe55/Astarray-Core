@@ -61,6 +61,11 @@ export class ToolRegistry {
     }
   }
 
+  /** 全部已注册工具名（含预览隐藏工具；供设置页/诊断只读查询）。 */
+  listRegisteredNames(): string[] {
+    return [...this.descriptorsByName.keys()].sort();
+  }
+
   isRegistered(toolName: string): boolean {
     return this.descriptorsByName.has(toolName);
   }
