@@ -794,6 +794,15 @@ export class MissionOrchestrator {
   }
 
   /** 当前调度图里的任务标识（只读；供运行中插入做依赖校验）。 */
+  /**
+   * COORD-05 05-05（2026-11-22）：**决定写回后放行等待步骤**。
+   *
+   * 只登记到调度器；下一轮 `scheduleRound` 才真正派发（不直接启动工具）。
+   */
+  markDecisionApplied(decisionIdentifier: string): void {
+    this.dagScheduler.markDecisionApplied(decisionIdentifier);
+  }
+
   getKnownTaskIdentifiers(): string[] {
     return this.dagScheduler.getCurrentGraph().getTaskIds();
   }

@@ -7094,3 +7094,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**890 files（884 passed / 4 failed / 2 skipped），5706 tests（5695 passed / 4 failed / 7 skipped）**；
 >   3 条已复现环境 + 1 条已知负载抖动（graph drill，隔离复跑通过）。`typecheck` / `lint` exit 0。
 > - 阻塞：秘书"已激活"状态在仓库内无权威来源（仅策略函数），需产品/宿主定义后接秘书通道。
+
+> **COORD-05 写回后通知运行中调度器（2026-11-22）**
+>
+> - `MissionOrchestrator.markDecisionApplied` → `DagScheduler`；`MainController.markDecisionAppliedForMission`
+>   只登记运行中的 mission（返回 false 表示下一轮新调度器从任务链证据读取）；只登记不派发。
+> - `applyUserDecision` 增 `onDecisionApplied` 钩子：写回成功调用一次，重复答复不通知。
+> - 反例 3 条；变异承重：移除钩子调用 ⇒ ① 红。
+> - 本机全量：**891 files（886 passed / 3 failed / 2 skipped），5709 tests（5699 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。

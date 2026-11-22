@@ -833,6 +833,27 @@ export class MainController {
    * 任务级执行根（GUI 多项目）：missionId → workspaceRootPath。
    * 只影响该 mission 的工具边界；未登记则用运行时默认工作区。
    */
+  /**
+   * COORD-05 05-05（2026-11-22）：决定写回后登记到**运行中的** mission 调度器。
+   *
+   * 返回 false 表示该 mission 当前没有活动编排器（下一轮新调度器会从任务链证据读到）；
+   * 不创建调度器、不直接派发，只让下一轮 ready-set 重算时放行依赖该决定的任务。
+   */
+  markDecisionAppliedForMission(input: {
+    readonly missionIdentifier: string;
+    readonly decisionIdentifier: string;
+  }): boolean {
+    const active = this.activeOrchestrators.get(input.missionIdentifier);
+    if (active === undefined) {
+      return false;
+    }
+    const scheduler = active.scheduler as { markDecisionApplied?: (decisionIdentifier: string) => void };
+    if (typeof scheduler.markDecisionApplied !== "function") {
+      return false;
+    }
+    scheduler.markDecisionApplied(input.decisionIdentifier);
+    return true;
+  }
   private readonly missionWorkspaceRootPaths = new Map<string, string>();
   /** mission → 所属项目（文件夹授权按项目查询）。 */
   private readonly missionProjectIdentifiers = new Map<string, string>();

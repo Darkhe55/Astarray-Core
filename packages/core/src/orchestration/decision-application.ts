@@ -29,6 +29,14 @@ export interface DecisionApplicationDeps {
   readonly resolveMissionStatus?: (
     missionIdentifier: string,
   ) => Promise<"running" | "cancelled" | "completed" | "unknown">;
+  /**
+   * COORD-05：写回成功后通知运行中的调度器（登记决定；下一轮 ready-set 才派发）。
+   * 不在此处直接启动工具。
+   */
+  readonly onDecisionApplied?: (input: {
+    readonly missionIdentifier: string;
+    readonly decisionIdentifier: string;
+  }) => void | Promise<void>;
   readonly nowIso?: () => string;
 }
 
@@ -136,6 +144,12 @@ export async function applyUserDecision(
   }
   if (writeback.kind === "conflict") {
     return { kind: "refused", code: "writeback-conflict", reason: writeback.reason };
+  }
+  if (writeback.kind === "advanced" && deps.onDecisionApplied !== undefined) {
+    await deps.onDecisionApplied({
+      missionIdentifier: input.missionIdentifier,
+      decisionIdentifier: submission.decisionId,
+    });
   }
   return {
     kind: writeback.kind === "duplicate" ? "duplicate" : "applied",

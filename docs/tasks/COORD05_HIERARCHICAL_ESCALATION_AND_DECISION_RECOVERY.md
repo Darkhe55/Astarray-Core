@@ -231,3 +231,13 @@ mission 取消、任务链缺失。变异承重：关闭取消守卫 ⇒ ⑤ 红
 
 **仍缺**：秘书通道的真实激活状态（仓库内无 secretary 激活存储，仅有策略函数）；
 该端口需产品/宿主提供"秘书已激活"的权威状态来源。
+## 进展（2026-11-22，写回后通知运行中调度器）
+
+- `MissionOrchestrator.markDecisionApplied` 委托给 `DagScheduler`；`MainController.markDecisionAppliedForMission`
+  只对**运行中的** mission 登记（返回 false = 无活动编排器，下一轮新调度器从任务链证据读取），
+  不创建调度器、不直接派发。
+- `applyUserDecision` 新增 `onDecisionApplied` 钩子：写回成功（advanced）后调用一次；
+  重复答复（duplicate）不再通知。装配层可把它接到 `controller.markDecisionAppliedForMission`。
+
+反例 3 条（`coord05-decision-dispatch-wiring.test.ts`）：通知一次/重复不通知、orchestrator 委托、
+controller 只登记活动 mission。变异承重：移除钩子调用 ⇒ ① 红。
