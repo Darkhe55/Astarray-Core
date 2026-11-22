@@ -219,3 +219,15 @@ mission 不存在、与 05-05 写回串联）；变异承重：关闭等待映�
 mission 取消、任务链缺失。变异承重：关闭取消守卫 ⇒ ⑤ 红。
 
 未做：秘书/用户通道与编排器自动调用 `markDecisionApplied` 的运行时装配；三路径端到端。
+## 进展（2026-11-22，直接用户通道接线）
+
+- 新增 `clarification-decision-channel.ts`：`createClarificationUserChannel` 复用 05-03 的
+  `UserClarificationStore` 作为**直接用户通道**——`sourceRequestIdentifier = submissionIdentifier`
+  保证重试/重启只生成一条待决事项；候选、推荐理由、受阻步骤原样带入；回执 = 澄清记录标识。
+- `DecisionSubmissionRecord` / 通道端口补充可选 `ownerAgentInstanceId` / `taskIdentifier`
+  （旧记录兼容；缺失时通道明确拒绝，不伪造提交方）。
+- 反例 4 条（登记一次、重复幂等、重启后不重复、缺提交方/任务拒绝）；变异承重：
+  移除 `sourceRequestIdentifier` ⇒ ① 红。
+
+**仍缺**：秘书通道的真实激活状态（仓库内无 secretary 激活存储，仅有策略函数）；
+该端口需产品/宿主提供"秘书已激活"的权威状态来源。

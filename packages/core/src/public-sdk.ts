@@ -8624,6 +8624,9 @@ export {
   type DecisionApplicationDeps,
 } from "./orchestration/decision-application.js";
 export {
+  createClarificationUserChannel,
+} from "./orchestration/clarification-decision-channel.js";
+export {
   buildResponsibilityRecord,
   describeResponsibilityInstructions,
   type ResponsibilityRecord,

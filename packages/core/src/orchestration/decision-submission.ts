@@ -23,6 +23,9 @@ export interface DecisionSubmissionRecord {
   readonly submissionIdentifier: string;
   readonly projectIdentifier: string;
   readonly decisionId: string;
+  /** COORD-05：提交方与任务（澄清通道登记待决记录时需要；可选以兼容旧记录）。 */
+  readonly ownerAgentInstanceId?: string;
+  readonly taskIdentifier?: string;
   readonly summary: string;
   readonly recommendedReason: string | null;
   readonly affectedStepIdentifiers: ReadonlyArray<string>;
@@ -245,6 +248,8 @@ export interface DecisionChannelPort {
     readonly submissionIdentifier: string;
     readonly projectIdentifier: string;
     readonly decisionId: string;
+    readonly ownerAgentInstanceId?: string;
+    readonly taskIdentifier?: string;
     readonly summary: string;
     readonly recommendedReason: string | null;
     readonly affectedStepIdentifiers: ReadonlyArray<string>;
@@ -283,6 +288,8 @@ export async function submitDecision(
     readonly submissionIdentifier: string;
     readonly projectIdentifier: string;
     readonly decisionId: string;
+    readonly ownerAgentInstanceId?: string;
+    readonly taskIdentifier?: string;
     readonly summary: string;
     readonly recommendedReason: string | null;
     readonly affectedStepIdentifiers: ReadonlyArray<string>;
@@ -296,6 +303,10 @@ export async function submitDecision(
       submissionIdentifier: input.submissionIdentifier,
       projectIdentifier: input.projectIdentifier,
       decisionId: input.decisionId,
+      ...(input.ownerAgentInstanceId === undefined
+        ? {}
+        : { ownerAgentInstanceId: input.ownerAgentInstanceId }),
+      ...(input.taskIdentifier === undefined ? {} : { taskIdentifier: input.taskIdentifier }),
       summary: input.summary,
       recommendedReason: input.recommendedReason,
       affectedStepIdentifiers: [...input.affectedStepIdentifiers],
@@ -328,6 +339,10 @@ export async function submitDecision(
       submissionIdentifier: record.submissionIdentifier,
       projectIdentifier: record.projectIdentifier,
       decisionId: record.decisionId,
+      ...(record.ownerAgentInstanceId === undefined
+        ? {}
+        : { ownerAgentInstanceId: record.ownerAgentInstanceId }),
+      ...(record.taskIdentifier === undefined ? {} : { taskIdentifier: record.taskIdentifier }),
       summary: record.summary,
       recommendedReason: record.recommendedReason,
       affectedStepIdentifiers: record.affectedStepIdentifiers,
