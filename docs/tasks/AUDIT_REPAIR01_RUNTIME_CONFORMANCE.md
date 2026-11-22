@@ -679,3 +679,20 @@ delegation 六条（成功/拒绝/撤销/revision/到期/拔线）与 tool-recal
   2. "未知工具应返回 `escalated-missing-tool`" —— 错，那是 `missing-capability` 请求语义。
 - 对**17 项分诊口径**做了更正：原文把"有源码"当"应已接入"，现按"是否存在已运行生产路径"重判（10 项改判为未构建）。
 - **未把任何"未审查能力"改成 done**；CLUSTER-01、AUDIT-REPAIR-01 各检查点在无人工验收前一律 implemented-unverified。
+
+## 进展（2026-11-22，检查点 01 反例）
+
+检查点 01 的代码改造（`proposeGoal` 不再旁路、经 PolicyWrapper 与自定义处理器）在 2026-11-06/11-09
+已落地，但此前**零反例**（全仓测试无 `proposeGoal` 引用）。本轮补处理器级反例 7 条
+（`audit01-goal-proposal-handler.test.ts`）：
+
+- 目标模式未激活 / 无 mission ⇒ 拒绝且不落提案；
+- 激活 + mission ⇒ 恰好一个提案，来源引用由本地 mission 生成（模型参数不得覆盖）；
+- 同一 callId 重试幂等；不同 callId 各自落提案（不合并）；
+- 参数非法（非 JSON / 空 objective / requirements 非数组）⇒ 拒绝且不落提案；
+- 提案存储失败 ⇒ 如实报错（不返回成功、不伪造完成）。
+
+变异承重：移除 callId 幂等 ⇒ ④ 红。
+
+**仍未验证（如实）**：卡内要求"从应用装配入口"覆盖 deny / 未分配 / ponder / 取消——
+需要走真实 `buildWorkerToolPort` 的装配级夹具（当前无此夹具，handler 级反例不能替代）。

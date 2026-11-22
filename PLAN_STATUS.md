@@ -7003,3 +7003,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**885 files（880 passed / 3 failed / 2 skipped），5675 tests（5665 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：写回后自动调用 markDecisionApplied 的生产接线（编排器）、秘书/用户通道、整卡端到端。
+
+> **AUDIT-REPAIR-01 检查点 01 反例（2026-11-22）**
+>
+> - `proposeGoal` 处理器补 7 条反例：未激活 / 无 mission / 激活+mission / callId 幂等 /
+>   不同调用不合并 / 参数非法 / 存储失败；来源引用由本地 mission 生成。
+> - 变异承重：移除 callId 幂等 ⇒ ④ 红。
+> - 本机全量：**886 files（881 passed / 3 failed / 2 skipped），5682 tests（5672 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未验证：装配级 deny/未分配/ponder/取消（缺 `buildWorkerToolPort` 夹具）。
