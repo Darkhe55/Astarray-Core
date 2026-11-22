@@ -1114,3 +1114,22 @@ Linux/macOS 平台证据（本机只有 Windows）。
 **不得**据本表把 01、03 的剩余项当作完成。
 
 > **核对（2026-11-22）**：上述三个测试文件定向运行 32 条全绿；03 的「缺行为反例」结论已过时。
+
+## 39. 复核：两进程陈旧写入验证（2026-11-23，本机 Windows）
+
+`npm run verify:two-process-stale-write` 在**当前 HEAD** 复跑，**exit 0**，10 个存储全部通过：
+
+| 项 | 结果 |
+|---|---|
+| 任务链（§36 C2） | A 旧 revision 3 被拒 `stale-revision`，B 的 revision 4/done 保持 |
+| goal 持久状态 | A 旧 revision 1 冲突，B 的 revision 2 保持 |
+| 完成收据 | A 覆盖被拒 `journal-corrupted`，B 的收据保持 |
+| 独立裁决 | A 改写被拒 `journal-corrupted`，B 的 accepted 保持 |
+| 恢复尝试 | 两进程失败都被计数（2） |
+| 恢复策略 | A 旧版本被拒，B 的策略保持 |
+| goal 契约 | A 旧 revision 被拒，B 的契约保持 |
+| 会话运行登记 | 三进程侧登记都保留 |
+| 提案确认 | 不会被两个目标重复确认 |
+| 工具包反馈 | 两条反馈都保留 |
+
+**口径**：本机 Windows；未在 Linux/macOS 复跑（环境无 WSL 发行版）⇒ 跨平台证据仍缺，沿用 §36.5/§38 结论。
