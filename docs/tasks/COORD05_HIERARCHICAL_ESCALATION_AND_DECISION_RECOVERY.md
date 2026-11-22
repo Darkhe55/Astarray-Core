@@ -1,6 +1,6 @@
 # COORD-05　逐级请示、用户裁决与任务恢复
 
-状态：待实施。归属：Core。前置依据：[任务反馈消费](COORD01_TASK_FEEDBACK_CONSUMPTION_REPAIR.md)、[直属上级关系](COMM01_ADDRESSABLE_UPPER_LAYER_AND_SINGLE_PARENT_TASK_CARD.md)、[上下文装配与回访](COORD03_CONTEXT_PACK_ASSEMBLY_AND_CLOSED_NODE_RECALL.md)。本卡通过本包的运行时、公开接口与集成测试独立验收。
+状态：`implemented-unverified`（2026-11-22）：六个子卡核心与公开门面/调度闸门均已落地并有反例；整卡装配（真实任务链调度、秘书/用户通道、三路径端到端）未完成，见文末验收小结。归属：Core。前置依据：[任务反馈消费](COORD01_TASK_FEEDBACK_CONSUMPTION_REPAIR.md)、[直属上级关系](COMM01_ADDRESSABLE_UPPER_LAYER_AND_SINGLE_PARENT_TASK_CARD.md)、[上下文装配与回访](COORD03_CONTEXT_PACK_ASSEMBLY_AND_CLOSED_NODE_RECALL.md)。本卡通过本包的运行时、公开接口与集成测试独立验收。
 
 ## 产品裁决与范围
 
@@ -190,3 +190,18 @@ mission 不存在、与 05-05 写回串联）；变异承重：关闭等待映�
 反例 5 条（`coord05-decision-gating.test.ts`）；变异承重：关闭闸门 ⇒ ①/③/⑤ 红。
 
 未做：调度器 `advanceStep` 的生产接线（写回后调用 `markDecisionApplied`）、秘书/用户通道装配、整卡端到端。
+## 验收小结（2026-11-22）
+
+| 子卡 | 已落地（有反例） | 未完成 |
+|---|---|---|
+| 05-01 责任与交接 | 权威推导/发布者归属回退/组队提示（6 条） | 动态进度写入、任务链真实装配 |
+| 05-02 契约与路由 | 链解析/方向/环/处置链/信封字段/openEscalation（8+5 条） | 控制面服务装配与真实反馈入口 |
+| 05-03 用户待决记录 | 读状态/幂等/并发/旧记录兼容（7 条） | —— |
+| 05-04 呈交与答复 | 先落盘/通道/恢复/答复幂等（7 条） | 真实秘书/用户通道端口 |
+| 05-05 写回与恢复 | 两个崩溃点/一次通知/取消/冲突 + 任务链端口 + 调度闸门（7+6+5 条） | 编排器自动调用 markDecisionApplied 的生产接线 |
+| 05-06 上下文与观测 | 引用投影/重复读取/观测账本（5 条） | 真实请求体统计采集端 |
+
+公开入口：`AstarrayApplicationFacade.openEscalation/handleEscalation/queryEscalation`（2 条门面反例）。
+全量门禁：见各轮 PLAN_STATUS 记录；最近一次 886 files / 5682 tests，仅 3 条已复现本机环境失败。
+
+**整卡验收未完成**：三条路径（本级解决/用户直达/秘书呈交）的运行时端到端、重启/通道切换/取消/损坏存储组合。

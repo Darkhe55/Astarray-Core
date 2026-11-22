@@ -7012,3 +7012,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**886 files（881 passed / 3 failed / 2 skipped），5682 tests（5672 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未验证：装配级 deny/未分配/ponder/取消（缺 `buildWorkerToolPort` 夹具）。
+
+> **状态纠偏：COORD-05 与 AUDIT-REPAIR-01（2026-11-22）**
+>
+> - COORD-05：六个子卡核心 + 门面/调度闸门落地，状态校正为 `implemented-unverified`；
+>   剩余为整卡装配（真实调度接线、秘书/用户通道、三路径端到端）。
+> - AUDIT-REPAIR-01：01/02/03/04 均落地并有反例（01 本轮补 handler 级 7 条），05 隔离包已执行；
+>   状态由过期的 `pending` 校正为 `implemented-unverified`。剩余：01 应用装配矩阵（缺 worker 工具
+>   可观测端口）、03 生产接线、04"被替代"等价核查。
+> - 本轮为文档纠偏，无代码变更；全量门禁沿用上一轮（886 files / 5682 tests，3 条环境失败）。
