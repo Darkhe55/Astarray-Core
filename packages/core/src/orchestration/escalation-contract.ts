@@ -288,11 +288,22 @@ export function appendEscalationDisposition(input: {
     };
   }
   if (record.currentHandlerAgentInstanceId !== input.handlerAgentInstanceId) {
-    return {
-      kind: "refused",
-      code: "handler-mismatch",
-      reason: "只有当前处理人可以追加处置结论。",
-    };
+    /**
+     * 用户通道（handler = null）仍允许**原发起者**登记 `needs-user`：
+     * 主层汇总后请用户决定，登记人就是主层自己。
+     */
+    const isUserChannelOriginalInitiator =
+      record.currentHandlerAgentInstanceId === null &&
+      record.state === "open" &&
+      input.handlerAgentInstanceId === record.originalInitiatorAgentInstanceId &&
+      input.disposition === "needs-user";
+    if (!isUserChannelOriginalInitiator) {
+      return {
+        kind: "refused",
+        code: "handler-mismatch",
+        reason: "只有当前处理人可以追加处置结论。",
+      };
+    }
   }
   const referenced = [...input.referencedDocumentIdentifiers];
   if (referenced.some((identifier) => identifier.trim() === "")) {

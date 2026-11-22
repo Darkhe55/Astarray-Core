@@ -6963,3 +6963,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**881 files（876 passed / 3 failed / 2 skipped），5656 tests（5646 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：真实请求体统计/文档读取的装配接线；COORD-05 整卡端到端。
+
+> **COORD-05 控制面编排（2026-11-22）**
+>
+> - `escalation-workflow.ts`：请求记录持久化（幂等 open）+ 处置编排（当前处理人/预期版本、终态拒绝、
+>   forwarded 不触发写回、resolved 触发写回一次、needs-user 触发用户呈交一次、并发冲突不写）；
+>   用户通道允许原发起者登记 needs-user。
+> - 反例 6 条 + 契约回归 13 条；变异承重：让转交触发写回 ⇒ ③ 红。
+> - 本机全量：**882 files（877 passed / 3 failed / 2 skipped），5662 tests（5652 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：真实任务链/秘书/用户通道装配；整卡三条路径端到端。
