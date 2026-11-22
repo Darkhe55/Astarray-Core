@@ -6869,3 +6869,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   3 条已复现本机环境 + 3 条并发负载抖动（`context-runtime-wiring`、`feedback-process-default-path`、
 >   `t12a06-cli-wiring`，隔离复跑 14/14 通过）。`typecheck` / `lint` exit 0。
 > - 未做：陈旧批准与 action/规则版本绑定、并发保存、重启恢复端到端。
+
+> **AUTH-CORE-01 第 4 片：规则热生效与批准版本绑定（2026-11-22）**
+>
+> - 生产装配读取持久化规则：引擎每次调用经 provider 读设置；规则保存后**下一次调用即生效**，无需重启。
+> - 批准绑定 `parameterAuthorizationRevision`：规则/开关变化后旧批准失效（不再"改了策略旧批准仍放行"）。
+> - 反例 ⑫（引擎级）+ 真实装配集成（保存规则 → 同进程下一次 ask → 重启新装配仍 ask）；
+>   承重：暂存 engine/runtime 后两处均红。
+> - 本机全量：**874 files（866 passed / 6 failed / 2 skipped），5610 tests（5597 passed / 6 failed / 7 skipped）**；
+>   3 条已复现本机环境 + 3 条并发负载抖动（`coord02-stamped-fork-link`、`toolkit01-merge01-joint`、
+>   `sensitive-content-access`，隔离复跑 19/19 通过）。`typecheck` / `lint` exit 0。
+> - 未做：并发保存的端到端证据（设置存储乐观并发已有单测）。
+
+> **推送状态（2026-11-22 第 4 片）**：本机网络不可达，5f218dcd 3 次推送均失败；按纪律留待下次合并推送（本地 HEAD 见 git log）。

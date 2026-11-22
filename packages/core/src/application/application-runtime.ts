@@ -163,6 +163,7 @@ import { FileSystemProcessExecutionStore } from "../execution/process-execution-
 import { PermissionProfileStore } from "../tools/permission-profile-store.js";
 import type { PermissionProfileReference } from "../tools/permission-profile-store.js";
 import { ConfigurablePermissionPolicyEngine } from "../tools/configurable-permission-policy-engine.js";
+import { ParameterAuthorizationSettingsStore } from "../tools/parameter-authorization-settings-store.js";
 import { CurrentPermissionSelectionStore } from "../tools/current-permission-selection.js";
 import { MainAgentReadonlyToolProjection } from "../tools/main-agent-readonly-projection.js";
 import {
@@ -1478,9 +1479,27 @@ export async function createApplicationRuntime(
     baseDirectory: stateDirectory,
     catalog: permissionCatalog,
   });
+  const parameterAuthorizationSettingsStore = new ParameterAuthorizationSettingsStore({
+    stateDirectory,
+    knownToolNamesProvider: async () => new Set(registry.listRegisteredNames()),
+  });
   const configurablePermissionPolicyEngine = new ConfigurablePermissionPolicyEngine({
     catalog: permissionCatalog,
     profileStore: permissionProfileStore,
+    /**
+     * AUTH-CORE-01 第 5 项（2026-11-22）：**正常装配读取同一套持久化规则**。
+     *
+     * 每次执行前重新读取设置：规则保存后下一次调用即生效（不需要重启），
+     * 批准绑定当时的 configurationRevision；设置不可读 ⇒ 返回 null（回退基线）。
+     */
+    parameterAuthorizationProvider: async () => {
+      const settingsDocument = await parameterAuthorizationSettingsStore.readSettings();
+      return {
+        settings: settingsDocument.settings,
+        rules: settingsDocument.rules,
+        configurationRevision: settingsDocument.configurationRevision ?? 0,
+      };
+    },
   });
   /** 当前权限组引用（可信运行时按模式提供；自定义组由认证设置控制面切换）。 */
   const currentPermissionProfileReference: PermissionProfileReference =

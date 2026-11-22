@@ -91,3 +91,24 @@
 
 未做（仍在卡内）：陈旧批准与 action/规则版本的绑定、并发保存、重启恢复的端到端证据；
 逐 action 目录在 SDK 报告中与"可执行"判定的进一步对齐。
+## 进展（2026-11-22，第 4 片：生产规则接线与批准版本绑定）
+
+- **正常装配读取同一套持久化规则**：`application-runtime` 构造
+  `ParameterAuthorizationSettingsStore`，引擎通过 `parameterAuthorizationProvider`
+  **每次执行前重新读取**设置；规则保存后**下一次调用即生效**，不需要重启。
+- **批准绑定规则版本**：`ProfileBoundAuthorization` 增加 `parameterAuthorizationRevision`；
+  规则或开关变化后旧批准失效（否则"改了策略但旧批准仍放行"）。
+- 规则不可读/解析失败 ⇒ provider 返回 null，回退工具基线（不阻断调用，不扩大规则面）。
+
+反例与承重：
+
+| 反例 | 旧实现 |
+|---|---|
+| ⑫ 初始无规则 allow → 保存 ask 规则后下一次调用 ask → 批准 allow → 规则 revision 再变化后 ask | 红（旧引擎不读 provider，永远 allow） |
+
+承重：暂存 `configurable-permission-policy-engine.ts` 后 ⑫ 变红，恢复后全绿。
+
+未做：并发保存与重启恢复的**端到端**证据（设置存储已有乐观并发与落盘恢复；待用真实运行时补证）。
+**补充证据（同日）**：新增真实装配集成 `auth-core01-live-rules-restart.test.ts`——
+从公开设置入口保存 ask 规则 ⇒ 同一引擎**下一次调用**由 allow 变 ask ⇒ 关闭后重新装配同一状态目录，
+引擎仍读到落盘规则（重启恢复）。承重：暂存引擎与 runtime 后该用例变红。

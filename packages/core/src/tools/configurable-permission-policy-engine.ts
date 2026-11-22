@@ -30,6 +30,24 @@ export interface ProfileBoundAuthorization {
   catalogVersion: number;
   argumentHash: string;
   expiresAtUnixSeconds: number;
+  /**
+   * AUTH-CORE-01 第 5 项（2026-11-22）：批准时绑定的**参数规则配置 revision**。
+   *
+   * 规则或开关变化后，旧批准不得复用（否则"改了策略但旧批准仍放行"）。
+   * 旧静态配置视为 0。
+   */
+  parameterAuthorizationRevision?: number;
+}
+
+/** 一次调用实际使用的参数规则配置（含 revision，用于批准失效判定）。 */
+export interface ResolvedParameterAuthorizationConfiguration {
+  settings: {
+    isParameterAuthorizationEnabled: boolean;
+    isParameterRulesEnabled: boolean;
+    perToolRulesEnabled?: Record<string, boolean>;
+  };
+  rules: ParameterAuthorizationRule[];
+  configurationRevision: number;
 }
 
 export interface ConfigurablePermissionPolicyEngineOptions {
@@ -54,6 +72,14 @@ export interface ConfigurablePermissionPolicyEngineOptions {
     };
     rules: ParameterAuthorizationRule[];
   };
+  /**
+   * AUTH-CORE-01 第 5 项：**每次调用**从持久化设置读取规则（规则保存后下一次调用即生效，
+   * 不需要重启；批准绑定当时的 configurationRevision）。
+   *
+   * 提供时优先于静态 `parameterAuthorization`；读取失败返回 null ⇒ 不套用规则
+   * （回退工具基线，与"配置不可读"的既有保守取向一致）。
+   */
+  parameterAuthorizationProvider?: () => Promise<ResolvedParameterAuthorizationConfiguration | null>;
 }
 
 export type ConfigurablePermissionDecision =
@@ -71,15 +97,12 @@ export class ConfigurablePermissionPolicyEngine {
   private readonly authorizations: Map<string, ProfileBoundAuthorization>;
   private readonly nowUnixSeconds: () => number;
   private readonly authorizationTtlSeconds: number;
-  /** MERGE-01：参数级授权配置（未注入 ⇒ 行为与既有完全一致）。 */
-  private readonly parameterAuthorization: {
-    settings: {
-      isParameterAuthorizationEnabled: boolean;
-      isParameterRulesEnabled: boolean;
-      perToolRulesEnabled?: Record<string, boolean>;
-    };
-    rules: ParameterAuthorizationRule[];
-  } | null;
+  /** MERGE-01：静态参数授权配置（缺省 ⇒ 不套用规则）。 */
+  private readonly parameterAuthorization: ResolvedParameterAuthorizationConfiguration | null;
+  /** AUTH-CORE-01 第 5 项：每次调用读取规则配置（优先于静态配置）。 */
+  private readonly parameterAuthorizationProvider:
+    | (() => Promise<ResolvedParameterAuthorizationConfiguration | null>)
+    | null;
 
   constructor(options: ConfigurablePermissionPolicyEngineOptions) {
     this.catalog = options.catalog;
@@ -87,7 +110,23 @@ export class ConfigurablePermissionPolicyEngine {
     this.authorizations = options.authorizations ?? new Map();
     this.nowUnixSeconds = options.nowUnixSeconds ?? (() => Math.floor(Date.now() / 1000));
     this.authorizationTtlSeconds = options.authorizationTtlSeconds ?? 600;
-    this.parameterAuthorization = options.parameterAuthorization ?? null;
+    this.parameterAuthorization =
+      options.parameterAuthorization === undefined
+        ? null
+        : { ...options.parameterAuthorization, configurationRevision: 0 };
+    this.parameterAuthorizationProvider = options.parameterAuthorizationProvider ?? null;
+  }
+
+  /** 解析本次调用的参数规则配置（provider 优先；读取失败 ⇒ null）。 */
+  private async resolveParameterAuthorizationConfiguration(): Promise<ResolvedParameterAuthorizationConfiguration | null> {
+    if (this.parameterAuthorizationProvider !== null) {
+      try {
+        return await this.parameterAuthorizationProvider();
+      } catch {
+        return null;
+      }
+    }
+    return this.parameterAuthorization;
   }
 
   /** 读取 profile 快照（内置动态生成；自定义读盘）。 */
@@ -152,11 +191,13 @@ export class ConfigurablePermissionPolicyEngine {
      * （基线 allow + 规则 ask 必须进入询问）。现在 ask 一律进入询问路径，
      * 由会话授权（用户批准）细化。
      */
+    const parameterConfiguration = await this.resolveParameterAuthorizationConfiguration();
     const parameterOutcome = this.evaluateParameterAuthorizationForCall({
       toolName: input.toolName,
       action: input.action ?? "",
       argumentsJson: input.argumentsJson,
       baselineDecision: baseDecision,
+      configuration: parameterConfiguration,
     });
     const effectiveDecision: PermissionDecision =
       parameterOutcome !== null && parameterOutcome.source === "parameter-rule"
@@ -205,6 +246,17 @@ export class ConfigurablePermissionPolicyEngine {
       this.authorizations.delete(authorizationKey);
       return { decision: "ask" };
     }
+    /**
+     * AUTH-CORE-01 第 5 项：**规则/开关变化后旧批准失效**。
+     * 否则"改了策略但旧批准仍放行"——批准必须绑定它当时看到的规则版本。
+     */
+    if (
+      (authorization.parameterAuthorizationRevision ?? 0) !==
+      (parameterConfiguration?.configurationRevision ?? 0)
+    ) {
+      this.authorizations.delete(authorizationKey);
+      return { decision: "ask" };
+    }
     if (authorization.argumentHash !== this.hashArguments(input.argumentsJson)) {
       this.authorizations.delete(authorizationKey);
       return { decision: "ask" };
@@ -219,12 +271,14 @@ export class ConfigurablePermissionPolicyEngine {
     argumentsJson: string;
   }): Promise<void> {
     const profile = await this.profileStore.readProfile(input.profileReference);
+    const configuration = await this.resolveParameterAuthorizationConfiguration();
     this.authorizations.set(this.authorizationKey(input.toolName, input.argumentsJson), {
       profileReference: input.profileReference,
       profileRevision: profile.revision,
       catalogVersion: profile.catalogVersion,
       argumentHash: this.hashArguments(input.argumentsJson),
       expiresAtUnixSeconds: this.nowUnixSeconds() + this.authorizationTtlSeconds,
+      parameterAuthorizationRevision: configuration?.configurationRevision ?? 0,
     });
   }
 
@@ -241,8 +295,9 @@ export class ConfigurablePermissionPolicyEngine {
     action: string;
     argumentsJson: string;
     baselineDecision: PermissionDecision;
+    configuration: ResolvedParameterAuthorizationConfiguration | null;
   }): ReturnType<typeof evaluateParameterAuthorization> | null {
-    const configuration = this.parameterAuthorization;
+    const configuration = input.configuration;
     if (configuration === null) {
       return null;
     }

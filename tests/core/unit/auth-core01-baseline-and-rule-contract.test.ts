@@ -311,4 +311,73 @@ describe("AUTH-CORE-01：工具基线优先级（显式决定 vs 能力映射）
       ),
     ).rejects.toThrow(/未知的族名\/别名与 action 组合/);
   });
+
+  it("⑫ 规则提供者：保存后下一次调用生效；规则版本变化使旧批准失效", async () => {
+    const catalog = new PermissionCapabilityCatalog();
+    let revision = 1;
+    let rules: ParameterAuthorizationRule[] = [];
+    const profileStore = {
+      readProfile: async () => ({
+        revision: 1,
+        catalogVersion: catalog.getCatalogVersion(),
+        capabilityDecisions: { "task.read": "allow" },
+        toolDecisions: {},
+        fallbackDecision: "deny" as const,
+      }),
+    };
+    const engine = new ConfigurablePermissionPolicyEngine({
+      catalog,
+      profileStore: profileStore as never,
+      parameterAuthorizationProvider: async () => ({
+        settings: { isParameterAuthorizationEnabled: true, isParameterRulesEnabled: true },
+        rules,
+        configurationRevision: revision,
+      }),
+    });
+    const argumentsJson = JSON.stringify({ sequenceId: "s-1" });
+    const decide = () =>
+      engine.decide({
+        toolName: "taskSequenceStatus",
+        action: "state-query",
+        profileReference: { kind: "builtin", profileId: "assist" },
+        argumentsJson,
+      });
+
+    /** 初始无规则 ⇒ 基线 allow（不需要重启）。 */
+    expect((await decide()).decision).toBe("allow");
+
+    /** 保存一条 ask 规则（revision 2）⇒ 下一次调用即 ask。 */
+    revision = 2;
+    rules = [
+      {
+        ruleIdentifier: "r1",
+        toolName: "taskSequenceStatus",
+        action: "",
+        decision: "ask",
+        explanation: "该工具所有 action 要求确认",
+      },
+    ];
+    expect((await decide()).decision).toBe("ask");
+
+    /** 用户批准 ⇒ allow。 */
+    await engine.grantSessionAuthorization({
+      toolName: "taskSequenceStatus",
+      profileReference: { kind: "builtin", profileId: "assist" },
+      argumentsJson,
+    });
+    expect((await decide()).decision).toBe("allow");
+
+    /** 规则版本再变化（仍是 ask）⇒ 旧批准必须失效，不得沿用。 */
+    revision = 3;
+    rules = [
+      {
+        ruleIdentifier: "r2",
+        toolName: "taskSequenceStatus",
+        action: "",
+        decision: "ask",
+        explanation: "规则改过",
+      },
+    ];
+    expect((await decide()).decision).toBe("ask");
+  });
 });
