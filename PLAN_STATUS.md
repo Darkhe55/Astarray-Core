@@ -6930,3 +6930,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   3 条已复现本机环境 + 1 条已知负载抖动（`graph-change-deterministic-drill`，隔离复跑 3/3 通过）。
 >   `typecheck` / `lint` exit 0。
 > - 未做：真实秘书/用户通道装配；05-05 决定写回与步骤恢复；05-01/05-06。
+
+> **COORD-05 05-05：决定写回与恢复（2026-11-22）**
+>
+> - `decision-writeback.ts`：决定写回权威文档（来源/版本/影响范围）；只推进显式依赖该决定的等待步骤；
+>   崩溃点 A（未写回）重试补写、崩溃点 B（未推进）重试只推进；一次通知（已通知步骤记录后跳过）；
+>   重复调用 duplicate；取消的 mission 不写回不推进；文档 revision 回退 ⇒ conflict 保留决定。
+> - 反例 7 条；变异承重：关闭 duplicate 守卫 ⇒ ④ 红，关闭 revision 冲突检测 ⇒ ⑥ 红。
+> - 本机全量：**879 files（873 passed / 4 failed / 2 skipped），5645 tests（5634 passed / 4 failed / 7 skipped）**；
+>   3 条已复现本机环境 + 1 条已知负载抖动（`graph-change-deterministic-drill`，隔离复跑 3/3 通过）。
+>   `typecheck` / `lint` exit 0。
+> - 未做：真实任务链/交接文档端口装配与用户答复接线；05-01/05-06。
+
+> **推送状态（2026-11-22 第 7 轮）**：62be231d 3 次推送均失败（连接重置/不可达）；按纪律留待下次合并推送。
