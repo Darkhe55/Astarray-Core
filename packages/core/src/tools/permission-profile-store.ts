@@ -37,6 +37,11 @@ export const permissionProfileDocumentSchema = z.object({
   catalogVersion: z.number().int().min(1),
   /** 逐项决定（缺省项按 fallbackDecision 处理）。 */
   capabilityDecisions: z.record(z.string(), permissionDecisionSchema),
+  /**
+   * AUTH-CORE-01 第 2 项：按**工具 ID** 的三态决定。
+   * 缺省/空表 ⇒ 使用能力映射得出的默认决定；能力映射为 deny 时仍不可放宽。
+   */
+  toolDecisions: z.record(z.string(), permissionDecisionSchema).optional(),
   /** 未来新权限的 fallback（自定义组默认 deny）。 */
   fallbackDecision: permissionDecisionSchema,
   /** 签名冻结（仅 Ponder）：内容哈希，任何修改拒绝。 */
@@ -116,6 +121,7 @@ export class PermissionProfileStore {
       revision: 1,
       catalogVersion: this.catalog.getCatalogVersion(),
       capabilityDecisions,
+      toolDecisions: {},
       fallbackDecision: "deny",
       frozenSignature:
         profileId === "ponder"

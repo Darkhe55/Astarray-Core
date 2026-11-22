@@ -2284,15 +2284,17 @@ export class MainController {
     const capabilityCatalog = this.options.permissionCapabilityCatalog;
     if (capabilityCatalog === null || capabilityCatalog === undefined) return [];
     const profile = await this.readCurrentPermissionProfileOrNull();
-    const strictest = (capabilityIds: string[]): PermissionDecision | null => {
-      if (profile === null || capabilityIds.length === 0) return null;
+    const strictest = (capabilityIds: string[], toolName: string): PermissionDecision | null => {
+      if (profile === null) return null;
+      const explicit = profile.toolDecisions?.[toolName];
+      if (capabilityIds.length === 0) return explicit ?? null;
       let decision: PermissionDecision = "allow";
       for (const capabilityId of capabilityIds) {
         const current = profile.capabilityDecisions[capabilityId] ?? profile.fallbackDecision;
         if (current === "deny") return "deny";
         if (current === "ask") decision = "ask";
       }
-      return decision;
+      return explicit ?? decision;
     };
     const wholeTools = capabilityCatalog.listToolMappings();
     const actionMappings = capabilityCatalog.listToolActionMappings();
@@ -2318,7 +2320,7 @@ export class MainController {
         isActionOnly: capabilityIds.length === 0 && actions.length > 0,
         capabilityIds: [...capabilityIds],
         actions,
-        baselineDecision: strictest(capabilityIds),
+        baselineDecision: strictest(capabilityIds, toolName),
         baselineSource: profile === null ? ("unknown" as const) : ("profile-capabilities" as const),
         // 注册即可调用（执行端口按注册表装配）；未注册 = 目录已映射但当前内核不可调用。
         isRegistered: registry.isRegistered(toolName),
@@ -2345,7 +2347,7 @@ export class MainController {
     if (actionMatched !== undefined) {
       return {
         status: "ok",
-        baselineDecision: await this.computeCapabilityBaseline(actionMatched.capabilityIds),
+        baselineDecision: await this.computeCapabilityBaseline(actionMatched.capabilityIds, input.toolName),
         capabilityIds: [...actionMatched.capabilityIds],
       };
     }
@@ -2358,6 +2360,7 @@ export class MainController {
 
   private async readCurrentPermissionProfileOrNull(): Promise<{
     capabilityDecisions: Record<string, PermissionDecision>;
+    toolDecisions: Record<string, PermissionDecision>;
     fallbackDecision: PermissionDecision;
   } | null> {
     const profileStore = this.options.permissionProfileStore;
@@ -2367,22 +2370,26 @@ export class MainController {
     const document = await profileStore.readProfile(reference);
     return {
       capabilityDecisions: document.capabilityDecisions,
+      toolDecisions: document.toolDecisions ?? {},
       fallbackDecision: document.fallbackDecision,
     };
   }
 
   private async computeCapabilityBaseline(
     capabilityIds: string[],
+    toolName: string,
   ): Promise<PermissionDecision | null> {
     const profile = await this.readCurrentPermissionProfileOrNull();
-    if (profile === null || capabilityIds.length === 0) return null;
+    if (profile === null) return null;
+    const explicit = profile.toolDecisions?.[toolName];
+    if (capabilityIds.length === 0) return explicit ?? null;
     let decision: PermissionDecision = "allow";
     for (const capabilityId of capabilityIds) {
       const current = profile.capabilityDecisions[capabilityId] ?? profile.fallbackDecision;
       if (current === "deny") return "deny";
       if (current === "ask") decision = "ask";
     }
-    return decision;
+    return explicit ?? decision;
   }
 
   /** 读取权限组可配置明细（内置组同样可读，只读）。 */
@@ -2393,6 +2400,7 @@ export class MainController {
     revision: number;
     catalogVersion: number;
     capabilityDecisions: Record<string, PermissionDecision>;
+    toolDecisions: Record<string, PermissionDecision>;
     fallbackDecision: PermissionDecision;
   }> {
     const profileStore = this.options.permissionProfileStore;
@@ -2407,6 +2415,7 @@ export class MainController {
       revision: document.revision,
       catalogVersion: document.catalogVersion,
       capabilityDecisions: { ...document.capabilityDecisions },
+      toolDecisions: { ...(document.toolDecisions ?? {}) },
       fallbackDecision: document.fallbackDecision,
     };
   }
@@ -2420,6 +2429,18 @@ export class MainController {
   }): Promise<{ permissionProfileId: string; revision: number }> {
     const controller = this.createCustomPermissionProfileController();
     const profile = await controller.updateCapabilityDecision(input);
+    return { permissionProfileId: profile.permissionProfileId, revision: profile.revision };
+  }
+
+  /** AUTH-CORE-01：自定义组的按工具三态决定。 */
+  async updatePermissionToolDecision(input: {
+    readonly permissionProfileId: string;
+    readonly toolName: string;
+    readonly decision: PermissionDecision;
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; revision: number }> {
+    const controller = this.createCustomPermissionProfileController();
+    const profile = await controller.updateToolDecision(input);
     return { permissionProfileId: profile.permissionProfileId, revision: profile.revision };
   }
 

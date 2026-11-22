@@ -29,8 +29,10 @@ export interface ParameterAuthorizationSettingsDocument {
   settings: {
     /** 总开关；默认开启（卡内"默认全部开启"）。 */
     isParameterAuthorizationEnabled: boolean;
-    /** 每工具细分开关；默认开启。 */
+    /** 每工具细分开关（全局默认）；默认开启。 */
     isParameterRulesEnabled: boolean;
+    /** AUTH-CORE-01：按工具的细分开关；缺省回退全局。 */
+    perToolRulesEnabled?: Record<string, boolean>;
   };
   rules: ParameterAuthorizationRule[];
   /**
@@ -57,6 +59,7 @@ function buildDefaultDocument(): ParameterAuthorizationSettingsDocument {
     settings: {
       isParameterAuthorizationEnabled: true,
       isParameterRulesEnabled: true,
+      perToolRulesEnabled: {},
     },
     rules: [],
   };
@@ -177,6 +180,22 @@ export function validateSettingsDocument(
   }
   const settings = document.settings;
   if (settings === null || typeof settings !== "object") {
+  const perToolRulesEnabled = (settings as Record<string, unknown>)["perToolRulesEnabled"];
+  if (perToolRulesEnabled !== undefined) {
+    if (perToolRulesEnabled === null || typeof perToolRulesEnabled !== "object") {
+      return { isValid: false, reason: "perToolRulesEnabled 必须是对象" };
+    }
+    for (const [toolName, enabled] of Object.entries(
+      perToolRulesEnabled as Record<string, unknown>,
+    )) {
+      if (toolName === "" || typeof enabled !== "boolean") {
+        return {
+          isValid: false,
+          reason: "perToolRulesEnabled 的项必须是 布尔值（tool=" + toolName + "）",
+        };
+      }
+    }
+  }
     return { isValid: false, reason: "settings 缺失" };
   }
   if (

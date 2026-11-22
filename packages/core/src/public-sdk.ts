@@ -1757,6 +1757,7 @@ export type PublicApplicationService = Pick<
   | "importPermissionProfile"
   | "listPermissionToolOverview"
   | "previewToolPermission"
+  | "updatePermissionToolDecision"
 >;
 
 /** 公开 mission 状态（SDK/CLI 共用视图）。 */
@@ -3345,6 +3346,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     revision: number;
     catalogVersion: number;
     capabilityDecisions: Record<string, "allow" | "ask" | "deny">;
+    toolDecisions: Record<string, "allow" | "ask" | "deny">;
     fallbackDecision: "allow" | "ask" | "deny";
   }> {
     this.assertOpen();
@@ -3360,6 +3362,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }): Promise<{ permissionProfileId: string; revision: number }> {
     this.assertOpen();
     return this.runtime.controller.updatePermissionCapabilityDecision(input);
+  }
+
+  /** AUTH-UI-01：自定义组按工具的三态决定。 */
+  async updatePermissionToolDecision(input: {
+    readonly permissionProfileId: string;
+    readonly toolName: string;
+    readonly decision: "allow" | "ask" | "deny";
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; revision: number }> {
+    this.assertOpen();
+    return this.runtime.controller.updatePermissionToolDecision(input);
   }
 
   /** 重命名自定义组。 */
@@ -4524,6 +4537,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   async queryParameterAuthorizationRuleDetails(): Promise<{
     isParameterAuthorizationEnabled: boolean;
     isParameterRulesEnabled: boolean;
+    perToolRulesEnabled: Record<string, boolean>;
     configurationRevision: number;
     rules: ParameterAuthorizationRule[];
   }> {
@@ -4533,6 +4547,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return {
       isParameterAuthorizationEnabled: document.settings.isParameterAuthorizationEnabled,
       isParameterRulesEnabled: document.settings.isParameterRulesEnabled,
+      perToolRulesEnabled: document.settings.perToolRulesEnabled ?? {},
       configurationRevision: document.configurationRevision ?? 0,
       rules: document.rules,
     };
@@ -4545,6 +4560,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   async updateParameterAuthorizationRules(input: {
     isParameterAuthorizationEnabled: boolean;
     isParameterRulesEnabled: boolean;
+    perToolRulesEnabled?: Record<string, boolean>;
     rules: ParameterAuthorizationRule[];
     expectedRevision: number;
     isConfirmedByAuthenticatedUser: boolean;
@@ -4590,6 +4606,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         settings: {
           isParameterAuthorizationEnabled: input.isParameterAuthorizationEnabled,
           isParameterRulesEnabled: input.isParameterRulesEnabled,
+          perToolRulesEnabled: input.perToolRulesEnabled ?? {},
         },
         rules: input.rules,
         expectedRevision: currentRevision,

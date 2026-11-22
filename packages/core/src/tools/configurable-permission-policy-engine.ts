@@ -46,7 +46,12 @@ export interface ConfigurablePermissionPolicyEngineOptions {
    * 判定委托 `evaluateParameterAuthorization`（纯函数，无脚本/无正则）。
    */
   parameterAuthorization?: {
-    settings: { isParameterAuthorizationEnabled: boolean; isParameterRulesEnabled: boolean };
+    settings: {
+      isParameterAuthorizationEnabled: boolean;
+      isParameterRulesEnabled: boolean;
+      /** AUTH-CORE-01：按工具的细分开关；缺省回退全局开关。 */
+      perToolRulesEnabled?: Record<string, boolean>;
+    };
     rules: ParameterAuthorizationRule[];
   };
 }
@@ -68,7 +73,11 @@ export class ConfigurablePermissionPolicyEngine {
   private readonly authorizationTtlSeconds: number;
   /** MERGE-01：参数级授权配置（未注入 ⇒ 行为与既有完全一致）。 */
   private readonly parameterAuthorization: {
-    settings: { isParameterAuthorizationEnabled: boolean; isParameterRulesEnabled: boolean };
+    settings: {
+      isParameterAuthorizationEnabled: boolean;
+      isParameterRulesEnabled: boolean;
+      perToolRulesEnabled?: Record<string, boolean>;
+    };
     rules: ParameterAuthorizationRule[];
   } | null;
 
@@ -94,11 +103,15 @@ export class ConfigurablePermissionPolicyEngine {
     action?: string | null;
     profile: PermissionProfileDocument;
   }): PermissionDecision {
-    return this.catalog.evaluateToolPermission({
+    const mapped = this.catalog.evaluateToolPermission({
       toolName: input.toolName,
       ...(input.action === undefined ? {} : { action: input.action }),
       capabilityDecisions: input.profile.capabilityDecisions,
     });
+    // 能力映射 deny 是不可放宽的上限；显式工具决定只能在其上收紧或明确覆盖 ask/allow。
+    if (mapped === "deny") return "deny";
+    const explicit = input.profile.toolDecisions?.[input.toolName];
+    return explicit ?? mapped;
   }
 
   /**
@@ -233,12 +246,16 @@ export class ConfigurablePermissionPolicyEngine {
     if (configuration === null) {
       return null;
     }
+    const perTool = configuration.settings.perToolRulesEnabled?.[input.toolName];
     return evaluateParameterAuthorization({
       toolName: input.toolName,
       action: input.action,
       argumentsJson: input.argumentsJson,
       baselineDecision: input.baselineDecision,
-      settings: configuration.settings,
+      settings: {
+        isParameterAuthorizationEnabled: configuration.settings.isParameterAuthorizationEnabled,
+        isParameterRulesEnabled: perTool ?? configuration.settings.isParameterRulesEnabled,
+      },
       rules: configuration.rules,
     });
   }

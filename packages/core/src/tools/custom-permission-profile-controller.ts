@@ -161,6 +161,35 @@ export class CustomPermissionProfileController {
     });
   }
 
+  /** AUTH-CORE-01：按工具 ID 的三态决定（仅自定义组；内置组只读）。 */
+  async updateToolDecision(input: {
+    permissionProfileId: string;
+    toolName: string;
+    decision: PermissionDecision;
+    expectedRevision: number;
+  }): Promise<PermissionProfileDocument> {
+    const document = await this.requireCustomProfile(input.permissionProfileId);
+    if (!this.catalog.isToolMapped(input.toolName)) {
+      throw new DomainError(
+        "dependency-not-found",
+        "目录未映射该工具（不能配置未知工具）: " + input.toolName,
+      );
+    }
+    const updated: PermissionProfileDocument = {
+      ...document,
+      toolDecisions: {
+        ...(document.toolDecisions ?? {}),
+        [input.toolName]: input.decision,
+      },
+      revision: document.revision + 1,
+      updatedAtIso: new Date().toISOString(),
+    };
+    return this.store.saveCustomProfile({
+      document: updated,
+      expectedRevision: input.expectedRevision,
+    });
+  }
+
   /** 重置为创建源（保留 ID/名称；revision 继续单调）。 */
   async resetProfile(input: {
     permissionProfileId: string;
@@ -214,6 +243,7 @@ export class CustomPermissionProfileController {
         displayName: document.displayName,
         catalogVersion: document.catalogVersion,
         capabilityDecisions: document.capabilityDecisions,
+        toolDecisions: { ...(document.toolDecisions ?? {}) },
         fallbackDecision: document.fallbackDecision,
       },
       exportedAtIso: new Date().toISOString(),
@@ -250,6 +280,20 @@ export class CustomPermissionProfileController {
       }
     }
     const permissionProfileId = newCustomProfileId();
+    const importedToolDecisions: Record<string, PermissionDecision> = {};
+    const rawToolDecisions = input.exportedDocument["toolDecisions"];
+    if (rawToolDecisions !== null && typeof rawToolDecisions === "object") {
+      for (const [toolName, decision] of Object.entries(
+        rawToolDecisions as Record<string, unknown>,
+      )) {
+        if (
+          this.catalog.isToolMapped(toolName) &&
+          (decision === "deny" || decision === "ask" || decision === "allow")
+        ) {
+          importedToolDecisions[toolName] = decision;
+        }
+      }
+    }
     const document: PermissionProfileDocument = {
       schemaVersion: 1,
       permissionProfileId,
@@ -258,6 +302,7 @@ export class CustomPermissionProfileController {
       revision: 1,
       catalogVersion: this.catalog.getCatalogVersion(),
       capabilityDecisions: filteredDecisions,
+      toolDecisions: importedToolDecisions,
       fallbackDecision: "deny",
       frozenSignature: null,
       createdAtIso: new Date().toISOString(),
