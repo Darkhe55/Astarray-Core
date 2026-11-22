@@ -6896,3 +6896,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**876 files（871 passed / 3 failed / 2 skipped），5618 tests（5608 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：COORD-05 其余分项（05-01/02/04/05/06）。
+
+> **COORD-05 05-02：逐级请示契约与路由核心（2026-11-22）**
+>
+> - 新增 `escalation-contract.ts`：沿创建关系解析上报链（成环/自指/未知发送者拒绝）、
+>   方向校验（越级/改投 ⇒ `direction-violation`）、主层后目标为用户裁决通道、
+>   处置链只追加（当前处理人 + 预期版本保护；终态后任何追加 ⇒ `already-terminal`）。
+> - 反例 8 条；变异承重：关闭环检测 ⇒ ③ 红，关闭方向校验 ⇒ ⑤ 红。
+> - 本机全量：**877 files（872 passed / 3 failed / 2 skipped），5626 tests（5616 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：反馈信封字段接线、控制面服务装配与多层端到端、05-01/04/05/06。
