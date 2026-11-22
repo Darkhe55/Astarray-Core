@@ -1084,3 +1084,17 @@ zod 默认**丢弃未知字段** ⇒ 经过 schema 的读写会把手写进去�
 
 **未覆盖**：`tool-packages/version-state`（其快照由 controller 版本控制承载，按 §36.3"不重复包装同等语义"未再包一层）；
 Linux/macOS 平台证据（本机只有 Windows）。
+## 进展（2026-11-22，WIRING-04-04 反例）
+
+`context-pack-resolution.ts` 此前零测试。本轮补 9 条反例：
+
+- 映射分类：完整声明 + 精确映射 ⇒ `exact`；声明但缺映射 / 声明与映射不一致 ⇒ `declared-missing`（阻塞，
+  不按映射猜）；未声明 + 精确项 ⇒ `exact`；只有整 mission 通配 ⇒ `imprecise`；都没有 ⇒ `missing`。
+- 自愈边界：只在"完整声明且完全没有映射项"时补；已有映射（哪怕不一致）不补。
+- 解析结果：缺绑定 ⇒ `mapping-missing`；映射指向读不到的节点 ⇒ `declared-but-missing`；
+  节点无包 ⇒ `no-pack-declared`（合法）；revision 为 0 占位 ⇒ `declared-but-missing`；
+  正常包 ⇒ 固定 revision + 稳定内容哈希。
+
+变异承重：把 `revision <= 0` 放宽为 `< 0` ⇒ ⑧ 红。
+
+未做：真实任务序列映射端到端（需运行时装配）；04-02/03/05 仍未开始。

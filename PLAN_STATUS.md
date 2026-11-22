@@ -7037,3 +7037,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - WB00 微编辑工作台原型：由 GUI-01-R 接管，标 superseded。
 > - GUI-MVP 卡原本已注明"由 GUI-01-R 接管"，无需改动。
 > - 本轮仅文档校正，无代码变更；门禁沿用上一轮。
+
+> **WIRING-04-04 任务包解析反例（2026-11-22）**
+>
+> - `context-pack-resolution.ts` 补 9 条反例：映射分类（exact/declared-missing/imprecise/missing）、
+>   自愈补映射边界、解析结果（mapping-missing / declared-but-missing / no-pack-declared / revision-0 拒绝 /
+>   正常包固定 revision + 内容哈希）。
+> - 变异承重：`revision <= 0` 放宽为 `< 0` ⇒ ⑧ 红。
+> - 全量：**887 files（882 passed / 3 failed / 2 skipped），5693 tests（5683 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：04-02/03/05 与真实任务序列映射端到端。
