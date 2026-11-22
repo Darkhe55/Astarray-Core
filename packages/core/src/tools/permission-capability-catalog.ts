@@ -198,6 +198,27 @@ export class PermissionCapabilityCatalog {
     return [...this.capabilitiesById.values()];
   }
 
+  /** 整工具映射快照（工具 → 能力）。 */
+  listToolMappings(): Array<{ toolName: string; capabilityIds: string[] }> {
+    return [...this.toolMappings.entries()].map(([toolName, capabilityIds]) => ({
+      toolName,
+      capabilityIds: [...capabilityIds],
+    }));
+  }
+
+  /** action 映射快照（工具 → { action → 能力[] }）。 */
+  listToolActionMappings(): Array<{
+    toolName: string;
+    actions: Record<string, string[]>;
+  }> {
+    return [...this.actionMappings.entries()].map(([toolName, actions]) => ({
+      toolName,
+      actions: Object.fromEntries(
+        Object.entries(actions).map(([action, capabilityIds]) => [action, [...capabilityIds]]),
+      ),
+    }));
+  }
+
   getCapabilityIds(): string[] {
     return [...this.capabilitiesById.keys()];
   }

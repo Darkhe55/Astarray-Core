@@ -2238,20 +2238,34 @@ export class MainController {
       applicableResources: string[];
       riskSummary: string;
       toolMappings: string[];
+      /** 仅通过 action 映射接入的工具（整工具映射之外）。 */
+      actionToolMappings: Array<{ toolName: string; actions: string[] }>;
     }>
   > {
     const capabilityCatalog = this.options.permissionCapabilityCatalog;
     if (capabilityCatalog === null || capabilityCatalog === undefined) return [];
-    return capabilityCatalog.listCapabilities().map((capability) => ({
-      capabilityId: capability.capabilityId,
-      displayName: capability.displayName,
-      description: capability.description,
-      devolveDefault: capability.devolveDefault,
-      assistDefault: capability.assistDefault,
-      applicableResources: [...capability.applicableResources],
-      riskSummary: capability.riskSummary,
-      toolMappings: [...capability.toolMappings],
-    }));
+    const actionMappings = capabilityCatalog.listToolActionMappings();
+    return capabilityCatalog.listCapabilities().map((capability) => {
+      const actionToolMappings = actionMappings
+        .map((entry) => ({
+          toolName: entry.toolName,
+          actions: Object.entries(entry.actions)
+            .filter(([, capabilityIds]) => capabilityIds.includes(capability.capabilityId))
+            .map(([action]) => action),
+        }))
+        .filter((entry) => entry.actions.length > 0);
+      return {
+        capabilityId: capability.capabilityId,
+        displayName: capability.displayName,
+        description: capability.description,
+        devolveDefault: capability.devolveDefault,
+        assistDefault: capability.assistDefault,
+        applicableResources: [...capability.applicableResources],
+        riskSummary: capability.riskSummary,
+        toolMappings: [...capability.toolMappings],
+        actionToolMappings,
+      };
+    });
   }
 
   /** 读取权限组可配置明细（内置组同样可读，只读）。 */

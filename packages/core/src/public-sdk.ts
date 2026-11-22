@@ -3325,6 +3325,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       applicableResources: string[];
       riskSummary: string;
       toolMappings: string[];
+      actionToolMappings: Array<{ toolName: string; actions: string[] }>;
     }>
   > {
     this.assertOpen();
