@@ -6994,3 +6994,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**884 files（879 passed / 3 failed / 2 skipped），5670 tests（5660 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：调度器 advanceStep 真实实现、秘书/用户通道装配、整卡三条路径端到端。
+
+> **COORD-05 调度闸门（2026-11-22）**
+>
+> - `TaskGraph` 记录已写回决定（构造时读任务链证据 + `markDecisionApplied`）；`findRunnableTaskIds`
+>   要求 `dependsOnDecisionIdentifiers` 全部已写回，否则不进入可运行集合；`DagScheduler` 暴露登记入口。
+> - 反例 5 条；变异承重：关闭闸门 ⇒ ①/③/⑤ 红。
+> - 本机全量：**885 files（880 passed / 3 failed / 2 skipped），5675 tests（5665 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：写回后自动调用 markDecisionApplied 的生产接线（编排器）、秘书/用户通道、整卡端到端。

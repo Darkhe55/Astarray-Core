@@ -93,6 +93,15 @@ export class DagScheduler {
     return this.graph;
   }
 
+  /** COORD-05 05-05：决定写回后登记，下一轮调度即可放行依赖该决定的节点。 */
+  markDecisionApplied(decisionIdentifier: string): void {
+    this.graph.markDecisionApplied(decisionIdentifier);
+  }
+
+  isDecisionApplied(decisionIdentifier: string): boolean {
+    return this.graph.isDecisionApplied(decisionIdentifier);
+  }
+
   isTaskClaimed(taskId: string): boolean {
     return this.claimedTaskIds.has(taskId);
   }

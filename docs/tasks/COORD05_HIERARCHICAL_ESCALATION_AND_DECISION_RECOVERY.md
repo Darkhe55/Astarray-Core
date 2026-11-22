@@ -179,3 +179,14 @@ Worker 通过现有反馈信箱向直属上级请示。上级在管理范围内�
 mission 不存在、与 05-05 写回串联）；变异承重：关闭等待映射 ⇒ ①/⑥ 红。
 
 未做：调度器 `advanceStep` 的真实实现、秘书/用户通道装配、整卡三条路径端到端。
+## 进展（2026-11-22，调度闸门）
+
+- `TaskGraph` 新增 `appliedDecisionIdentifiers`：构造时从任务链 `decisionApplicationEvidence` 读取，
+  运行时可用 `markDecisionApplied` 登记；`findRunnableTaskIds` 要求节点的
+  `dependsOnDecisionIdentifiers` 全部已写回，否则**不进入可运行集合**。
+- `DagScheduler` 暴露 `markDecisionApplied` / `isDecisionApplied`：写回后下一轮调度即可放行。
+- 效果：依赖决定的步骤在决定写回前"等待"，其他可运行任务照常调度；下游仍受普通依赖约束。
+
+反例 5 条（`coord05-decision-gating.test.ts`）；变异承重：关闭闸门 ⇒ ①/③/⑤ 红。
+
+未做：调度器 `advanceStep` 的生产接线（写回后调用 `markDecisionApplied`）、秘书/用户通道装配、整卡端到端。

@@ -16,8 +16,18 @@ export class TaskGraph {
    */
   private readonly declarationOrderById = new Map<string, number>();
   private nextDeclarationOrder = 0;
+  /**
+   * COORD-05 05-05（2026-11-22）：**已写回的决定**。
+   *
+   * 节点可通过 `dependsOnDecisionIdentifiers` 显式依赖决定；只有对应决定已写回
+   * （任务链 `decisionApplicationEvidence` 或运行时 `markDecisionApplied`）才可运行。
+   */
+  private readonly appliedDecisionIdentifiers = new Set<string>();
 
-  constructor(nodes: TaskDependencyNode[]) {
+  constructor(nodes: TaskDependencyNode[], appliedDecisionIdentifiers?: Iterable<string>) {
+    for (const identifier of appliedDecisionIdentifiers ?? []) {
+      this.appliedDecisionIdentifiers.add(identifier);
+    }
     for (const node of nodes) {
       if (this.nodesById.has(node.id)) {
         throw new DomainError(
@@ -58,7 +68,21 @@ export class TaskGraph {
   }
 
   static fromTaskChain(document: TaskChainDocument): TaskGraph {
-    return new TaskGraph(document.tasks);
+    return new TaskGraph(
+      document.tasks,
+      (document.decisionApplicationEvidence ?? []).map(
+        (entry) => entry.decisionIdentifier,
+      ),
+    );
+  }
+
+  /** 决定写回后登记（调度器在任务链追加证据后调用）。 */
+  markDecisionApplied(decisionIdentifier: string): void {
+    this.appliedDecisionIdentifiers.add(decisionIdentifier);
+  }
+
+  isDecisionApplied(decisionIdentifier: string): boolean {
+    return this.appliedDecisionIdentifiers.has(decisionIdentifier);
   }
 
   /**
@@ -164,6 +188,15 @@ export class TaskGraph {
     const runnableTaskIds = this.getTaskIds().filter((taskId) => {
       const node = this.nodesById.get(taskId);
       if (node === undefined || node.status !== "pending") {
+        return false;
+      }
+      /** COORD-05：显式依赖的决定未写回 ⇒ 等待（不进入可运行集合）。 */
+      const decisionDependencies = node.dependsOnDecisionIdentifiers ?? [];
+      if (
+        !decisionDependencies.every((decisionIdentifier) =>
+          this.appliedDecisionIdentifiers.has(decisionIdentifier),
+        )
+      ) {
         return false;
       }
       return node.dependsOn.every(
