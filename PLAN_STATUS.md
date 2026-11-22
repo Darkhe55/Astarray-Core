@@ -7047,3 +7047,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**887 files（882 passed / 3 failed / 2 skipped），5693 tests（5683 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：04-02/03/05 与真实任务序列映射端到端。
+
+> **AUDIT-REPAIR-01 01：装配端口矩阵（2026-11-22）**
+>
+> - 经 `runtime.controller.options.buildWorkerToolPort` 直接执行 `proposeGoal`：
+>   未分配 ⇒ `tool-permission-denied`；已分配但 assist 为 ask ⇒ `permission-ask-pending`；两种都零提案文件。
+> - 证明统一策略/门禁在装配端口上先于自定义处理器生效（此前只有 handler/wrapper 级）。
+> - 全量：**888 files（883 passed / 3 failed / 2 skipped），5695 tests（5685 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 仍缺：allow 路径（需激活 + 批准）、取消/ponder 的装配矩阵（ponder 已有 wrapper 级）。

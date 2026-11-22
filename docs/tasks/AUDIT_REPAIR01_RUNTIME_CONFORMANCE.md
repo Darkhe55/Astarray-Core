@@ -713,3 +713,13 @@ wrapper 级"未分配 ⇒ 拒绝且处理器不被调用"与"权限引擎 deny �
 - **05**：隔离包报告已存在；prepack 失败如实记录。
 
 **不得**以本轮 handler 级反例替代 01 的应用矩阵；也不将 03 的生产接线算作完成。
+## 进展（2026-11-22，检查点 01 装配端口矩阵）
+
+通过真实运行时 `runtime.controller.options.buildWorkerToolPort` 构建 worker 工具端口并直接执行
+`proposeGoal`（`audit01-worker-tool-port-matrix.test.ts`）：
+
+- **未分配**（任务子集不含 `proposeGoal`）⇒ 返回 `tool-permission-denied`，提案目录零文件；
+- **已分配但 assist 为 ask** ⇒ 返回 `permission-ask-pending`（未获批准），提案目录零文件。
+
+这补上了此前"只有 handler 级"的空白：证明统一策略/门禁在**装配端口**上先于自定义处理器生效。
+**仍缺**：allow 路径（需目标模式激活 + 批准）与取消/ponder 的装配矩阵；ponder 已有 wrapper 级用例。
