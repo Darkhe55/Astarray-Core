@@ -79,7 +79,10 @@ import type { GuidanceControlQueue } from "../runtime-guidance/guidance-control-
 import type { ContextNodeLifecyclePort } from "./worker-agent.js";
 import type { PermissionProfileStore } from "../tools/permission-profile-store.js";
 import type { PermissionProfileReference } from "../tools/permission-profile-store.js";
-import type { PermissionCapabilityCatalog } from "../tools/permission-capability-catalog.js";
+import type {
+  PermissionCapabilityCatalog,
+  PermissionDecision,
+} from "../tools/permission-capability-catalog.js";
 import type { ConfigurablePermissionPolicyEngine } from "../tools/configurable-permission-policy-engine.js";
 import type { ScopeAuthorizationGate } from "../tools/scope-authorization-gate.js";
 import { describeToolOperation } from "../tools/scope-authorization-gate.js";
@@ -2221,6 +2224,107 @@ export class MainController {
       total: allProfiles.length,
       page,
       pageSize,
+    };
+  }
+
+  /** 权限能力目录（只读；GUI 权限明细据此渲染）。 */
+  async listPermissionCapabilities(): Promise<
+    Array<{
+      capabilityId: string;
+      displayName: string;
+      description: string;
+      devolveDefault: PermissionDecision;
+      assistDefault: PermissionDecision;
+      applicableResources: string[];
+      riskSummary: string;
+      toolMappings: string[];
+    }>
+  > {
+    const capabilityCatalog = this.options.permissionCapabilityCatalog;
+    if (capabilityCatalog === null || capabilityCatalog === undefined) return [];
+    return capabilityCatalog.listCapabilities().map((capability) => ({
+      capabilityId: capability.capabilityId,
+      displayName: capability.displayName,
+      description: capability.description,
+      devolveDefault: capability.devolveDefault,
+      assistDefault: capability.assistDefault,
+      applicableResources: [...capability.applicableResources],
+      riskSummary: capability.riskSummary,
+      toolMappings: [...capability.toolMappings],
+    }));
+  }
+
+  /** 读取权限组可配置明细（内置组同样可读，只读）。 */
+  async readPermissionProfile(reference: PermissionProfileReference): Promise<{
+    permissionProfileId: string;
+    displayName: string;
+    isBuiltin: boolean;
+    revision: number;
+    catalogVersion: number;
+    capabilityDecisions: Record<string, PermissionDecision>;
+    fallbackDecision: PermissionDecision;
+  }> {
+    const profileStore = this.options.permissionProfileStore;
+    if (profileStore === null || profileStore === undefined) {
+      throw new DomainError("invalid-task-chain", "权限组存储未装配：无法读取权限明细。");
+    }
+    const document = await profileStore.readProfile(reference);
+    return {
+      permissionProfileId: document.permissionProfileId,
+      displayName: document.displayName,
+      isBuiltin: document.isBuiltin,
+      revision: document.revision,
+      catalogVersion: document.catalogVersion,
+      capabilityDecisions: { ...document.capabilityDecisions },
+      fallbackDecision: document.fallbackDecision,
+    };
+  }
+
+  /** 自定义组逐项三态更新（内置组拒绝：需先复制为自定义组）。 */
+  async updatePermissionCapabilityDecision(input: {
+    readonly permissionProfileId: string;
+    readonly capabilityId: string;
+    readonly decision: PermissionDecision;
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; revision: number }> {
+    const controller = this.createCustomPermissionProfileController();
+    const profile = await controller.updateCapabilityDecision(input);
+    return { permissionProfileId: profile.permissionProfileId, revision: profile.revision };
+  }
+
+  /** 重命名自定义组（不改 ID）。 */
+  async renamePermissionProfile(input: {
+    readonly permissionProfileId: string;
+    readonly newDisplayName: string;
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; displayName: string; revision: number }> {
+    const controller = this.createCustomPermissionProfileController();
+    const profile = await controller.renameProfile(input);
+    return {
+      permissionProfileId: profile.permissionProfileId,
+      displayName: profile.displayName,
+      revision: profile.revision,
+    };
+  }
+
+  /** 导出权限组（只含可配置字段，不含内部执行策略）。 */
+  async exportPermissionProfile(
+    reference: PermissionProfileReference,
+  ): Promise<{ exportedDocument: Record<string, unknown>; exportedAtIso: string }> {
+    const controller = this.createCustomPermissionProfileController();
+    return controller.exportProfile(reference);
+  }
+
+  /** 导入权限组（创建新自定义组；只接受目录内能力与合法三态）。 */
+  async importPermissionProfile(input: {
+    readonly exportedDocument: Record<string, unknown>;
+  }): Promise<{ permissionProfileId: string; displayName: string; revision: number }> {
+    const controller = this.createCustomPermissionProfileController();
+    const profile = await controller.importProfile(input);
+    return {
+      permissionProfileId: profile.permissionProfileId,
+      displayName: profile.displayName,
+      revision: profile.revision,
     };
   }
 

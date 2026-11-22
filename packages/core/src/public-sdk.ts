@@ -1748,6 +1748,12 @@ export type PublicApplicationService = Pick<
   | "createPermissionProfile"
   | "resetPermissionProfile"
   | "deletePermissionProfile"
+  | "listPermissionCapabilities"
+  | "readPermissionProfile"
+  | "updatePermissionCapabilityDecision"
+  | "renamePermissionProfile"
+  | "exportPermissionProfile"
+  | "importPermissionProfile"
 >;
 
 /** 公开 mission 状态（SDK/CLI 共用视图）。 */
@@ -3307,6 +3313,78 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }): Promise<{ permissionProfileId: string; deleted: true }> {
     this.assertOpen();
     return this.runtime.controller.deletePermissionProfile(input);
+  }
+  /** 权限能力目录（GUI 权限明细用）。 */
+  async listPermissionCapabilities(): Promise<
+    Array<{
+      capabilityId: string;
+      displayName: string;
+      description: string;
+      devolveDefault: "allow" | "ask" | "deny";
+      assistDefault: "allow" | "ask" | "deny";
+      applicableResources: string[];
+      riskSummary: string;
+      toolMappings: string[];
+    }>
+  > {
+    this.assertOpen();
+    return this.runtime.controller.listPermissionCapabilities();
+  }
+
+  /** 读取权限组明细（内置组只读）。 */
+  async readPermissionProfile(input:
+    | { readonly kind: "builtin"; readonly profileId: "ponder" | "assist" | "devolve" }
+    | { readonly kind: "custom"; readonly profileId: string }): Promise<{
+    permissionProfileId: string;
+    displayName: string;
+    isBuiltin: boolean;
+    revision: number;
+    catalogVersion: number;
+    capabilityDecisions: Record<string, "allow" | "ask" | "deny">;
+    fallbackDecision: "allow" | "ask" | "deny";
+  }> {
+    this.assertOpen();
+    return this.runtime.controller.readPermissionProfile(input);
+  }
+
+  /** 自定义组逐项更新（内置组拒绝）。 */
+  async updatePermissionCapabilityDecision(input: {
+    readonly permissionProfileId: string;
+    readonly capabilityId: string;
+    readonly decision: "allow" | "ask" | "deny";
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; revision: number }> {
+    this.assertOpen();
+    return this.runtime.controller.updatePermissionCapabilityDecision(input);
+  }
+
+  /** 重命名自定义组。 */
+  async renamePermissionProfile(input: {
+    readonly permissionProfileId: string;
+    readonly newDisplayName: string;
+    readonly expectedRevision: number;
+  }): Promise<{ permissionProfileId: string; displayName: string; revision: number }> {
+    this.assertOpen();
+    return this.runtime.controller.renamePermissionProfile(input);
+  }
+
+  /** 导出权限组可配置字段。 */
+  async exportPermissionProfile(input:
+    | { readonly kind: "builtin"; readonly profileId: "ponder" | "assist" | "devolve" }
+    | { readonly kind: "custom"; readonly profileId: string }): Promise<{
+    exportedDocument: Record<string, unknown>;
+    exportedAtIso: string;
+  }> {
+    this.assertOpen();
+    return this.runtime.controller.exportPermissionProfile(input);
+  }
+
+  /** 导入权限组（创建新自定义组）。 */
+  async importPermissionProfile(input: {
+    readonly exportedDocument: Record<string, unknown>;
+  }): Promise<{ permissionProfileId: string; displayName: string; revision: number }> {
+    this.assertOpen();
+    return this.runtime.controller.importPermissionProfile(input);
   }
   /**
    * UI-ALIGN-01：只读查询 mission 的权威任务序列投影（节点/依赖/就绪/revision）。
