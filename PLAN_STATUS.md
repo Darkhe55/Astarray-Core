@@ -7197,3 +7197,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   仍缺 TUI 视图/虚拟列表/搜索/锚点/滚动保持、人工体验、分段存储（设计决定）。
 > - AR07：Linux 平台证据已于 2026-11-08 取得（WSL2），macOS 仍缺；按"不填绿"原则仍不判通过。
 > - 本轮仅文档；门禁沿用上一轮。
+
+> **未完成清单对账更新（2026-11-22 第 33 轮）**
+>
+> - `UNFINISHED_CARDS_2026-11-22.md` 追加"对账更新"表，覆盖此前过期行：WIRING-04、SEC-02、SMART-01、
+>   PROJECT-01、ALIGN 系列、OBS-01、HISTORY-01、AR07、COMM-01、STARTUP_RECOVERY、MERGE-01、
+>   COORD-05、AUDIT-REPAIR-01、E2E-01 逐张给出"现状 + 真正剩余"。
+> - 共同结论：剩余缺口集中于人工体验/跨平台证据、产品决策、TUI/GUI 未建视图三类；不当作完成声明。
+> - 本轮仅文档；门禁沿用上一轮。

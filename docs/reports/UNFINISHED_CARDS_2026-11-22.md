@@ -66,3 +66,24 @@
 本窗口**未完成全部任务卡**，也不宣称完成。未闭合项以本文件 A/B/D 三组为准；
 其中 B 组（人工体验/平台证据）与 D 组（产品决策）**不是本仓单方面可闭合**的。
 下一窗口建议顺序：COORD-05 装配 → AUDIT-01 应用矩阵（先建 worker 工具可观测端口）→ WIRING-04-02/03。
+## 对账更新（2026-11-22，第 33 轮；**本表覆盖上方过期行**）
+
+| 卡 | 现状 | 真正剩余 |
+|---|---|---|
+| WIRING-04 | implemented-unverified | 01 revision/执行尝试核验（消息无字段，阻塞）；真实任务序列映射端到端 |
+| SEC-02 | in_progress | 通道 15 外发门禁无调用方；通道 9 OCR；MCP 四态扫描默认 record |
+| SMART-01 | in_progress | TUI/GUI 两入口；包级验收与真实运行证据（SDK+CLI 已接） |
+| PROJECT-01 | implemented-unverified | CLI 其余文件操作统一收口；跨平台证据 |
+| ALIGN-01/02/03/04 | implemented-unverified | 01-03/01-04/01-06 已收口（11-05/08）；02/03 已有 11-05/09 追加；仍缺自动触发点与人工验收 |
+| OBS-01 | implemented-unverified | 开关默认决策；Provider/Git/恢复外错误路径；跨平台测量 |
+| HISTORY-01 | implemented-unverified | TUI 视图/虚拟列表/搜索/锚点；人工体验；分段存储（设计决定） |
+| AR07 | in_progress | Linux 证据已取得（WSL2 11-08）；macOS 证据缺 ⇒ 不判通过 |
+| COMM-01 | 03 本地可证 done | GUI 入口；跨平台证据 |
+| STARTUP_RECOVERY | 已交付（11-06） | 后续以 11-10 归档记录为准 |
+| MERGE-01 | 01/02/03 done（本地口径） | 人工体验；Linux/macOS 证据 |
+| COORD-05 | implemented-unverified | 秘书通道（无权威激活状态，产品阻塞）；三路径端到端 |
+| AUDIT-REPAIR-01 | implemented-unverified | 03 生产接线；04「被替代」等价核查；01 取消语义（产品定义） |
+| E2E-01 | pending | 人工体验结论；Linux/macOS 证据 |
+
+**共同结论**：剩余缺口集中在三类——①人工体验/跨平台证据（本仓无法闭合）；②产品决策（秘书激活、外发通道、
+Agent 工具入口、缓存接线）；③TUI/GUI 尚未建立的视图。**不把对账更新当作完成声明。**
