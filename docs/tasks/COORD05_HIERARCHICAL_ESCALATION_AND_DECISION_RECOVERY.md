@@ -164,3 +164,18 @@ Worker 通过现有反馈信箱向直属上级请示。上级在管理范围内�
 该用例暴露并修正了"无回调时终态返回 updated"的缺陷。
 
 未做：真实任务链/秘书/用户通道装配与整卡三条路径端到端。
+## 进展（2026-11-22，05-05 任务链接线）
+
+新增 `task-chain-decision-ports.ts`：把真实 `TaskStore` 接到 `DecisionWritebackPorts`。
+
+- **文档 revision** = 任务链 revision；写回时校验期望 revision，不一致拒绝（不覆盖并发更新）。
+- **写回** = 在任务链文档内**追加** `decisionApplicationEvidence`（同一次原子提交）；
+  同一 `decisionIdentifier` 幂等（重复写回返回当前 revision、不重复追加）。schema 已登记该字段（zod 不剥离）。
+- **状态映射**：显式依赖决定（`dependsOnDecisionIdentifiers`）且未完成的节点映射为
+  `waiting-on-decision`；其他节点按真实状态；mission 状态可由装配层覆盖（任务链本身不记录取消）。
+- **推进** 仍由调度器回调完成（`advanceStep`），适配器不直接改任务状态。
+
+反例 6 条（`coord05-task-chain-ports.test.ts`：状态映射、幂等写回、revision 冲突、推进委托、
+mission 不存在、与 05-05 写回串联）；变异承重：关闭等待映射 ⇒ ①/⑥ 红。
+
+未做：调度器 `advanceStep` 的真实实现、秘书/用户通道装配、整卡三条路径端到端。

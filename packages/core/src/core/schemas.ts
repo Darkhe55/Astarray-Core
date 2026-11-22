@@ -145,6 +145,8 @@ export const taskDependencyNodeSchema = z.object({
   sourceSequenceTaskIdentifier: z.string().min(1).optional(),
   sourceSequenceIdentifier: z.string().min(1).optional(),
   sourceSequenceOwnerAgentInstanceIdentifier: z.string().min(1).optional(),
+  /** COORD-05 05-05：本节点显式依赖的决定（必须登记，否则读链时被 zod 丢弃）。 */
+  dependsOnDecisionIdentifiers: z.array(z.string().min(1)).optional(),
 });
 
 export const taskChainSchema = z.object({
@@ -164,6 +166,19 @@ export const taskChainSchema = z.object({
         messageIdentifier: z.string().min(1),
         appliedAtIso: z.iso.datetime(),
         resultingTaskStatus: z.enum(["done", "failed"]),
+      }),
+    )
+    .optional(),
+  /** COORD-05 05-05：决定写回证据（同一决定只追加一次）。 */
+  decisionApplicationEvidence: z
+    .array(
+      z.object({
+        decisionIdentifier: z.string().min(1),
+        escalationRequestIdentifier: z.string().min(1),
+        source: z.enum(["agent", "user"]),
+        summary: z.string().min(1),
+        affectedStepIdentifiers: z.array(z.string().min(1)),
+        appliedAtIso: z.iso.datetime(),
       }),
     )
     .optional(),

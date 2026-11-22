@@ -8614,6 +8614,10 @@ export {
   type DecisionWritebackRecord,
 } from "./orchestration/decision-writeback.js";
 export {
+  createTaskChainDecisionPorts,
+  type TaskChainDecisionPortsInput,
+} from "./orchestration/task-chain-decision-ports.js";
+export {
   buildResponsibilityRecord,
   describeResponsibilityInstructions,
   type ResponsibilityRecord,

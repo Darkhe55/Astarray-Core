@@ -6983,3 +6983,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**883 files（878 passed / 3 failed / 2 skipped），5664 tests（5654 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：真实任务链/秘书/用户通道装配与整卡三条路径端到端。
+
+> **COORD-05 05-05 任务链接线（2026-11-22）**
+>
+> - `task-chain-decision-ports.ts`：任务链 revision 作为文档版本（期望不一致拒绝）；写回追加
+>   `decisionApplicationEvidence`（同一次原子提交、按决定 ID 幂等）；显式依赖决定的未完成节点映射
+>   `waiting-on-decision`；推进委托调度器回调。任务链 schema 已登记新字段（dependsOnDecisionIdentifiers /
+>   decisionApplicationEvidence）。
+> - 反例 6 条（含与 05-05 写回串联）；变异承重：关闭等待映射 ⇒ ①/⑥ 红。
+> - 本机全量：**884 files（879 passed / 3 failed / 2 skipped），5670 tests（5660 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：调度器 advanceStep 真实实现、秘书/用户通道装配、整卡三条路径端到端。

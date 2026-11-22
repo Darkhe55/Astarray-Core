@@ -362,6 +362,13 @@ export interface TaskDependencyNode {
    * 缺失即视为来源不可考（不得按名称或最近任务猜）。
    */
   sourceSequenceTaskIdentifier?: string;
+  /**
+   * COORD-05 05-05（2026-11-22）：**本节点显式依赖的决定**。
+   *
+   * 只有列在这里（或命中写回记录 affected 步骤）的节点在该决定写回前等待；
+   * 旧文档没有该字段 ⇒ 视为不依赖任何决定。
+   */
+  dependsOnDecisionIdentifiers?: ReadonlyArray<string>;
   sourceSequenceIdentifier?: string;
   sourceSequenceOwnerAgentInstanceIdentifier?: string;
 }
@@ -381,6 +388,20 @@ export interface TaskChainDocument {
     readonly messageIdentifier: string;
     readonly appliedAtIso: string;
     readonly resultingTaskStatus: "done" | "failed";
+  }>;
+  /**
+   * COORD-05 05-05（2026-11-22）：**决定写回证据**。
+   *
+   * 与任务状态写在同一个文档、同一次原子提交；`decisionIdentifier` 幂等
+   * （同一决定只追加一次），并记录来源、影响步骤与写回时间。
+   */
+  decisionApplicationEvidence?: ReadonlyArray<{
+    readonly decisionIdentifier: string;
+    readonly escalationRequestIdentifier: string;
+    readonly source: "agent" | "user";
+    readonly summary: string;
+    readonly affectedStepIdentifiers: ReadonlyArray<string>;
+    readonly appliedAtIso: string;
   }>;
   schemaVersion: number;
   missionId: string;
