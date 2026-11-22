@@ -2268,6 +2268,115 @@ export class MainController {
     });
   }
 
+  /** AUTH-UI-01：真实工具权限概览（工具 → 能力 → 当前基线）。 */
+  async listPermissionToolOverview(): Promise<
+    Array<{
+      toolName: string;
+      isActionOnly: boolean;
+      capabilityIds: string[];
+      actions: Array<{ action: string; capabilityIds: string[] }>;
+      baselineDecision: PermissionDecision | null;
+      baselineSource: "profile-capabilities" | "unknown";
+    }>
+  > {
+    const capabilityCatalog = this.options.permissionCapabilityCatalog;
+    if (capabilityCatalog === null || capabilityCatalog === undefined) return [];
+    const profile = await this.readCurrentPermissionProfileOrNull();
+    const strictest = (capabilityIds: string[]): PermissionDecision | null => {
+      if (profile === null || capabilityIds.length === 0) return null;
+      let decision: PermissionDecision = "allow";
+      for (const capabilityId of capabilityIds) {
+        const current = profile.capabilityDecisions[capabilityId] ?? profile.fallbackDecision;
+        if (current === "deny") return "deny";
+        if (current === "ask") decision = "ask";
+      }
+      return decision;
+    };
+    const wholeTools = capabilityCatalog.listToolMappings();
+    const actionMappings = capabilityCatalog.listToolActionMappings();
+    const toolNames = new Set<string>([
+      ...wholeTools.map((entry) => entry.toolName),
+      ...actionMappings.map((entry) => entry.toolName),
+    ]);
+    return [...toolNames].sort().map((toolName) => {
+      const whole = wholeTools.find((entry) => entry.toolName === toolName);
+      const actionEntry = actionMappings.find((entry) => entry.toolName === toolName);
+      const capabilityIds = whole?.capabilityIds ?? [];
+      const actions = actionEntry === undefined
+        ? []
+        : Object.entries(actionEntry.actions).map(([action, ids]) => ({
+            action,
+            capabilityIds: [...ids],
+          }));
+      return {
+        toolName,
+        isActionOnly: capabilityIds.length === 0 && actions.length > 0,
+        capabilityIds: [...capabilityIds],
+        actions,
+        baselineDecision: strictest(capabilityIds),
+        baselineSource: profile === null ? ("unknown" as const) : ("profile-capabilities" as const),
+      };
+    });
+  }
+
+  /** AUTH-UI-01：预览某次工具调用的授权结论（无副作用）。 */
+  async previewToolPermission(input: {
+    readonly toolName: string;
+    readonly action: string;
+  }): Promise<{
+    status: "ok" | "unknown-tool";
+    baselineDecision: PermissionDecision | null;
+    capabilityIds: string[];
+  }> {
+    const overview = await this.listPermissionToolOverview();
+    const tool = overview.find((entry) => entry.toolName === input.toolName);
+    if (tool === undefined) {
+      return { status: "unknown-tool", baselineDecision: null, capabilityIds: [] };
+    }
+    const actionMatched = tool.actions.find((entry) => entry.action === input.action);
+    if (actionMatched !== undefined) {
+      return {
+        status: "ok",
+        baselineDecision: await this.computeCapabilityBaseline(actionMatched.capabilityIds),
+        capabilityIds: [...actionMatched.capabilityIds],
+      };
+    }
+    return {
+      status: "ok",
+      baselineDecision: tool.baselineDecision,
+      capabilityIds: [...tool.capabilityIds],
+    };
+  }
+
+  private async readCurrentPermissionProfileOrNull(): Promise<{
+    capabilityDecisions: Record<string, PermissionDecision>;
+    fallbackDecision: PermissionDecision;
+  } | null> {
+    const profileStore = this.options.permissionProfileStore;
+    if (profileStore === null || profileStore === undefined) return null;
+    const reference = await this.getCurrentPermissionProfileReference();
+    if (reference === null) return null;
+    const document = await profileStore.readProfile(reference);
+    return {
+      capabilityDecisions: document.capabilityDecisions,
+      fallbackDecision: document.fallbackDecision,
+    };
+  }
+
+  private async computeCapabilityBaseline(
+    capabilityIds: string[],
+  ): Promise<PermissionDecision | null> {
+    const profile = await this.readCurrentPermissionProfileOrNull();
+    if (profile === null || capabilityIds.length === 0) return null;
+    let decision: PermissionDecision = "allow";
+    for (const capabilityId of capabilityIds) {
+      const current = profile.capabilityDecisions[capabilityId] ?? profile.fallbackDecision;
+      if (current === "deny") return "deny";
+      if (current === "ask") decision = "ask";
+    }
+    return decision;
+  }
+
   /** 读取权限组可配置明细（内置组同样可读，只读）。 */
   async readPermissionProfile(reference: PermissionProfileReference): Promise<{
     permissionProfileId: string;

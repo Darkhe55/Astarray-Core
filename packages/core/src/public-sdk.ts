@@ -238,6 +238,7 @@ export {
   type ParameterAuthorizationSettings,
   type ParameterRuleMatch,
 } from "./tools/parameter-authorization.js";
+import { evaluateParameterAuthorization } from "./tools/parameter-authorization.js";
 import {
   ParameterAuthorizationSettingsStore,
   evaluateParameterAuthorizationSettingChange,
@@ -1754,6 +1755,8 @@ export type PublicApplicationService = Pick<
   | "renamePermissionProfile"
   | "exportPermissionProfile"
   | "importPermissionProfile"
+  | "listPermissionToolOverview"
+  | "previewToolPermission"
 >;
 
 /** 公开 mission 状态（SDK/CLI 共用视图）。 */
@@ -4343,6 +4346,155 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       }
       throw error;
     }
+  }
+
+  /** 与主控制器同名的门面转发（PublicApplicationService 形状要求）。 */
+  async listPermissionToolOverview() {
+    this.assertOpen();
+    return this.runtime.controller.listPermissionToolOverview();
+  }
+
+  /** 与主控制器同名的门面转发（PublicApplicationService 形状要求）。 */
+  async previewToolPermission(input: {
+    readonly toolName: string;
+    readonly action: string;
+  }) {
+    this.assertOpen();
+    return this.runtime.controller.previewToolPermission(input);
+  }
+
+  /** AUTH-UI-01：真实工具权限概览（工具/action/当前基线）。 */
+  async queryPermissionToolOverview(): Promise<
+    Array<{
+      toolName: string;
+      isActionOnly: boolean;
+      capabilityIds: string[];
+      actions: Array<{ action: string; capabilityIds: string[] }>;
+      baselineDecision: "allow" | "ask" | "deny" | null;
+      baselineSource: "profile-capabilities" | "unknown";
+    }>
+  > {
+    this.assertOpen();
+    return this.runtime.controller.listPermissionToolOverview();
+  }
+
+  /**
+   * AUTH-UI-01：无副作用判定预览。
+   * 只读当前 profile / 参数授权设置 / 规则，不改任何状态、不调用模型。
+   */
+  async previewParameterAuthorization(input: {
+    readonly toolName: string;
+    readonly action: string;
+    readonly argumentsJson: string;
+  }): Promise<{
+    status: "ok" | "unknown-tool" | "invalid-arguments" | "preview-unavailable";
+    decision: "allow" | "ask" | "deny" | null;
+    source: "tool-baseline" | "parameter-rule" | null;
+    appliedRuleExplanation: string | null;
+    isRuleEvaluationSkipped: boolean;
+    baselineDecision: "allow" | "ask" | "deny" | null;
+    capabilityIds: string[];
+    configurationRevision: number;
+    message: string | null;
+  }> {
+    this.assertOpen();
+    let parsedArguments: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(input.argumentsJson || "{}") as unknown;
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {
+          status: "invalid-arguments",
+          decision: null,
+          source: null,
+          appliedRuleExplanation: null,
+          isRuleEvaluationSkipped: false,
+          baselineDecision: null,
+          capabilityIds: [],
+          configurationRevision: 0,
+          message: "参数必须是 JSON 对象。",
+        };
+      }
+      parsedArguments = parsed as Record<string, unknown>;
+    } catch {
+      return {
+        status: "invalid-arguments",
+        decision: null,
+        source: null,
+        appliedRuleExplanation: null,
+        isRuleEvaluationSkipped: false,
+        baselineDecision: null,
+        capabilityIds: [],
+        configurationRevision: 0,
+        message: "参数不是合法 JSON。",
+      };
+    }
+    const baseline = await this.runtime.controller.previewToolPermission({
+      toolName: input.toolName,
+      action: input.action,
+    });
+    if (baseline.status === "unknown-tool") {
+      return {
+        status: "unknown-tool",
+        decision: null,
+        source: null,
+        appliedRuleExplanation: null,
+        isRuleEvaluationSkipped: false,
+        baselineDecision: null,
+        capabilityIds: [],
+        configurationRevision: 0,
+        message: "未知工具：" + input.toolName,
+      };
+    }
+    if (baseline.baselineDecision === null) {
+      return {
+        status: "preview-unavailable",
+        decision: null,
+        source: null,
+        appliedRuleExplanation: null,
+        isRuleEvaluationSkipped: false,
+        baselineDecision: null,
+        capabilityIds: baseline.capabilityIds,
+        configurationRevision: 0,
+        message: "当前权限组不可读，无法预览。",
+      };
+    }
+    const store = this.createParameterAuthorizationSettingsStore();
+    const document = await store.readSettings();
+    if (document.settings.isParameterAuthorizationEnabled !== true) {
+      return {
+        status: "ok",
+        decision: baseline.baselineDecision,
+        source: "tool-baseline",
+        appliedRuleExplanation: null,
+        isRuleEvaluationSkipped: true,
+        baselineDecision: baseline.baselineDecision,
+        capabilityIds: baseline.capabilityIds,
+        configurationRevision: document.configurationRevision ?? 0,
+        message: "参数授权总开关关闭：只按工具基线判定。",
+      };
+    }
+    const outcome = evaluateParameterAuthorization({
+      toolName: input.toolName,
+      action: input.action,
+      argumentsJson: JSON.stringify(parsedArguments),
+      baselineDecision: baseline.baselineDecision,
+      settings: {
+        isParameterAuthorizationEnabled: true,
+        isParameterRulesEnabled: document.settings.isParameterRulesEnabled,
+      },
+      rules: document.rules,
+    });
+    return {
+      status: "ok",
+      decision: outcome.decision,
+      source: outcome.source,
+      appliedRuleExplanation: outcome.appliedRuleExplanation,
+      isRuleEvaluationSkipped: outcome.isRuleEvaluationSkipped,
+      baselineDecision: baseline.baselineDecision,
+      capabilityIds: baseline.capabilityIds,
+      configurationRevision: document.configurationRevision ?? 0,
+      message: null,
+    };
   }
 
   // ─── MERGE-01 §1.3 第 4 项：参数授权**设置入口**（SDK 侧） ───
