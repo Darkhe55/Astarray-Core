@@ -360,6 +360,25 @@ export const feedbackMessageSchema = z
      * 空串不是有效章 ⇒ 校验失败（fail-closed），缺省才是"未盖章"。
      */
     authorizationIdentifier: z.string().min(1).optional(),
+    /**
+     * COORD-05 05-02（2026-11-22）：逐级请示信封字段。
+     *
+     * 必须登记进 schema：zod 默认丢弃未登记字段，否则经反馈进程校验后
+     * 原请求标识/原发起者/影响步骤/文档引用全部静默丢失，处置链无法幂等或追溯。
+     * 空串不是有效标识 ⇒ 校验失败；缺省才是"未提供"。
+     */
+    escalationRequestIdentifier: z.string().min(1).optional(),
+    originalInitiatorAgentInstanceId: z.string().min(1).optional(),
+    affectedStepIdentifiers: z.array(z.string().min(1)).nonempty().optional(),
+    documentReferences: z
+      .array(
+        z.object({
+          documentIdentifier: z.string().min(1),
+          revision: z.number().int().nonnegative(),
+        }),
+      )
+      .nonempty()
+      .optional(),
     payload: feedbackMessagePayloadSchema,
   })
   .superRefine((message, context) => {

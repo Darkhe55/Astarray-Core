@@ -137,6 +137,110 @@ export async function resolveEscalationTarget(input: {
   return { kind: "agent", agentInstanceId: directSuperior, chain: resolution.chain };
 }
 
+export interface OpenEscalationInput {
+  readonly requestIdentifier: string;
+  readonly senderAgentInstanceId: string;
+  /** 原始发起者；缺省 = 发送者（中间层转交不得改写）。 */
+  readonly originalInitiatorAgentInstanceId?: string;
+  readonly projectIdentifier: string;
+  readonly missionIdentifier: string;
+  readonly taskIdentifier: string;
+  readonly affectedStepIdentifiers: ReadonlyArray<string>;
+  readonly questionSummary: string;
+  readonly documentReferences: ReadonlyArray<EscalationDocumentReference>;
+  readonly proposedRecipientAgentInstanceId?: string | null;
+  readonly nowIso: string;
+}
+
+export type OpenEscalationOutcome =
+  | {
+      readonly kind: "opened";
+      readonly record: EscalationRecord;
+      readonly target:
+        | { readonly kind: "agent"; readonly agentInstanceId: string }
+        | { readonly kind: "user" };
+    }
+  | {
+      readonly kind: "refused";
+      readonly code: EscalationRoutingRefusalCode | "invalid-input";
+      readonly reason: string;
+    };
+
+/**
+ * 打开一条逐级请示：先按真实管理树解析唯一直属上级，再生成可持久化的处置记录。
+ *
+ * 到主层仍不能决断 ⇒ `currentHandlerAgentInstanceId = null`（用户裁决通道）。
+ * 本函数不做 I/O 持久化；调用方负责在写入成功后开始投递。
+ */
+export async function openEscalation(
+  input: OpenEscalationInput,
+  deps: {
+    readonly resolveCreatorOf: (agentInstanceId: string) => Promise<string | null>;
+    readonly isAgentKnown: (agentInstanceId: string) => Promise<boolean>;
+  },
+): Promise<OpenEscalationOutcome> {
+  const requestIdentifier = input.requestIdentifier.trim();
+  if (requestIdentifier === "") {
+    return { kind: "refused", code: "invalid-input", reason: "原请求标识不能为空。" };
+  }
+  for (const value of [
+    input.projectIdentifier,
+    input.missionIdentifier,
+    input.taskIdentifier,
+    input.questionSummary,
+  ]) {
+    if (typeof value !== "string" || value.trim() === "") {
+      return { kind: "refused", code: "invalid-input", reason: "项目/任务/问题摘要不能为空。" };
+    }
+  }
+  for (const stepIdentifier of input.affectedStepIdentifiers) {
+    if (stepIdentifier.trim() === "") {
+      return { kind: "refused", code: "invalid-input", reason: "受影响步骤标识不能为空字符串。" };
+    }
+  }
+  for (const reference of input.documentReferences) {
+    if (reference.documentIdentifier.trim() === "" || !Number.isInteger(reference.revision) || reference.revision < 0) {
+      return {
+        kind: "refused",
+        code: "invalid-input",
+        reason: "文档引用必须带非空标识与非负整数 revision。",
+      };
+    }
+  }
+
+  const resolution = await resolveEscalationTarget({
+    senderAgentInstanceId: input.senderAgentInstanceId,
+    ...(input.proposedRecipientAgentInstanceId === undefined
+      ? {}
+      : { proposedRecipientAgentInstanceId: input.proposedRecipientAgentInstanceId }),
+    resolveCreatorOf: deps.resolveCreatorOf,
+    isAgentKnown: deps.isAgentKnown,
+  });
+  if (resolution.kind === "refused") {
+    return resolution;
+  }
+  const target =
+    resolution.kind === "agent"
+      ? ({ kind: "agent", agentInstanceId: resolution.agentInstanceId } as const)
+      : ({ kind: "user" } as const);
+  const record: EscalationRecord = {
+    requestIdentifier,
+    originalInitiatorAgentInstanceId:
+      input.originalInitiatorAgentInstanceId?.trim() || input.senderAgentInstanceId.trim(),
+    projectIdentifier: input.projectIdentifier,
+    missionIdentifier: input.missionIdentifier,
+    taskIdentifier: input.taskIdentifier,
+    affectedStepIdentifiers: [...input.affectedStepIdentifiers],
+    questionSummary: input.questionSummary,
+    documentReferences: [...input.documentReferences],
+    currentHandlerAgentInstanceId: target.kind === "agent" ? target.agentInstanceId : null,
+    version: 1,
+    state: "open",
+    dispositions: [],
+  };
+  return { kind: "opened", record, target };
+}
+
 export type EscalationAdvanceOutcome =
   | { readonly kind: "updated"; readonly record: EscalationRecord }
   | {

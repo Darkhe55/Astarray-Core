@@ -576,6 +576,17 @@ export interface FeedbackMessage {
    * 不得据此放行。传输层（反馈映射 / 发件箱 / 信封 schema）必须原样传递，不得改写或补默认值。
    */
   authorizationIdentifier?: string;
+  /**
+   * COORD-05 05-02（2026-11-22）：**逐级请示信封字段**。
+   *
+   * 逐级上报必须能让收件人识别"同一个原请求"（幂等）、"谁发起的"（不得被中间层改写）、
+   * "哪些步骤受影响"以及"引用了哪些文档与版本"。全部可选以兼容旧消息；
+   * 生产者按可用信息填写，消费侧缺失时如实记 not-provided，不猜。
+   */
+  escalationRequestIdentifier?: string;
+  originalInitiatorAgentInstanceId?: string;
+  affectedStepIdentifiers?: string[];
+  documentReferences?: Array<{ documentIdentifier: string; revision: number }>;
   payload: FeedbackMessagePayload;
 }
 

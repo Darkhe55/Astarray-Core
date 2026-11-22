@@ -6906,3 +6906,16 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**877 files（872 passed / 3 failed / 2 skipped），5626 tests（5616 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：反馈信封字段接线、控制面服务装配与多层端到端、05-01/04/05/06。
+
+> **COORD-05 05-02 接线：请示信封字段 + openEscalation（2026-11-22）**
+>
+> - `FeedbackMessage` / `feedbackMessageSchema` 登记可选请示字段（原请求 ID、原发起者、受影响步骤、
+>   文档引用+revision）；zod 不登记会静默剥离，空/负值一律拒绝（反例 ⑫/⑬）。
+> - `openEscalation`：真实管理树解析直属上级并生成处置记录；主层无法决断 ⇒ 用户通道；
+>   原发起者缺省为发送者且中间层不得改写（反例 ⑨–⑪）。
+> - 变异承重：暂存 schema 后 ⑫/⑬ 红。
+> - 本机全量：**877 files（872 passed / 3 failed / 2 skipped），5631 tests（5621 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：处置记录持久化存储、控制面服务装配与多层端到端；05-01/04/05/06。
+
+> **推送状态（2026-11-22 第 5 轮）**：40c3d65e 3 次推送均失败（网络中断/连接重置）；按纪律留待下次合并推送。

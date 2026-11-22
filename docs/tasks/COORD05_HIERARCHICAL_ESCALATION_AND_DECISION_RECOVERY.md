@@ -64,3 +64,17 @@ Worker 通过现有反馈信箱向直属上级请示。上级在管理范围内�
 
 未做（本卡其余）：反馈信封字段接线（稳定请求 ID/原发起者/文档引用进入真实反馈消息）、
 控制面服务装配与端到端多层上报、05-01/04/05/06。
+## 进展（2026-11-22，05-02 接线：请示信封字段 + 打开请示）
+
+- **反馈信封登记**：`FeedbackMessage` 与 `feedbackMessageSchema` 新增可选
+  `escalationRequestIdentifier` / `originalInitiatorAgentInstanceId` / `affectedStepIdentifiers` /
+  `documentReferences[{documentIdentifier, revision}]`。zod 默认剥离未登记字段 ⇒
+  不登记就会在反馈进程校验后静默丢失；空标识/空数组/负 revision 一律拒绝。
+- **openEscalation**：校验请求标识、项目/任务/问题摘要、步骤与文档引用后，
+  按真实管理树解析唯一直属上级并生成处置记录（`currentHandlerAgentInstanceId`；
+  主层无法决断 ⇒ null = 用户通道），`originalInitiator` 缺省为发送者且不得被中间层改写。
+
+反例：⑨ worker ⇒ 直属上级且字段保留；⑩ 主层 ⇒ 用户通道；⑪ 未登记/空标识拒绝；
+⑫ 信封字段 schema 往返不丢；⑬ 空/负值拒绝。变异承重：暂存 schema 后 ⑫/⑬ 红。
+
+未做：处置记录持久化存储与控制面服务装配、多层端到端投递；05-01/04/05/06。
