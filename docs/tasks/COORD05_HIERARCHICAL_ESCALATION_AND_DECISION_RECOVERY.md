@@ -205,3 +205,17 @@ mission 不存在、与 05-05 写回串联）；变异承重：关闭等待映�
 全量门禁：见各轮 PLAN_STATUS 记录；最近一次 886 files / 5682 tests，仅 3 条已复现本机环境失败。
 
 **整卡验收未完成**：三条路径（本级解决/用户直达/秘书呈交）的运行时端到端、重启/通道切换/取消/损坏存储组合。
+## 进展（2026-11-22，用户答复 → 写回 → 任务链接线）
+
+新增 `decision-application.ts`：`applyUserDecision` 把 05-04 与 05-05 接成产品路径——
+
+1. `markAnswered` 校验原项目/原请求与"已呈交"前置（不匹配/未呈交拒绝）；
+2. 以**同一决定 ID** 登记写回记录（重复答复不生成第二条）；
+3. `applyDecisionWriteback` + 真实 `TaskStore`：追加 `decisionApplicationEvidence`，
+   只推进显式依赖该决定的等待步骤；
+4. mission 已取消 ⇒ 拒绝且不写回不推进；任务链不可读 ⇒ `writeback-deferred`（可重试，不谎报成功）。
+
+反例 6 条（`coord05-decision-application.test.ts`）：happy path、重复答复幂等、项目不匹配、未呈交、
+mission 取消、任务链缺失。变异承重：关闭取消守卫 ⇒ ⑤ 红。
+
+未做：秘书/用户通道与编排器自动调用 `markDecisionApplied` 的运行时装配；三路径端到端。

@@ -8618,6 +8618,12 @@ export {
   type TaskChainDecisionPortsInput,
 } from "./orchestration/task-chain-decision-ports.js";
 export {
+  applyUserDecision,
+  type ApplyUserDecisionInput,
+  type ApplyUserDecisionOutcome,
+  type DecisionApplicationDeps,
+} from "./orchestration/decision-application.js";
+export {
   buildResponsibilityRecord,
   describeResponsibilityInstructions,
   type ResponsibilityRecord,

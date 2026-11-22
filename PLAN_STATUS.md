@@ -7073,3 +7073,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - mission 任务状态无 `cancelled`（仅 pending/running/blocked/done/failed）；`cancelled` 属个体任务序列节点，
 >   序列层取消节点不会被映射为待派发任务 ⇒ "取消 ⇒ 不写提案"由派发层保证，worker 工具端口无取消入参可测。
 > - 端口级取消证据需要产品先明确 mission 层"取消"语义；已在该卡记录，不作为代码缺口谎报。
+
+> **COORD-05 用户答复→写回→任务链接线（2026-11-22）**
+>
+> - `decision-application.ts`（`applyUserDecision`）：答复校验（项目/原请求/已呈交）→ 同一决定 ID 登记
+>   写回记录 → 真实 `TaskStore` 追加 `decisionApplicationEvidence` → 只推进依赖步骤；mission 取消拒绝且不写；
+>   任务链不可读 ⇒ `writeback-deferred`（可重试，不谎报成功）。
+> - 附带修复：`applyDecisionWriteback` 读取文档 revision 失败时返回 deferred（此前抛异常逃逸）。
+> - 反例 6 条；变异承重：关闭取消守卫 ⇒ ⑤ 红。
+> - 本机全量：**889 files（884 passed / 3 failed / 2 skipped），5702 tests（5692 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：秘书/用户通道与编排器自动 `markDecisionApplied` 的运行时装配；三路径端到端。

@@ -222,7 +222,17 @@ export async function applyDecisionWriteback(
   /** 1. 写回（若尚未写回）。 */
   let record = existing;
   if (record.status === "answered") {
-    const currentRevision = await deps.ports.readDocumentRevision();
+    let currentRevision: number;
+    try {
+      currentRevision = await deps.ports.readDocumentRevision();
+    } catch (error) {
+      /** 文档暂不可读（如任务链缺失）⇒ 保持 answered，返回 deferred 供重试。 */
+      return {
+        kind: "deferred",
+        record,
+        reason: "读取文档 revision 失败：" + (error instanceof Error ? error.message : String(error)),
+      };
+    }
     if (
       record.documentRevision !== null &&
       currentRevision < record.documentRevision
