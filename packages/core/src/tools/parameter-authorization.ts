@@ -90,7 +90,8 @@ function doesRuleMatch(input: {
   if (rule.toolName === "" || rule.toolName !== toolName) {
     return false;
   }
-  if (rule.action === "" || rule.action !== action) {
+  // AUTH-CORE-01 第 3 项：空 action ⇒ 整工具规则（该工具的所有 action 都匹配）。
+  if (rule.action !== "" && rule.action !== action) {
     return false;
   }
   if (rule.match === undefined) {

@@ -211,8 +211,9 @@ export function validateSettingsDocument(
     if (typeof ruleRecord["toolName"] !== "string" || ruleRecord["toolName"] === "") {
       return { isValid: false, reason: "规则缺少 toolName: " + ruleIdentifier };
     }
-    if (typeof ruleRecord["action"] !== "string" || ruleRecord["action"] === "") {
-      return { isValid: false, reason: "规则缺少 action: " + ruleIdentifier };
+    // AUTH-CORE-01 第 3 项：action 允许为空 ⇒ 整工具规则（无 action 的工具必须有这个入口）。
+    if (typeof ruleRecord["action"] !== "string") {
+      return { isValid: false, reason: "规则 action 非法: " + ruleIdentifier };
     }
     if (
       ruleRecord["decision"] !== "deny" &&
@@ -224,17 +225,24 @@ export function validateSettingsDocument(
         reason: "规则 decision 必须是 deny/ask/allow: " + ruleIdentifier,
       };
     }
+    /**
+     * AUTH-CORE-01 第 3 项：**允许无 match 的整 action 规则**。
+     * match 缺省 ⇒ 该 action 一律匹配（判定器已支持，见 doesRuleMatch）；
+     * 显式给出 match 时仍做种类校验，禁止正则/脚本等可执行匹配。
+     */
     const match = ruleRecord["match"];
-    if (match === null || typeof match !== "object") {
-      return { isValid: false, reason: "规则缺少 match: " + ruleIdentifier };
-    }
-    const matchKind = (match as Record<string, unknown>)["kind"];
-    if (!KNOWN_MATCH_KINDS.includes(matchKind as (typeof KNOWN_MATCH_KINDS)[number])) {
-      return {
-        isValid: false,
-        reason:
-          "规则的匹配种类未知（不得使用正则等可执行匹配）: " + String(matchKind),
-      };
+    if (match !== undefined) {
+      if (match === null || typeof match !== "object") {
+        return { isValid: false, reason: "规则 match 非法: " + ruleIdentifier };
+      }
+      const matchKind = (match as Record<string, unknown>)["kind"];
+      if (!KNOWN_MATCH_KINDS.includes(matchKind as (typeof KNOWN_MATCH_KINDS)[number])) {
+        return {
+          isValid: false,
+          reason:
+            "规则的匹配种类未知（不得使用正则等可执行匹配）: " + String(matchKind),
+        };
+      }
     }
     /**
      * 综合校验：把规则交给判定器实测。这样"设置里存了判定器不认识的东西"
@@ -265,11 +273,14 @@ export function validateSettingsDocument(
      * 判定器会如常返回（`isRuleEvaluationSkipped=false`），于是这条**永远不生效**的规则
      * 会被静默保存 —— 用户以为配了策略，实际什么都没发生。故显式拒绝。
      */
-    const knownAction = resolveToolAction({
-      toolNameOrAlias: ruleRecord["toolName"] as string,
-      action: ruleRecord["action"] as string,
-    });
-    if (knownAction === null) {
+    const declaredAction = ruleRecord["action"] as string;
+    const knownAction = declaredAction === ""
+      ? null
+      : resolveToolAction({
+          toolNameOrAlias: ruleRecord["toolName"] as string,
+          action: declaredAction,
+        });
+    if (declaredAction !== "" && knownAction === null) {
       return {
         isValid: false,
         reason:
