@@ -214,12 +214,16 @@ export class EscalationWorkflow {
         reason: "并发写入：请求版本已变化，结论未持久化。",
       };
     }
-    if (persisted.state === "needs-user" && this.deps.onSubmitToUser !== undefined) {
-      await this.deps.onSubmitToUser(persisted);
+    if (persisted.state === "needs-user") {
+      if (this.deps.onSubmitToUser !== undefined) {
+        await this.deps.onSubmitToUser(persisted);
+      }
       return { kind: "submitted-to-user", record: persisted };
     }
-    if (persisted.state === "resolved-by-agent" && this.deps.onResolved !== undefined) {
-      await this.deps.onResolved(persisted);
+    if (persisted.state === "resolved-by-agent") {
+      if (this.deps.onResolved !== undefined) {
+        await this.deps.onResolved(persisted);
+      }
       return { kind: "resolved", record: persisted };
     }
     return { kind: "updated", record: persisted };

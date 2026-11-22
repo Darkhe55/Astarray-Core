@@ -11,6 +11,13 @@ import { promises as fs } from "node:fs";
 import { AgentCreationRegistry } from "./orchestration/agent-parent-binding-store.js";
 import type { AgentRole } from "./core/types.js";
 import { CollaborationInboxStore } from "./orchestration/collaboration-inbox-store.js";
+import {
+  EscalationRequestStore,
+  EscalationWorkflow,
+  type EscalationHandleOutcome,
+  type EscalationOpenOutcome,
+} from "./orchestration/escalation-workflow.js";
+import type { EscalationRecord } from "./orchestration/escalation-contract.js";
 import { CollaborationOutboxTransport } from "./orchestration/collaboration-outbox-transport.js";
 import {
   sendCollaborationRequest,
@@ -7557,6 +7564,114 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   /**
+   * COORD-05（2026-11-22）：**打开逐级请示**（门面入口，非模型工具）。
+   *
+   * 发送者身份/管理树由运行时登记推导；同 requestIdentifier 幂等。
+   */
+  async openEscalation(input: {
+    readonly requestIdentifier: string;
+    readonly senderAgentInstanceIdentifier: string;
+    readonly originalInitiatorAgentInstanceIdentifier?: string | null;
+    readonly projectIdentifier: string;
+    readonly missionIdentifier: string;
+    readonly taskIdentifier: string;
+    readonly affectedStepIdentifiers: ReadonlyArray<string>;
+    readonly questionSummary: string;
+    readonly documentReferences: ReadonlyArray<{
+      readonly documentIdentifier: string;
+      readonly revision: number;
+    }>;
+    readonly proposedRecipientAgentInstanceIdentifier?: string | null;
+  }): Promise<EscalationOpenOutcome> {
+    this.assertOpen();
+    return this.createEscalationWorkflow().open({
+      requestIdentifier: input.requestIdentifier,
+      senderAgentInstanceId: input.senderAgentInstanceIdentifier,
+      ...(input.originalInitiatorAgentInstanceIdentifier === undefined ||
+      input.originalInitiatorAgentInstanceIdentifier === null
+        ? {}
+        : {
+            originalInitiatorAgentInstanceId:
+              input.originalInitiatorAgentInstanceIdentifier,
+          }),
+      projectIdentifier: input.projectIdentifier,
+      missionIdentifier: input.missionIdentifier,
+      taskIdentifier: input.taskIdentifier,
+      affectedStepIdentifiers: input.affectedStepIdentifiers,
+      questionSummary: input.questionSummary,
+      documentReferences: input.documentReferences,
+      ...(input.proposedRecipientAgentInstanceIdentifier === undefined ||
+      input.proposedRecipientAgentInstanceIdentifier === null
+        ? {}
+        : {
+            proposedRecipientAgentInstanceId:
+              input.proposedRecipientAgentInstanceIdentifier,
+          }),
+      nowIso: new Date().toISOString(),
+    });
+  }
+
+  /** COORD-05：当前处理人追加处置结论（处理人 + 预期版本保护）。 */
+  async handleEscalation(input: {
+    readonly requestIdentifier: string;
+    readonly expectedVersion: number;
+    readonly handlerAgentInstanceId: string;
+    readonly disposition: "resolved" | "forwarded" | "needs-user";
+    readonly reason: string;
+    readonly referencedDocumentIdentifiers: ReadonlyArray<string>;
+    readonly forwardToAgentInstanceId?: string | null;
+  }): Promise<EscalationHandleOutcome> {
+    this.assertOpen();
+    return this.createEscalationWorkflow().handle({
+      requestIdentifier: input.requestIdentifier,
+      expectedVersion: input.expectedVersion,
+      handlerAgentInstanceId: input.handlerAgentInstanceId,
+      disposition: input.disposition,
+      reason: input.reason,
+      referencedDocumentIdentifiers: input.referencedDocumentIdentifiers,
+      handledAtIso: new Date().toISOString(),
+      ...(input.forwardToAgentInstanceId === undefined
+        ? {}
+        : { forwardToAgentInstanceId: input.forwardToAgentInstanceId }),
+    });
+  }
+
+  /** COORD-05：只读查询一条请示记录。 */
+  async queryEscalation(input: {
+    readonly requestIdentifier: string;
+  }): Promise<EscalationRecord | null> {
+    this.assertOpen();
+    const store = new EscalationRequestStore({ baseDirectory: this.requireStateDirectory() });
+    return store.get(input.requestIdentifier);
+  }
+
+  private createEscalationWorkflow(): EscalationWorkflow {
+    const stateDirectory = this.requireStateDirectory();
+    const registry = new AgentCreationRegistry({ stateDirectory });
+    return new EscalationWorkflow({
+      store: new EscalationRequestStore({ baseDirectory: stateDirectory }),
+      resolveCreatorOf: async (agentInstanceId) => {
+        const record = await registry.getRecord(agentInstanceId);
+        return record?.createdByAgentInstanceId ?? null;
+      },
+      isAgentKnown: async (agentInstanceId) => {
+        const record = await registry.getRecord(agentInstanceId);
+        return record !== null && record.recycledAtIso === null;
+      },
+    });
+  }
+
+  private requireStateDirectory(): string {
+    if (this.stateDirectory === null) {
+      throw new PublicApplicationError(
+        "missing-state-directory",
+        "未配置状态目录：无法访问请示记录",
+      );
+    }
+    return this.stateDirectory;
+  }
+
+  /**
    * 登记一条跨项目授权（**认证控制面**入口，不是模型工具）。
    *
    * 卡内 §8 要求"基础规则协调完成后才能改变生产默认行为"，故此处不新增默认放行路径：
@@ -8463,6 +8578,52 @@ export {
   type CollaborationRequestServiceDeps,
   type SendCollaborationRequestInput,
 } from "./orchestration/collaboration-request-service.js";
+
+/** COORD-05（2026-11-22）：逐级请示的契约、路由、编排、呈交、写回与观测。 */
+export {
+  EscalationRequestStore,
+  EscalationWorkflow,
+  type EscalationHandleOutcome,
+  type EscalationOpenOutcome,
+} from "./orchestration/escalation-workflow.js";
+export {
+  appendEscalationDisposition,
+  openEscalation,
+  resolveEscalationChain,
+  resolveEscalationTarget,
+  type EscalationDispositionEntry,
+  type EscalationDocumentReference,
+  type EscalationRecord,
+  type EscalationRoutingResolution,
+  type EscalationState,
+  type OpenEscalationOutcome,
+} from "./orchestration/escalation-contract.js";
+export {
+  DecisionSubmissionStore,
+  submitDecision,
+  type DecisionChannel,
+  type DecisionSubmissionRecord,
+  type DecisionSubmissionServiceDeps,
+  type SubmitDecisionOutcome,
+} from "./orchestration/decision-submission.js";
+export {
+  DecisionWritebackStore,
+  applyDecisionWriteback,
+  type DecisionWritebackOutcome,
+  type DecisionWritebackPorts,
+  type DecisionWritebackRecord,
+} from "./orchestration/decision-writeback.js";
+export {
+  buildResponsibilityRecord,
+  describeResponsibilityInstructions,
+  type ResponsibilityRecord,
+} from "./orchestration/responsibility-handoff.js";
+export {
+  EscalationObservationLedger,
+  buildEscalationToolResult,
+  buildStepNotification,
+  type EscalationObservationSnapshot,
+} from "./orchestration/escalation-context-observation.js";
 
 // EVENT-01（2026-10-24）：控制通道（模型/工具门禁、取消能力、分阶段确认、崩溃重放）。
 export {

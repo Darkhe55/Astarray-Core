@@ -152,3 +152,15 @@ Worker 通过现有反馈信箱向直属上级请示。上级在管理范围内�
 变异承重：让"转交"也触发写回回调 ⇒ ③ 红。
 
 未做：真实任务链/秘书/用户通道装配、整卡三条路径（本级解决、用户直达、秘书呈交）的端到端证据。
+## 进展（2026-11-22，公开门面入口）
+
+- `AstarrayApplicationFacade` 新增 `openEscalation` / `handleEscalation` / `queryEscalation`：
+  管理树由运行时 `AgentCreationRegistry` 推导（创建关系 + 未回收校验），门面与工作流共用同一实现。
+- `handleEscalation` 的结局以**状态**为准：`resolved` / `submitted-to-user` 即使未注入回调也如实返回
+  （回调可选，供装配层接写回/呈交）。
+- SDK 导出六个 COORD-05 模块（契约/路由/编排/呈交/写回/观测）。
+
+反例 2 条（`coord05-escalation-sdk-entry.test.ts`：打开→结案→查询→幂等重开；未登记发送者拒绝）；
+该用例暴露并修正了"无回调时终态返回 updated"的缺陷。
+
+未做：真实任务链/秘书/用户通道装配与整卡三条路径端到端。

@@ -6973,3 +6973,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本机全量：**882 files（877 passed / 3 failed / 2 skipped），5662 tests（5652 passed / 3 failed / 7 skipped）**；
 >   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
 > - 未做：真实任务链/秘书/用户通道装配；整卡三条路径端到端。
+
+> **COORD-05 公开门面入口（2026-11-22）**
+>
+> - `openEscalation` / `handleEscalation` / `queryEscalation`：管理树由运行时注册表推导（创建关系 + 未回收），
+>   结局以状态为准（`resolved` / `submitted-to-user` 即使未注入回调也如实返回）。
+> - SDK 导出 COORD-05 六个模块（契约/路由/编排/呈交/写回/观测）。
+> - 反例 2 条（门面打开→结案→查询→幂等重开；未登记发送者拒绝）；该用例暴露并修正"无回调时终态返回 updated"。
+> - 本机全量：**883 files（878 passed / 3 failed / 2 skipped），5664 tests（5654 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：真实任务链/秘书/用户通道装配与整卡三条路径端到端。
