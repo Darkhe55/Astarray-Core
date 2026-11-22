@@ -6884,3 +6884,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > **推送状态（2026-11-22 第 4 片）**：本机网络不可达，5f218dcd 3 次推送均失败；按纪律留待下次合并推送（本地 HEAD 见 git log）。
 
 > **推送状态（2026-11-22 收口）**：本机网络持续不可达，a9323ba、03612ee 均未推送（累计 4 次失败）；按纪律留待网络恢复后合并推送。
+
+> **COORD-05 05-03：用户待决记录（2026-11-22）**
+>
+> - `UserClarificationStore.readState()` 区分 missing / valid / corrupted / unreadable；
+>   损坏或暂时不可读时 register/answer **拒绝覆盖**（旧实现读失败一律回空，下一次登记会抹掉用户问题）。
+> - 幂等登记：按（项目, `sourceRequestIdentifier`）重试只生成一条；新增 impactSummary / recommendedReason /
+>   blockedStepIdentifiers，旧记录缺字段仍可读可答复。
+> - 跨进程文件锁内读-改-写：两个实例并发登记 40 条全部保留；并发登记与答复互不覆盖。
+> - 反例 7 条（旧实现 6 红）；承重：暂存 store 后 6 红。
+> - 本机全量：**876 files（871 passed / 3 failed / 2 skipped），5618 tests（5608 passed / 3 failed / 7 skipped）**；
+>   仅 3 条已复现本机环境。`typecheck` / `lint` exit 0。
+> - 未做：COORD-05 其余分项（05-01/02/04/05/06）。
