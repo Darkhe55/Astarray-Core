@@ -7343,3 +7343,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**894 files（888 passed / 4 failed / 2 skipped），5721 tests（5710 passed / 4 failed / 7 skipped）**；
 >   3 环境 + 1 已知抖动（graph drill）。`typecheck` / `lint` 0。
 > - 未做：真实秘书激活状态与投递器、三路径端到端。
+
+> **行尾修复（2026-11-23 第 50 轮）**
+>
+> - 上一提交 `9f9af58d` 因 PowerShell `WriteAllLines` 把 `public-sdk.ts` 整体写成 CRLF（8834 个 CR），
+>   产生 8975/8767 的噪声 diff。
+> - 已恢复 LF（CR=0）；`git diff HEAD~1` 回到 **69 insertions**（仅本意改动）；`typecheck` 0，
+>   两个门面/通道测试 10 条全绿。下一提交仅为行尾归一，不改语义。
