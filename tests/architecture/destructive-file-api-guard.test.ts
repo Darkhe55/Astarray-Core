@@ -43,7 +43,15 @@ const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }>
    * 理由：只写 `mcp/egress-authorizations.json`（连接/主体/目的端/有效期的**元数据**，
    * 不含项目内容）；撤销只追加连接标识，不删除任何用户文件。
    */
-  "core/src/bridge/mcp-egress-authorization-store.ts": {
+  /**
+   * RESUME-02（2026-11-24）：恢复意图回执仓库。
+   * 理由：只写 `resume-intent/receipts.json`（请求 ID/主体/目标/版本/有效期元数据，
+   * 不含正文或凭据）；过期回执仅从数组移除，不删除用户文件。
+   */
+  "core/src/orchestration/continuation-receipt-store.ts": {
+    tokens: ["writeFile"],
+    reason: "恢复意图回执的元数据写入（状态目录，不含正文/凭据）",
+  },  "core/src/bridge/mcp-egress-authorization-store.ts": {
     tokens: ["writeFile"],
     reason: "MCP 连接授权绑定与撤销状态的元数据写入（状态目录，不含项目内容）",
   },  "core/src/infra/atomic-json.ts": {

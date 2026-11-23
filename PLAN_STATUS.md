@@ -7784,3 +7784,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 未做（如实）：控制器 claim/assemble/dispatch、SDK/CLI/远程通道、恢复包预算、观测与交付文档。
 
 > **推送状态（2026-11-24 第 99 轮）**：`4e25667e` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **RESUME-02 回执持久化（2026-11-24 第 100 轮）**
+>
+> - 新增 `ResumeIntentReceiptStore`：按请求 ID 去重（不延长期限）、跨实例复核、过期清理、
+>   文件损坏按无回执（fail-closed）；反例 7 条。
+> - 全量：**925 files（923 passed / 2 skipped），5891 tests（5884 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 未做：控制器 claim/assemble/dispatch、SDK/CLI/远程通道、恢复包预算、观测。
