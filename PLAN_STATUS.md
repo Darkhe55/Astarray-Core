@@ -7718,3 +7718,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `verify:tarball-isolation-install` **exit 0**（安装后 CLI 0.1.0）。
 > - 结论：公开 CLI/SDK 边界未被 bridge/CLI 授权接线破坏；`gui` 仍返回稳定错误。
 > - 本轮仅文档 + 既有脚本复跑，无代码改动。
+
+> **RELEASE-01-01 双子进程夹具（2026-11-24 第 92 轮）**
+>
+> - 两个真实 `mcp serve` 子进程共享状态目录：各自提交正常；跨主体查询被拒（工具级 isError，不泄漏）；
+>   撤销 A 后 A 释放被拒、B 不受影响。
+> - 全量：**918 files（916 passed / 2 skipped），5843 tests（5836 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - RELEASE-01-01 主体完成；剩余：真实部署的独立目的端注入（需宿主配置面）。
+
+> **推送状态（2026-11-24 第 92 轮）**：`7d959bfa` 3 次推送失败（网络不可达）；留待下次合并推送。
