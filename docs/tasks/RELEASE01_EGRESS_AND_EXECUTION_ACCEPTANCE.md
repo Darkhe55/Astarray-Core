@@ -1,6 +1,6 @@
 # RELEASE-01　MCP、Provider 与受控执行的生产入口返修
 
-状态：**02 已实施；01/03 待实施；04 已有基线**（2026-11-23）。基线：c3264ceb。B1–B4 指 11 月 23 日的[阻塞汇总](../reports/BLOCKERS_2026-11-23.md)。本卡将建议细化为施工口径，实施、验证和发布分别记录。各子卡可独立推进。
+状态：**01 第一片、02 已实施；01 端到端/03 待实施；04 已有基线**（2026-11-23）。基线：c3264ceb。B1–B4 指 11 月 23 日的[阻塞汇总](../reports/BLOCKERS_2026-11-23.md)。本卡将建议细化为施工口径，实施、验证和发布分别记录。各子卡可独立推进。
 
 ## 01　B1：MCP 会话授权到每次结果释放
 
@@ -42,3 +42,15 @@
 - **已补（2026-11-23）**：`resolveProviderEgressScanMode` 统一解析配置——缺省/空值 ⇒ block；
   `record`/`off` 仅在 `isIsolatedDiagnostic=true` 时生效，否则报冲突并回落 block；未知值 fail-closed。
   反例 6 条（缺省/显式 block/旧 record/旧 off/隔离诊断/未知值）。\n- **仍未做（如实）**：ADR-0080 旧默认的替代记录；两协议下的"零网络请求"计数验收（需假服务计数夹具）。
+### 01 MCP 授权到每次结果释放（第一片，2026-11-23）
+
+- 新增 `bridge/mcp-egress-authorization.ts`：`McpConnectionAuthorizationBinding` + `evaluateMcpRelease`
+  + `evaluateMcpReleaseAgainstStore`（**每次释放前重读**绑定与撤销状态，读失败视为撤销）。
+- 校验项：无绑定、主体/连接/目的端不一致、过期、撤销、内容 revision、规则版本、资源越界；
+  拒绝只给稳定原因码，越界信息**不返回资源名**。
+- `runMcpStdioSession` 新增 `authorizeRelease` 钩子：宿主拒绝时回 JSON-RPC 错误（只含原因码），
+  stdout 不出现结果正文；未注入时保持既有"仅内容扫描"行为（生产装配必须注入）。
+- 反例：模块 8 条 + 会话钩子 4 条。
+- 门禁：912 files / 5815 tests（全绿）。
+- **仍未做（如实）**：真实宿主装配（注入权威绑定仓库与目标账户）、双客户端/两项目/临时资源端到端、
+  真实 stdio 子进程验收、"释放点清单 + 幂等重连"记录。

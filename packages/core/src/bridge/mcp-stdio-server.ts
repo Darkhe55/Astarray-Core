@@ -88,6 +88,22 @@ export interface McpStdioSessionOptions {
    * - `off`：关闭（仅测试/诊断显式选择）。
    */
   outboundContentScanMode?: "block" | "record" | "off";
+  /**
+   * RELEASE-01-01（2026-11-23）：**释放前授权钩子**（由可信宿主注入）。
+   *
+   * 缺省不注入 ⇒ 保持既有行为（仅内容扫描）；生产装配必须注入并实现
+   * "权威重读绑定 + 撤销/目的端/资源范围/revision 校验"（可用
+   * `evaluateMcpReleaseAgainstStore` 组合）。返回拒绝时只回稳定原因码，不反射正文。
+   */
+  authorizeRelease?: (input: {
+    readonly toolName: string;
+    readonly outcome: {
+      readonly isError: boolean;
+      readonly errorCode: string | null;
+      readonly textContent: string;
+      readonly structuredContent: Record<string, unknown>;
+    };
+  }) => Promise<{ readonly allowed: true } | { readonly allowed: false; readonly reasonCodes: readonly string[] }>;
   /** 审计端口：记录被阻断/被记录的外发判定（不含正文）。 */
   outboundContentScanAuditSink?: (record: {
     readonly jsonRpcId: string | number | null;
@@ -229,6 +245,18 @@ export async function runMcpStdioSession(
           arguments: toolArguments,
           principal: options.principal,
         });
+        if (options.authorizeRelease !== undefined) {
+          const decision = await options.authorizeRelease({ toolName, outcome });
+          if (!decision.allowed) {
+            /** 拒绝只回原因码，不反射结果正文。 */
+            writeError(
+              identifier,
+              JSONRPC_INTERNAL_ERROR,
+              `MCP 释放被拒绝：${decision.reasonCodes.join(", ")}`,
+            );
+            return;
+          }
+        }
         const createdTaskIdentifier = outcome.structuredContent["taskIdentifier"];
         if (
           !outcome.isError &&

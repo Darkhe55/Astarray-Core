@@ -7663,3 +7663,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `resolveProviderEgressScanMode`：缺省/空 ⇒ block；`record`/`off` 仅隔离诊断允许，否则**冲突回落 block**；未知值 fail-closed。
 > - 反例 6 条；全量：**910 files（908 passed / 2 skipped），5803 tests（5796 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 剩余：ADR-0080 替代记录 + 两协议"零网络请求"计数验收。
+
+> **RELEASE-01-01 第一片（2026-11-23 第 84 轮）**
+>
+> - 新增 MCP 释放前授权契约与判定（重读绑定、撤销/过期/主体/目的端/revision/资源范围，拒绝不反射资源名）。
+> - `runMcpStdioSession` 接入 `authorizeRelease` 钩子；未注入保持既有行为（生产装配必须注入）。
+> - 反例 12 条；全量：**912 files（910 passed / 2 skipped），5815 tests（5808 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 剩余：真实宿主装配、端到端双客户端验收、释放点清单与幂等重连。
