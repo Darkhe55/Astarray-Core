@@ -10,6 +10,7 @@ import type {
   McpBridgePrincipal,
   McpToolBridge,
 } from "./mcp-tool-bridge.js";
+import { scanSensitiveContent } from "../tools/sensitive-content-scan-contract.js";
 
 /**
  * 首选（最新）协议修订。
@@ -79,6 +80,20 @@ export interface McpStdioSessionOptions {
   serverVersion?: string;
   /** 输入流结束时是否关闭桥接会话（默认 true：断连即会话收口）。 */
   closeSessionOnInputEnd?: boolean;
+  /**
+   * D6-E2（2026-11-23）：**MCP 出站内容扫描**。
+   *
+   * - `block`（默认）：结果序列化后未通过四态扫描 ⇒ 回 JSON-RPC 错误，**不释放正文**；
+   * - `record`：只记审计，不阻断（用于受控接收端验证）；
+   * - `off`：关闭（仅测试/诊断显式选择）。
+   */
+  outboundContentScanMode?: "block" | "record" | "off";
+  /** 审计端口：记录被阻断/被记录的外发判定（不含正文）。 */
+  outboundContentScanAuditSink?: (record: {
+    readonly jsonRpcId: string | number | null;
+    readonly outcome: "sensitive" | "incomplete" | "error";
+    readonly matchedRuleIdentifiers: readonly string[];
+  }) => void;
 }
 
 interface JsonRpcRequest {
@@ -99,7 +114,30 @@ export async function runMcpStdioSession(
   const writeMessage = (message: Record<string, unknown>): void => {
     options.output.write(JSON.stringify(message) + "\n");
   };
+  const outboundContentScanMode = options.outboundContentScanMode ?? "block";
   const writeResult = (id: unknown, result: Record<string, unknown>): void => {
+    if (outboundContentScanMode !== "off") {
+      const scanResult = scanSensitiveContent({ content: JSON.stringify(result) });
+      if (scanResult.outcome !== "clean") {
+        options.outboundContentScanAuditSink?.({
+          jsonRpcId: typeof id === "string" || typeof id === "number" ? id : null,
+          outcome: scanResult.outcome,
+          matchedRuleIdentifiers: [...scanResult.matchedRuleIdentifiers],
+        });
+        if (outboundContentScanMode === "block") {
+          /** 与 D5 一致：没扫干净不算干净，不释放正文。 */
+          writeMessage({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            error: {
+              code: -32010,
+              message: `出站内容未通过敏感扫描（${scanResult.outcome}）：按 block 策略不释放正文`,
+            },
+          });
+          return;
+        }
+      }
+    }
     writeMessage({ jsonrpc: "2.0", id: id ?? null, result });
   };
   const writeError = (

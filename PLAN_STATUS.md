@@ -7568,3 +7568,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 4 条 `d2-cancelled-node-dispatch-loop`：真实派发入口（`SecondaryContinuousDispatchLoop`）下，
 >   取消节点 worker 启动数与提案文件均为 0，可派发对照照常派发；全部取消时零派发且不是处理器缺失。
 > - 全量：**906 files（904 passed / 2 skipped），5785 tests（5778 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **D6-E2 MCP 出站内容判定（2026-11-23 第 72 轮）**
+>
+> - `mcp-stdio-server` 的 `writeResult` 在写 stdout 前做**四态敏感扫描**：默认 `block`，非 clean 回
+>   JSON-RPC 错误 `-32010` 且**不释放正文**；`record`/`off` 可显式选择；审计端口记录判定（不含正文）。
+> - 反例 3 条：含密钥结果被阻断且 stdout 无原文、普通结果原样返回、审计端口收到判定。
+> - 全量：**907 files（905 passed / 2 skipped），5788 tests（5781 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 边界：目标端/资源范围/授权 revision 的校验仍无模型（D6 后续），本轮只落**内容判定**。
+
+> **推送状态（2026-11-23 第 72 轮）**：`27de027f` 3 次推送失败（网络不可达）；留待下次合并推送。

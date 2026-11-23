@@ -8,7 +8,7 @@
 | 编号 | 出口 | 是否已装配 | 送出内容 | 内容门禁 | 结论 |
 |---|---|---|---|---|---|
 | E1 | **模型 Provider 请求** | ✅ 生产装配 | 提示词、工具结果、上下文 | `provider-egress-scan`（默认 `record`，可 `block`） | 已装配；默认只记录**不阻断** |
-| E2 | **MCP stdio 服务** | ✅ CLI `mcp-serve` | 工具结果（含 `readFile`/`searchProjectText`/证据查询） | **无** | 已装配；**未接入任何外发门禁** |
+| E2 | **MCP stdio 服务** | ✅ CLI `mcp-serve` | 工具结果（含 `readFile`/`searchProjectText`/证据查询） | **四态内容扫描（默认 block）** | 已装配；已接内容判定（D6-E2，2026-11-23） |
 | E3 | 远程证据导出服务 | ❌ 无生产消费者 | 证据快照文本 | 有 scope 评估（`evaluateRemoteExportScope`） | **不可用**（仅测试） |
 | E4 | 远程投递出站 | ❌ 无生产消费者 | 消息文本 | 操作校验（`validateRemoteDeliveryOperation`） | **不可用**（仅测试） |
 | E5 | 会话/权限配置导出 | ✅（本地） | 会话快照、权限配置 | 目标为本地文件（state 目录） | 本地落地，不跨授权边界 |
@@ -28,7 +28,7 @@
 ### E2 MCP stdio 服务（已装配，未接门禁）
 - `packages/tui/src/cli/commands.ts:3908`：`executeMcpServeCommand` → `runMcpStdioSession({ input: process.stdin, output: process.stdout, ... })`；
 - `packages/core/src/bridge/mcp-tool-bridge.ts`：桥接 `readFile`、`searchProjectText`、证据查询等工具；
-- `packages/core/src/bridge/mcp-stdio-server.ts:100`：`options.output.write(JSON.stringify(message) + "\n")` —— 结果直接写到外部客户端。
+- `packages/core/src/bridge/mcp-stdio-server.ts:100`：`options.output.write(JSON.stringify(message) + "\n")` —— 结果直接写到外部客户端。\n- **2026-11-23 起**：`writeResult` 在写 stdout 前做四态敏感扫描（默认 `block`；`record`/`off` 可显式选择）；\n  非 clean ⇒ 回 JSON-RPC 错误 `-32010`，**不释放正文**；审计端口记录判定（不含正文）。
 - 认证主体：`ASTARRAY_MCP_PRINCIPAL` 环境变量（缺省 `external-harness:stdio`）。
 
 **缺口**：**未调用 `evaluateOutboundContentGate`**（全仓唯一引用在 `public-sdk.ts:722-729` 的再导出，无生产调用点）。
