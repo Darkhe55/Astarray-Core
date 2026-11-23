@@ -7350,3 +7350,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   产生 8975/8767 的噪声 diff。
 > - 已恢复 LF（CR=0）；`git diff HEAD~1` 回到 **69 insertions**（仅本意改动）；`typecheck` 0，
 >   两个门面/通道测试 10 条全绿。下一提交仅为行尾归一，不改语义。
+
+> **COORD-05 用户路径端到端（2026-11-23 第 51 轮）**
+>
+> - `coord05-user-path-e2e.test.ts`：呈交（直接用户通道）⇒ 一条待决记录 ⇒ 答复 ⇒ 任务链证据 ⇒
+>   读回并 `markDecisionApplied` 后依赖步骤进入 ready set（写回前不可派发）。
+> - 全量：**895 files（889 passed / 4 failed / 2 skipped），5722 tests（5711 passed / 4 failed / 7 skipped）**；
+>   3 环境 + 1 并发抖动（artifact-registry-concurrency，隔离复跑通过）。`typecheck` / `lint` 0。
+> - 口径：组合证据，各单元已有独立变异承重；秘书/agent 路径仍缺真实宿主实现。
