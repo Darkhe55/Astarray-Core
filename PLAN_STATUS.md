@@ -7797,3 +7797,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `ContinuationController`：validate → reconcile → claim（fencing token、幂等、冲突合并、坏文件 fail-closed）；反例 7 条。
 > - 全量：**926 files（924 passed / 2 skipped），5898 tests（5891 passed / 7 skipped），EXIT=0**；`lint` 0（修一处 type-only import）。
 > - 未做：assemble/dispatch、SDK/CLI/远程通道、恢复包、观测。
+
+> **RESUME-02 只读公共接线（2026-11-24 第 102 轮）**
+>
+> - 新增 `continuation status [--json]`：配置缺省关闭、有效回执数、活动领取清单；只读、不派发。
+> - 反例 3 条；全量：**927 files（925 passed / 2 skipped），5901 tests（5894 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 未做：assemble/dispatch、request 写入路径、远程通道、恢复包、观测。
+
+> **推送状态（2026-11-24 第 102 轮）**：`240ccb01` 3 次推送失败（网络不可达）；留待下次合并推送。

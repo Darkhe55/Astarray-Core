@@ -13,6 +13,7 @@ import {
   runSimilarityCommand,
 } from "./cli/similarity-command.js";
 import { executeRunCommand } from "./cli/run-command.js";
+import { executeContinuationStatusCommand } from "./cli/continuation-command.js";
 // RELOCATE-01-04（2026-10-18）：冷启动重定位状态只读查询（命令名经用户确认=项目状态）。
 import {
   executeProjectReconcileCommand,
@@ -2555,6 +2556,20 @@ workflowCommand
   );
 
 /** RELEASE-01-03：受控执行验收记录（只读诊断；逐项记录 OS/架构/后端/版本/结果）。 */
+/** RESUME-02：断点续接的只读状态（默认关闭；领取不等于已恢复）。 */
+const continuationCommand = program
+  .command("continuation")
+  .description("断点续接（实验性；默认关闭，只读状态）");
+continuationCommand
+  .command("status")
+  .description("查看续接配置、有效回执与活动领取（只读，不派发）")
+  .option("--json", "机器可读输出")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await executeContinuationStatusCommand({
+      stateDirectory: defaultStateDirectory(),
+      isJsonOutput: options.json === true,
+    });
+  });
 const sandboxCommand = program
   .command("sandbox")
   .description("受控执行沙箱诊断（只读；不启动进程）");
