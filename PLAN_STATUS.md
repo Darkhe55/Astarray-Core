@@ -7918,3 +7918,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `npm test`：**935 files（933 passed / 2 skipped），5956 tests（5949 passed / 7 skipped），EXIT=0**。
 > - `lint` 0；隐私 `privacy-ok`；工作树干净，`HEAD == origin/main == 12c8be12`。
 > - 无新代码/文档改动；本轮为收尾复核。后续按用户对 B9/B10/RESUME-02 三项裁决推进。
+
+> **B9 覆盖率：远端导出服务投递分支（2026-11-24 第 118 轮）**
+>
+> - 新增 7 条：准备阶段三种拒绝、直接投递三态、outbox 幂等语义
+>   （**平台"接受"≠已送达 ⇒ unknown；再次尝试 ⇒ requires-explicit-resend**，不自动重试）、
+>   回执确认 ⇒ already-sent、平台拒绝 ⇒ refused、投递前绑定消失 ⇒ refused。
+> - 全量：**936 files（934 passed / 2 skipped），5963 tests（5956 passed / 7 skipped），EXIT=0**；`lint` 0。
