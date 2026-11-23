@@ -170,6 +170,13 @@ export interface ProcessExecutionControllerOptions {
    */
   readonly outputScanBoundaryCarryCharacters?: number;
   /**
+   * D5（2026-11-23 产品裁决）：**模型可见输出的扫描策略**。
+   *
+   * - `block`（默认）：非 clean 的正文**不释放**，抛 `execution-output-scan-blocked`；
+   * - `redact`：保留既有"替换后返回"行为（仅供诊断/非模型可见路径显式选择）。
+   */
+  readonly outputScanPolicy?: "block" | "redact";
+  /**
    * 上级可管理判定（"明确授权的上级"）。
    * 缺省 null ⇒ 只有**同一主体**能查询/读取/取消自己的执行。
    */
@@ -232,6 +239,7 @@ export class ProcessExecutionController {
   private readonly nowIso: () => string;
   private readonly generateExecutionId: (() => string) | undefined;
   private readonly isSandboxBackendDetectionAttempted: boolean;
+  private readonly outputScanPolicy: "block" | "redact";
 
   constructor(options: ProcessExecutionControllerOptions) {
     this.environmentRegistry = options.environmentRegistry;
@@ -249,6 +257,7 @@ export class ProcessExecutionController {
     );
     this.generateExecutionId = options.generateExecutionId;
     this.isSandboxBackendDetectionAttempted = options.isSandboxBackendDetectionAttempted === true;
+    this.outputScanPolicy = options.outputScanPolicy ?? "block";
   }
 
   /** 后端能力探测（供装配自检与分诊使用；不启动进程）。 */
@@ -515,6 +524,13 @@ export class ProcessExecutionController {
     }
     const redactedText = scannedChunk.textToEmit;
     const isSensitiveContentRedacted = scannedChunk.isRedacted;
+    if (isSensitiveContentRedacted && this.outputScanPolicy === "block") {
+      /** D5：非 clean 不释放正文（"没扫干净"同样不得当干净）。 */
+      throw new DomainError(
+        "execution-output-scan-blocked",
+        "执行输出未通过敏感扫描：按 block 策略不释放正文（可读诊断不含原文）",
+      );
+    }
     return {
       executionId: record.identity.executionId,
       stream: input.stream,

@@ -283,3 +283,5 @@ ConversationIdentityStore.resolveOrOpen… → MissionManager.createMission → 
 两套记账自动修复、SEC-02 注入侧。
 
 **窗口到此结束。**
+
+2026-11-23 施工入口：历史待决项按[当前产品决策与验收口径](../reports/PRODUCT_DECISIONS_2026-11-23.md)执行。实施进度与剩余证据仍按本卡记录。

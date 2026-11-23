@@ -7462,3 +7462,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   D9 UI 排期与验收口径。
 > - 每项含"问题 / 卡住卡项 / 选项与建议 / 不决策时的默认行为"；最小决策集为 D1、D4、D5-3、D8。
 > - 本轮仅文档；门禁沿用第 60 轮（896 files / 5729 tests 全绿）。
+2026-11-23 产品决策更新：见[当前施工口径 D1–D8](docs/reports/PRODUCT_DECISIONS_2026-11-23.md)。决策落实与产品路径验收分别记录。
+
+> **产品决策落地（2026-11-23 第 62 轮）**
+>
+> - 用户已补充决策文档（D1–D8）；本轮实施 **D5**：模型可见执行输出按 **block**——非 clean 正文不释放，
+>   抛 `execution-output-scan-blocked`；`redact` 策略保留给显式选择的诊断路径。
+> - 新增 block 用例 3 条；既有"替换"用例显式固定 `outputScanPolicy: "redact"`；SDK 输出测试改为断言 block。
+> - 修复 graph drill 时序依赖：注入后**显式** `recomputeGoalPotential` 再轮询暂停落盘（不再赌 scheduler 下一轮）。
+> - **全量门禁：895 files 全过（2 skipped）、5725 tests 全过（7 skipped），EXIT=0；lint 0。**
+> - 其余决策（D1/D2/D4/D6/D7/D8）留待后续轮次按同一纪律实施。

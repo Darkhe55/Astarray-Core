@@ -327,7 +327,18 @@ describe("确定性图变更演练", () => {
       });
       expect(injection.outcome).toBe("injected");
 
-      /** 联动是异步写入：轮询到暂停落盘（最多 3s）。 */
+      /**
+       * 2026-11-23：不依赖"注入恰好赶上 scheduler 下一轮"的时序——
+       * 显式触发一次按当前证据的 V 重算（宿主 API），再轮询落盘。
+       * 断言不变：V 从 0 升到 1 ⇒ 暂停并要求重新规划。
+       */
+      const recompute = await application.recomputeGoalPotential({
+        goalIdentifier,
+        missionIdentifier,
+      });
+      expect(recompute.status).toBe("computed");
+
+      /** 联动是异步写入：轮询到暂停落盘。 */
       let goalState = JSON.parse(await fs.readFile(statePath, "utf8")) as {
         requiresReplanning: boolean;
         pauseReason: string | null;

@@ -144,7 +144,7 @@ async function buildRuntime(outputText: string) {
 }
 
 describe("EXEC-01-04 SDK 执行控制面", () => {
-  it("输出读取在返回前脱敏（密钥不得交给调用方）", async () => {
+  it("输出含密钥 ⇒ 按 block 策略拒绝交出正文（D5 裁决）", async () => {
     const secret = "sk-abcdefghijklmnop1234567890";
     const runtime = await buildRuntime(`输出里有 ${secret}`);
     const facade = new AstarrayApplicationFacade(runtime);
@@ -154,15 +154,16 @@ describe("EXEC-01-04 SDK 执行控制面", () => {
         mode: "assist",
       });
       const executionId = await startExecution(runtime);
-      const output = await facade.readProcessExecutionOutput({
-        sessionId: session.sessionId,
-        executionId,
-        stream: "stdout",
-        fromCursorBytes: 0,
+      await expect(
+        facade.readProcessExecutionOutput({
+          sessionId: session.sessionId,
+          executionId,
+          stream: "stdout",
+          fromCursorBytes: 0,
+        }),
+      ).rejects.toMatchObject({
+        errorCode: "execution-output-scan-blocked",
       });
-      expect(output.outputText).toContain("[REDACTED]");
-      expect(output.outputText).not.toContain(secret);
-      expect(output.nextCursorBytes).toBeGreaterThan(0);
     } finally {
       await runtime.shutdown().catch(() => undefined);
     }

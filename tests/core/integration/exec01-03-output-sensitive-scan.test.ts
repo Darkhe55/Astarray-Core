@@ -69,6 +69,8 @@ async function startAndRead(text: string) {
     environmentRegistry: registry,
     store: new InMemoryProcessExecutionStore(),
     sandboxBackend: buildBackend(text),
+    /** 既有用例验证"替换"语义；block 策略由独立用例覆盖。 */
+    outputScanPolicy: "redact",
   });
   const started = await controller.start({
     ownership: {
@@ -178,6 +180,7 @@ async function readAllChunks(input: {
     environmentRegistry: registry,
     store: new InMemoryProcessExecutionStore(),
     sandboxBackend: buildCursorBackend(input.fullText),
+    outputScanPolicy: "redact",
     ...(input.boundaryCarryCharacters === undefined
       ? {}
       : { outputScanBoundaryCarryCharacters: input.boundaryCarryCharacters }),

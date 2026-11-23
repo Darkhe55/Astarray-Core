@@ -321,3 +321,4 @@ astarray: 反馈进程拒绝非法消息（schema 校验失败）: Invalid UUID 
 **867 files（862 passed / 3 failed / 2 skipped），5561 tests（5551 passed / 3 failed / 7 skipped），exit 1**。
 3 条失败与本轮改动无关，且都已在基线 HEAD 上复现：`project-scope-boundary` ③、`tool-registry` 符号链接
 （Windows 创建链接需特权）、`exec01-02-cli-bootstrap-autodetect`（无隔离执行后端）。
+2026-11-23 施工入口：历史待决项按[当前产品决策与验收口径](../reports/PRODUCT_DECISIONS_2026-11-23.md)执行。实施进度与剩余证据仍按本卡记录。
