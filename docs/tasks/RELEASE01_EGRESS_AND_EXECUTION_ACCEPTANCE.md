@@ -41,7 +41,9 @@
 - 门禁：909 files / 5797 tests（全绿）；`lint` 0。
 - **已补（2026-11-23）**：`resolveProviderEgressScanMode` 统一解析配置——缺省/空值 ⇒ block；
   `record`/`off` 仅在 `isIsolatedDiagnostic=true` 时生效，否则报冲突并回落 block；未知值 fail-closed。
-  反例 6 条（缺省/显式 block/旧 record/旧 off/隔离诊断/未知值）。\n- **仍未做（如实）**：ADR-0080 旧默认的替代记录；两协议下的"零网络请求"计数验收（需假服务计数夹具）。
+  反例 6 条（缺省/显式 block/旧 record/旧 off/隔离诊断/未知值）。\n- **已补（2026-11-23）**：ADR-0080 增补「修订」节（缺省 block、record/off 仅隔离诊断、冲突回落）；
+  新增 `provider-egress-default-block-count.test.ts`（8 条）：两协议下敏感/扫描未完成 ⇒ **零网络请求**，
+  干净请求一次，显式 record 仍发送。
 ### 01 MCP 授权到每次结果释放（第一片，2026-11-23）
 
 - 新增 `bridge/mcp-egress-authorization.ts`：`McpConnectionAuthorizationBinding` + `evaluateMcpRelease`

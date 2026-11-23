@@ -44,8 +44,8 @@ export interface OpenAiCompatibleRuntimeOptions {
    */
   providerRequestUsageObserver?: ProviderRequestUsageObserverPort;
   /**
-   * 接线缺口第 ③ 项（2026-10-28）：模型请求最终出口扫描模式。
-   * 缺省 `record`（命中只记录不拦截）；`block` 需要用户显式开启。
+   * 模型请求最终出口扫描模式。
+   * **2026-11-23（RELEASE-01-02）起缺省 `block`**（命中即拒发）；`record`/`off` 仅限显式隔离诊断。
    */
   egressScanMode?: ProviderEgressScanMode;
   egressAuditSink?: (record: ProviderEgressScanRecord) => void;

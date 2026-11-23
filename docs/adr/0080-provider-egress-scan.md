@@ -1,6 +1,6 @@
 # ADR-0080 模型请求最终出口扫描（接线缺口第 ③ 项 / SEC-02-06 通道 13）
 
-- 状态：部分采纳（两个 runtime 已接；其余适配器未接，默认只记录不拦截）
+- 状态：部分采纳（两个 runtime 已接；其余适配器未接）。**2026-11-23 修订：缺省改为 block**，见文末「修订」节
 - 日期：2026-10-28
 - 来源：[SEC02_CHANNEL_MATRIX](../tasks/SEC02_CHANNEL_MATRIX.md) 通道 13、
   [STATUS_UPDATE_WIRING_GAPS_2026-10-28](../reports/STATUS_UPDATE_WIRING_GAPS_2026-10-28.md) 清单第 ③ 项
@@ -60,3 +60,12 @@ AnthropicMessagesRuntime.run / OpenAiCompatibleRuntime.run
 
 **implemented-unverified**：未编写/未运行测试、未人工验收。
 已执行：`npm run typecheck` exit 0、`npx eslint <本批文件>` exit 0、`npm run build` 成功。
+
+## 修订（2026-11-23，RELEASE-01-02）
+
+- **缺省改为 `block`**：`DEFAULT_PROVIDER_EGRESS_SCAN_MODE = "block"`，两个 runtime 的缺省改引用该常量；
+- `record`/`off` 仅用于**明确隔离的诊断**；生产配置出现这两个值时，`resolveProviderEgressScanMode`
+  报冲突并回落 `block`（fail-closed）；
+- 验收：两协议在注入 `fetchImpl` 计数下，敏感/扫描未完成的请求体**零网络请求**，干净请求一次；
+  显式 `record` 仍发送并只记录（`provider-egress-default-block-count`，8 条）；
+- 与 D5（执行输出 block）同一原则："没扫干净不算干净"。

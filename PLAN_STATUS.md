@@ -7698,3 +7698,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 修复 `file-lock`：`open(wx)` 的 EPERM/EACCES/EBUSY 作为瞬时错误重试，超时才 `lock-timeout`；反例 4 条。
 > - 全量门禁无并发抖动：**915 files（913 passed / 2 skipped），5830 tests（5823 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - RELEASE-01-03：Windows 后端源码存在，但本机**无 Rust 工具链**且 AppContainer 需提权 ⇒ 记录为明确阻塞，不宣称通过。
+
+> **RELEASE-01-02 收尾（2026-11-23 第 89 轮）**
+>
+> - ADR-0080 增补修订节（缺省 block、record/off 仅隔离诊断、冲突回落）；OpenAI 运行时注释同步。
+> - 新增两协议"零网络请求"计数验收 8 条：敏感/扫描未完成 ⇒ 0 请求；干净 ⇒ 1 次；显式 record ⇒ 仍发送。
+> - 全量：**916 files（914 passed / 2 skipped），5838 tests（5831 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - **RELEASE-01-02 完成**（其验收范围内）；RELEASE-01 剩余：01 双客户端夹具、03 平台阻塞、04 基线复核。
