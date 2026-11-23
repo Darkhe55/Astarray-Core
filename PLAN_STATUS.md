@@ -7278,3 +7278,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   （"先运行 npm run test:coverage"）。**这不是新缺陷**：环境失败阻止覆盖率产物，跨平台/环境修复后需重跑。
 > - `verify:sdk-consumer` 需要 tarball 参数（未提供），本轮未执行。
 > - 本轮仅文档；无代码变更。
+
+> **mutation-kills 隔离副本复跑：**结论无效**（2026-11-23 第 44 轮）
+>
+> - 在 `.tools/mut-repo` 副本（node_modules 用 junction 共享主仓）跑完 313 个变异体：312 被拦下，
+>   1 个"存活"（`comm02-delivery-skips-persist`）。速度快得异常（约 10 分钟）。
+> - 在主仓直接注入同一变异体复验：`comm02-inbox-feedback-process` **2 条测试变红** ⇒ 该变异体**实际会被拦下**。
+>   说明副本结果**不可信**：共享的 `node_modules` 里 vite/vitest 转换缓存导致部分变异未被真正执行。
+> - 清理：主仓变异已还原、副本已安全删除（先删 junction，node_modules 未受损）、相关测试复绿。
+> - **结论**：完整 mutation-kills 重跑必须使用**独立的 node_modules**（不能 junction）；在缺少离线安装条件前，
+>   不记录 mutation-kills 通过。
