@@ -95,8 +95,8 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 |---|---|
 | 01 契约 | implemented-unverified（2026-11-09，`8657d10e`+`6d6e2b99`） |
 | 02 自带沙箱、基础工具链与安装自检 | **阻塞**：清单已提交（`fd16a4ee`）、探测已编码；真实后端/工具链/干净设备验收未交付，见 §02 阻塞项 |
-| 03 生命周期 | **部分交付（2026-11-14 核实更新）**：持久化、输出游标/截断、重启对账已交付；**取消/超时分类已确认实现**（`execution-contract` 枚举含 `cancelled`/`timed-out`；`process-execution-controller` 处理终态；`bubblewrap-sandbox-backend` 分别置位）；**敏感扫描闸仍未接线**（`process-execution-output-buffer.readAllTextForScanning()` 只有测试调用，无生产调用方） |
-| 04 生产接线与异步内部执行 | implemented-unverified（2026-11-09，提交待推送）：可达性与去阻塞已证；SDK/CLI 事件面未接 |
+| 03 生命周期 | **部分交付（2026-11-14 核实更新；2026-11-23 复核：输出扫描闸仍无生产调用方）**：持久化、输出游标/截断、重启对账已交付；**取消/超时分类已确认实现**（`execution-contract` 枚举含 `cancelled`/`timed-out`；`process-execution-controller` 处理终态；`bubblewrap-sandbox-backend` 分别置位）；**敏感扫描闸仍未接线**（`process-execution-output-buffer.readAllTextForScanning()` 只有测试调用，无生产调用方） |
+| 04 生产接线与异步内部执行 | implemented-unverified：可达性与去阻塞已证；**SDK/CLI 事件面已接**（`emitExecutionStatusIfChanged` 发脱敏 `execution-status` 事件；CLI `execution-status-jsonl.ts` 已订阅，见 2026-11-23 更正） |
 | 05 开发闭环及分诊 | 部分交付（2026-11-09，`96fc126e`+`783b971a`）：分诊报告与应用级 allow/deny 矩阵已交付；**闭环本身阻塞**（需真实沙箱后端） |
 | 06 包级与安全验收 | **本地可验证部分完成（2026-11-14）**：`npm pack` 经正常 prepack 产出 tarball（SHA256 `498a0c49…`，HEAD `0281f9bc`），隔离安装到临时项目后经**公开入口**跑通 6 项检查（见 `docs/reports/EXEC01_06_PACKAGE_EVIDENCE_2026-11-14.json`）；**真实隔离与多平台仍 blocked** |
 
@@ -771,3 +771,12 @@ npm 向上找到了仓库根 `package.json`，把 tarball 装成根依赖并 pru
 删除后恢复绿色。测试文件与守卫逻辑均未为此放宽。
 
 同时说明：注释里提到这些函数名**不算违规**（只扫代码行），避免文档更新把守卫搞红。
+
+
+## 7.1 状态更正（2026-11-23）
+
+- **04 的"SDK/CLI 事件面未接"已过时**：`public-sdk.ts` 的 `emitExecutionStatusIfChanged` 会发布脱敏
+  `execution-status` 事件（不含输出正文/凭据），CLI 侧 `execution-status-jsonl.ts` 订阅并输出 JSONL
+  （`run-command.ts` 中订阅/退订）。事件面**已接**，不应再列为缺口。
+- **03 的输出扫描闸确为未接线**：`readAllTextForScanning()` 只有定义与测试调用，无生产调用方；
+  是否在模型可见输出前做四态扫描并阻断，属**安全策略决策**（SEC-02 通道 6），需产品确定阻断/记录口径后再接。

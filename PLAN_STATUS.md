@@ -7358,3 +7358,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**895 files（889 passed / 4 failed / 2 skipped），5722 tests（5711 passed / 4 failed / 7 skipped）**；
 >   3 环境 + 1 并发抖动（artifact-registry-concurrency，隔离复跑通过）。`typecheck` / `lint` 0。
 > - 口径：组合证据，各单元已有独立变异承重；秘书/agent 路径仍缺真实宿主实现。
+
+> **EXEC-01 04 状态更正（2026-11-23 第 52 轮）**
+>
+> - 卡面"SDK/CLI 事件面未接"已过时：`emitExecutionStatusIfChanged` 发布脱敏 `execution-status` 事件，
+>   CLI `execution-status-jsonl.ts` 已订阅（`run-command.ts` 订阅/退订）⇒ 事件面**已接**。
+> - **03 的输出扫描闸**经复核仍无生产调用方（`readAllTextForScanning` 仅测试）；是否阻断属
+>   SEC-02 通道 6 的安全策略决策，需产品口径后再接。
+> - 本轮仅文档；门禁沿用上一轮。
