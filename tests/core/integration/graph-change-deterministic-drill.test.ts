@@ -135,6 +135,25 @@ async function waitForTaskBlocked(
   return null;
 }
 
+/**
+ * 2026-11-23：等待目标状态**写入稳定**（连续两次读取内容相同）。
+ *
+ * 图变更联动与任务组收尾都是异步写；直接改状态文件会与它们竞争，
+ * 导致"V 上升"比较看不到我们预置的 0。先等稳定再预置，避免时序抖动。
+ */
+async function waitForGoalStateQuiet(goalIdentifier: string, timeoutMilliseconds: number): Promise<void> {
+  const statePath = path.join(stateDirectory, "goal-mode", `${goalIdentifier}.json`);
+  const deadline = Date.now() + timeoutMilliseconds;
+  let previous = "";
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const current = await fs.readFile(statePath, "utf8").catch(() => "");
+    if (current !== "" && current === previous) {
+      return;
+    }
+    previous = current;
+  }
+}
 async function startBlockedMission(): Promise<{
   readonly application: AstarrayApplicationFacade;
   readonly missionIdentifier: string;
@@ -316,7 +335,13 @@ describe("确定性图变更演练", () => {
         ...seeded.gateSnapshot,
         lastPotentialValue: 0,
       };
-      await fs.writeFile(statePath, JSON.stringify(seeded, null, 2), "utf8");
+      await waitForGoalStateQuiet(goalIdentifier, 5_000);
+      const quietState = JSON.parse(await fs.readFile(statePath, "utf8")) as Record<string, unknown> & {
+        gateSnapshot: Record<string, unknown>;
+      };
+      quietState.lastPotentialValue = 0;
+      quietState.gateSnapshot = { ...quietState.gateSnapshot, lastPotentialValue: 0 };
+      await fs.writeFile(statePath, JSON.stringify(quietState, null, 2), "utf8");
 
       const injection = await application.injectMissionTask(missionIdentifier, {
         id: "T-99",
@@ -327,16 +352,6 @@ describe("确定性图变更演练", () => {
       });
       expect(injection.outcome).toBe("injected");
 
-      /**
-       * 2026-11-23：不依赖"注入恰好赶上 scheduler 下一轮"的时序——
-       * 显式触发一次按当前证据的 V 重算（宿主 API），再轮询落盘。
-       * 断言不变：V 从 0 升到 1 ⇒ 暂停并要求重新规划。
-       */
-      const recompute = await application.recomputeGoalPotential({
-        goalIdentifier,
-        missionIdentifier,
-      });
-      expect(recompute.status).toBe("computed");
 
       /** 联动是异步写入：轮询到暂停落盘。 */
       let goalState = JSON.parse(await fs.readFile(statePath, "utf8")) as {

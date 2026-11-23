@@ -7519,3 +7519,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量覆盖率：5754 tests 全绿；**全局分支 80.87%**（<85%）。
 > - 安全模块：**20/22 达标**（`sensitive-content-access-policy`、`mailbox-journal` 本轮达标）；
 >   未达标剩 `policy-wrapper` 90.20%、`entrypoint` 87.01%。
+
+> **D8 覆盖率补测：policy-wrapper / entrypoint（2026-11-23 第 68 轮）**
+>
+> - 新增 `policy-wrapper-branches.test.ts`（9 条：取消/工作窗口/未注册/子集/风险评估 deny/ask/
+>   处理器异常与授权类异常/profile 解析失败回退）。
+> - 新增 `feedback-entrypoint-branches.test.ts`（2 条：协议不兼容、心跳丢失自终止）。
+> - 修复 graph-drill 的**竞争**：显式 recompute 会抢在联动回调前写 V，导致"V 上升"比较看不到预置值；
+>   改为注入前等待目标状态稳定（连续两次读取一致）再预置，并移除显式 recompute。
+> - 全量：**904 files（902 passed / 2 skipped），5772 tests（5765 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 覆盖率复测运行中。
