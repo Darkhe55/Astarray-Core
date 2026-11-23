@@ -7912,3 +7912,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `verify:exec01-03-preconditions`：逐项记录平台/helper/Rust/提权；本机 readyForAcceptance=false，blockers 3 条。
 > - `--strict` 未就绪 exit 2；输出不含本机路径与用户标识。
 > - 结论不变：B3 需用户授权安装 Rust/MSVC 与提权；本脚本把缺口固定为可复现记录。
+
+> **最终门禁复核（2026-11-24 第 117 轮）**
+>
+> - `npm test`：**935 files（933 passed / 2 skipped），5956 tests（5949 passed / 7 skipped），EXIT=0**。
+> - `lint` 0；隐私 `privacy-ok`；工作树干净，`HEAD == origin/main == 12c8be12`。
+> - 无新代码/文档改动；本轮为收尾复核。后续按用户对 B9/B10/RESUME-02 三项裁决推进。
