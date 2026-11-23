@@ -171,3 +171,30 @@ BATCH6/WB00 等卡完成头行/状态对账。
 
 此前归为"被 prepack 阻断"的三条脚本均**已执行并给出真实结论**；其中 entry-runtime 脚本的
 JSON 解析、状态目录隔离与 CLI-only 构建判定三处缺陷已修复。
+## 定稿：已完成 / 明确阻塞 / 后继（2026-11-23，第 80 轮）
+
+**已完成（有反例或实测证据）**
+
+| 项 | 证据 |
+|---|---|
+| D1 秘书通道单通道锁定 | `coord05-channel-lock` 4 条 |
+| D2 取消节点不启动 | 派发过滤 + 真实派发入口 4 条 |
+| D4 执行尝试 + taskRevision 盖章 | 7 条单元用例 + 门禁 |
+| D5 输出 block + 完整流扫描 | 8 条（含 Authorization/PEM/跨块） |
+| D6 外发出口清单 + MCP 内容扫描 | 报告 + `mcp-outbound-content-scan` 3 条 |
+| D7 协作请求宿主专用 | 3 条 |
+| EXEC-01-03 完整流扫描 | 同上 D5 |
+| 包级三条脚本 | entry-runtime 18/18、tarball-install ok、security-coverage 可运行 |
+| 全量门禁 | 909 files / 5796 tests（exit 0，HEAD `5600478c`） |
+
+**明确阻塞（需外部条件，非工程待办）**
+
+1. 产品口径：D6-E2 目的端/资源范围/授权 revision 模型；Provider 通道默认 record/block；
+2. 平台/人工证据：EXEC-01-02 真沙箱后端、REMOTE-01 平台投递、E2E-01 人工体验、GUI/TUI 视图；
+3. 覆盖率：全局分支 80.92% → 85%；`entrypoint` 7 行不可达/需注入（不靠改代码凑数）。
+
+**后继（工程项，已记录不宣称完成）**
+
+- "同一次逻辑派发重投复用 attempt"（无重投路径可测）；
+- ALIGN-02 规划路径端到端演练；
+- Provider 通道默认策略落地（依赖产品口径）。
