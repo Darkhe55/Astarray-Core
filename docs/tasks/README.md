@@ -69,6 +69,14 @@ GUI-01 使用自己的前驱和验收门禁，不得与 T07D 的 Provider 生产
 | `B6R-11-COVERAGE-SPRINT.md` | 覆盖率补强 |
 | `B6R10_FINAL_ACCEPTANCE.md` | 当前终验证据与未决平台项 |
 
+## 后续验收卡（2026-11-24 增补）
+
+| 文件 | 用途 |
+|---|---|
+| `RELEASE01_EGRESS_AND_EXECUTION_ACCEPTANCE.md` | B1–B4 生产入口返修（MCP 授权释放 / Provider 默认阻断 / B3 受控执行 / 公开包验收） |
+| `RESUME02_EXPERIMENTAL_SMART_CONTINUATION.md` | 断点续接首版（判定/回执/领取/恢复包/CLI；dispatch 未接线） |
+| `RESUME02_IMPLEMENTATION_HANDOFF.md` | RESUME-02 实现交接（调用链、默认值、剩余问题、待验证条件） |
+
 ## 使用规则
 
 - OpenCode 每轮默认只执行一张高风险任务卡中的一个检查点。
