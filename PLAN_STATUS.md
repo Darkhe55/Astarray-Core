@@ -7372,3 +7372,5 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `verify:e2e01` 当前 HEAD **exit 0**：fixture fingerprint 与卡面一致、基线失败、参考实现通过、产物哈希稳定。
 > - 整卡仍 `pending`：只缺人工体验结论与 Linux/macOS 证据（本机无 WSL 发行版，无法补）。
 > - 本轮仅文档；门禁沿用上一轮。
+
+> **推送技巧（2026-11-23 第 53 轮）**：普通推送多次 "remote end hung up / Everything up-to-date" 但远端未更新；改用 git -c http.version=HTTP/1.1 push **一次成功**（91f9a2e7..5a037785）。后续网络抖动可优先用此方式。
