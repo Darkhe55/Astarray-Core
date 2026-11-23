@@ -101,3 +101,16 @@ assembleContinuationPack                       packages/core/src/orchestration/c
 | `tests/tui/unit/resume02-continuation-request-command.test.ts` | 6 | 写路径、未认证、运行中、领取 |
 
 全量门禁（2026-11-24）：`npm test` 与 `npm run lint` 通过；隐私检查 `privacy-ok`。
+
+## 7. 构建产物验证（2026-11-24，第 115 轮）
+
+在构建后的 `dist/cli.js` 上实测：
+
+| 命令 | 结果 |
+|---|---|
+| `continuation --help` | 列出 `status` / `request` 两个子命令（exit 0） |
+| `continuation status --json` | 输出 `status=continuation-status`、`isEnabled=false`、`settingReason=config-missing`、`activeClaims=[]`、`note` 含"不等于已恢复" |
+| `sandbox self-check --json` | 输出验收记录：`backendKind=null`、`isExecutionAllowed=false`、下一步"无隔离后端" |
+| `scripts/check-public-privacy.mjs` | `privacy-ok` |
+
+说明：以上均为**只读/显式请求**入口；`request` 成功也只到"已领取"，dispatch 仍未接线（见 §4）。

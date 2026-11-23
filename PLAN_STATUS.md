@@ -7900,3 +7900,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**935 files（933 passed / 2 skipped），5956 tests（5949 passed / 7 skipped）**；`lint` 0；覆盖率门禁按预期退出 1（未达标，如实）。
 
 > **推送状态（2026-11-24 第 114 轮）**：`a1f2d12f` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **构建产物最终核对（2026-11-24 第 115 轮）**
+>
+> - `dist/cli.js continuation --help` 列出 status/request；`continuation status --json` 默认关闭输出正确；
+>   `sandbox self-check --json` 如实报告无后端；`check-public-privacy` = `privacy-ok`。
+> - 结论：本轮新增入口在构建产物上可用，且无隐私泄露；未新增代码，仅验证 + 记录。
