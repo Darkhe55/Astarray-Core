@@ -7481,3 +7481,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**898 files（896 passed / 2 skipped），5736 tests（5729 passed / 7 skipped），EXIT=0**；`lint` 0。
 
 > **推送状态（2026-11-23 第 63 轮）**：`d81176c8` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **D2 取消语义落地（2026-11-23 第 64 轮）**
+>
+> - 新增派发过滤 `sequence-dispatch-guard`，并在 `createMission` 前按权威序列快照过滤已取消来源节点；
+>   全部被过滤 ⇒ `task-sequence-node-cancelled` 拒绝建 mission（不启动 worker、不产生提案文件）。
+> - 反例 4 条；**未做**：依赖 ALIGN-02 规划路径的"worker 计数为 0"端到端反例（已列后继）。
+> - 全量：**899 files（895 passed / 2 failed / 2 skipped），5740 tests（5731 passed / 2 failed / 7 skipped）**；
+>   2 失败均为并发/时序抖动（`cross-project-ledger-concurrency`、`mission-task-sequence-query`，隔离复跑通过）。
+
+> **推送状态（2026-11-23 第 64 轮）**：`88794a7a` 3 次推送失败（网络不可达）；留待下次合并推送。

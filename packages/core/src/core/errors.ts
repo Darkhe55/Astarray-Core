@@ -7,6 +7,8 @@
 export type DomainErrorCode =
   /** D5（2026-11-23）：执行输出未通过敏感扫描，按 block 策略不释放正文。 */
   | "execution-output-scan-blocked"
+  /** D2（2026-11-23）：派发前已取消的序列节点，禁止创建 mission。 */
+  | "task-sequence-node-cancelled"
   /** 跨进程文件锁等待超时（不是静默失败）。 */
   | "lock-timeout"
   | "invalid-task-chain"

@@ -746,3 +746,14 @@ wrapper 级"未分配 ⇒ 拒绝且处理器不被调用"与"权限引擎 deny �
 **后继（明确、不擅自扩大）**：若仍需要协议层验收，应把上表 ❌/🟡 项作为独立后继卡接入
 `completion-protocol` 的消费点；在此之前 **不得宣称"被替代已等价"**。
 2026-11-23 施工入口：历史待决项按[当前产品决策与验收口径](../reports/PRODUCT_DECISIONS_2026-11-23.md)执行。实施进度与剩余证据仍按本卡记录。
+
+### D2 落地：派发前已取消的序列节点不启动（2026-11-23）
+
+- 新增 `sequence-dispatch-guard.ts`：`filterDispatchableSequenceNodes` 依据权威序列快照过滤候选节点，
+  `isEveryDispatchableNodeBlocked` 判定"全部被阻止"。
+- `main-controller` 在 `createMission` 前用 `taskSequenceStatusController.getSnapshot` 读取序列状态，
+  过滤来源节点已 `cancelled` 的候选；**全部被过滤 ⇒ 抛 `task-sequence-node-cancelled`，不创建 mission**
+  （因此不启动 worker、不产生提案文件）；快照读取失败**不猜**，保持原节点交由下游解析层如实阻塞。
+- 反例 4 条（部分阻止/全部阻止/无来源不误伤/阻止清单排序稳定）；全量门禁 899 files / 5740 tests。
+- **未做（如实）**：真实派发入口的"worker 启动计数为 0 + 新增提案文件为 0"端到端反例——它依赖
+  ALIGN-02 任务规划路径产生带来源声明的节点（默认关闭）；已作为后继明确项，不以纯函数测试冒充。

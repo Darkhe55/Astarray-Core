@@ -102,6 +102,10 @@ import type { TertiaryTerminalReport } from "./main-agent-report-archive.js";
 import type { ConversationTaskInsertionController } from "./conversation-task-insertion-controller.js";
 import type { ConversationIdentityStore } from "./conversation-identity-store.js";
 import type { TaskSequenceManageController } from "./task-sequence-controllers.js";
+import {
+  filterDispatchableSequenceNodes,
+  isEveryDispatchableNodeBlocked,
+} from "./sequence-dispatch-guard.js";
 import type { MissionRelationIndexStore } from "./mission-relation-index.js";
 import { buildEvidenceSnapshot } from "./remote-evidence-snapshot.js";
 import type {
@@ -1442,11 +1446,66 @@ export class MainController {
         `[来源未采信] 节点声明了未知来源，已剥离：${declaredStamping.rejectedMissionTaskIdentifiers.join(", ")}`,
       );
     }
-    await this.options.missionManager.createMission({
+    /**
+     * D2（2026-11-23 产品裁决）：**派发前已取消的节点不得启动**。
+     *
+     * 用权威序列快照过滤候选节点；全部被过滤 ⇒ 直接拒绝创建 mission（不启动 worker、
+     * 不产生提案文件）。快照读取失败不猜测：保持原节点，由下游解析层如实阻塞。
+     */
+    let nodesForDispatch = taskNodesWithSource;
+    const dispatchGuardStatusController = this.options.taskSequenceStatusController ?? null;
+    if (dispatchGuardStatusController !== null) {
+      const cancelledSequenceTaskIdentifiers = new Set<string>();
+      const visitedSequences = new Set<string>();
+      for (const node of taskNodesWithSource) {
+        if (
+          node.sourceSequenceTaskIdentifier === undefined ||
+          node.sourceSequenceIdentifier === undefined ||
+          node.sourceSequenceOwnerAgentInstanceIdentifier === undefined
+        ) {
+          continue;
+        }
+        const sequenceKey = `${node.sourceSequenceOwnerAgentInstanceIdentifier}::${node.sourceSequenceIdentifier}`;
+        if (visitedSequences.has(sequenceKey)) continue;
+        visitedSequences.add(sequenceKey);
+        try {
+          const snapshot = await dispatchGuardStatusController.getSnapshot({
+            ownerAgentInstanceId: node.sourceSequenceOwnerAgentInstanceIdentifier,
+            sequenceId: node.sourceSequenceIdentifier,
+            viewer: { sourceKind: "user", actorId: "host" },
+          });
+          for (const sequenceNode of snapshot.nodes) {
+            if (sequenceNode.status === "cancelled") {
+              cancelledSequenceTaskIdentifiers.add(sequenceNode.taskId);
+            }
+          }
+        } catch {
+          /** 读不到权威序列 ⇒ 不过滤（不猜）；如实留给下游解析层。 */
+        }
+      }
+      const filtered = filterDispatchableSequenceNodes({
+        nodes: taskNodesWithSource,
+        cancelledSequenceTaskIdentifiers,
+      });
+      nodesForDispatch = filtered.dispatchableNodes;
+      const blockedSequenceSources = filtered.blockedSourceSequenceTaskIdentifiers;
+      if (isEveryDispatchableNodeBlocked(filtered)) {
+        throw new DomainError(
+          "task-sequence-node-cancelled",
+          `派发前节点已取消，拒绝创建 mission：${blockedSequenceSources.join(", ")}`,
+        );
+      }
+      if (blockedSequenceSources.length > 0) {
+        this.options.streamOutput(
+          null,
+          `[已取消节点未派发] ${blockedSequenceSources.join(", ")}`,
+        );
+      }
+    }    await this.options.missionManager.createMission({
       missionId,
       mode,
       prompt: message,
-      taskNodes: taskNodesWithSource,
+      taskNodes: nodesForDispatch,
       responsibleSecondaryAgentInstanceId,
       ...(projectIdentifier === undefined ? {} : { projectIdentifier }),
       ...(conversationIdentity === null
