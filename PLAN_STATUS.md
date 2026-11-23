@@ -7547,3 +7547,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   作为**明确阻塞点**记录，不为覆盖率改代码或造假。
 > - 全量：**904 files（902 passed / 2 skipped），5778 tests（5771 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 安全模块维持 **21/22 达标**（唯一未达标：`entrypoint`）。
+
+> **D6 外发出口清单（2026-11-23 第 69 轮）**
+>
+> - 新增 `docs/reports/OUTBOUND_EXITS_INVENTORY_2026-11-23.md`：7 个出口逐一列账（Provider 请求 / MCP stdio /
+>   远程证据导出 / 远程投递出站 / 本地导出 / 反馈信箱 / TUI stdout）。
+> - 关键事实：**E2 MCP stdio 是当前唯一"已装配且会把文件内容送出进程"的出口，且未接外发门禁**；
+>   `evaluateOutboundContentGate` 全仓仅有再导出、**无生产调用点**；E1 Provider 通道默认 `record`（只记录不阻断）；
+>   E3/E4 无生产消费者 ⇒ **不可用**。
+> - 后继：Provider 默认策略（record/block）需产品口径；MCP 出口在下一次实际外发前接门禁或声明客户端在边界内。
