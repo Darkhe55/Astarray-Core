@@ -7756,3 +7756,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增规划路径端到端：两节点候选稿（T-1 → T-2）经本地校验采纳，依赖保留、按序各派发一次、mission done。
 > - 全量：**921 files（919 passed / 2 skipped），5852 tests（5845 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 阻塞清单 F2 关闭。
+
+> **B9 覆盖率：远端导出范围分支（2026-11-24 第 97 轮）**
+>
+> - 新增 9 条 `evaluateRemoteExportScope` 分支用例（撤销/过期/非法时钟/项目越界/记录类别越界/
+>   账户与用户身份/设备不匹配/无设备标识/多原因逐条）。
+> - 定向覆盖率分析：全局分支 80.98%；未覆盖最多的文件为 main-controller 408、commands 336、
+>   application-runtime 318、public-sdk 294（大文件，测试杠杆低）。
+> - 全量：**922 files（920 passed / 2 skipped），5861 tests（5854 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 结论：B9 需约 **1000 条分支**才能到 85%，本轮属增量；后续优先挑"高未覆盖且可纯测"的模块。
+
+> **推送状态（2026-11-24 第 97 轮）**：`502cb8ff` 3 次推送失败（网络不可达）；留待下次合并推送。
