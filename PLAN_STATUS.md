@@ -7819,3 +7819,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 修一处架构守卫：CLI stderr 改走诊断漏斗（`logToStderr`）。
 > - 全量：**929 files（927 passed / 2 skipped），5915 tests（5908 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 未做：真实内容读取/扫描接线、dispatch、SDK 写入、远程通道、观测与交付文档。
+
+> **RESUME-02 交接文档（2026-11-24 第 105 轮）**
+>
+> - 新增 `RESUME02_IMPLEMENTATION_HANDOFF.md`：逐入口真实调用链、默认值、复用组件、6 项剩余问题、待验证条件。
+> - 全量门禁与隐私检查通过（文档改动，仍跑门禁）。
+> - 未做/未验证如实列明：dispatch 未接线、恢复包真实装配未接、SDK/远程/观测缺失、无人工验收。
