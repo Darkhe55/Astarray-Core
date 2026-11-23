@@ -23,6 +23,13 @@ import type { SensitiveScanResult } from "../tools/sensitive-content-scan-contra
 
 export type ProviderEgressScanMode = "off" | "record" | "block";
 
+/**
+ * RELEASE-01-02（2026-11-23）：**生产缺省**为 `block`。
+ *
+ * `record`/`off` 只用于显式隔离的诊断；旧配置仍是这两个值时应在装配层报冲突并提示迁移。
+ */
+export const DEFAULT_PROVIDER_EGRESS_SCAN_MODE: ProviderEgressScanMode = "block";
+
 export interface ProviderEgressScanRecord {
   readonly providerIdentifier: string;
   readonly recordedAtIso: string;

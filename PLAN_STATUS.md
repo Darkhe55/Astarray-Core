@@ -7648,3 +7648,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 阻塞汇总同步更新（B4 改为"公开包入口范围已明确"）。
 > - 门禁：**909 files（907 passed / 2 skipped），5796 tests（5789 passed / 7 skipped），EXIT=0**；`lint` 0；隐私通过。
 > - 目标轮次已扩至 **120** 并恢复 active。
+
+> **RELEASE-01-02：Provider 缺省 block（2026-11-23 第 82 轮）**
+>
+> - 新增 `DEFAULT_PROVIDER_EGRESS_SCAN_MODE = "block"`；两个 Provider 运行时缺省改用该常量。
+> - 反例：缺省档位必须为 block；三档行为与 incomplete 阻断用例保持通过。
+> - 全量：**909 files（907 passed / 2 skipped），5797 tests（5790 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 未做：旧配置 record/off 的冲突提示与迁移、ADR-0080 替代记录、两协议"零网络请求"计数验收。
+
+> **推送状态（2026-11-23 第 82 轮）**：`15713ecc` 3 次推送失败（网络不可达）；留待下次合并推送。

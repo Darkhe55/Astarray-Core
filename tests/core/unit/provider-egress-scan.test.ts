@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_PROVIDER_EGRESS_SCAN_MODE,
   MAXIMUM_PROVIDER_EGRESS_SCAN_RECORDS,
   applyProviderEgressScan,
   clearProviderEgressScanRecords,
@@ -122,5 +123,9 @@ describe("出口扫描三档", () => {
     const serialized = JSON.stringify(readProviderEgressScanRecords());
     expect(serialized).not.toContain(FAKE_TOKEN);
     expect(serialized).not.toContain("配置：");
+  });
+
+  it("缺省档位必须是 block（RELEASE-01-02）", () => {
+    expect(DEFAULT_PROVIDER_EGRESS_SCAN_MODE).toBe("block");
   });
 });

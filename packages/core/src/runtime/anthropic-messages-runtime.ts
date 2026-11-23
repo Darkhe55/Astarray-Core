@@ -16,6 +16,7 @@
  */
 import { DomainError } from "../core/errors.js";
 import {
+  DEFAULT_PROVIDER_EGRESS_SCAN_MODE,
   applyProviderEgressScan,
   type ProviderEgressScanMode,
   type ProviderEgressScanOptions,
@@ -105,7 +106,8 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
   constructor(private readonly options: AnthropicMessagesRuntimeOptions) {
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.egressScanOptions = {
-      mode: options.egressScanMode ?? "record",
+      /** RELEASE-01-02（2026-11-23）：生产缺省 **block**；record/off 仅限显式隔离的诊断。 */
+      mode: options.egressScanMode ?? DEFAULT_PROVIDER_EGRESS_SCAN_MODE,
       ...(options.egressAuditSink === undefined
         ? {}
         : { auditSink: options.egressAuditSink }),
