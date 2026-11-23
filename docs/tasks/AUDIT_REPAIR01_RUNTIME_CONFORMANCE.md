@@ -723,3 +723,25 @@ wrapper 级"未分配 ⇒ 拒绝且处理器不被调用"与"权限引擎 deny �
 
 这补上了此前"只有 handler 级"的空白：证明统一策略/门禁在**装配端口**上先于自定义处理器生效。
 **allow 路径已补**（同日）：目标模式激活（`activateGoalMode` 认证用户显式开启）+ 引擎授予本次参数批准 ⇒ 端口执行 `proposeGoal` 成功，提案目录**恰好一个**文件。空 requirements 会被真实提案校验拒绝（`goal-proposal-invalid`），证明处理器确实执行到存储层。**仍缺：取消的装配矩阵**（2026-11-22 核查）——mission 任务状态只有 pending/running/blocked/done/failed（无 cancelled）；`cancelled` 属于**个体任务序列**节点状态，序列层取消节点不会被映射为待派发任务。因此"任务已取消 ⇒ 不写入提案"在当前模型里由**派发层**保证，worker 工具端口没有取消入参可测；若要端口级证据，需要产品先明确"取消"在 mission 层的语义并给出信号。ponder 已有 wrapper 级用例。
+### 04 收口核查：`LocalCompletionVerifier`"被替代"的等价性（2026-11-23）
+
+分诊表把 `LocalCompletionVerifier` 标为"被替代（疑似）"。本轮逐项比对它与现行**权威完成校验**
+（`evaluateAuthoritativeCompletion` = 收据校验 + 协调门禁）的实际覆盖：
+
+| `LocalCompletionVerifier` 的检查 | 现行权威门禁是否覆盖 |
+|---|---|
+| `completionAttemptId` 重放 | ❌ 不覆盖（权威门禁无尝试 ID 重放概念） |
+| `taskExecutionId` 匹配 | ✅ 覆盖（`currentExecutionAttempt` 比对） |
+| revision 陈旧 | ✅ 覆盖（`currentTaskRevision` 比对） |
+| 声明任务可完成 / 前驱未满足 / 预期外任务 | 🟡 部分覆盖（任务状态与来源校验有，按声明的"范围完整性"无） |
+| 未决工作项数（pendingWorkItemCount） | ❌ 不覆盖 |
+| 产物/验收门禁证据 | 🟡 覆盖真实产物路径（收据），**门禁证据数组**不覆盖 |
+| 高严谨性证据门禁（ADR-0016） | ❌ 不覆盖 |
+| 循环活锁 / 预算绕过 / Provider 流干净结束 | ❌ 不覆盖 |
+
+**结论**：`LocalCompletionVerifier` **不是**等价被替代——它是主 Agent 协议层的完成事件验收器
+（`TaskCompletionEventV1`），权威门禁替代的是**编排层收据合并**，二者检查集合不同。
+`LocalCompletionVerifier` 目前仍**零调用方**（历史保留，不删除）。
+
+**后继（明确、不擅自扩大）**：若仍需要协议层验收，应把上表 ❌/🟡 项作为独立后继卡接入
+`completion-protocol` 的消费点；在此之前 **不得宣称"被替代已等价"**。

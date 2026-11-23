@@ -7306,3 +7306,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 隔离副本（独立 node_modules + 复制 dist）完整跑完：**313/313 变异体全部被拦下，EXIT=0**。
 > - 前两次"312/313、5–10 分钟"是**缺 dist 导致整组测试跳过**的假象，已作废；带 dist 后同一变异体立即变红。
 > - 已写入 WIRING-04 卡 §41；口径：源码与 HEAD 一致（仅 PLAN_STATUS 差异）、Windows 本机、跨平台未跑。
+
+> **AUDIT-REPAIR-01 04：被替代等价核查（2026-11-23 第 47 轮）**
+>
+> - 逐项比对 `LocalCompletionVerifier` 与现行权威门禁：执行尝试/revision 已覆盖；**尝试 ID 重放、
+>   未决工作项、证据门禁、活锁/预算/Provider 干净结束均未覆盖** ⇒ **不是等价被替代**。
+> - 它仍是协议层验收器（`TaskCompletionEventV1`），历史保留、不删除；⚠️ 后继为独立卡接
+>   `completion-protocol` 消费点，之前不得宣称"被替代已等价"。
+> - 已写入 AUDIT 卡第 04 节；本轮仅文档。
