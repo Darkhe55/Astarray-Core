@@ -2574,6 +2574,10 @@ mcpCommand
     "--egress-authorization-file <path>",
     "MCP 连接授权绑定文件（缺省 <state>/mcp/egress-authorizations.json；无绑定即拒绝工具调用）",
   )
+  .option(
+    "--egress-target-account <id>",
+    "释放目的端的独立来源（缺省取绑定目标；装配建议显式提供）",
+  )
   .action(
     async (options: {
       runtime?: string;
@@ -2584,6 +2588,7 @@ mcpCommand
       providerRequestTimeoutSeconds?: string;
       runtimeDiagnosticsFile?: string;
       egressAuthorizationFile?: string;
+      egressTargetAccount?: string;
     }) => {
       process.exitCode = await executeMcpServeCommand({
         stateDirectory: defaultStateDirectory(),
@@ -2611,6 +2616,9 @@ mcpCommand
           : {}),
         ...(options.egressAuthorizationFile !== undefined
           ? { egressAuthorizationFilePath: options.egressAuthorizationFile }
+          : {}),
+        ...(options.egressTargetAccount !== undefined
+          ? { egressTargetAccountIdentifier: options.egressTargetAccount }
           : {}),
       });
     },
@@ -3294,6 +3302,10 @@ program
     "--egress-authorization-file <path>",
     "MCP 连接授权绑定文件（缺省 <state>/mcp/egress-authorizations.json；无绑定即拒绝工具调用）",
   )
+  .option(
+    "--egress-target-account <id>",
+    "释放目的端的独立来源（缺省取绑定目标；装配建议显式提供）",
+  )
   .action(
     async (options: {
       port?: number;
@@ -3306,6 +3318,7 @@ program
       providerRequestTimeoutSeconds?: string;
       runtimeDiagnosticsFile?: string;
       egressAuthorizationFile?: string;
+      egressTargetAccount?: string;
     }) => {
       process.exitCode = await executeGuiServeCommand({
         stateDirectory: defaultStateDirectory(),
@@ -3335,6 +3348,9 @@ program
           : {}),
         ...(options.egressAuthorizationFile !== undefined
           ? { egressAuthorizationFilePath: options.egressAuthorizationFile }
+          : {}),
+        ...(options.egressTargetAccount !== undefined
+          ? { egressTargetAccountIdentifier: options.egressTargetAccount }
           : {}),
       });
     },

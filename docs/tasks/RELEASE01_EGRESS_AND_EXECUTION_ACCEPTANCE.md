@@ -55,5 +55,7 @@
 - **已补（2026-11-23）**：`McpEgressAuthorizationStore`（权威文件仓库：写入/撤销/跨实例读取/损坏按撤销）+
   `createMcpReleaseAuthorizer`；`mcp serve` 缺省注入该钩子（缺绑定即拒绝），新增
   `--egress-authorization-file` 选项。反例 7 条（缺绑定/有效/撤销/过期/异主体/损坏/撤销幂等）。
-- **仍未做（如实）**：目标账户与资源清单的**独立来源**（当前 target 取绑定、资源集为空，故目的端/范围检查对 MCP 桥接工具是弱校验）、
-  双客户端/两项目/临时资源端到端、真实 stdio 子进程验收、"释放点清单 + 幂等重连"记录。
+- **已补（2026-11-23）**：`extractMcpResultResourceIdentifiers` 按结果中的 `task/mission/project` 标识生成资源清单；
+  `createMcpReleaseAuthorizer` 支持**独立目的端来源**（`targetAccountIdentifier`）；`mcp serve` 新增 `--egress-target-account`。
+  反例 3 条（默认提取越界拒绝 / 允许前缀放行 / 独立目的端不一致拒绝）。
+- **仍未做（如实）**：双客户端/两项目/临时资源端到端、真实 stdio 子进程验收、"释放点清单 + 幂等重连"记录。

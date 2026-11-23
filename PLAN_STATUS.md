@@ -7677,3 +7677,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `mcp serve` **缺省注入**释放判定钩子（无绑定即拒绝工具调用），新增 `--egress-authorization-file`。
 > - 反例 7 条；全量：**913 files（911 passed / 2 skipped），5822 tests（5815 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 边界（如实）：MCP 桥接工具无独立"目标账户/资源清单"来源 ⇒ 目的端与资源范围对桥接工具是弱校验；端到端双客户端待做。
+
+> **RELEASE-01-01 资源范围与独立目的端（2026-11-23 第 86 轮）**
+>
+> - 新增 `extractMcpResultResourceIdentifiers`（task/mission/project → 资源标识）；释放判定按绑定前缀检查越界。
+> - `createMcpReleaseAuthorizer` 支持独立 `targetAccountIdentifier`；`mcp serve` 新增 `--egress-target-account`。
+> - 反例 3 条；全量：**913 files（910 passed / 1 failed / 2 skipped），5825 tests（5817 passed / 1 failed / 7 skipped）**；
+>   唯一失败为已知并发抖动（`cross-project-ledger-concurrency`，隔离复跑通过）；`lint` 0。
+> - 剩余：真实 stdio 子进程端到端、释放点清单与幂等重连。

@@ -3853,6 +3853,8 @@ export interface McpServeCommandOptions {
    * 未写入绑定时，工具调用一律拒绝（缺绑定即拒绝项目内容释放）。
    */
   egressAuthorizationFilePath?: string;
+  /** RELEASE-01-01：目的端的独立来源（宿主配置；缺省取绑定目标，属弱校验）。 */
+  egressTargetAccountIdentifier?: string;
 }
 
 export async function executeMcpServeCommand(
@@ -3928,6 +3930,9 @@ export async function executeMcpServeCommand(
         store: egressAuthorizationStore,
         connectionIdentifier: session.sessionIdentifier,
         authenticatedPrincipalIdentifier: session.principal.authenticatedPrincipalIdentifier,
+        ...(options.egressTargetAccountIdentifier === undefined
+          ? {}
+          : { targetAccountIdentifier: options.egressTargetAccountIdentifier }),
       }),
     });
     return EXIT_CODES.SUCCESS;
@@ -3962,6 +3967,8 @@ export interface GuiServeCommandOptions {
    * 未写入绑定时，工具调用一律拒绝（缺绑定即拒绝项目内容释放）。
    */
   egressAuthorizationFilePath?: string;
+  /** RELEASE-01-01：目的端的独立来源（宿主配置；缺省取绑定目标，属弱校验）。 */
+  egressTargetAccountIdentifier?: string;
 }
 
 

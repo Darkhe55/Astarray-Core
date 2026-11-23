@@ -48,6 +48,8 @@ function authorizerFor(store: McpEgressAuthorizationStore, nowIso = "2026-11-23T
     store,
     connectionIdentifier: "session-1",
     authenticatedPrincipalIdentifier: "principal-user",
+    /** 既有场景不涉及资源清单；范围提取由新增用例单独覆盖。 */
+    extractResourceIdentifiers: () => [],
     nowIso: () => nowIso,
   });
 }
@@ -127,5 +129,72 @@ describe("RELEASE-01-01：授权仓库与装配", () => {
     await store.revoke("session-1");
     const after = JSON.parse(await fs.readFile(filePath, "utf8")) as { revision: number };
     expect(after.revision).toBe(before.revision);
+  });
+});
+
+describe("RELEASE-01-01：资源清单与独立目的端", () => {
+  it("⑧ 结果含 task 标识 ⇒ 默认提取为 task:<id>；绑定未允许 ⇒ 越界拒绝", async () => {
+    const store = new McpEgressAuthorizationStore({ filePath });
+    await store.writeBinding(binding());
+    const authorizer = createMcpReleaseAuthorizer({
+      store,
+      connectionIdentifier: "session-1",
+      authenticatedPrincipalIdentifier: "principal-user",
+      nowIso: () => "2026-11-23T00:00:00.000Z",
+    });
+    const decision = await authorizer({
+      toolName: "query_task",
+      outcome: {
+        isError: false,
+        errorCode: null,
+        textContent: "摘要",
+        structuredContent: { taskIdentifier: "task-1" },
+      },
+    });
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) {
+      expect(decision.reasonCodes).toContain("resource-out-of-scope");
+    }
+  });
+
+  it("⑨ 绑定允许 task: 前缀 ⇒ 放行", async () => {
+    const store = new McpEgressAuthorizationStore({ filePath });
+    await store.writeBinding(binding({ allowedResourcePrefixes: ["task:", "project:"] }));
+    const authorizer = createMcpReleaseAuthorizer({
+      store,
+      connectionIdentifier: "session-1",
+      authenticatedPrincipalIdentifier: "principal-user",
+      nowIso: () => "2026-11-23T00:00:00.000Z",
+    });
+    const decision = await authorizer({
+      toolName: "query_task",
+      outcome: {
+        isError: false,
+        errorCode: null,
+        textContent: "摘要",
+        structuredContent: { taskIdentifier: "task-1", projectIdentifier: "project-a" },
+      },
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("⑩ 宿主提供独立目的端且与绑定不一致 ⇒ target-mismatch", async () => {
+    const store = new McpEgressAuthorizationStore({ filePath });
+    await store.writeBinding(binding({ allowedResourcePrefixes: ["task:"] }));
+    const authorizer = createMcpReleaseAuthorizer({
+      store,
+      connectionIdentifier: "session-1",
+      authenticatedPrincipalIdentifier: "principal-user",
+      targetAccountIdentifier: "client-2",
+      nowIso: () => "2026-11-23T00:00:00.000Z",
+    });
+    const decision = await authorizer({
+      toolName: "query_task",
+      outcome: { isError: false, errorCode: null, textContent: "摘要", structuredContent: {} },
+    });
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) {
+      expect(decision.reasonCodes).toContain("target-mismatch");
+    }
   });
 });

@@ -113,10 +113,46 @@ export class McpEgressAuthorizationStore implements McpAuthorizationStorePort {
  * 因此 target 取绑定的目标（对无绑定场景仍会被 `authorization-missing` 拦下），
  * 资源范围检查目前为空集；按工具提取资源清单是后续分项。
  */
+/** 从工具结果提取本结果依赖的资源标识（供范围校验）。 */
+export function extractMcpResultResourceIdentifiers(input: {
+  readonly toolName: string;
+  readonly structuredContent: Record<string, unknown>;
+}): string[] {
+  const identifiers: string[] = [];
+  const taskIdentifier = input.structuredContent["taskIdentifier"];
+  if (typeof taskIdentifier === "string" && taskIdentifier !== "") {
+    identifiers.push(`task:${taskIdentifier}`);
+  }
+  const missionIdentifier = input.structuredContent["missionIdentifier"];
+  if (typeof missionIdentifier === "string" && missionIdentifier !== "") {
+    identifiers.push(`mission:${missionIdentifier}`);
+  }
+  const projectIdentifier = input.structuredContent["projectIdentifier"];
+  if (typeof projectIdentifier === "string" && projectIdentifier !== "") {
+    identifiers.push(`project:${projectIdentifier}`);
+  }
+  return identifiers;
+}
+
 export function createMcpReleaseAuthorizer(input: {
   readonly store: McpAuthorizationStorePort;
   readonly connectionIdentifier: string;
   readonly authenticatedPrincipalIdentifier: string;
+  /**
+   * 目的端的**独立来源**（宿主配置/环境变量）。缺省取绑定自身的目标，
+   * 此时目的端校验对桥接工具是弱校验（如实记录，装配应传独立值）。
+   */
+  readonly targetAccountIdentifier?: string;
+  /** 资源清单提取（缺省按结果中的 task/mission/project 标识）。 */
+  readonly extractResourceIdentifiers?: (payload: {
+    readonly toolName: string;
+    readonly outcome: {
+      readonly isError: boolean;
+      readonly errorCode: string | null;
+      readonly textContent: string;
+      readonly structuredContent: Record<string, unknown>;
+    };
+  }) => string[];
   readonly nowIso?: () => string;
 }): (payload: {
   readonly toolName: string;
@@ -127,19 +163,28 @@ export function createMcpReleaseAuthorizer(input: {
     readonly structuredContent: Record<string, unknown>;
   };
 }) => Promise<McpEgressDecision> {
-  return async () => {
+  return async (payload) => {
     const binding = await input.store
       .readBinding(input.connectionIdentifier)
       .catch(() => null);
+    const resourceIdentifiers = (
+      input.extractResourceIdentifiers ??
+      ((value) =>
+        extractMcpResultResourceIdentifiers({
+          toolName: value.toolName,
+          structuredContent: value.outcome.structuredContent,
+        }))
+    )(payload);
     return evaluateMcpReleaseAgainstStore({
       store: input.store,
       request: {
         connectionIdentifier: input.connectionIdentifier,
         authenticatedPrincipalIdentifier: input.authenticatedPrincipalIdentifier,
-        targetAccountIdentifier: binding?.targetAccountIdentifier ?? "",
+        targetAccountIdentifier:
+          input.targetAccountIdentifier ?? binding?.targetAccountIdentifier ?? "",
         contentRevision: binding?.contentRevision ?? 0,
         ruleSetVersion: SENSITIVE_SCAN_RULE_SET_VERSION,
-        resourceIdentifiers: [],
+        resourceIdentifiers,
         nowIso: (input.nowIso ?? (() => new Date().toISOString()))(),
       },
     });
