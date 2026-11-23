@@ -7685,3 +7685,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 3 条；全量：**913 files（910 passed / 1 failed / 2 skipped），5825 tests（5817 passed / 1 failed / 7 skipped）**；
 >   唯一失败为已知并发抖动（`cross-project-ledger-concurrency`，隔离复跑通过）；`lint` 0。
 > - 剩余：真实 stdio 子进程端到端、释放点清单与幂等重连。
+
+> **RELEASE-01-01 端到端（2026-11-23 第 87 轮）**
+>
+> - 真实 stdio 子进程端到端（`dist/cli.js`）：已授权 `submit_task` 正常；运行中撤销后 `query_task` 被拒且不泄漏标识。
+> - 连接 ID 稳定化（`ASTARRAY_MCP_CONNECTION_ID`）；释放点清单与幂等重连写入卡内。
+> - 全量：**914 files（912 passed / 2 skipped），5826 tests（5819 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 剩余：双客户端/两项目夹具、真实部署中的独立目的端注入验证。

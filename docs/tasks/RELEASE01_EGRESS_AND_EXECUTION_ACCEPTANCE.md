@@ -58,4 +58,10 @@
 - **已补（2026-11-23）**：`extractMcpResultResourceIdentifiers` 按结果中的 `task/mission/project` 标识生成资源清单；
   `createMcpReleaseAuthorizer` 支持**独立目的端来源**（`targetAccountIdentifier`）；`mcp serve` 新增 `--egress-target-account`。
   反例 3 条（默认提取越界拒绝 / 允许前缀放行 / 独立目的端不一致拒绝）。
-- **仍未做（如实）**：双客户端/两项目/临时资源端到端、真实 stdio 子进程验收、"释放点清单 + 幂等重连"记录。
+- **已补（2026-11-23）**：**真实 stdio 子进程端到端**（临时状态目录 + 绑定文件 + 稳定连接 ID）：
+  `initialize` → `submit_task` 正常返回；**运行中改写绑定为撤销后** `query_task` 被拒
+  （仅原因码 `authorization-revoked`，stdout 无任务标识/正文）。夹具在生产构建 `dist/cli.js` 上运行。
+- **释放点清单**：① `tools/call` 结果写 stdout（内容扫描 + 释放判定）；② 通知不产生响应；
+  ③ stderr 仅诊断、不含正文；④ 诊断报告不含凭据/正文。**幂等重连**：连接 ID 用 `ASTARRAY_MCP_CONNECTION_ID`
+  稳定化，每次释放前重读绑定；同 ID 重连沿用同一授权状态。
+- **仍未做（如实）**：双客户端/两项目夹具、目标账户的宿主侧独立注入在真实部署中的验证。

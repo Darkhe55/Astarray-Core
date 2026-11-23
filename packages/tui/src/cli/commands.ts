@@ -3914,6 +3914,13 @@ export async function executeMcpServeCommand(
       process.env["ASTARRAY_MCP_PRINCIPAL"] ?? "external-harness:stdio",
     sessionId,
   });
+  /**
+   * RELEASE-01-01：连接标识。宿主可用 `ASTARRAY_MCP_CONNECTION_ID` 预置稳定的连接 ID
+   * （否则用桥接会话随机 ID，宿主无法提前写入绑定）。
+   */
+  const egressConnectionIdentifier =
+    process.env["ASTARRAY_MCP_CONNECTION_ID"]?.trim() ||
+    session.sessionIdentifier;
   /** RELEASE-01-01：宿主侧权威绑定仓库（缺省状态目录下），每次释放前复核。 */
   const egressAuthorizationStore = new McpEgressAuthorizationStore({
     filePath:
@@ -3928,7 +3935,7 @@ export async function executeMcpServeCommand(
       principal: session.principal,
       authorizeRelease: createMcpReleaseAuthorizer({
         store: egressAuthorizationStore,
-        connectionIdentifier: session.sessionIdentifier,
+        connectionIdentifier: egressConnectionIdentifier,
         authenticatedPrincipalIdentifier: session.principal.authenticatedPrincipalIdentifier,
         ...(options.egressTargetAccountIdentifier === undefined
           ? {}
