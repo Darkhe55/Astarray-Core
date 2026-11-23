@@ -7288,3 +7288,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 清理：主仓变异已还原、副本已安全删除（先删 junction，node_modules 未受损）、相关测试复绿。
 > - **结论**：完整 mutation-kills 重跑必须使用**独立的 node_modules**（不能 junction）；在缺少离线安装条件前，
 >   不记录 mutation-kills 通过。
+
+> **mutation-kills 隔离跑失败原因定位（2026-11-23 第 45 轮）**
+>
+> - 前两次副本跑（junction 与独立 `npm ci --offline`）都在 ~5–10 分钟跑完 313 个变异体并报 312/313，
+>   假"存活"为 `comm02-delivery-skips-persist`。
+> - **根因**：副本未带 `dist/`，而 `comm02-inbox-feedback-process` 等测试用 `describe.skipIf(!hasBuiltEntry)`
+>   整组跳过 ⇒ 变异自然"存活"；速度快也是因为大量测试被跳过。
+> - 修复：把主仓 `dist/` 复制进副本后，手动注入同一变异体 ⇒ 该测试 **2 条变红**（正确拦下）。
+> - 现已在**带 dist、独立 node_modules** 的副本重新启动完整 mutation-kills（预计 ~4.5 小时），
+>   结果下一轮起核对，未完成前不记通过。
+
+> **推送状态（2026-11-23 第 45 轮）**：`83122497` 推送失败（网络不可达）；留待下次合并推送。
