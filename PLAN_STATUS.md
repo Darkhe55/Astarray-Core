@@ -7657,3 +7657,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 未做：旧配置 record/off 的冲突提示与迁移、ADR-0080 替代记录、两协议"零网络请求"计数验收。
 
 > **推送状态（2026-11-23 第 82 轮）**：`15713ecc` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **RELEASE-01-02 配置冲突与迁移提示（2026-11-23 第 83 轮）**
+>
+> - 新增 `resolveProviderEgressScanMode`：缺省/空 ⇒ block；`record`/`off` 仅隔离诊断允许，否则**冲突回落 block**；未知值 fail-closed。
+> - 反例 6 条；全量：**910 files（908 passed / 2 skipped），5803 tests（5796 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 剩余：ADR-0080 替代记录 + 两协议"零网络请求"计数验收。

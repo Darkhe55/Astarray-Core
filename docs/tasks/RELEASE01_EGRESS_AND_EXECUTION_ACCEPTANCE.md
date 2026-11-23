@@ -39,5 +39,6 @@
 - 反例：`provider-egress-scan.test.ts` 新增"缺省档位必须是 block"；
   既有三档行为用例（off/record/block、incomplete 阻断、环形缓冲有界）保持通过。
 - 门禁：909 files / 5797 tests（全绿）；`lint` 0。
-- **未做（如实）**：旧生产配置若仍显式 `record`/`off` 的"配置冲突提示与迁移"；ADR-0080 旧默认的替代记录；
-  两协议下的"零网络请求"计数验收（需假服务计数夹具）——列为 02 的后续分项。
+- **已补（2026-11-23）**：`resolveProviderEgressScanMode` 统一解析配置——缺省/空值 ⇒ block；
+  `record`/`off` 仅在 `isIsolatedDiagnostic=true` 时生效，否则报冲突并回落 block；未知值 fail-closed。
+  反例 6 条（缺省/显式 block/旧 record/旧 off/隔离诊断/未知值）。\n- **仍未做（如实）**：ADR-0080 旧默认的替代记录；两协议下的"零网络请求"计数验收（需假服务计数夹具）。

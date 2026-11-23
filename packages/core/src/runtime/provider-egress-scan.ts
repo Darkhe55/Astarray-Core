@@ -30,6 +30,48 @@ export type ProviderEgressScanMode = "off" | "record" | "block";
  */
 export const DEFAULT_PROVIDER_EGRESS_SCAN_MODE: ProviderEgressScanMode = "block";
 
+/**
+ * RELEASE-01-02（2026-11-23）：**把配置解析成有效策略**（装配层唯一入口）。
+ *
+ * 规则：
+ * - 缺省/空值 ⇒ 新默认 `block`；
+ * - `block` ⇒ 放行；
+ * - `record`/`off` ⇒ **仅显式隔离诊断允许**；生产配置出现即报冲突并回落 `block`（不静默沿用弱化档位）；
+ * - 未知值 ⇒ 同上（fail-closed）。
+ */
+export interface ProviderEgressPolicyResolution {
+  readonly mode: ProviderEgressScanMode;
+  /** 非 null 表示旧/非法配置被拒绝并已回落 block；调用方必须报告该提示。 */
+  readonly conflictReason: string | null;
+}
+
+export function resolveProviderEgressScanMode(input: {
+  readonly configuredMode?: string | null;
+  readonly isIsolatedDiagnostic?: boolean;
+}): ProviderEgressPolicyResolution {
+  const configured = input.configuredMode?.trim() ?? "";
+  if (configured === "") {
+    return { mode: DEFAULT_PROVIDER_EGRESS_SCAN_MODE, conflictReason: null };
+  }
+  if (configured === "block") {
+    return { mode: "block", conflictReason: null };
+  }
+  if (configured === "record" || configured === "off") {
+    if (input.isIsolatedDiagnostic === true) {
+      return { mode: configured, conflictReason: null };
+    }
+    return {
+      mode: DEFAULT_PROVIDER_EGRESS_SCAN_MODE,
+      conflictReason:
+        `旧配置使用 ${configured}：生产缺省已改为 block，已回落 block；` +
+        "如确需该档位，仅在明确隔离的诊断环境显式开启并记录原因。",
+    };
+  }
+  return {
+    mode: DEFAULT_PROVIDER_EGRESS_SCAN_MODE,
+    conflictReason: `未知的出口扫描档位 ${JSON.stringify(configured)}：已回落 block（fail-closed）。`,
+  };
+}
 export interface ProviderEgressScanRecord {
   readonly providerIdentifier: string;
   readonly recordedAtIso: string;
