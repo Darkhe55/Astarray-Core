@@ -195,6 +195,105 @@ describe("B9：TaskLedgerBridge 边界", () => {
     ).rejects.toMatchObject({ errorCode: "stale-revision" });
   });
 
+
+  it("⑧ 写回成功路径：只执行 mark-sequence-done，其余跳过并给原因；revision 逐次递增", async () => {
+    const calls: Array<{ taskId: string; expectedRevision: number }> = [];
+    const sequenceLedger: TaskSequenceLedgerPort = {
+      getSnapshot: async () => ({
+        sequenceId: "seq-1",
+        revision: 5,
+        nodes: [
+          { taskId: "T-1", status: "done" },
+          { taskId: "T-2", status: "done" },
+        ],
+        readyTaskIds: [],
+      }),
+    };
+    const bridge = new TaskLedgerBridge({
+      sequenceLedger,
+      missionTaskChain: {
+        getMissionStatus: async () => ({
+          taskChain: { tasks: [{ id: "T-1", status: "done" }, { id: "T-2", status: "done" }] },
+        }),
+      },
+      sequenceTransition: {
+        transitionTaskStatus: async (parameters) => {
+          calls.push({ taskId: parameters.taskId, expectedRevision: parameters.expectedRevision });
+          return { revision: parameters.expectedRevision + 1 };
+        },
+      },
+    });
+    const result = await bridge.applyWriteBackProposal({
+      proposal: {
+        missionIdentifier: "m-1",
+        sequenceId: "seq-1",
+        sequenceRevision: 5,
+        entries: [
+          { taskIdentifier: "T-1", proposedAction: "mark-sequence-done" },
+          { taskIdentifier: "T-2", proposedAction: "needs-human-review" },
+          { taskIdentifier: "T-3", proposedAction: "mark-sequence-done" },
+        ],
+      },
+      ownerAgentInstanceId: "owner",
+      approval: { approvedBy: "user-1", approvedAtIso: "2026-11-24T00:00:00.000Z" },
+      expectedSequenceRevision: 5,
+      actor: viewer,
+    });
+    expect(result.appliedTaskIdentifiers).toEqual(["T-1", "T-3"]);
+    expect(result.skipped).toEqual([
+      {
+        taskIdentifier: "T-2",
+        proposedAction: "needs-human-review",
+        reason: "该动作需要人工判断（本次只执行 mark-sequence-done）",
+      },
+    ]);
+    expect(result.sequenceRevisionAfter).toBe(7);
+    expect(calls).toEqual([
+      { taskId: "T-1", expectedRevision: 5 },
+      { taskId: "T-3", expectedRevision: 6 },
+    ]);
+  });
+
+  it("⑨ 全部跳过 ⇒ 不调用迁移端口、revision 不变", async () => {
+    let transitionCount = 0;
+    const bridge = new TaskLedgerBridge({
+      sequenceLedger: {
+        getSnapshot: async () => ({
+          sequenceId: "seq-1",
+          revision: 5,
+          nodes: [],
+          readyTaskIds: [],
+        }),
+      },
+      missionTaskChain: { getMissionStatus: async () => ({ taskChain: { tasks: [] } }) },
+      sequenceTransition: {
+        transitionTaskStatus: async () => {
+          transitionCount += 1;
+          return { revision: 6 };
+        },
+      },
+    });
+    const result = await bridge.applyWriteBackProposal({
+      proposal: {
+        missionIdentifier: "m-1",
+        sequenceId: "seq-1",
+        sequenceRevision: 5,
+        entries: [
+          { taskIdentifier: "T-1", proposedAction: "missing-in-sequence" },
+          { taskIdentifier: "T-2", proposedAction: "missing-in-mission" },
+        ],
+      },
+      ownerAgentInstanceId: "owner",
+      approval: { approvedBy: "user-1", approvedAtIso: "2026-11-24T00:00:00.000Z" },
+      expectedSequenceRevision: 5,
+      actor: viewer,
+    });
+    expect(result.appliedTaskIdentifiers).toEqual([]);
+    expect(result.skipped).toHaveLength(2);
+    expect(result.sequenceRevisionAfter).toBe(5);
+    expect(transitionCount).toBe(0);
+  });
+
   it("⑦ 提案：映射过期（两侧都不存在）⇒ notes 明示，不猜状态", async () => {
     const bridge = bridgeWith({
       nodes: [{ taskId: "T-1", status: "done" }],

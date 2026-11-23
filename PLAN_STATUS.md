@@ -7925,3 +7925,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   （**平台"接受"≠已送达 ⇒ unknown；再次尝试 ⇒ requires-explicit-resend**，不自动重试）、
 >   回执确认 ⇒ already-sent、平台拒绝 ⇒ refused、投递前绑定消失 ⇒ refused。
 > - 全量：**936 files（934 passed / 2 skipped），5963 tests（5956 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B9 覆盖率：写回应用成功路径（2026-11-24 第 119 轮）**
+>
+> - 新增 2 条：只执行 mark-sequence-done、其余动作跳过并给原因；revision 逐次递增且每次迁移带当前 revision；
+>   全部跳过时不调用迁移端口、revision 不变。
+> - 全量：**936 files（934 passed / 2 skipped），5965 tests（5958 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **推送状态（2026-11-24 第 119 轮）**：`24719842` 3 次推送失败（网络不可达）；留待下次合并推送。
