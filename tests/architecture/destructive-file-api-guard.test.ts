@@ -48,7 +48,15 @@ const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }>
    * 理由：只写 `resume-intent/receipts.json`（请求 ID/主体/目标/版本/有效期元数据，
    * 不含正文或凭据）；过期回执仅从数组移除，不删除用户文件。
    */
-  "core/src/orchestration/continuation-receipt-store.ts": {
+  /**
+   * RESUME-02（2026-11-24）：续接领取记录。
+   * 理由：只写 `continuation/claims.json`（领取 ID/请求 ID/项目/任务/版本/token/期限），
+   * 不含正文；过期领取仅从数组移除。
+   */
+  "core/src/orchestration/continuation-controller.ts": {
+    tokens: ["writeFile"],
+    reason: "续接领取的元数据写入（状态目录，不含正文/凭据）",
+  },  "core/src/orchestration/continuation-receipt-store.ts": {
     tokens: ["writeFile"],
     reason: "恢复意图回执的元数据写入（状态目录，不含正文/凭据）",
   },  "core/src/bridge/mcp-egress-authorization-store.ts": {

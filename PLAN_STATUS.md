@@ -7791,3 +7791,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   文件损坏按无回执（fail-closed）；反例 7 条。
 > - 全量：**925 files（923 passed / 2 skipped），5891 tests（5884 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 未做：控制器 claim/assemble/dispatch、SDK/CLI/远程通道、恢复包预算、观测。
+
+> **RESUME-02 领取控制器（2026-11-24 第 101 轮）**
+>
+> - 新增 `ContinuationController`：validate → reconcile → claim（fencing token、幂等、冲突合并、坏文件 fail-closed）；反例 7 条。
+> - 全量：**926 files（924 passed / 2 skipped），5898 tests（5891 passed / 7 skipped），EXIT=0**；`lint` 0（修一处 type-only import）。
+> - 未做：assemble/dispatch、SDK/CLI/远程通道、恢复包、观测。

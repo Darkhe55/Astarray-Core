@@ -1,6 +1,6 @@
 # RESUME-02：实验性断点续接——显式请求与安全恢复
 
-状态：**implemented-unverified（2026-11-24 首版）**：检查点 01–03 的**本地判定层**已落地（`continuation-request.ts` + 12 条反例）：\n配置默认关闭（缺失/损坏/false 一律关闭）、结构化请求、状态推导（needs-selection/still-running/needs-answer/\nneeds-authorization/paused/completed/cancelled/reconciling/resumable）、5 分钟恢复意图回执与执行前复核。\n**已补（2026-11-24）**：`ResumeIntentReceiptStore`（持久化、按请求 ID 去重、过期清理、文件损坏按无回执、跨实例复核），反例 7 条。\n**未做**：ContinuationController 的 claim/assemble/dispatch、SDK/CLI/远程通道接线、有界恢复包（04）、观测与交付文档（05）；\n不解析自然语言、不调用意图模型（首版按卡内要求不做）。
+状态：**implemented-unverified（2026-11-24 首版）**：检查点 01–03 的**本地判定层**已落地（`continuation-request.ts` + 12 条反例）：\n配置默认关闭（缺失/损坏/false 一律关闭）、结构化请求、状态推导（needs-selection/still-running/needs-answer/\nneeds-authorization/paused/completed/cancelled/reconciling/resumable）、5 分钟恢复意图回执与执行前复核。\n**已补（2026-11-24）**：`ResumeIntentReceiptStore`（持久化、按请求 ID 去重、过期清理、文件损坏按无回执、跨实例复核），反例 7 条。\n**已补（2026-11-24）**：`ContinuationController` 的本地对账 + 原子领取：validate-request → reconcile → claim\n（单调 revision + fencing token、同请求幂等、同版本冲突合并、损坏按无领取、旧 token 复核失败），反例 7 条。\n**未做**：assemble/dispatch（派发与上下文装配）、SDK/CLI/远程通道接线、有界恢复包（04）、观测与交付文档（05）；\n不解析自然语言、不调用意图模型（首版按卡内要求不做）。
 
 ## 执行契约与现状
 
