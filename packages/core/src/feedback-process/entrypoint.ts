@@ -60,8 +60,6 @@ export function runFeedbackProcessEntry(
   let heartbeatWatchdog: NodeJS.Timeout | null = null;
   const recipientDeliveryTimers = new Map<string, NodeJS.Timeout>();
   let baseDirectory = options.defaultBaseDirectory;
-  /** COMM-01（2026-11-15）：子进程侧读任务链（与主进程共用 stateDirectory）。 */
-  let feedbackTaskStore: TaskStore | null = null;
   let heartbeatTimeoutMilliseconds = 30_000;
   /** 连续错过 2 次才判定主进程失联：单次负载抖动不应杀掉子进程。 */
   const heartbeatMissTolerance = createHeartbeatMissTolerance({
@@ -268,14 +266,17 @@ export function runFeedbackProcessEntry(
        * 若这里不注入，带回复标记的消息就会从这条路径绕过校验——等于规则只在一半路径上成立。
        * 任务链存储与主进程共用同一个 stateDirectory，因此子进程也能解析"任务 → 发布者"。
        */
-      feedbackTaskStore = new TaskStore({ baseDirectory });
+      /**
+       * 2026-11-24（B10 收口）：用**局部常量**捕获本次初始化的任务存储。
+       * 闭包在 journal 构造之后才可能调用；原先读模块级可空变量导致一行永远不可达的
+       * `feedbackTaskStore === null` 守卫（死代码），改为局部常量后该分支被删除，
+       * 且仍保持"构造失败由外层 catch 统一上报"的语义。
+       */
+      const taskStoreForReplyGuard = new TaskStore({ baseDirectory });
       journal = new MailboxJournal(baseDirectory, {
         replyRoutingGuard: createInProjectReplyRoutingGuard({
           resolveTask: async ({ missionIdentifier, taskIdentifier }) => {
-            if (feedbackTaskStore === null) {
-              return null;
-            }
-            const taskChain = await feedbackTaskStore.readTaskChain(missionIdentifier);
+            const taskChain = await taskStoreForReplyGuard.readTaskChain(missionIdentifier);
             const task = taskChain?.tasks.find((candidate) => candidate.id === taskIdentifier);
             return task === undefined ? null : task;
           },
