@@ -7556,3 +7556,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `evaluateOutboundContentGate` 全仓仅有再导出、**无生产调用点**；E1 Provider 通道默认 `record`（只记录不阻断）；
 >   E3/E4 无生产消费者 ⇒ **不可用**。
 > - 后继：Provider 默认策略（record/block）需产品口径；MCP 出口在下一次实际外发前接门禁或声明客户端在边界内。
+
+> **D7 模型工具入口确认（2026-11-23 第 70 轮）**
+>
+> - 反例 3 条：内置工具集不含协作请求工具、生产注册表解析不到、宿主 API 仍在（原有定向通信保留）。
+> - 全量：**905 files（903 passed / 2 skipped），5781 tests（5774 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - D7 的产品选型问题关闭；生产装配（本级结案/主层升级的端到端）已有 COORD-05 用例覆盖，仍需真实宿主演练。

@@ -322,3 +322,16 @@ astarray: 反馈进程拒绝非法消息（schema 校验失败）: Invalid UUID 
 3 条失败与本轮改动无关，且都已在基线 HEAD 上复现：`project-scope-boundary` ③、`tool-registry` 符号链接
 （Windows 创建链接需特权）、`exec01-02-cli-bootstrap-autodetect`（无隔离执行后端）。
 2026-11-23 施工入口：历史待决项按[当前产品决策与验收口径](../reports/PRODUCT_DECISIONS_2026-11-23.md)执行。实施进度与剩余证据仍按本卡记录。
+
+## D7 落地：模型工具入口（2026-11-23）
+
+产品裁决：**本轮不把 `sendCollaborationRequest` 注册为模型写工具**；Worker 只经反馈信箱逐级请示，
+本级有权且能决定就结案；到主层仍未决只呈交用户或已激活秘书；**原有宿主定向通信继续使用**。
+
+| 检查 | 结果 |
+|---|---|
+| 内置工具集是否含协作请求工具 | 否（`BUILTIN_TOOL_DESCRIPTORS` 无该名/无同类名） |
+| 生产注册表能否解析到该工具 | 否（`getDescriptor` 未定义、预览列表不含） |
+| 宿主 API 是否保留 | 是（`AstarrayApplicationFacade.prototype.sendCollaborationRequest` 存在） |
+
+反例 3 条已入库；全量门禁 905 files / 5781 tests 全绿。
