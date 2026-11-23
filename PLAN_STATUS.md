@@ -7418,3 +7418,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **全量门禁：893 files 全过、5715 tests 全过、7 skipped，EXIT=0；lint 0。**（本窗口首次全绿）
 > - 影响：此前归为"环境阻断"的包级验证（`verify:security-coverage`、`verify:entry-runtime-selection`、
 >   `verify:tarball-install`）现在具备重跑条件，下一轮起验证并记录。
+
+> **覆盖率与安全模块覆盖首次可测（2026-11-23 第 58 轮）**
+>
+> - `vitest run --coverage --maxWorkers=2`：**5715 tests 全绿**、生成 `coverage-summary.json`；
+>   **全局分支覆盖 80.78% < 85% 阈值**（其余维度达标）⇒ 门槛未过，属**真实覆盖缺口**。
+> - `verify:security-coverage` 可运行：关键安全模块 **18/22 达标（95%）**，未达标 4 个：
+>   `mailbox-journal` 92.75%、`policy-wrapper` 90.20%、`sensitive-content-access-policy` 74.11%、
+>   `feedback-process/entrypoint` 87.01%。
+> - 本轮同时修复 graph-drill 在覆盖率插桩下的超时预算（testTimeout 240s，内部 deadline 90s，
+>   满足架构规则"deadline < testTimeout"）。
+> - 全量常规门禁仍全绿（893 files / 5715 tests / exit 0）。

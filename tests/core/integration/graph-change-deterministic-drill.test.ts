@@ -16,7 +16,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.setConfig({ testTimeout: 90_000 });
+vi.setConfig({ testTimeout: 240_000 });
 
 import { AstarrayApplicationFacade } from "../../../packages/core/src/public-sdk.js";
 import {
@@ -223,7 +223,7 @@ async function startBlockedMission(): Promise<{
   if (missionIdentifier === undefined || missionIdentifier === null) {
     throw new Error("submitTask 未返回 missionIdentifier");
   }
-  const blockedTaskId = await waitForTaskBlocked(missionIdentifier, 20_000);
+  const blockedTaskId = await waitForTaskBlocked(missionIdentifier, 90_000);
   expect(blockedTaskId).toBe("T-001");
   return { application, missionIdentifier, goalIdentifier };
 }
@@ -285,7 +285,7 @@ describe("确定性图变更演练", () => {
         lastPotentialValue: number;
       };
       /** 负载容忍窗口：并行全量下事件循环可能被挤压，10s 会偶发不够；断言不变，只等更久。 */
-    const goalDeadline = Date.now() + 30_000;
+    const goalDeadline = Date.now() + 90_000; /* 覆盖率插桩下更慢，断言不变 */
       while (Date.now() < goalDeadline && goalState.lastPotentialValue !== 1) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         goalState = JSON.parse(await fs.readFile(goalStatePath, "utf8")) as typeof goalState;
@@ -334,7 +334,7 @@ describe("确定性图变更演练", () => {
         lastPotentialValue: number;
       };
       /** 同上：负载容忍窗口，不改变最终断言。 */
-    const deadline = Date.now() + 30_000;
+    const deadline = Date.now() + 90_000; /* 覆盖率插桩下更慢，断言不变 */
       while (Date.now() < deadline && !goalState.requiresReplanning) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         goalState = JSON.parse(await fs.readFile(statePath, "utf8")) as typeof goalState;
