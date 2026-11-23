@@ -7253,3 +7253,19 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本轮仅文档；无代码变更。
 
 > **推送状态（2026-11-23 第 41 轮）**：`51229a7e` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **WIRING-04 跨进程锁复跑（2026-11-23）**
+>
+> - `npm run verify:cross-process-lock` 当前 HEAD **exit 0**：两真实进程并发更新后 revision=41（无丢更新）。
+> - 已写入卡内 §40；`verify:mutation-kills` 正在后台运行，结果待记录。
+> - 本轮仅文档；无代码变更。
+
+> **提示：mutation-kills 运行被会话重启中断（2026-11-23 11:12）**
+>
+> - `verify:mutation-kills` 在后台运行至第 **217** 个变异体时被中断；脚本未走到还原步骤，
+>   工作树里残留 `explore-verification-contract.ts` / `lesson-record-contract.ts` 的**变异改动**。
+> - 已从 HEAD 还原这两个文件；`typecheck` 0，相关测试 `explore01-verification-contract` +
+>   `lesson01-record-contract` **18 条全绿**；残留 temp 目录已清理。
+> - 结论：**本轮不把 mutation-kills 记为通过**；需重新完整运行（上次约 4.5 小时）后再记录。
+
+> **推送状态（2026-11-23 第 42 轮）**：`5af4f79a` 3 次推送失败（网络不可达）；留待下次合并推送。

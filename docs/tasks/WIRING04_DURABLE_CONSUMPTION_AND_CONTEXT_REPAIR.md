@@ -1133,3 +1133,7 @@ Linux/macOS 平台证据（本机只有 Windows）。
 | 工具包反馈 | 两条反馈都保留 |
 
 **口径**：本机 Windows；未在 Linux/macOS 复跑（环境无 WSL 发行版）⇒ 跨平台证据仍缺，沿用 §36.5/§38 结论。
+## 40. 复核：跨进程文件锁（2026-11-23，本机 Windows）
+
+`npm run verify:cross-process-lock` 当前 HEAD **exit 0**：两个真实进程并发更新后 **revision=41**（无丢更新）。
+口径与 §39 相同：仅 Windows；跨平台仍缺。
