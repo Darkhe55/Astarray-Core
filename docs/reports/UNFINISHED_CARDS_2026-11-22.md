@@ -103,3 +103,19 @@ Agent 工具入口、缓存接线）；③TUI/GUI 尚未建立的视图。**不�
 本窗口（第 21–38 轮）已对 COORD-05、AUDIT-REPAIR-01、WIRING-04、SEC-02、SMART-01、PROJECT-01、
 OBS-01、HISTORY-01、AR07、COMM-01、RELOCATE-01、TOOLKIT-01、CLIENT-01、EXP-01、SMART-01、
 BATCH6/WB00 等卡完成头行/状态对账。
+## 验证证据复核（2026-11-23，第 55 轮）
+
+| 项 | 命令 | 结果 |
+|---|---|---|
+| 变异验证 | `verify:mutation-kills`（隔离副本：独立 node_modules + 复制 dist） | ✅ **313/313 被拦下**，exit 0；此前"312/313 且 5–10 分钟"因缺 dist 整组跳过，已作废 |
+| 两进程陈旧写入 | `verify:two-process-stale-write` | ✅ 10 个存储全部拒绝旧写入 |
+| 跨进程文件锁 | `verify:cross-process-lock` | ✅ 并发后 revision=41，无丢更新 |
+| E2E-01 fixture | `verify:e2e01` | ✅ fingerprint 一致、基线失败、参考实现通过 |
+| 覆盖率 / 包级 | `verify:security-coverage`、`verify:entry-runtime-selection`、`verify:tarball-install` | ⛔ 被 prepack 前置（3 环境失败 + 1 抖动）阻断，未记通过 |
+| 全量门禁 | `npm test` | 895 files / 5722 tests；4 失败 = 3 环境 + 1 已验证抖动 |
+
+**对账结论补充**：
+- **AUDIT-04**：`LocalCompletionVerifier` 与权威门禁**不等价**（尝试 ID 重放、未决工作项、证据门禁、活锁/预算/Provider 干净结束未覆盖）⇒ 保留历史、写明后继，不宣称已替代。
+- **WIRING-04-01**：信封字段与比较逻辑已有，但**无生产者盖章**、消费端恒 null ⇒ 需产品定义"执行尝试"权威来源。
+- **EXEC-01-04**：SDK/CLI 事件面**已接**（脱敏事件 + CLI JSONL 订阅），卡面"未接"已更正；**03 输出扫描闸未接线**，是否阻断属安全策略决策。
+- **COORD-05**：用户路径端到端已证；秘书通道已端口化（激活/投递由宿主注入），真实宿主实现与 agent 路径仍缺。
