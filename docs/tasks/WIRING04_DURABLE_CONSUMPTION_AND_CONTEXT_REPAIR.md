@@ -1183,3 +1183,11 @@ Linux/macOS 平台证据（本机只有 Windows）。
 
 **未做（如实）**：`taskRevision` 独立盖章（需 worker 知道链 revision）；"同一次逻辑派发重投复用同一 attempt"
 尚无重投路径可测。二者作为后继明确项。
+### D4 后续：taskRevision 盖章（2026-11-23，第 78 轮）
+
+- `DagScheduler` 维护"最近落盘 revision"（初始从链读取，落盘后取写入返回的 revision）；
+- `MissionOrchestrator` 构造 Worker 时传 `taskRevision`；`WorkerAgent` 把它盖到反馈信封
+  （与 `executionAttempt` 并列）；
+- 反例 3 条：初始 revision 读取、落盘后更新、只读端口下保持原值（不猜）。
+- 全量门禁 909 files / 5796 tests 全绿。
+- **仍未做**："同一次逻辑派发重投复用同一 attempt"（无重投路径可测）。

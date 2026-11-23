@@ -112,6 +112,8 @@ export interface WorkerAgentOptions {
   agentInstanceId: string;
   missionId: string;
   task: TaskDependencyNode;
+  /** D4（2026-11-23）：派发时的任务链 revision（与执行尝试一起盖章）。缺省 ⇒ 不盖（消费端视为不可验证）。 */
+  taskRevision?: number;
   runtime: AgentRuntime;
   /** T07D-R2-03：暴露给 Provider 的工具子集描述符（默认空 = 不暴露工具）。 */
   availableToolDescriptors?: ToolDescriptor[];
@@ -1126,6 +1128,9 @@ export class WorkerAgent {
       ...(this.options.task.executionAttempt === undefined
         ? {}
         : { executionAttempt: this.options.task.executionAttempt }),
+      ...(this.options.taskRevision === undefined
+        ? {}
+        : { taskRevision: this.options.taskRevision }),
       source: {
         sourceType: "agent",
         agentInstanceId: this.options.agentInstanceId,

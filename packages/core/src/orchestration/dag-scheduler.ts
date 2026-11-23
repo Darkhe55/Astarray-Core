@@ -79,6 +79,8 @@ export class DagScheduler {
   private readonly graph: TaskGraph;
   private readonly concurrency: number;
   private readonly missionId: string;
+  /** D4（2026-11-23）：最近一次落盘的任务链 revision（供派发时盖章）。 */
+  private chainRevision: number;
 
   constructor(
     initialChain: TaskChainDocument,
@@ -87,10 +89,16 @@ export class DagScheduler {
     this.graph = TaskGraph.fromTaskChain(initialChain);
     this.concurrency = options.concurrency;
     this.missionId = initialChain.missionId;
+    this.chainRevision = initialChain.revision;
   }
 
   getCurrentGraph(): TaskGraph {
     return this.graph;
+  }
+
+  /** D4：当前任务链 revision（上次落盘后的值；派发时随执行尝试一起盖章）。 */
+  getChainRevision(): number {
+    return this.chainRevision;
   }
 
   /** COORD-05 05-05：决定写回后登记，下一轮调度即可放行依赖该决定的节点。 */
@@ -606,8 +614,8 @@ export class DagScheduler {
     };
   }
 
-  private async persistChain(): Promise<void> {
-    await this.options.taskStore.updateTaskChain(this.missionId, (current) => {
+  private async persistChain(): Promise<number> {
+    const nextRevision = await this.options.taskStore.updateTaskChain(this.missionId, (current) => {
       const previousRevision = current?.revision ?? 0;
       return {
         schemaVersion: TASK_CHAIN_SCHEMA_VERSION,
@@ -617,6 +625,14 @@ export class DagScheduler {
         tasks: this.graph.getNodes(),
       };
     });
+    if (
+      nextRevision !== undefined &&
+      nextRevision !== null &&
+      typeof nextRevision.revision === "number"
+    ) {
+      this.chainRevision = nextRevision.revision;
+    }
+    return this.chainRevision;
   }
 
   /**

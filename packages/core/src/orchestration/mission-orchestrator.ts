@@ -1362,6 +1362,8 @@ export class MissionOrchestrator {
       agentInstanceId,
       missionId,
       task,
+      /** D4（2026-11-23）：派发时的任务链 revision（随后由 worker 盖到反馈信封）。 */
+      taskRevision: this.dagScheduler.getChainRevision(),
       availableToolDescriptors:
         this.options.workerFactories.toolDescriptorFactory?.(task) ?? [],
       requireCompletionEvent: this.options.requireCompletionControlEvent ?? false,

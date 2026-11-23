@@ -7616,3 +7616,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**908 files（906 passed / 2 skipped），5793 tests（5786 passed / 7 skipped），EXIT=0**。
 > - 包级：`entry-runtime-selection` 18/18、`tarball-install` ok、`security-coverage` 可运行（21/22）。
 > - 结论：本窗口所有代码/测试/脚本改动在 HEAD 上通过完整门禁；剩余为明确阻塞项（产品口径/平台证据/覆盖率阈值）。
+
+> **D4 taskRevision 盖章（2026-11-23 第 78 轮）**
+>
+> - 调度器维护最近落盘 revision；派发时传 `taskRevision`，worker 盖到反馈信封；消费端已按链 revision 比较。
+> - 反例 3 条；全量：**909 files（907 passed / 2 skipped），5796 tests（5789 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 剩：逻辑派发重投复用 attempt（无路径）。
+
+> **推送状态（2026-11-23 第 78 轮）**：`07aae0b6` 3 次推送失败（网络不可达）；留待下次合并推送。
