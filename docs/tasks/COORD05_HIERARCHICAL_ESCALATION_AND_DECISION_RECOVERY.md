@@ -1,6 +1,6 @@
 # COORD-05　逐级请示、用户裁决与任务恢复
 
-状态：`implemented-unverified`（2026-11-22）：六个子卡核心与公开门面/调度闸门均已落地并有反例；整卡装配（真实任务链调度、秘书/用户通道、三路径端到端）未完成，见文末验收小结。归属：Core。前置依据：[任务反馈消费](COORD01_TASK_FEEDBACK_CONSUMPTION_REPAIR.md)、[直属上级关系](COMM01_ADDRESSABLE_UPPER_LAYER_AND_SINGLE_PARENT_TASK_CARD.md)、[上下文装配与回访](COORD03_CONTEXT_PACK_ASSEMBLY_AND_CLOSED_NODE_RECALL.md)。本卡通过本包的运行时、公开接口与集成测试独立验收。
+状态：`implemented-unverified`（2026-11-23 对账）：六个子卡核心与公开门面/调度闸门已落地并有反例；**D1 单通道锁定已实施**；整卡装配（真实任务链调度、秘书激活宿主、三路径端到端）仍未完成，见文末。
 
 ## 产品裁决与范围
 
