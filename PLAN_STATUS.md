@@ -7805,3 +7805,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 未做：assemble/dispatch、request 写入路径、远程通道、恢复包、观测。
 
 > **推送状态（2026-11-24 第 102 轮）**：`240ccb01` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **RESUME-02 恢复包装配（2026-11-24 第 103 轮）**
+>
+> - 新增 `assembleContinuationPack`（检查点 04 纯装配层）：预算扣减、全局 4096 取严、未知窗口阻塞、
+>   安全约束不截断、无关节点留磁盘、前置优先；反例 8 条。
+> - 全量：**928 files（926 passed / 2 skipped），5909 tests（5902 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 未做：真实内容读取/扫描接线、dispatch、request 写入路径、远程通道、观测。
