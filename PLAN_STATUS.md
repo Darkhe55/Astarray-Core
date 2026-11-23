@@ -7562,3 +7562,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 3 条：内置工具集不含协作请求工具、生产注册表解析不到、宿主 API 仍在（原有定向通信保留）。
 > - 全量：**905 files（903 passed / 2 skipped），5781 tests（5774 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - D7 的产品选型问题关闭；生产装配（本级结案/主层升级的端到端）已有 COORD-05 用例覆盖，仍需真实宿主演练。
+
+> **D2 端到端反例（2026-11-23 第 71 轮）**
+>
+> - 新增 4 条 `d2-cancelled-node-dispatch-loop`：真实派发入口（`SecondaryContinuousDispatchLoop`）下，
+>   取消节点 worker 启动数与提案文件均为 0，可派发对照照常派发；全部取消时零派发且不是处理器缺失。
+> - 全量：**906 files（904 passed / 2 skipped），5785 tests（5778 passed / 7 skipped），EXIT=0**；`lint` 0。
