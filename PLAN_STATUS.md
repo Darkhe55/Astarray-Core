@@ -7269,3 +7269,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 结论：**本轮不把 mutation-kills 记为通过**；需重新完整运行（上次约 4.5 小时）后再记录。
 
 > **推送状态（2026-11-23 第 42 轮）**：`5af4f79a` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **覆盖率验证尝试（2026-11-23 第 43 轮）**
+>
+> - `npm run test:coverage` 在当前 HEAD 跑完：**5711 tests（5701 passed / 3 failed / 7 skipped，192.82s）**；
+>   3 失败即既有的 3 条本机环境失败（tool-registry 符号链接、exec01-02 CLI 引导、project-scope ③）。
+> - 因测试非全绿，`coverage/coverage-summary.json` **未生成** ⇒ `verify:security-coverage` 无法读取并退出 1
+>   （"先运行 npm run test:coverage"）。**这不是新缺陷**：环境失败阻止覆盖率产物，跨平台/环境修复后需重跑。
+> - `verify:sdk-consumer` 需要 tarball 参数（未提供），本轮未执行。
+> - 本轮仅文档；无代码变更。
