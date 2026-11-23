@@ -7591,3 +7591,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 未完成清单新增"决策落地与验证更新（第 61–73 轮）"：D1–D8 逐项证据、更新后的门禁/覆盖率/包级状态、
 >   以及按性质分类的剩余项（产品口径 / 平台人工证据 / 覆盖率 / 包级脚本 / 实现后继）。
 > - 本轮仅文档；全量门禁沿用第 73 轮（908 files / 5793 tests，1 条已证并发抖动）。
+
+> **包级验收：entry-runtime-selection 通过（2026-11-23 第 75 轮）**
+>
+> - `verify:entry-runtime-selection`：**18/18 通过，exit 0**（3 项不适用：公开构建不含 Web GUI，`gui` 按设计 fail-closed）。
+>   tarball sha256 = `719fc4c00a24b233363fc929fcf645a9bc6883a48676c10fc99a2e2a3f3704bb`；
+>   `run` 入口由受保护凭据引用驱动到 `done`，协议服务器收到真实请求。
+> - 本轮修复脚本三处**真实缺陷**：① `npm pack --json` 输出前有 prepack 噪声导致 JSON 解析失败（改取最后一个行首 `[`）；
+>   ② 假定的缺省状态目录错误（真实为 `%LOCALAPPDATA%\Astarray\state`）⇒ 用 `ASTARRAY_DATA_DIR` 隔离，避免读写真实用户数据；
+>   ③ `gui` 在 CLI-only 构建不可用 ⇒ 相关检查如实标"不适用"而非通过/失败；[5] 切到 `mcp serve` 时误带 `--no-open` 已修正。
+> - 未跑：`verify:tarball-install`（下一轮）。

@@ -34,6 +34,13 @@ const consumerRoot = path.join(repositoryRoot, ".tmp", "entry-runtime-selection"
 const packageArchiveRoot = path.join(repositoryRoot, ".tmp", "packages", runIdentifier);
 // `defaultStateDirectory()` = <cwd>/.astarray；凭据与报告都落在隔离安装目录内。
 const stateDirectory = path.join(consumerRoot, ".astarray");
+/**
+ * 2026-11-23 修正：真实 CLI 的缺省状态目录是 `%LOCALAPPDATA%\\Astarray\\state`（不是 `<cwd>/.astarray`，
+ * 后者只在 VITEST=true 时生效）。安装验收必须隔离：用 `ASTARRAY_DATA_DIR` 把状态锁进本次消费目录，
+ * 否则会读写真实用户数据（且备份 copyfile 在用户目录下可能 EPERM）。
+ */
+const isolatedDataDirectory = path.join(consumerRoot, ".astarray-data");
+mkdirSync(isolatedDataDirectory, { recursive: true });
 
 const argumentsList = process.argv.slice(2);
 const skipPack = argumentsList.includes("--skip-pack");
@@ -47,9 +54,16 @@ const explicitCliEntryPath =
   cliEntryArgumentIndex >= 0 ? argumentsList[cliEntryArgumentIndex + 1] : undefined;
 
 const CHECKS = [];
-function recordCheck(checkName, isPassed, detail) {
-  CHECKS.push({ checkName, isPassed: Boolean(isPassed), detail: String(detail) });
-  console.log(`${isPassed ? "  ✓" : "  ✗"} ${checkName} — ${detail}`);
+/**
+ * 2026-11-23：**公开构建只含 CLI**（TUI/GUI 不在公开源码中），`gui` 入口按设计 fail-closed。
+ * 这类检查记为"不适用"而不是"通过"，也不计入失败——如实反映"本构建无法验证 gui"。
+ */
+let isGuiEntryAvailable = true;
+function recordCheck(checkName, isPassed, detail, options = {}) {
+  const isApplicable = options.isApplicable !== false;
+  CHECKS.push({ checkName, isPassed: Boolean(isPassed), detail: String(detail), isApplicable });
+  const marker = !isApplicable ? "–" : isPassed ? "✓" : "✗";
+  console.log(`  ${marker} ${checkName} — ${detail}`);
 }
 function fail(message) {
   console.error("\n三入口运行时选择安装验收失败: " + message);
@@ -57,8 +71,13 @@ function fail(message) {
   process.exit(1);
 }
 function printSummary() {
-  const passedCount = CHECKS.filter((check) => check.isPassed).length;
-  console.log(`\n检查项: ${passedCount}/${CHECKS.length} 通过`);
+  const applicableChecks = CHECKS.filter((check) => check.isApplicable);
+  const passedCount = applicableChecks.filter((check) => check.isPassed).length;
+  const skippedCount = CHECKS.length - applicableChecks.length;
+  console.log(
+    `\n检查项: ${passedCount}/${applicableChecks.length} 通过` +
+      (skippedCount > 0 ? `（${skippedCount} 项不适用：本构建不含 Web GUI）` : ""),
+  );
 }
 
 function resolveTarballPath() {
@@ -101,7 +120,20 @@ if (explicitCliEntryPath !== undefined) {
     )
       .replace(/\u001B\[[0-9;]*m/g, "")
       .trim();
-    const packResult = JSON.parse(packOutput.slice(packOutput.indexOf("[")))[0];
+    /**
+     * 2026-11-23：prepack 的脚本输出会出现在 JSON 之前（vitest 进度里也含 `[`），
+     * 从**第一个** `[` 截取会偶发 `Unexpected non-whitespace character after JSON`。
+     * npm 的 `--json` 结果始终在末尾，取**最后一个**行首 `[` 更稳。
+     */
+    const jsonStartIndex = Math.max(
+      packOutput.lastIndexOf("\n["),
+      packOutput.lastIndexOf("\r\n["),
+    );
+    const packJsonText =
+      jsonStartIndex >= 0
+        ? packOutput.slice(jsonStartIndex + (packOutput[jsonStartIndex] === "\r" ? 2 : 1))
+        : packOutput.slice(packOutput.indexOf("["));
+    const packResult = JSON.parse(packJsonText)[0];
     tarballPath = path.join(packageArchiveRoot, packResult.filename);
   }
   const tarballSha256 = execFileSync("node", [
@@ -186,7 +218,7 @@ function runInstalledCli(commandArguments, stdinText) {
         cwd: consumerRoot,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
-        env: { ...process.env, NO_COLOR: "1", ASTARRAY_MCP_PRINCIPAL: "install-verify:stdio" },
+        env: { ...process.env, NO_COLOR: "1", ASTARRAY_MCP_PRINCIPAL: "install-verify:stdio", ASTARRAY_DATA_DIR: isolatedDataDirectory },
       },
     );
     let stdoutText = "";
@@ -233,7 +265,7 @@ async function runLongRunningEntry(commandArguments, reportFilePath) {
     cwd: consumerRoot,
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
-    env: { ...process.env, NO_COLOR: "1", ASTARRAY_MCP_PRINCIPAL: "install-verify:stdio" },
+    env: { ...process.env, NO_COLOR: "1", ASTARRAY_MCP_PRINCIPAL: "install-verify:stdio", ASTARRAY_DATA_DIR: isolatedDataDirectory },
   });
   let stdoutText = "";
   let stderrText = "";
@@ -431,6 +463,20 @@ const missingParameterCases = [
 ];
 for (const testCase of missingParameterCases) {
   const result = await runInstalledCli(testCase.commandArguments);
+  /**
+   * 公开构建不含 Web GUI：gui 入口会以稳定文案 fail-closed（退出码 1），
+   * 此时"缺参退出码 2"的检查**不适用**（不是失败），并关闭后续 gui 检查。
+   */
+  if (testCase.commandArguments[0] === "gui" && result.stderrText.includes("此构建不含 Web GUI")) {
+    isGuiEntryAvailable = false;
+    recordCheck(
+      `缺参 ${testCase.commandArguments[0]} → 退出码 2`,
+      true,
+      "CLI-only 构建：gui 按设计 fail-closed（不适用）",
+      { isApplicable: false },
+    );
+    continue;
+  }
   const reasonReported = result.stderrText.includes(testCase.expectedReason);
   recordCheck(
     `缺参 ${testCase.commandArguments[0]} → 退出码 2`,
@@ -440,7 +486,15 @@ for (const testCase of missingParameterCases) {
 }
 
 console.log("\n[4] 受保护凭据引用被选用（gui / mcp serve）");
-for (const entryName of ["gui", "mcp"]) {
+if (!isGuiEntryAvailable) {
+  recordCheck(
+    "gui：引用路径被选用",
+    true,
+    "CLI-only 构建：gui 不可用（不适用）",
+    { isApplicable: false },
+  );
+}
+for (const entryName of isGuiEntryAvailable ? ["gui", "mcp"] : ["mcp"]) {
   const reportFilePath = path.join(stateDirectory, `runtime-diagnostics-${entryName}.json`);
   const commandArguments =
     entryName === "gui"
@@ -455,6 +509,9 @@ for (const entryName of ["gui", "mcp"]) {
           "fake-model",
           "--provider-credential-reference",
           protectedCredentialReferenceId,
+          /** 2026-11-23：provider 运行时要求显式端点；此段只验收"引用被选用"，不发起请求。 */
+          "--provider-endpoint",
+          "http://127.0.0.1:9/v1",
         ]
       : [
           "mcp",
@@ -465,6 +522,8 @@ for (const entryName of ["gui", "mcp"]) {
           "fake-model",
           "--provider-credential-reference",
           protectedCredentialReferenceId,
+          "--provider-endpoint",
+          "http://127.0.0.1:9/v1",
         ];
   const { report, stdoutText, stderrText } = await runLongRunningEntry(
     [...commandArguments, "--runtime-diagnostics-file", reportFilePath],
@@ -505,14 +564,15 @@ for (const entryName of ["gui", "mcp"]) {
 console.log("\n[5] 引用缺失 → 退出码 2 且不写报告（fail-closed）");
 const missingReferenceReportPath = path.join(stateDirectory, "runtime-diagnostics-missing.json");
 const missingReferenceResult = await runInstalledCli([
-  "gui",
-  "--no-open",
+  ...(isGuiEntryAvailable ? ["gui", "--no-open"] : ["mcp", "serve"]),
   "--runtime",
   "openai-compatible",
   "--provider-model",
   "fake-model",
   "--provider-credential-reference",
   "cred-ref-does-not-exist",
+  "--provider-endpoint",
+  "http://127.0.0.1:9/v1",
   "--runtime-diagnostics-file",
   missingReferenceReportPath,
 ]);
@@ -531,7 +591,7 @@ recordCheck(
 console.log("\n[6] 未给运行时参数 → mock 默认（离线路径未被破坏，不误报 provider）");
 const mockReportPath = path.join(stateDirectory, "runtime-diagnostics-mock.json");
 const mockResult = await runLongRunningEntry(
-  ["gui", "--no-open", "--port", "0", "--runtime-diagnostics-file", mockReportPath],
+  [...(isGuiEntryAvailable ? ["gui", "--no-open", "--port", "0"] : ["mcp", "serve"]), "--runtime-diagnostics-file", mockReportPath],
   mockReportPath,
 );
 recordCheck(
@@ -577,7 +637,7 @@ recordCheck(
 await new Promise((resolve) => protocolServer.close(() => resolve()));
 
 printSummary();
-const failedChecks = CHECKS.filter((check) => !check.isPassed);
+const failedChecks = CHECKS.filter((check) => check.isApplicable && !check.isPassed);
 if (failedChecks.length > 0) {
   console.error("\n失败检查项:");
   for (const failedCheck of failedChecks) {
