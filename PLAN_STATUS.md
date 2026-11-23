@@ -7841,3 +7841,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   映射过期的 notes）；全用注入端口，无文件系统。
 > - 全量：**930 files（928 passed / 2 skipped），5922 tests（5915 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - B9 仍为增量（全局分支 80.98% → 85% 需约 1000 条分支）。
+
+> **B9 覆盖率：内置工具参数/装配分支（2026-11-24 第 108 轮）**
+>
+> - 新增 8 条内置工具边界用例：readFile/createProjectFile/replaceFileContent 缺参数、
+>   taskSequenceStatus 缺 sequenceId、searchProjectText 缺 pattern、gitReadonlyView 未装配策略引擎、
+>   processExecution 缺主体/非法 action；均为"显式报错，不静默返回空"。
+> - 全量：**931 files（929 passed / 2 skipped），5930 tests（5923 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - B9 仍为增量（80.98% → 85% 需约 1000 条分支）。
+
+> **推送状态（2026-11-24 第 108 轮）**：`11a4b9db` 3 次推送失败（网络不可达）；留待下次合并推送。
