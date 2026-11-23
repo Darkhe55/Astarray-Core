@@ -7537,3 +7537,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**904 files（900 passed / 2 failed / 2 skipped），5775 tests（5766 passed / 2 failed / 7 skipped）**；
 >   2 失败为并发抖动（`edit-intent-baseline-concurrency`、`journal-append-concurrency`，隔离复跑通过）；`lint` 0。
 > - 覆盖率复测待下一轮（上轮：安全模块 21/22，`entrypoint` 89.61%）。
+
+> **D8 覆盖率（2026-11-23 第 68 轮收尾）**
+>
+> - `policy-wrapper` 已达标；`entrypoint` 定向覆盖后仅剩 **7 行**未覆盖：
+>   `186` 防御性空返回、`238` 清理循环（定时器已被投递流程消费）、`276/283` 守卫内部两处分支、
+>   `305/312/313` **初始化失败 catch**（构造器不抛错，需 DI 才能触发）。
+> - 结论：`entrypoint` 行覆盖约 **90.9%（70/77）**，**无法在不改产品/不加测试注入的前提下达到 95%**；
+>   作为**明确阻塞点**记录，不为覆盖率改代码或造假。
+> - 全量：**904 files（902 passed / 2 skipped），5778 tests（5771 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 安全模块维持 **21/22 达标**（唯一未达标：`entrypoint`）。
