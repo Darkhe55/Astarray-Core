@@ -7632,3 +7632,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   三条包级脚本全部执行确认（entry-runtime 18/18、tarball-install ok、security-coverage 21/22）。
 > - **目标未完成**：剩余项需产品口径（D6-E2、Provider 默认策略）、平台/人工证据（沙箱、远程投递、GUI/TUI），
 >   以及覆盖率阈值与少量工程后继；如实保持 active，不标完成。
+
+> **阻塞项汇总落盘（2026-11-23）**
+>
+> - 新增 `docs/reports/BLOCKERS_2026-11-23.md`，作为阻塞项**唯一汇总入口**：
+>   B1–B4 产品口径、B5–B8 平台/人工证据、B9–B10 覆盖率、F1–F3 工程后继；每项带"卡住什么/需要谁/证据链接"。
+> - 已完成项与证据仍以 `UNFINISHED_CARDS_2026-11-22.md`「定稿」节与本文件第 61–80 轮条目为准。
