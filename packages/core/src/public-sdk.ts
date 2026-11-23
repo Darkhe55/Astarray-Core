@@ -15,6 +15,10 @@ import { TaskStore } from "./infra/task-store.js";
 import { DecisionSubmissionStore } from "./orchestration/decision-submission.js";
 import { DecisionWritebackStore } from "./orchestration/decision-writeback.js";
 import { applyUserDecision as applyUserDecisionUseCase, type ApplyUserDecisionOutcome } from "./orchestration/decision-application.js";
+import { submitDecision, type SubmitDecisionOutcome } from "./orchestration/decision-submission.js";
+import { createClarificationUserChannel } from "./orchestration/clarification-decision-channel.js";
+import { createSecretaryDecisionChannel, type SecretaryDecisionDispatcher } from "./orchestration/secretary-decision-channel.js";
+import { UserClarificationStore } from "./orchestration/user-clarification.js";
 import {
   EscalationRequestStore,
   EscalationWorkflow,
@@ -74,7 +78,6 @@ import {
   PermissionAskRequestStore,
   type PermissionAskRequestRecord,
 } from "./orchestration/permission-ask-request-store.js";
-import { UserClarificationStore } from "./orchestration/user-clarification.js";
 import type { UserClarificationRequest } from "./orchestration/user-clarification.js";
 import type {
   InstallationInquiryAnswer,
@@ -7621,6 +7624,71 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    * 写回成功后通知运行中的 mission 调度器（无活动编排器时由下一次调度从任务链证据读取）；
    * 步骤推进由调度器下一轮 ready-set 重算完成，不在此处直接启动工具。
    */
+  /**
+   * COORD-05 05-04（2026-11-23）：**决定呈交入口**——直接用户通道 / 秘书通道。
+   *
+   * 秘书通道由宿主注入（激活状态 + 投递器）；未提供 ⇒ 一律走直接用户通道（登记待决记录）。
+   * 未激活/投递失败 ⇒ `channel-unavailable` 且保持待呈交，不伪造回执。
+   */
+  async submitDecisionSummary(input: {
+    readonly submissionIdentifier: string;
+    readonly projectIdentifier: string;
+    readonly decisionId: string;
+    readonly ownerAgentInstanceId: string;
+    readonly taskIdentifier: string;
+    readonly summary: string;
+    readonly recommendedReason?: string | null;
+    readonly affectedStepIdentifiers?: ReadonlyArray<string>;
+    readonly candidates?: ReadonlyArray<{
+      readonly candidateIdentifier: string;
+      readonly label: string;
+      readonly value: string;
+    }>;
+    readonly nowIso?: string;
+    readonly secretary?: {
+      readonly isActivated: () => boolean | Promise<boolean>;
+      readonly dispatcher: SecretaryDecisionDispatcher;
+    };
+  }): Promise<SubmitDecisionOutcome> {
+    this.assertOpen();
+    const stateDirectory = this.requireStateDirectory();
+    const nowIso = input.nowIso ?? new Date().toISOString();
+    const secretary = input.secretary;
+    return submitDecision(
+      {
+        store: new DecisionSubmissionStore({ baseDirectory: stateDirectory }),
+        isSecretaryActivated:
+          secretary === undefined ? async () => false : () => Promise.resolve(secretary.isActivated()),
+        secretaryChannel:
+          secretary === undefined
+            ? {
+                submit: async () => {
+                  throw new Error("秘书通道未配置");
+                },
+              }
+            : createSecretaryDecisionChannel({
+                isActivated: secretary.isActivated,
+                dispatcher: secretary.dispatcher,
+              }),
+        userChannel: createClarificationUserChannel({
+          store: new UserClarificationStore({ baseDirectory: stateDirectory }),
+          nowIso: () => nowIso,
+        }),
+      },
+      {
+        submissionIdentifier: input.submissionIdentifier,
+        projectIdentifier: input.projectIdentifier,
+        decisionId: input.decisionId,
+        ownerAgentInstanceId: input.ownerAgentInstanceId,
+        taskIdentifier: input.taskIdentifier,
+        summary: input.summary,
+        recommendedReason: input.recommendedReason ?? null,
+        affectedStepIdentifiers: input.affectedStepIdentifiers ?? [],
+        candidates: input.candidates ?? [],
+        nowIso,
+      },
+    );
+  }
   async applyUserDecision(input: {
     readonly submissionIdentifier: string;
     readonly projectIdentifier: string;

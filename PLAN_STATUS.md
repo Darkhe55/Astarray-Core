@@ -7334,3 +7334,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 未做：真实激活状态与投递器的宿主实现、三路径端到端（产品接线）。
 
 > **推送状态（2026-11-23 第 49 轮）**：`9992dd4a` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **COORD-05 门面决定呈交入口（2026-11-23）**
+>
+> - `facade.submitDecisionSummary`：秘书激活 ⇒ 秘书通道；无秘书/未激活 ⇒ 回退直接用户通道（登记待决记录）；
+>   秘书投递失败 ⇒ `channel-unavailable` 保持待呈交。
+> - 反例 4 条；变异承重：默认激活改 true ⇒ ① 红。
+> - 全量：**894 files（888 passed / 4 failed / 2 skipped），5721 tests（5710 passed / 4 failed / 7 skipped）**；
+>   3 环境 + 1 已知抖动（graph drill）。`typecheck` / `lint` 0。
+> - 未做：真实秘书激活状态与投递器、三路径端到端。
