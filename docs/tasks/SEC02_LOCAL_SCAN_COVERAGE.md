@@ -223,3 +223,19 @@ Azure/GCP 凭据、webhook 带签名链接）。**没有任何一行标"已验�
 未跑"宿主有 key 时子进程看不到""跨服务复用引用被拒""模型载荷含 key 被拒"任何一条。
 
 **验证状态**：未编写/未运行测试；`npm run typecheck` exit 0、`npx eslint` exit 0、`npm run build` 成功。
+
+## 覆盖证据（2026-11-23，门禁转全绿后首次可测）
+
+- `vitest run --coverage --maxWorkers=2`：**5715 tests 全绿**，生成 `coverage/coverage-summary.json`；
+  **全局分支覆盖 80.78% < 85% 阈值**（lines/functions/statements 达标）⇒ 门槛未过，**真实缺口**。
+- `npm run verify:security-coverage`：关键安全模块 **18/22 达到 95%**；未达标：
+
+| 模块 | 行覆盖 | 备注 |
+|---|---|---|
+| `packages/core/src/feedback-process/mailbox-journal.ts` | 92.75% | 128/138 |
+| `packages/core/src/tools/policy-wrapper.ts` | 90.20% | 129/143 |
+| `packages/core/src/tools/sensitive-content-access-policy.ts` | **74.11%** | 63/85（最低，且卡内静态审查点 1/4 正落在此文件） |
+| `packages/core/src/feedback-process/entrypoint.ts` | 87.01% | 67/77 |
+
+**后继（明确）**：为上述 4 个模块补分支用例（优先 `sensitive-content-access-policy` 的截断/身份核对分支），
+并把全局分支提升到 ≥85%；在达标前，不宣称 SEC-02 覆盖完成。
