@@ -1242,6 +1242,14 @@ export class MissionOrchestrator {
       return;
     }
     /**
+     * D4（2026-11-23）：**派发前记录执行尝试**（权威派发器职责）。
+     *
+     * 尝试序号随任务链落盘，并经由 `task.executionAttempt` 传给 worker，
+     * 由 worker 在反馈信封上盖章；同一次派发的重投不会递增。
+     * 落盘失败不阻塞派发：由调度器在只读测试端口下跳过写回，内存序号仍用于盖章。
+     */
+    await this.dagScheduler.noteDispatchAttempt(action.taskId);
+    /**
      * LESSON-01-03 分派节点投递（2026-10-20）：**只建议、不阻塞**。
      * 抛错/拒绝都不改变派生流程（教训不能成为派发的单点故障）。
      */

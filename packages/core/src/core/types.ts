@@ -361,6 +361,12 @@ export interface TaskDependencyNode {
    * 只有三个字段齐全时读取方才会建立/使用**精确映射**；
    * 缺失即视为来源不可考（不得按名称或最近任务猜）。
    */
+  /**
+   * D4（2026-11-23 产品裁决）：**执行尝试序号**（权威派发器在任务链节点上持久化）。
+   *
+   * 单调递增：真正重新执行才 +1；旧信封缺字段 ⇒ 消费端视为不可验证（不猜测当前值）。
+   */
+  executionAttempt?: number;
   sourceSequenceTaskIdentifier?: string;
   /**
    * COORD-05 05-05（2026-11-22）：**本节点显式依赖的决定**。

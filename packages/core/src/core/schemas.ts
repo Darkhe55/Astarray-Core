@@ -142,6 +142,8 @@ export const taskDependencyNodeSchema = z.object({
    * **必须显式登记**，否则 zod 默认会把未知字段**静默丢弃**——
    * 那样"精确映射"在读链时就永远看不到来源。
    */
+  /** D4（2026-11-23）：执行尝试序号（可选；旧文档没有该字段）。 */
+  executionAttempt: z.number().int().min(1).optional(),
   sourceSequenceTaskIdentifier: z.string().min(1).optional(),
   sourceSequenceIdentifier: z.string().min(1).optional(),
   sourceSequenceOwnerAgentInstanceIdentifier: z.string().min(1).optional(),

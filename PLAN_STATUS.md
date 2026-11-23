@@ -7491,3 +7491,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   2 失败均为并发/时序抖动（`cross-project-ledger-concurrency`、`mission-task-sequence-query`，隔离复跑通过）。
 
 > **推送状态（2026-11-23 第 64 轮）**：`88794a7a` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **D4 执行尝试落地（2026-11-23 第 65 轮）**
+>
+> - `executionAttempt` 入库类型/ zodschema；`TaskGraph.recordDispatchAttempt` 单调递增；
+>   `DagScheduler.noteDispatchAttempt` 派发前递增并落盘（只读测试端口跳过写回）；
+>   worker 反馈信封盖章；消费端取权威任务链节点值比较。
+> - 反例 4 条；中间发现并修复"夹具无 updateTaskChain ⇒ 派发直接抛错"的回归（改为只读端口跳过写回）。
+> - 全量：**900 files（898 passed / 2 skipped），5744 tests（5737 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 未做：`taskRevision` 独立盖章、重投复用 attempt（无重投路径）。

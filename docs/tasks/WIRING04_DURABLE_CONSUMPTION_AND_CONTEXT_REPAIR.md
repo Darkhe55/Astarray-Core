@@ -1162,3 +1162,24 @@ Linux/macOS 平台证据（本机只有 Windows）。
 **唯一阻塞点**：需要设计决定"执行尝试"的权威来源（任务链 per-task revision / 恢复尝试计数 / 运行登记）
 并让反馈生产者与消费者共用同一来源；在此之前 01 **不能判完成**，也不应以"字段已加"冒充核验已生效。
 2026-11-23 施工入口：历史待决项按[当前产品决策与验收口径](../reports/PRODUCT_DECISIONS_2026-11-23.md)执行。实施进度与剩余证据仍按本卡记录。
+
+## 43. D4 执行尝试落地（2026-11-23）
+
+**产品裁决**：任务定义版本与执行尝试分别记录；权威派发器在任务链节点持久化单调 attempt；
+生产者从派发记录盖章；消费者与当前节点比较；旧信封缺字段 ⇒ 不可验证。
+
+**实现**：
+
+| 层 | 改动 |
+|---|---|
+| 类型/schema | `TaskDependencyNode.executionAttempt?: number`（zod 显式登记，避免读链被丢弃） |
+| `TaskGraph` | `recordDispatchAttempt`：单调 +1，旧节点从 1 开始（不猜历史） |
+| `DagScheduler` | `noteDispatchAttempt`：递增并 `persistChain`；只读测试端口下跳过写回 |
+| `MissionOrchestrator.launchWorker` | 启动 worker 前调用（真实派发器职责） |
+| `WorkerAgent.reportOutcome` | 反馈信封盖章 `executionAttempt`（缺省不盖 ⇒ 消费端不可验证） |
+| `application-runtime` | 协调完成门禁的 `currentExecutionAttempt` 取**权威任务链节点**值 |
+
+**反例 4 条**（首次=1/旧节点从 1/有值继续单调/不存在任务报错）；全量门禁 **898 files / 5744 tests 全绿**。
+
+**未做（如实）**：`taskRevision` 独立盖章（需 worker 知道链 revision）；"同一次逻辑派发重投复用同一 attempt"
+尚无重投路径可测。二者作为后继明确项。

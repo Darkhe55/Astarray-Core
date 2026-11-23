@@ -274,6 +274,21 @@ export class TaskGraph {
     );
   }
 
+  /**
+   * D4（2026-11-23）：**记录一次真实派发尝试**（单调 +1，返回新值）。
+   *
+   * 只由权威派发器在启动 worker 前调用；同一逻辑派发重投不经过这里（复用旧 attempt）。
+   */
+  recordDispatchAttempt(taskId: string): number {
+    const node = this.nodesById.get(taskId);
+    if (node === undefined) {
+      throw new DomainError("dependency-not-found", `任务不存在: ${taskId}`);
+    }
+    const nextAttempt = (node.executionAttempt ?? 0) + 1;
+    node.executionAttempt = nextAttempt;
+    return nextAttempt;
+  }
+
   markRunning(taskId: string): void {
     this.transitionTo(taskId, "running", ["pending"]);
   }

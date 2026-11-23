@@ -5289,7 +5289,8 @@ const controller = new MainController({
         messageTaskRevision: coordinationMessage.taskRevision ?? null,
         messageExecutionAttempt: coordinationMessage.executionAttempt ?? null,
         currentTaskRevision: missionTaskChain?.revision ?? null,
-        currentExecutionAttempt: null,
+        /** D4（2026-11-23）：当前尝试取**权威任务链节点**（旧文档无该字段 ⇒ null ⇒ 不可验证）。 */
+        currentExecutionAttempt: coordinationTask?.executionAttempt ?? null,
         outcome: coordinationTaskStatus,
         sourceAgentInstanceIdentifier:
           coordinationMessage.source.sourceType === "agent"

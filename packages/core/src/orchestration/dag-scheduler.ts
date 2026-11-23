@@ -292,6 +292,22 @@ export class DagScheduler {
     await this.persistChain();
   }
 
+  /**
+   * D4（2026-11-23）：派发前记录**执行尝试**并落盘（权威派发器职责）。
+   *
+   * 返回本次尝试序号；任务节点随后被 worker 读取并盖章到反馈信封。
+   */
+  async noteDispatchAttempt(taskId: string): Promise<number> {
+    const attempt = this.graph.recordDispatchAttempt(taskId);
+    /**
+     * 测试夹具可能只提供只读任务端口（无 `updateTaskChain`）：此时**不落盘**，
+     * 但仍返回内存序号供盖章（生产装配始终提供写端口）。
+     */
+    if (typeof this.options.taskStore.updateTaskChain === "function") {
+      await this.persistChain();
+    }
+    return attempt;
+  }
   private collectDownstreamBlocks(actions: ScheduleAction[]): void {
     // 传播已在 finishTask 内完成；此处仅将 pending→blocked 的变更产出动作提示
     for (const taskId of this.graph.getTaskIds()) {

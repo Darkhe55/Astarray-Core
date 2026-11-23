@@ -1122,6 +1122,10 @@ export class WorkerAgent {
     await this.options.feedbackTransport.enqueue({
       protocolVersion: 1,
       messageId: randomUUID(),
+      /** D4（2026-11-23）：从派发记录盖章执行尝试（缺省 ⇒ 消费端视为不可验证）。 */
+      ...(this.options.task.executionAttempt === undefined
+        ? {}
+        : { executionAttempt: this.options.task.executionAttempt }),
       source: {
         sourceType: "agent",
         agentInstanceId: this.options.agentInstanceId,
