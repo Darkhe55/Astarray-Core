@@ -7472,3 +7472,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 修复 graph drill 时序依赖：注入后**显式** `recomputeGoalPotential` 再轮询暂停落盘（不再赌 scheduler 下一轮）。
 > - **全量门禁：895 files 全过（2 skipped）、5725 tests 全过（7 skipped），EXIT=0；lint 0。**
 > - 其余决策（D1/D2/D4/D6/D7/D8）留待后续轮次按同一纪律实施。
+
+> **D1 秘书通道单通道锁定（2026-11-23 第 63 轮）**
+>
+> - 首次尝试前锁定 `selectedChannel` 并持久化；重试沿用同通道同待决 ID，不因激活状态变化切换（防双发）。
+> - 权威状态读取失败 ⇒ `channel-unavailable` 且不锁通道；已知未激活 ⇒ 首次即用户通道。
+> - 反例 4 条；既有"重启换通道"用例按 D1 更正。
+> - 全量：**898 files（896 passed / 2 skipped），5736 tests（5729 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **推送状态（2026-11-23 第 63 轮）**：`d81176c8` 3 次推送失败（网络不可达）；留待下次合并推送。

@@ -36,6 +36,12 @@ export interface DecisionSubmissionRecord {
   }>;
   readonly state: DecisionSubmissionState;
   readonly channel: DecisionChannel | null;
+  /**
+   * D1（2026-11-23 产品裁决）：**本待决已选定的通道**（首次尝试即锁定）。
+   *
+   * 重试沿用同一通道与同一待决 ID：避免"上次可能已发出、这次换通道再发"的双发。
+   */
+  readonly selectedChannel?: DecisionChannel | null;
   readonly receiptIdentifier: string | null;
   readonly createdAtIso: string;
   readonly submittedAtIso: string | null;
@@ -131,6 +137,7 @@ export class DecisionSubmissionStore {
         ...record,
         state: "pending-record",
         channel: null,
+        selectedChannel: null,
         receiptIdentifier: null,
         submittedAtIso: null,
         answeredAtIso: null,
@@ -145,6 +152,41 @@ export class DecisionSubmissionStore {
     });
   }
 
+  /**
+   * D1（2026-11-23）：**锁定本待决的通道**（一次写入，重试复用）。
+   *
+   * - 只在 pending-record 且尚未锁定时写入；
+   * - 已锁定则原样返回（不因本次激活状态变化而换通道）。
+   */
+  async lockSelectedChannel(input: {
+    readonly submissionIdentifier: string;
+    readonly channel: DecisionChannel;
+  }): Promise<DecisionSubmissionRecord> {
+    return withFileLock({ lockFilePath: this.lockFilePath }, async () => {
+      const current = await this.requireReadable();
+      const existing = current.submissions.find(
+        (candidate) => candidate.submissionIdentifier === input.submissionIdentifier,
+      );
+      if (existing === undefined) {
+        throw new Error("待呈交记录不存在：" + input.submissionIdentifier);
+      }
+      if (existing.selectedChannel !== undefined && existing.selectedChannel !== null) {
+        return existing;
+      }
+      const locked: DecisionSubmissionRecord = {
+        ...existing,
+        selectedChannel: input.channel,
+      };
+      await writeAtomicJson(this.filePath, {
+        schemaVersion: 1,
+        revision: current.revision + 1,
+        submissions: current.submissions.map((candidate) =>
+          candidate.submissionIdentifier === input.submissionIdentifier ? locked : candidate,
+        ),
+      } satisfies DecisionSubmissionFile);
+      return locked;
+    });
+  }
   /** 标记已呈交（只从 pending-record 迁移；重复回执不重复写）。 */
   async markSubmitted(input: {
     submissionIdentifier: string;
@@ -330,9 +372,35 @@ export async function submitDecision(
     return { kind: "duplicate", record };
   }
 
-  const useSecretary = await deps.isSecretaryActivated();
-  const channel: DecisionChannel = useSecretary ? "secretary" : "direct-user";
-  const port = useSecretary ? deps.secretaryChannel : deps.userChannel;
+  /**
+   * D1（2026-11-23 产品裁决）：**每项待决只选一个通道**。
+   *
+   * - 首次尝试时锁定通道并持久化；重试沿用已选通道与同一待决 ID；
+   * - 权威激活状态**读取失败** ⇒ 保持待呈交并报 `channel-unavailable`，不猜测、不切用户通道；
+   * - 已知未激活 ⇒ 首次即选直接用户通道。
+   */
+  let selectedChannel: DecisionChannel | null = record.selectedChannel ?? null;
+  if (selectedChannel === null) {
+    let useSecretary: boolean;
+    try {
+      useSecretary = await deps.isSecretaryActivated();
+    } catch (error) {
+      return {
+        kind: "refused",
+        code: "channel-unavailable",
+        reason:
+          "读取秘书激活状态失败：保持待呈交，稍后按同一待决 ID 重试（不切换到用户通道以免双发）：" +
+          (error instanceof Error ? error.message : String(error)),
+      };
+    }
+    selectedChannel = useSecretary ? "secretary" : "direct-user";
+    record = await deps.store.lockSelectedChannel({
+      submissionIdentifier: record.submissionIdentifier,
+      channel: selectedChannel,
+    });
+  }
+  const channel: DecisionChannel = selectedChannel;
+  const port = channel === "secretary" ? deps.secretaryChannel : deps.userChannel;
   let receiptIdentifier: string;
   try {
     const receipt = await port.submit({

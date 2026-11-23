@@ -129,7 +129,7 @@ describe("COORD-05 05-04：呈交与答复", () => {
     expect(userCalls).toHaveLength(1);
   });
 
-  it("⑤ 重启恢复：失败后换实例、秘书已激活 ⇒ 同一待决 ID 经秘书呈交一次", async () => {
+  it("⑤ D1：首次锁定用户通道，重启后秘书已激活仍不换通道（同一待决 ID 呈交一次）", async () => {
     const firstSecretary: string[] = [];
     const firstUser: string[] = [];
     const firstDeps = makeService({
@@ -149,13 +149,14 @@ describe("COORD-05 05-04：呈交与答复", () => {
       userCalls: secondUser,
     });
     const outcome = await submitDecision(secondDeps, baseInput());
-    expect(outcome).toMatchObject({ kind: "submitted", channel: "secretary" });
-    expect(secondSecretary).toHaveLength(1);
-    expect(secondUser).toHaveLength(0);
+    /** 2026-11-23（D1）：首次已锁定用户通道 ⇒ 重启后即使秘书激活也不切换（避免双发）。 */
+    expect(outcome).toMatchObject({ kind: "submitted", channel: "direct-user" });
+    expect(secondUser).toHaveLength(1);
+    expect(secondSecretary).toHaveLength(0);
 
     /** 已呈交后再呈交 ⇒ duplicate，不再发送。 */
     expect((await submitDecision(secondDeps, baseInput())).kind).toBe("duplicate");
-    expect(secondSecretary).toHaveLength(1);
+    expect(secondUser).toHaveLength(1);
   });
 
   it("⑥ 答复：项目匹配才写回；重复答复幂等；未呈交不可答复", async () => {
