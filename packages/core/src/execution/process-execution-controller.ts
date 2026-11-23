@@ -158,6 +158,13 @@ export interface ProcessExecutionControllerOptions {
   /** 缺省 null ⇒ 一律 `execution-backend-unsupported`（不静默降级到宿主执行）。 */
   readonly sandboxBackend?: SandboxExecutionBackend | null;
   /**
+   * EXEC-01-02（2026-11-23）：**是否已尝试过自动探测后端**。
+   *
+   * 仅影响拒绝原因的可读性：`true` 表示"探测没找到"（本机缺组件），`false/缺省` 表示"未装配"。
+   * 二者都拒绝执行，绝不降级到宿主进程。
+   */
+  readonly isSandboxBackendDetectionAttempted?: boolean;
+  /**
    * EXEC-01-03：跨块扫描的边界暂扣窗口（字符数）。缺省 0 ⇒ 关闭（保持既有按块行为）。
    * 开启后读取路径会暂扣末尾窗口，秘密被切块时前半段不会先外发。
    */
@@ -224,6 +231,7 @@ export class ProcessExecutionController {
     | null;
   private readonly nowIso: () => string;
   private readonly generateExecutionId: (() => string) | undefined;
+  private readonly isSandboxBackendDetectionAttempted: boolean;
 
   constructor(options: ProcessExecutionControllerOptions) {
     this.environmentRegistry = options.environmentRegistry;
@@ -240,6 +248,7 @@ export class ProcessExecutionController {
       ),
     );
     this.generateExecutionId = options.generateExecutionId;
+    this.isSandboxBackendDetectionAttempted = options.isSandboxBackendDetectionAttempted === true;
   }
 
   /** 后端能力探测（供装配自检与分诊使用；不启动进程）。 */
@@ -248,9 +257,12 @@ export class ProcessExecutionController {
       return {
         isAvailable: false,
         backendIdentifier: "none",
-        isolationPrimitiveDescription: "未装配隔离后端",
-        reasonUnavailable:
-          "未装配沙箱执行后端：拒绝执行（不降级到宿主进程执行）",
+        isolationPrimitiveDescription: this.isSandboxBackendDetectionAttempted
+          ? "探测未命中"
+          : "未装配隔离后端",
+        reasonUnavailable: this.isSandboxBackendDetectionAttempted
+          ? "已启用沙箱后端探测，但本机没有可用的隔离执行后端（不可用：缺少系统组件；拒绝降级到宿主进程执行）"
+          : "未装配沙箱执行后端：拒绝执行（不降级到宿主进程执行）",
       };
     }
     return this.sandboxBackend.probeCapability();

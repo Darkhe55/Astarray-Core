@@ -1473,6 +1473,8 @@ export async function createApplicationRuntime(
     environmentRegistry: executionEnvironmentRegistry,
     store: new FileSystemProcessExecutionStore({ stateDirectory }),
     sandboxBackend: sandboxExecutionBackend,
+    /** EXEC-01-02：把"是否已尝试探测"传下去，区分"未装配"与"探测未命中"。 */
+    isSandboxBackendDetectionAttempted: options.isSandboxBackendAutoDetected === true,
   });
   const permissionCatalog = new PermissionCapabilityCatalog();
   const permissionProfileStore = new PermissionProfileStore({
