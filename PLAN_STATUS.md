@@ -7513,3 +7513,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 9 条 mailbox-journal 分支用例（重放去重/状态不一致/幂等键冲突/回复守卫/应用状态/上下文状态）。
 > - 全量：**902 files（900 passed / 2 skipped），5761 tests（5754 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 全量覆盖率运行已启动复核逐模块百分比。
+
+> **覆盖率复测（2026-11-23 第 67 轮）**
+>
+> - 全量覆盖率：5754 tests 全绿；**全局分支 80.87%**（<85%）。
+> - 安全模块：**20/22 达标**（`sensitive-content-access-policy`、`mailbox-journal` 本轮达标）；
+>   未达标剩 `policy-wrapper` 90.20%、`entrypoint` 87.01%。
