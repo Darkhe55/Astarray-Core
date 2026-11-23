@@ -7529,3 +7529,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   改为注入前等待目标状态稳定（连续两次读取一致）再预置，并移除显式 recompute。
 > - 全量：**904 files（902 passed / 2 skipped），5772 tests（5765 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 覆盖率复测运行中。
+
+> **D8 覆盖率补测：entrypoint 追加（2026-11-23 第 68 轮续）**
+>
+> - `feedback-entrypoint-branches.test.ts` 扩到 5 条：协议不兼容、心跳丢失、shutdown 清看门狗、
+>   投递发送失败记录 stderr、邮箱目录不可写 ⇒ `journal-unavailable`。
+> - 全量：**904 files（900 passed / 2 failed / 2 skipped），5775 tests（5766 passed / 2 failed / 7 skipped）**；
+>   2 失败为并发抖动（`edit-intent-baseline-concurrency`、`journal-append-concurrency`，隔离复跑通过）；`lint` 0。
+> - 覆盖率复测待下一轮（上轮：安全模块 21/22，`entrypoint` 89.61%）。
