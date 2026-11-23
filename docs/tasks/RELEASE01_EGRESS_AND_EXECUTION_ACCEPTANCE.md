@@ -87,3 +87,17 @@
 | `verify:tarball-isolation-install` | ✅ exit 0："tarball-isolation-install-ok: 安装后 CLI 版本 0.1.0" |
 
 结论：公开 CLI/SDK 产品边界未被本轮接线破坏；未提供的 `gui` 入口仍返回稳定错误。
+
+### 03 验收前置检查（2026-11-24，第 116 轮）
+
+新增 `verify:exec01-03-preconditions`（只读；不执行受控进程、不装工具链、不提权）：
+
+| 检查项 | 本机结果 |
+|---|---|
+| 平台支持 | ✅ win32/x64 有受支持后端实现 |
+| `sandbox-helper.exe` 已构建 | ❌ 缺失（需 Rust 构建） |
+| Rust 工具链（rustc/cargo） | ❌ 未安装（安装需用户授权） |
+| 管理员权限（AppContainer 预建） | ❌ 非管理员（`CreateAppContainerProfile` 会 E_ACCESSDENIED） |
+
+输出 `readyForAcceptance=false` + 逐条 `blockers`；`--strict` 时 exit 2（可供安装验收门禁使用）。
+**结论**：B3 实测验收仍需用户授权安装工具链/提权；本检查把"缺什么、下一步做什么"固定成可复现记录。

@@ -7906,3 +7906,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `dist/cli.js continuation --help` 列出 status/request；`continuation status --json` 默认关闭输出正确；
 >   `sandbox self-check --json` 如实报告无后端；`check-public-privacy` = `privacy-ok`。
 > - 结论：本轮新增入口在构建产物上可用，且无隐私泄露；未新增代码，仅验证 + 记录。
+
+> **B3 验收前置检查脚本（2026-11-24 第 116 轮）**
+>
+> - 新增 `verify:exec01-03-preconditions`：逐项记录平台/helper/Rust/提权；本机 readyForAcceptance=false，blockers 3 条。
+> - `--strict` 未就绪 exit 2；输出不含本机路径与用户标识。
+> - 结论不变：B3 需用户授权安装 Rust/MSVC 与提权；本脚本把缺口固定为可复现记录。
