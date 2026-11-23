@@ -321,9 +321,18 @@ describe("PolicyWrapper 权限执行", () => {
       // 部分环境（权限）无法创建符号链接时跳过
     });
     if (await fs.access(symlinkPath).then(() => true).catch(() => false)) {
-      await expect(
-        boundary.resolveWithinWorkspace("link/secret.txt"),
-      ).rejects.toMatchObject({ errorCode: "path-escape-attempt" });
+      try {
+        await expect(
+          boundary.resolveWithinWorkspace("link/secret.txt"),
+        ).rejects.toMatchObject({ errorCode: "path-escape-attempt" });
+      } finally {
+        /**
+         * Windows 上目录 junction 的存在会让上层 `fs.rm(recursive)` 在删目录时
+         * 因 `ENOTEMPTY` 失败（清理顺序问题，非安全断言问题）：断言后先单独移除链接，
+         * 不让测试基础设施把"环境失败"混进安全结论。
+         */
+        await fs.rm(symlinkPath, { recursive: true, force: true }).catch(() => undefined);
+      }
     }
   });
 });

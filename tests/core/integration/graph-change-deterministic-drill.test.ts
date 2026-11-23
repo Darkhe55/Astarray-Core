@@ -253,13 +253,22 @@ describe("确定性图变更演练", () => {
       const journal = new TaskGraphChangeJournalStore({
         baseDirectory: stateDirectory,
       });
-      const entries = await journal.listForMission(missionIdentifier);
-      expect(
-        entries.some(
+      /**
+       * 2026-11-23：审计日志是异步落盘，注入返回后可能尚未写入；
+       * 改为**轮询到出现**（最多 10s），不再拿单次读制造负载相关的假失败。
+       */
+      let hasInjectedEntry = false;
+      const journalDeadline = Date.now() + 10_000;
+      while (Date.now() < journalDeadline) {
+        const entries = await journal.listForMission(missionIdentifier);
+        hasInjectedEntry = entries.some(
           (entry) =>
             entry.changeKind === "inject" && entry.taskIdentifier === "T-99",
-        ),
-      ).toBe(true);
+        );
+        if (hasInjectedEntry) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(hasInjectedEntry).toBe(true);
 
       /**
        * 目标重算在编排循环里异步落盘：轮询到 V 重算完成（最多 3s），

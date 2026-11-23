@@ -33,6 +33,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  /**
+   * Windows 的目录 junction 先单独删除：直接对整个目录树 `rm -r` 会在包含 junction 时
+   * 卡住/ENOTEMPTY，导致 hook 超时，把清理问题误报成安全判定失败。
+   */
+  await fs.rm(path.join(workspaceRootPath, "escape-link"), { recursive: true, force: true }).catch(() => undefined);
   try {
     await fs.rm(path.dirname(workspaceRootPath), { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   } catch {

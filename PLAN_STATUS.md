@@ -7409,3 +7409,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 说明：此前被归为"环境"的 `exec01-02` 实为**真缺陷**，已修复；环境失败从 3 条降为 2 条。
 
 > **推送状态（2026-11-23 第 56 轮）**：`3298420b`（第 55 轮）与 `bd1f4d3a` 未推送（3 次均失败，网络不可达）；留待下次合并推送。
+
+> **门禁转全绿（2026-11-23 第 57 轮）**
+>
+> - 修复两处被误判为"环境失败"的测试基础设施缺陷：Windows 目录 junction 清理顺序
+>   （`tool-registry` 符号链接用例、`project-scope-boundary` ③ 的 afterEach 超时）；
+> - `graph-change-deterministic-drill` 的审计日志断言改为**轮询到出现**（原来单次读取）。
+> - **全量门禁：893 files 全过、5715 tests 全过、7 skipped，EXIT=0；lint 0。**（本窗口首次全绿）
+> - 影响：此前归为"环境阻断"的包级验证（`verify:security-coverage`、`verify:entry-runtime-selection`、
+>   `verify:tarball-install`）现在具备重跑条件，下一轮起验证并记录。
