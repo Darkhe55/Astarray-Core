@@ -7859,3 +7859,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**932 files（930 passed / 2 skipped），5934 tests（5927 passed / 7 skipped），EXIT=0**；`lint` 0。
 
 > **推送状态（2026-11-24 第 109 轮）**：`a4a7c09a` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **B9 覆盖率：Anthropic 协议边界（2026-11-24 第 110 轮）**
+>
+> - 新增 7 条用例：工具调用缺 id/名称/参数/非对象参数/非法 JSON 均整批拒绝；
+>   SSE 注释与多行 data 正确处理；结尾无换行的残留事件可解析。
+> - 全量：**933 files（931 passed / 2 skipped），5941 tests（5934 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **推送状态（2026-11-24 第 110 轮）**：`9b2f4ef2` 3 次推送失败（网络不可达）；留待下次合并推送。
