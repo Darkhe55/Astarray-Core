@@ -7314,3 +7314,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 它仍是协议层验收器（`TaskCompletionEventV1`），历史保留、不删除；⚠️ 后继为独立卡接
 >   `completion-protocol` 消费点，之前不得宣称"被替代已等价"。
 > - 已写入 AUDIT 卡第 04 节；本轮仅文档。
+
+> **WIRING-04-01 核验缺口定位（2026-11-23 第 48 轮）**
+>
+> - 信封字段与门禁比较逻辑已有；但**无生产者填写 `executionAttempt`**，消费端 `currentExecutionAttempt`
+>   **恒为 null** ⇒ 核验永远不触发。
+> - 唯一阻塞：需产品/设计决定"执行尝试"的权威来源（任务链 per-task revision / 恢复尝试 / 运行登记），
+>   生产者与消费者共用同一来源后才能判 01 完成。
+> - 已写入 WIRING-04 卡 §42；不把"字段已加"当作核验生效。本轮仅文档。
