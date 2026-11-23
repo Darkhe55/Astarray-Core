@@ -7711,3 +7711,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增双客户端/两项目夹具 4 条：资源互相隔离、目标不一致、跨项目越界、撤销隔离、主体不一致。
 > - 全量：**917 files（915 passed / 2 skipped），5842 tests（5835 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 剩余：真实部署的独立目的端注入验证；双子进程并发夹具。
+
+> **RELEASE-01-04 公开包复核（2026-11-24 第 91 轮）**
+>
+> - 打包变更后重跑：`verify:entry-runtime-selection` **18/18 exit 0**（新 tarball sha256 `70b6ebf6…`）；
+>   `verify:tarball-isolation-install` **exit 0**（安装后 CLI 0.1.0）。
+> - 结论：公开 CLI/SDK 边界未被 bridge/CLI 授权接线破坏；`gui` 仍返回稳定错误。
+> - 本轮仅文档 + 既有脚本复跑，无代码改动。

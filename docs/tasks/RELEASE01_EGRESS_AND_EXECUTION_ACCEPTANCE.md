@@ -1,6 +1,6 @@
 # RELEASE-01　MCP、Provider 与受控执行的生产入口返修
 
-状态：**01 第一片、02 已实施；01 端到端/03 待实施；04 已有基线**（2026-11-23）。基线：c3264ceb。B1–B4 指 11 月 23 日的[阻塞汇总](../reports/BLOCKERS_2026-11-23.md)。本卡将建议细化为施工口径，实施、验证和发布分别记录。各子卡可独立推进。
+状态：**01 主体完成、02 完成、04 复核通过；03 平台阻塞**（2026-11-24）。基线：c3264ceb。B1–B4 指 11 月 23 日的[阻塞汇总](../reports/BLOCKERS_2026-11-23.md)。本卡将建议细化为施工口径，实施、验证和发布分别记录。各子卡可独立推进。
 
 ## 01　B1：MCP 会话授权到每次结果释放
 
@@ -76,3 +76,13 @@
   （`execution-backend-unsupported`，不降级到宿主进程）。
 - **B3 验收在获得 Rust/MSVC 工具链与必要授权前无法开始**；本节作为阻塞证据，不宣称通过。
 - 已就绪的前置：`buildSandboxSelfCheckReport`（SDK 导出）可在有后端时记录组件状态。
+### 04 公开包验收复核（2026-11-24）
+
+打包变更（bridge/CLI 授权接线）后重跑：
+
+| 脚本 | 结果 |
+|---|---|
+| `verify:entry-runtime-selection` | ✅ **18/18**（3 项不适用：公开构建无 Web GUI），exit 0；tarball sha256 `70b6ebf6…4398fa9` |
+| `verify:tarball-isolation-install` | ✅ exit 0："tarball-isolation-install-ok: 安装后 CLI 版本 0.1.0" |
+
+结论：公开 CLI/SDK 产品边界未被本轮接线破坏；未提供的 `gui` 入口仍返回稳定错误。
