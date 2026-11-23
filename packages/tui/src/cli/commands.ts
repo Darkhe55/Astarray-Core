@@ -3835,6 +3835,57 @@ export async function executeWorkflowScenarioCommand(
 }
 
 /** BRIDGE-01-02：MCP stdio 服务器（最小工具面：submit/query/cancel/read-result）。 */
+/** RELEASE-01-03：受控执行验收记录（只读诊断；不启动进程、不写状态）。 */
+export interface SandboxSelfCheckCommandOptions {
+  applicationRootPath: string;
+  isJsonOutput: boolean;
+}
+
+export async function executeSandboxSelfCheckCommand(
+  options: SandboxSelfCheckCommandOptions,
+): Promise<number> {
+  const { createPlatformSandboxExecutionBackend, resolveSandboxHelperExecutablePath } =
+    await import("../../../core/src/execution/platform-sandbox-backend.js");
+  const { buildSandboxAcceptanceRecord } = await import(
+    "../../../core/src/execution/sandbox-acceptance-record.js"
+  );
+  const { promises: fsPromises } = await import("node:fs");
+  const path = await import("node:path");
+  const packageVersion = await fsPromises
+    .readFile(path.join(options.applicationRootPath, "package.json"), "utf8")
+    .then((content) => {
+      const parsed = JSON.parse(content) as { version?: unknown };
+      return typeof parsed.version === "string" ? parsed.version : null;
+    })
+    .catch(() => null);
+  const backend = createPlatformSandboxExecutionBackend({
+    applicationRootPath: options.applicationRootPath,
+  });
+  const backendKind =
+    backend === null ? null : process.platform === "linux" ? "bubblewrap" : "sandbox-helper";
+  const record = buildSandboxAcceptanceRecord({
+    platform: process.platform,
+    architecture: process.arch,
+    nodeVersion: process.version,
+    packageVersion,
+    applicationRootPath: options.applicationRootPath,
+    backendKind,
+    helperExecutablePath: resolveSandboxHelperExecutablePath({
+      applicationRootPath: options.applicationRootPath,
+    }),
+  });
+  if (options.isJsonOutput) {
+    printJson(record);
+  } else {
+    process.stdout.write(
+      `平台: ${record.platform}/${record.architecture}\n` +
+        `后端: ${String(record.backendKind)}\n` +
+        `可执行: ${record.isExecutionAllowed ? "是" : "否"}\n` +
+        `下一步: ${record.nextActionText}\n`,
+    );
+  }
+  return EXIT_CODES.SUCCESS;
+}
 export interface McpServeCommandOptions {
   stateDirectory: string;
   /** BRIDGE-01：运行时选择（缺省 mock；openai-compatible 需端点和模型，缺参数即 exit 2）。 */

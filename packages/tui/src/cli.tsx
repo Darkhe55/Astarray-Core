@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import packageMetadata from "../../../package.json" with { type: "json" };
 import { defaultStateDirectory } from "./cli/run-command.js";
@@ -124,6 +126,7 @@ import {
   executeGuideStatusCommand,
   executeGuideSubmitCommand,
   executeMcpServeCommand,
+  executeSandboxSelfCheckCommand,
   executeSummaryBuildCommand,
   executeSummaryPublishCommand,
   executeSummaryListCommand,
@@ -2551,6 +2554,22 @@ workflowCommand
     },
   );
 
+/** RELEASE-01-03：受控执行验收记录（只读诊断；逐项记录 OS/架构/后端/版本/结果）。 */
+const sandboxCommand = program
+  .command("sandbox")
+  .description("受控执行沙箱诊断（只读；不启动进程）");
+sandboxCommand
+  .command("self-check")
+  .description("输出受控执行验收记录（OS/架构/后端/安装包版本/可执行性）")
+  .option("--json", "机器可读输出")
+  .option("--application-root <path>", "安装根（含 native/sandbox-helper 与 package.json）")
+  .action(async (options: { json?: boolean; applicationRoot?: string }) => {
+    process.exitCode = await executeSandboxSelfCheckCommand({
+      applicationRootPath:
+        options.applicationRoot ?? path.dirname(path.dirname(fileURLToPath(import.meta.url))),
+      isJsonOutput: options.json === true,
+    });
+  });
 const mcpCommand = program
   .command("mcp")
   .description("MCP 外部工具桥接（BRIDGE-01：stdio，仅最小工具面）");

@@ -7727,3 +7727,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - RELEASE-01-01 主体完成；剩余：真实部署的独立目的端注入（需宿主配置面）。
 
 > **推送状态（2026-11-24 第 92 轮）**：`7d959bfa` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **RELEASE-01-03 验收记录入口（2026-11-24 第 93 轮）**
+>
+> - 新增 `sandbox self-check --json`（公开只读诊断）+ `buildSandboxAcceptanceRecord`（反例 4 条）。
+> - 本机实测如实报告：`backendKind=null`、`isExecutionAllowed=false`、下一步"无隔离后端"。
+> - 全量：**919 files（916 passed / 1 failed / 2 skipped），5847 tests（5839 passed / 1 failed / 7 skipped）**；
+>   唯一失败 `b6r10-wait-for-task-terminal` ⑤ 为负载敏感（隔离复跑 10/10 通过）；`lint` 0。
+> - B3 仍阻塞：Rust/MSVC 工具链与 AppContainer 提权（按纪律需单独授权）。
