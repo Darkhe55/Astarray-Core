@@ -69,3 +69,14 @@
 
 读取共同实施规则与本卡，核对前驱动态证据。本轮只执行 E2E-01-01；先记录基线和失败场景，再完成该检查点。不要领取后继，未满足条件不得标记done。
 
+
+## 复核（2026-11-23，第 53 轮）
+
+`npm run verify:e2e01`（`node scripts/e2e01-acceptance.mjs fixture`）在当前 HEAD 复跑 **exit 0**：
+
+- `fixtureFingerprint = sha256:6512b2a6322fb6b6730b68fb4029b622b8fc7f06e1f3adee0342b7d044e94c7c`（与卡面记录一致）；
+- `baselineFailedAsFrozen = true`（基线测试确实失败，不是预设成功）；
+- `solutionPassedAsFrozen = true`；
+- 产物哈希：`out/summary.json = fc1328fb…`、`out/test-evidence.json = ddbf68ab…`。
+
+**结论不变**：本地可证项仍通过；整卡仍 `pending`，只缺**人工体验结论**与 **Linux/macOS 证据**（本机无 WSL 发行版）。

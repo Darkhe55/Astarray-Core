@@ -7366,3 +7366,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **03 的输出扫描闸**经复核仍无生产调用方（`readAllTextForScanning` 仅测试）；是否阻断属
 >   SEC-02 通道 6 的安全策略决策，需产品口径后再接。
 > - 本轮仅文档；门禁沿用上一轮。
+
+> **E2E-01 fixture 复跑（2026-11-23 第 53 轮）**
+>
+> - `verify:e2e01` 当前 HEAD **exit 0**：fixture fingerprint 与卡面一致、基线失败、参考实现通过、产物哈希稳定。
+> - 整卡仍 `pending`：只缺人工体验结论与 Linux/macOS 证据（本机无 WSL 发行版，无法补）。
+> - 本轮仅文档；门禁沿用上一轮。
