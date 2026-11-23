@@ -7750,3 +7750,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 4 条：两次派发 1→2、重投同一信封不改 attempt、旧信封不可验证、新执行新值而旧信封保留旧值。
 > - 全量：**920 files（918 passed / 2 skipped），5851 tests（5844 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 备注：无独立"信封重投传输"；语义按同一信封重发定义，已如实记录。
+
+> **F2 ALIGN-02 端到端演练（2026-11-24 第 96 轮）**
+>
+> - 新增规划路径端到端：两节点候选稿（T-1 → T-2）经本地校验采纳，依赖保留、按序各派发一次、mission done。
+> - 全量：**921 files（919 passed / 2 skipped），5852 tests（5845 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 阻塞清单 F2 关闭。
