@@ -13,7 +13,10 @@ import {
   runSimilarityCommand,
 } from "./cli/similarity-command.js";
 import { executeRunCommand } from "./cli/run-command.js";
-import { executeContinuationStatusCommand } from "./cli/continuation-command.js";
+import {
+  executeContinuationRequestCommand,
+  executeContinuationStatusCommand,
+} from "./cli/continuation-command.js";
 // RELOCATE-01-04（2026-10-18）：冷启动重定位状态只读查询（命令名经用户确认=项目状态）。
 import {
   executeProjectReconcileCommand,
@@ -2570,6 +2573,39 @@ continuationCommand
       isJsonOutput: options.json === true,
     });
   });
+continuationCommand
+  .command("request")
+  .description("显式请求续接某任务（结构化参数；领取不等于已派发）")
+  .requiredOption("--mission <mission>", "任务链所属 mission 标识")
+  .requiredOption("--task <task>", "目标任务标识")
+  .requiredOption("--expected-revision <revision>", "请求所依据的任务链 revision")
+  .option("--request-id <id>", "显式请求 ID（缺省随机生成）")
+  .option("--json", "机器可读输出")
+  .action(
+    async (options: {
+      mission: string;
+      task: string;
+      expectedRevision: string;
+      requestId?: string;
+      json?: boolean;
+    }) => {
+      const expectedRevision = Number.parseInt(options.expectedRevision, 10);
+      if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
+        logToStderr("expected-revision 必须是非负整数");
+        process.exitCode = 2;
+        return;
+      }
+      process.exitCode = await executeContinuationRequestCommand({
+        stateDirectory: defaultStateDirectory(),
+        principalIdentifier: null,
+        missionIdentifier: options.mission,
+        taskIdentifier: options.task,
+        expectedRevision,
+        requestIdentifier: options.requestId ?? null,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
 const sandboxCommand = program
   .command("sandbox")
   .description("受控执行沙箱诊断（只读；不启动进程）");

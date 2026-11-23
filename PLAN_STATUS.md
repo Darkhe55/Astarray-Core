@@ -7812,3 +7812,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   安全约束不截断、无关节点留磁盘、前置优先；反例 8 条。
 > - 全量：**928 files（926 passed / 2 skipped），5909 tests（5902 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 未做：真实内容读取/扫描接线、dispatch、request 写入路径、远程通道、观测。
+
+> **RESUME-02 请求写入路径（2026-11-24 第 104 轮）**
+>
+> - 新增 `continuation request`：本地任务链推导状态、登记回执、领取；未认证 exit 2；不派发。反例 6 条。
+> - 修一处架构守卫：CLI stderr 改走诊断漏斗（`logToStderr`）。
+> - 全量：**929 files（927 passed / 2 skipped），5915 tests（5908 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 未做：真实内容读取/扫描接线、dispatch、SDK 写入、远程通道、观测与交付文档。
