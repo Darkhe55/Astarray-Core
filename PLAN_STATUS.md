@@ -7442,3 +7442,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**895 files（892 passed / 1 failed / 2 skipped），5722 tests（5714 passed / 1 failed / 7 skipped）**；
 >   唯一失败 `startup-recovery-boot`（延迟执行类），**隔离复跑 2/2 通过** ⇒ 负载抖动，非回归。
 > - 覆盖率（本轮前）：5715 tests 全绿、全局分支 80.78% < 85%（真实缺口）；安全模块 18/22。
+
+> **SEC-02 四态扫描分支补测（2026-11-23 第 60 轮）**
+>
+> - 新增 `sec02-four-state-scan-branches.test.ts`（7 条）：四态扫描 clean 放行、sensitive/incomplete/error
+>   一律拒绝（类别取首个命中规则或 dlp:scan-incomplete/dl_scan-error）、旧布尔扫描器命中即拒、
+>   无正文不调用扫描器、目录敏感名过滤。
+> - 全量门禁：**896 files（894 passed / 2 skipped），5729 tests（5722 passed / 7 skipped），EXIT=0**；
+>   `typecheck` / `lint` 0。
+> - 覆盖率缺口（全局分支 80.78%、4 个安全模块 <95%）仍需后续补测；本轮仅为 `sensitive-content-access-policy`
+>   的关键判定分支补上直接反例。
+
+> **推送状态（2026-11-23 第 60 轮）**：`a80077b5` 3 次推送失败（网络不可达）；留待下次合并推送。
