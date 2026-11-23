@@ -1137,3 +1137,13 @@ Linux/macOS 平台证据（本机只有 Windows）。
 
 `npm run verify:cross-process-lock` 当前 HEAD **exit 0**：两个真实进程并发更新后 **revision=41**（无丢更新）。
 口径与 §39 相同：仅 Windows；跨平台仍缺。
+## 41. mutation-kills 完整复跑（2026-11-23，隔离副本，**有效**）
+
+| 项 | 值 |
+|---|---|
+| 命令 | `node scripts/verify-mutation-kills.mjs`（在 `.tools/mut-repo` 副本内，**独立 node_modules** + 复制自主树的 `dist/`） |
+| 结果 | **313/313 变异体全部被拦下**，`EXIT=0` |
+| 为何前两次无效 | 副本缺 `dist/` ⇒ `describe.skipIf(!hasBuiltEntry)` 整组跳过 ⇒ 变异体"存活"；带 dist 后同一变异体立即变红 |
+| 口径 | 副本源码与主树 HEAD 一致（仅 PLAN_STATUS 差异）；Windows 本机；跨平台未跑 |
+
+**结论**：mutation-kills 在当前代码上完整通过；此前"312/313"与 5–10 分钟完成均为**跳过假象**，已作废。
