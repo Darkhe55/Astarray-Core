@@ -7374,3 +7374,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 本轮仅文档；门禁沿用上一轮。
 
 > **推送技巧（2026-11-23 第 53 轮）**：普通推送多次 "remote end hung up / Everything up-to-date" 但远端未更新；改用 git -c http.version=HTTP/1.1 push **一次成功**（91f9a2e7..5a037785）。后续网络抖动可优先用此方式。
+
+> **包级验证脚本尝试（2026-11-23 第 54 轮）**
+>
+> - `verify:entry-runtime-selection` 走 `npm pack`；prepack 执行 `typecheck && lint && build && test:serial`，
+>   其中 4 条失败（3 条已复现本机环境 + `graph-change-deterministic-drill` 负载抖动；后者隔离可过），
+>   导致 `npm pack` 失败、脚本 exit 1。
+> - **不是新缺陷**：包级脚本依赖全绿 prepack，被已知环境问题阻断；同类 `verify:security-coverage`、
+>   `verify:tarball-install` 也受同一前提约束。环境修复前不记通过、不删脚本。
+> - 本轮仅文档；门禁沿用上一轮。
+
+> **推送状态（2026-11-23 第 54 轮）**：`aa805051` 3 次推送失败（HTTP/1.1 也失败，网络不可达）；留待下次合并推送。
