@@ -7585,3 +7585,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 5 条：Authorization 头、PEM 私钥、跨两次读取的秘密、普通输出、超预算。
 > - 全量：**908 files（905 passed / 1 failed / 2 skipped），5793 tests（5785 passed / 1 failed / 7 skipped）**；
 >   唯一失败为已知并发抖动（`cross-project-ledger-concurrency`，隔离复跑通过）；`lint` 0。
+
+> **收尾对账（2026-11-23 第 74 轮）**
+>
+> - 未完成清单新增"决策落地与验证更新（第 61–73 轮）"：D1–D8 逐项证据、更新后的门禁/覆盖率/包级状态、
+>   以及按性质分类的剩余项（产品口径 / 平台人工证据 / 覆盖率 / 包级脚本 / 实现后继）。
+> - 本轮仅文档；全量门禁沿用第 73 轮（908 files / 5793 tests，1 条已证并发抖动）。

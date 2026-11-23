@@ -131,3 +131,33 @@ BATCH6/WB00 等卡完成头行/状态对账。
 
 **仍未闭合（性质）**：① 四模块覆盖率与全局分支阈值（需补测试）；② 包级三脚本结果确认；
 ③ 人工体验/跨平台证据；④ 产品决策（秘书激活、Agent 工具入口、EXEC B1–B4、外发通道）。
+## 决策落地与验证更新（2026-11-23，第 61–73 轮）
+
+用户补充了 D1–D8 决策（`PRODUCT_DECISIONS_2026-11-23.md`），本窗口据此实施：
+
+| 决策 | 落地 | 证据 |
+|---|---|---|
+| D1 秘书通道 | 单通道锁定（`selectedChannel`），重试沿用同通道；激活状态读取失败保持待呈交 | `coord05-channel-lock.test.ts` 4 条 + 门禁 |
+| D2 取消语义 | 派发过滤 + 真实派发入口反例（启动数/提案文件为 0，保留对照） | `d2-cancelled-node-dispatch-loop.test.ts` 4 条 |
+| D3 缓存 | 保留候选、不接线（照裁决） | 文档 |
+| D4 执行尝试 | `executionAttempt` 单调落盘、worker 盖章、消费端取任务链节点 | `execution-attempt.test.ts` 4 条 |
+| D5 输出 block | `outputScanPolicy=block` 默认；**完整流扫描**（8 MiB 预算）非 clean 不释放 | `exec01-03-output-scan-block`、`exec01-03-whole-stream-scan` 共 8 条 |
+| D6 外发 | 出口清单 7 项；MCP stdio 接内容扫描（默认 block） | `OUTBOUND_EXITS_INVENTORY_2026-11-23.md`、`mcp-outbound-content-scan.test.ts` |
+| D7 模型工具入口 | 协作请求为宿主专用（非模型工具），3 条反例 | `d7-no-model-collaboration-tool.test.ts` |
+| D8 覆盖率 | 安全模块 **21/22**（仅 `entrypoint` 90.9%，剩余 7 行不可达/需注入） | `SEC02_LOCAL_SCAN_COVERAGE.md` |
+
+### 更新后的验证状态
+
+- **全量门禁**：907–908 files / 5788–5793 tests；偶发 1 条并发抖动（`cross-project-ledger-concurrency`、
+  `journal-append-concurrency` 等，隔离复跑通过），其余全绿；`typecheck`/`lint` 0。
+- **覆盖率**：全局分支 **80.92%**（<85%）；安全模块 21/22。
+- **包级脚本**：`verify:security-coverage` 可运行；`verify:entry-runtime-selection` 曾因 graph-drill 抖动失败，
+  修复后**未重跑确认**；`verify:tarball-install` 仍未运行。
+
+### 仍未闭合（按性质）
+
+1. **产品口径**：D6-E2 的"目的端/资源范围/授权 revision"模型；Provider 通道默认 record/block；
+2. **平台/人工证据**：EXEC-01-02 沙箱后端、REMOTE-01 平台投递、E2E-01 人工体验、GUI/TUI 未建视图；
+3. **覆盖率**：全局分支达 85%、`entrypoint` 剩余不可达行；
+4. **包级脚本**：`entry-runtime-selection`、`tarball-install` 结果确认；
+5. **实现后继**：`taskRevision` 独立盖章、逻辑派发重投复用 attempt、ALIGN-02 规划路径的端到端演练。
