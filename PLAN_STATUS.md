@@ -7609,3 +7609,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `security-coverage` 可运行并给出 21/22 的真实结果。
 > - `lint` 0；隐私 `privacy-ok`。
 > - 包级脚本合计：`verify:security-coverage` / `verify:entry-runtime-selection` / `verify:tarball-install` 全部**已执行确认**。
+
+> **HEAD 全量门禁（2026-11-23 第 77 轮，``656eb5dc``）**
+>
+> - `typecheck` 0、`lint` 0、隐私 `privacy-ok`。
+> - 全量：**908 files（906 passed / 2 skipped），5793 tests（5786 passed / 7 skipped），EXIT=0**。
+> - 包级：`entry-runtime-selection` 18/18、`tarball-install` ok、`security-coverage` 可运行（21/22）。
+> - 结论：本窗口所有代码/测试/脚本改动在 HEAD 上通过完整门禁；剩余为明确阻塞项（产品口径/平台证据/覆盖率阈值）。
