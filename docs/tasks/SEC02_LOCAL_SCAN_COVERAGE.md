@@ -253,3 +253,14 @@ Azure/GCP 凭据、webhook 带签名链接）。**没有任何一行标"已验�
 `coverage-final.json`（定向）显示未命中语句已从 `sensitive-content-access-policy` 的 29 处降至
 覆盖上述区域后的剩余项；完整百分比待下一轮全量覆盖率复核。**未达标模块**：`policy-wrapper`（90.20%）、
 `mailbox-journal`（92.75%）、`feedback-process/entrypoint`（87.01%）仍待补测。
+## 覆盖补测：信箱日志（2026-11-23，第 67 轮）
+
+新增 `mailbox-journal-branches.test.ts`（9 条）：
+
+- **重放去重**：同 messageId 同内容 ⇒ 计数递增但不重复入库；同 messageId 异内容 ⇒ `operation-not-idempotent`；
+  有重放记录但邮箱无消息（状态不一致）⇒ 报错而非静默重发；同幂等键异内容拒绝、同内容返回原序号；
+- **回复路由**：未装配守卫的回复 ⇒ `task-sequence-permission-denied`；装配守卫 ⇒ 被调用且能查原消息；
+- **应用状态**：`applied` → `idempotent-replay` → `ignored-stale` → `not-found`（消息/收件人两种缺失）；
+- **上下文状态**：命中写回、未知收件人/消息静默返回；空目录列举 `[]`、有文件时解码收件人 ID。
+
+**覆盖率**：待全量覆盖率复核后记录逐模块数值（定向运行只能证明分支被执行，不足以更新百分比）。
