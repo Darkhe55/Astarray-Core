@@ -797,3 +797,15 @@ npm 向上找到了仓库根 `package.json`，把 tarball 装成根依赖并 pru
 运行时探测（集成）断言缺省不探测时为"未装配"、已探测时匹配 `未装配|不可用`。
 **变异承重**：把装配层的 `isSandboxBackendDetectionAttempted` 写死为 false ⇒ 引导测试**红**。
 2026-11-23 施工入口：历史待决项按[当前产品决策与验收口径](../reports/PRODUCT_DECISIONS_2026-11-23.md)执行。实施进度与剩余证据仍按本卡记录。
+
+## 03 完整流扫描接线（2026-11-23）
+
+D5 裁决："模型可见执行输出采用 block，完整扫描得到 clean 后方可交出；非 clean、扫描异常和未判定的
+跨块尾部不释放正文。"
+
+- `ProcessExecutionController` 新增 `requireWholeStreamScan`（默认开启）与累积上限（默认 8 MiB）；
+- `block` 策略下，每次读取把本流**已读内容累积**后整体做四态扫描：非 clean ⇒ `execution-output-scan-blocked`，
+  **不释放正文**；超过扫描预算同样阻断（不把"没扫完"当"扫完"）；
+- 反例 5 条：`Authorization: Bearer`（旧单块脱敏覆盖不到）、PEM 私钥、秘密切两次读取、普通输出、超预算；
+- **已知边界**：累积只覆盖"已读取部分"；若调用方从不读取某段输出，那段不会被扫描，也不会被释放（不作为已证明安全）。
+- 全量门禁 908 files / 5793 tests（1 条并发抖动，隔离复跑通过）。

@@ -8,6 +8,7 @@
  * - 首版非交互（stdin 关闭）、有限时长、网络禁止。
  */
 import { DomainError } from "../core/errors.js";
+import { scanSensitiveContent } from "../tools/sensitive-content-scan-contract.js";
 import {
   DEFAULT_BOUNDARY_CARRY_CHARACTERS,
   scanOutputChunkAcrossBoundaries,
@@ -177,6 +178,15 @@ export interface ProcessExecutionControllerOptions {
    */
   readonly outputScanPolicy?: "block" | "redact";
   /**
+   * D5（2026-11-23）：**完整流扫描**（默认开启）。
+   *
+   * 仅 `block` 策略下生效：每次读取把本流已读内容累积后整体做四态扫描，
+   * 命中即不释放正文（单块脱敏规则覆盖不到 `Authorization`/私钥/连接串等模式）。
+   */
+  readonly requireWholeStreamScan?: boolean;
+  /** 完整流扫描的累积上限（字节；超限即阻断，不当作"扫完"）。 */
+  readonly outputScanAccumulatorMaximumBytes?: number;
+  /**
    * 上级可管理判定（"明确授权的上级"）。
    * 缺省 null ⇒ 只有**同一主体**能查询/读取/取消自己的执行。
    */
@@ -240,6 +250,9 @@ export class ProcessExecutionController {
   private readonly generateExecutionId: (() => string) | undefined;
   private readonly isSandboxBackendDetectionAttempted: boolean;
   private readonly outputScanPolicy: "block" | "redact";
+  private readonly requireWholeStreamScan: boolean;
+  private readonly outputScanAccumulatorMaximumBytes: number;
+  private readonly outputScanAccumulatorByStream = new Map<string, string>();
 
   constructor(options: ProcessExecutionControllerOptions) {
     this.environmentRegistry = options.environmentRegistry;
@@ -258,6 +271,9 @@ export class ProcessExecutionController {
     this.generateExecutionId = options.generateExecutionId;
     this.isSandboxBackendDetectionAttempted = options.isSandboxBackendDetectionAttempted === true;
     this.outputScanPolicy = options.outputScanPolicy ?? "block";
+    this.requireWholeStreamScan = options.requireWholeStreamScan !== false;
+    this.outputScanAccumulatorMaximumBytes =
+      options.outputScanAccumulatorMaximumBytes ?? 8 * 1024 * 1024;
   }
 
   /** 后端能力探测（供装配自检与分诊使用；不启动进程）。 */
@@ -524,6 +540,30 @@ export class ProcessExecutionController {
     }
     const redactedText = scannedChunk.textToEmit;
     const isSensitiveContentRedacted = scannedChunk.isRedacted;
+    if (this.outputScanPolicy === "block" && this.requireWholeStreamScan) {
+      /**
+       * D5：**完整扫描得到 clean 之后才交出**。单块脱敏只覆盖有限模式
+       * （反例：`Authorization: Bearer ...`、PEM、连接串密码在旧路径会被原样交出）。
+       */
+      const accumulatedText = `${this.outputScanAccumulatorByStream.get(carryKey) ?? ""}${chunk.text}`;
+      if (
+        Buffer.byteLength(accumulatedText, "utf8") >
+        this.outputScanAccumulatorMaximumBytes
+      ) {
+        throw new DomainError(
+          "execution-output-scan-blocked",
+          "执行输出超过完整扫描预算：无法证明 clean，按 block 策略不释放正文",
+        );
+      }
+      this.outputScanAccumulatorByStream.set(carryKey, accumulatedText);
+      const wholeStreamScan = scanSensitiveContent({ content: accumulatedText });
+      if (wholeStreamScan.outcome !== "clean") {
+        throw new DomainError(
+          "execution-output-scan-blocked",
+          `执行输出未通过完整敏感扫描（${wholeStreamScan.outcome}）：按 block 策略不释放正文`,
+        );
+      }
+    }
     if (isSensitiveContentRedacted && this.outputScanPolicy === "block") {
       /** D5：非 clean 不释放正文（"没扫干净"同样不得当干净）。 */
       throw new DomainError(

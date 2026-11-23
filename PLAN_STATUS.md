@@ -7578,3 +7578,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 边界：目标端/资源范围/授权 revision 的校验仍无模型（D6 后续），本轮只落**内容判定**。
 
 > **推送状态（2026-11-23 第 72 轮）**：`27de027f` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **EXEC-01-03 完整流扫描接线（2026-11-23 第 73 轮）**
+>
+> - 控制器新增完整流扫描（默认开启、8 MiB 预算）：`block` 下累积已读内容整体四态扫描，非 clean 不释放。
+> - 反例 5 条：Authorization 头、PEM 私钥、跨两次读取的秘密、普通输出、超预算。
+> - 全量：**908 files（905 passed / 1 failed / 2 skipped），5793 tests（5785 passed / 1 failed / 7 skipped）**；
+>   唯一失败为已知并发抖动（`cross-project-ledger-concurrency`，隔离复跑通过）；`lint` 0。
