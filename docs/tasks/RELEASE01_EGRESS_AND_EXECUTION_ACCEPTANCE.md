@@ -76,7 +76,7 @@
   （`execution-backend-unsupported`，不降级到宿主进程）。
 - **B3 验收在获得 Rust/MSVC 工具链与必要授权前无法开始**；本节作为阻塞证据，不宣称通过。
 - **已就绪（2026-11-24）**：`sandbox self-check --json`（公开只读诊断）输出验收记录：`platform/architecture/nodeVersion/packageVersion/backendKind/helperExecutablePath/components/isExecutionAllowed/nextActionText`；
-  纯装配 `buildSandboxAcceptanceRecord` 有 4 条反例（含缺 helper 的"不可执行 + 工具链前置"）。\n  本机实测：`backendKind=null`、`isExecutionAllowed=false`、下一步提示"无隔离后端：受控执行会被拒绝"。\n  干净设备上可直接用该命令产出 B3 的记录行（OS/架构/后端/版本/每项结果）。
+  纯装配 `buildSandboxAcceptanceRecord` 有 4 条反例（含缺 helper 的"不可执行 + 工具链前置"）。\n  本机实测：`backendKind=null`、`isExecutionAllowed=false`、下一步提示"无隔离后端：受控执行会被拒绝"。\n- **打包验收已集成（2026-11-24）**：`verify:tarball-isolation-install` 在隔离安装产物上运行 `sandbox self-check --json`，\n  校验记录必需字段与"无后端不可声明可执行"的自洽性，并打印 `sandbox-acceptance-record: platform=win32/x64 backendKind=null isExecutionAllowed=false`。\n  干净设备上可直接用该命令产出 B3 的记录行（OS/架构/后端/版本/每项结果）。
 ### 04 公开包验收复核（2026-11-24）
 
 打包变更（bridge/CLI 授权接线）后重跑：

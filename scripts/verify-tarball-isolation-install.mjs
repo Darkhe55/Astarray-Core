@@ -79,6 +79,45 @@ async function main() {
       throw new Error(`安装后的 CLI 未输出版本号：${versionText.slice(0, 200)}`);
     }
     console.log(`tarball-isolation-install-ok: 安装后 CLI 版本 ${versionText}`);
+
+    /**
+     * RELEASE-01-03（2026-11-24）：在**隔离安装产物**上产出受控执行验收记录。
+     *
+     * 只读诊断：不启动进程、不写状态。记录必须自洽——没有后端就不能声称可执行；
+     * 缺 helper 是"待验证/阻塞"，不是安装失败（安装本身已成功）。
+     */
+    const applicationRootPath = path.dirname(path.dirname(cliPath));
+    const recordText = runCommand(process.execPath, [
+      cliPath,
+      "sandbox",
+      "self-check",
+      "--json",
+      "--application-root",
+      applicationRootPath,
+    ], { cwd: installDirectory });
+    const record = JSON.parse(recordText);
+    for (const key of [
+      "schemaVersion",
+      "platform",
+      "architecture",
+      "nodeVersion",
+      "backendKind",
+      "helperExecutablePath",
+      "components",
+      "isExecutionAllowed",
+      "nextActionText",
+    ]) {
+      if (!(key in record)) {
+        throw new Error(`验收记录缺少字段 ${key}`);
+      }
+    }
+    if (record.backendKind === null && record.isExecutionAllowed !== false) {
+      throw new Error("验收记录自相矛盾：无隔离后端却标记为可执行");
+    }
+    console.log(
+      `sandbox-acceptance-record: platform=${record.platform}/${record.architecture} ` +
+        `backendKind=${String(record.backendKind)} isExecutionAllowed=${String(record.isExecutionAllowed)}`,
+    );
   } finally {
     await fs.rm(installDirectory, { recursive: true, force: true, maxRetries: 10 });
     await fs.rm(tarballPath, { force: true });

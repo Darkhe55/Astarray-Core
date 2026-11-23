@@ -7735,3 +7735,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**919 files（916 passed / 1 failed / 2 skipped），5847 tests（5839 passed / 1 failed / 7 skipped）**；
 >   唯一失败 `b6r10-wait-for-task-terminal` ⑤ 为负载敏感（隔离复跑 10/10 通过）；`lint` 0。
 > - B3 仍阻塞：Rust/MSVC 工具链与 AppContainer 提权（按纪律需单独授权）。
+
+> **RELEASE-01-03 验收记录接入打包脚本（2026-11-24 第 94 轮）**
+>
+> - `verify:tarball-isolation-install` 在隔离安装产物上运行 `sandbox self-check --json`，校验记录字段与自洽性；
+>   实测输出 `sandbox-acceptance-record: platform=win32/x64 backendKind=null isExecutionAllowed=false`（exit 0）。
+> - 全量：**919 files（917 passed / 2 skipped），5847 tests（5840 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - B3 仍阻塞于 Rust/MSVC 工具链与 AppContainer 提权（需单独授权）。
+
+> **推送状态（2026-11-24 第 94 轮）**：`004bdf71` 3 次推送失败（网络不可达）；留待下次合并推送。
