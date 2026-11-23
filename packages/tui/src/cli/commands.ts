@@ -3848,6 +3848,11 @@ export interface McpServeCommandOptions {
   providerRequestTimeoutMilliseconds?: number;
   /** 可选：把本次实际选中的运行时写成公开诊断报告（供 tarball 级验收断言）。 */
   runtimeDiagnosticsFilePath?: string;
+  /**
+   * RELEASE-01-01（2026-11-23）：MCP 连接授权绑定文件（缺省 `<state>/mcp/egress-authorizations.json`）。
+   * 未写入绑定时，工具调用一律拒绝（缺绑定即拒绝项目内容释放）。
+   */
+  egressAuthorizationFilePath?: string;
 }
 
 export async function executeMcpServeCommand(
@@ -3861,6 +3866,9 @@ export async function executeMcpServeCommand(
   );
   const { runMcpStdioSession } = await import(
     "../../../core/src/bridge/mcp-stdio-server.js"
+  );
+  const { McpEgressAuthorizationStore, createMcpReleaseAuthorizer } = await import(
+    "../../../core/src/bridge/mcp-egress-authorization-store.js"
   );
   const sessionId = "mcp-session-stdio";
   let runtimeSelection: RuntimeSelection;
@@ -3904,12 +3912,23 @@ export async function executeMcpServeCommand(
       process.env["ASTARRAY_MCP_PRINCIPAL"] ?? "external-harness:stdio",
     sessionId,
   });
+  /** RELEASE-01-01：宿主侧权威绑定仓库（缺省状态目录下），每次释放前复核。 */
+  const egressAuthorizationStore = new McpEgressAuthorizationStore({
+    filePath:
+      options.egressAuthorizationFilePath ??
+      `${options.stateDirectory}/mcp/egress-authorizations.json`,
+  });
   try {
     await runMcpStdioSession({
       input: process.stdin,
       output: process.stdout,
       bridge,
       principal: session.principal,
+      authorizeRelease: createMcpReleaseAuthorizer({
+        store: egressAuthorizationStore,
+        connectionIdentifier: session.sessionIdentifier,
+        authenticatedPrincipalIdentifier: session.principal.authenticatedPrincipalIdentifier,
+      }),
     });
     return EXIT_CODES.SUCCESS;
   } finally {
@@ -3938,6 +3957,11 @@ export interface GuiServeCommandOptions {
   providerRequestTimeoutMilliseconds?: number;
   /** 可选：把本次实际选中的运行时写成公开诊断报告（供 tarball 级验收断言）。 */
   runtimeDiagnosticsFilePath?: string;
+  /**
+   * RELEASE-01-01（2026-11-23）：MCP 连接授权绑定文件（缺省 `<state>/mcp/egress-authorizations.json`）。
+   * 未写入绑定时，工具调用一律拒绝（缺绑定即拒绝项目内容释放）。
+   */
+  egressAuthorizationFilePath?: string;
 }
 
 

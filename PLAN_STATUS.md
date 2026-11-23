@@ -7670,3 +7670,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `runMcpStdioSession` 接入 `authorizeRelease` 钩子；未注入保持既有行为（生产装配必须注入）。
 > - 反例 12 条；全量：**912 files（910 passed / 2 skipped），5815 tests（5808 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 剩余：真实宿主装配、端到端双客户端验收、释放点清单与幂等重连。
+
+> **RELEASE-01-01 宿主装配（2026-11-23 第 85 轮）**
+>
+> - 新增 `McpEgressAuthorizationStore`（权威文件仓库：写入/撤销/跨实例读取；损坏按撤销）+ `createMcpReleaseAuthorizer`。
+> - `mcp serve` **缺省注入**释放判定钩子（无绑定即拒绝工具调用），新增 `--egress-authorization-file`。
+> - 反例 7 条；全量：**913 files（911 passed / 2 skipped），5822 tests（5815 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 边界（如实）：MCP 桥接工具无独立"目标账户/资源清单"来源 ⇒ 目的端与资源范围对桥接工具是弱校验；端到端双客户端待做。

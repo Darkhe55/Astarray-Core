@@ -38,7 +38,15 @@ const ALLOWED_MODULES: Record<string, { tokens: AllowedTokens; reason: string }>
     tokens: ["writeFile", "rename"],
     reason: "诊断聚类派生索引的临时文件→原子 rename；只写状态目录下的派生快照，不触碰项目源码",
   },
-  "core/src/infra/atomic-json.ts": {
+  /**
+   * RELEASE-01-01（2026-11-23）：MCP 连接授权绑定的状态目录写入。
+   * 理由：只写 `mcp/egress-authorizations.json`（连接/主体/目的端/有效期的**元数据**，
+   * 不含项目内容）；撤销只追加连接标识，不删除任何用户文件。
+   */
+  "core/src/bridge/mcp-egress-authorization-store.ts": {
+    tokens: ["writeFile"],
+    reason: "MCP 连接授权绑定与撤销状态的元数据写入（状态目录，不含项目内容）",
+  },  "core/src/infra/atomic-json.ts": {
     tokens: ["writeFile", "rm", "rename", "copyFile"],
     reason: "底层原子写/备份/陈旧临时文件清理白名单模块（atomic temp→rename、.bak copy、.tmp rm）",
   },

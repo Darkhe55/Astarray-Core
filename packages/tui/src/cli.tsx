@@ -2570,6 +2570,10 @@ mcpCommand
     "--runtime-diagnostics-file <path>",
     "把本次选中的运行时写入公开诊断报告（供安装验收；不含凭据）",
   )
+  .option(
+    "--egress-authorization-file <path>",
+    "MCP 连接授权绑定文件（缺省 <state>/mcp/egress-authorizations.json；无绑定即拒绝工具调用）",
+  )
   .action(
     async (options: {
       runtime?: string;
@@ -2579,6 +2583,7 @@ mcpCommand
       providerCredentialReference?: string;
       providerRequestTimeoutSeconds?: string;
       runtimeDiagnosticsFile?: string;
+      egressAuthorizationFile?: string;
     }) => {
       process.exitCode = await executeMcpServeCommand({
         stateDirectory: defaultStateDirectory(),
@@ -2603,6 +2608,9 @@ mcpCommand
           : {}),
         ...(options.runtimeDiagnosticsFile !== undefined
           ? { runtimeDiagnosticsFilePath: options.runtimeDiagnosticsFile }
+          : {}),
+        ...(options.egressAuthorizationFile !== undefined
+          ? { egressAuthorizationFilePath: options.egressAuthorizationFile }
           : {}),
       });
     },
@@ -3282,6 +3290,10 @@ program
     "--runtime-diagnostics-file <path>",
     "把本次选中的运行时写入公开诊断报告（供安装验收；不含凭据）",
   )
+  .option(
+    "--egress-authorization-file <path>",
+    "MCP 连接授权绑定文件（缺省 <state>/mcp/egress-authorizations.json；无绑定即拒绝工具调用）",
+  )
   .action(
     async (options: {
       port?: number;
@@ -3293,6 +3305,7 @@ program
       providerCredentialReference?: string;
       providerRequestTimeoutSeconds?: string;
       runtimeDiagnosticsFile?: string;
+      egressAuthorizationFile?: string;
     }) => {
       process.exitCode = await executeGuiServeCommand({
         stateDirectory: defaultStateDirectory(),
@@ -3319,6 +3332,9 @@ program
           : {}),
         ...(options.runtimeDiagnosticsFile !== undefined
           ? { runtimeDiagnosticsFilePath: options.runtimeDiagnosticsFile }
+          : {}),
+        ...(options.egressAuthorizationFile !== undefined
+          ? { egressAuthorizationFilePath: options.egressAuthorizationFile }
           : {}),
       });
     },
