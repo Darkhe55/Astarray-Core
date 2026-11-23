@@ -7867,3 +7867,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**933 files（931 passed / 2 skipped），5941 tests（5934 passed / 7 skipped），EXIT=0**；`lint` 0。
 
 > **推送状态（2026-11-24 第 110 轮）**：`9b2f4ef2` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **B9 覆盖率：跨项目授权分支（2026-11-24 第 111 轮）**
+>
+> - 新增 7 条用例：未认证授予拒绝、撤销幂等/未知标识、列表三维过滤、
+>   缩权派生五种拒绝、合法派生深度+1 跨实例可读、再转交拒绝、同项目关系 created/existing/revoked。
+> - 全量：**934 files（932 passed / 2 skipped），5948 tests（5941 passed / 7 skipped），EXIT=0**；`lint` 0。
