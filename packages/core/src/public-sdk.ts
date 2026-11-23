@@ -8674,6 +8674,11 @@ export {
   createClarificationUserChannel,
 } from "./orchestration/clarification-decision-channel.js";
 export {
+  createSecretaryDecisionChannel,
+  type SecretaryDecisionDispatcher,
+  type SecretaryDecisionDispatchInput,
+} from "./orchestration/secretary-decision-channel.js";
+export {
   buildResponsibilityRecord,
   describeResponsibilityInstructions,
   type ResponsibilityRecord,
