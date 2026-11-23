@@ -7692,3 +7692,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 连接 ID 稳定化（`ASTARRAY_MCP_CONNECTION_ID`）；释放点清单与幂等重连写入卡内。
 > - 全量：**914 files（912 passed / 2 skipped），5826 tests（5819 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 剩余：双客户端/两项目夹具、真实部署中的独立目的端注入验证。
+
+> **F3 并发抖动修复 + B3 阻塞取证（2026-11-23 第 88 轮）**
+>
+> - 修复 `file-lock`：`open(wx)` 的 EPERM/EACCES/EBUSY 作为瞬时错误重试，超时才 `lock-timeout`；反例 4 条。
+> - 全量门禁无并发抖动：**915 files（913 passed / 2 skipped），5830 tests（5823 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - RELEASE-01-03：Windows 后端源码存在，但本机**无 Rust 工具链**且 AppContainer 需提权 ⇒ 记录为明确阻塞，不宣称通过。

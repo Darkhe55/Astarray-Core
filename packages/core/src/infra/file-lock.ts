@@ -50,8 +50,26 @@ export async function withFileLock<T>(
       handle = await fs.open(options.lockFilePath, "wx");
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code;
-      if (errorCode !== "EEXIST") {
+      /**
+       * Windows 上 `open(..., "wx")` 在另一进程**创建/释放的瞬间**可能短暂返回
+       * `EPERM`/`EACCES`/`EBUSY`（实测：并发压测下偶发，隔离复跑不出现）。
+       * 这些是**可重试**的瞬时错误：按锁冲突同等等待，超时才报 `lock-timeout`
+       * （不把瞬时竞争伪装成真实失败，也不无限等待）。
+       */
+      const isTransientWindowsCode =
+        errorCode === "EPERM" || errorCode === "EACCES" || errorCode === "EBUSY";
+      if (errorCode !== "EEXIST" && !isTransientWindowsCode) {
         throw error;
+      }
+      if (isTransientWindowsCode) {
+        if (Date.now() >= deadline) {
+          throw new DomainError(
+            "lock-timeout",
+            `获取文件锁超时（${timeoutMilliseconds}ms）: ${options.lockFilePath}（最后错误 ${String(errorCode)}）`,
+          );
+        }
+        await delay(RETRY_INTERVAL_MILLISECONDS);
+        continue;
       }
       /** 陈旧锁：持有者已死 ⇒ 删除后重试（删除的只是锁文件本身）。 */
       const lockStats = await fs.stat(options.lockFilePath).catch(() => null);

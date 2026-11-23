@@ -65,3 +65,12 @@
   ③ stderr 仅诊断、不含正文；④ 诊断报告不含凭据/正文。**幂等重连**：连接 ID 用 `ASTARRAY_MCP_CONNECTION_ID`
   稳定化，每次释放前重读绑定；同 ID 重连沿用同一授权状态。
 - **仍未做（如实）**：双客户端/两项目夹具、目标账户的宿主侧独立注入在真实部署中的验证。
+### 03 B3 Windows 受控执行：当前阻塞与已取证（2026-11-23）
+
+- Windows 后端实现存在（`native/sandbox-helper/src/main.rs`，Job Object + AppContainer），但：
+  1. **本机无 Rust 工具链**（`cargo`/`rustc` 均未安装）⇒ 无法构建 `sandbox-helper.exe`；
+  2. README 明确 **`CreateAppContainerProfile` 需要提权**（安装期预建档案）。
+- 因此 `createPlatformSandboxExecutionBackend` 在本机返回 `null`，控制器按纪律拒绝执行
+  （`execution-backend-unsupported`，不降级到宿主进程）。
+- **B3 验收在获得 Rust/MSVC 工具链与必要授权前无法开始**；本节作为阻塞证据，不宣称通过。
+- 已就绪的前置：`buildSandboxSelfCheckReport`（SDK 导出）可在有后端时记录组件状态。
