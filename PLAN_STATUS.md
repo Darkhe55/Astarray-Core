@@ -7601,3 +7601,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   ② 假定的缺省状态目录错误（真实为 `%LOCALAPPDATA%\Astarray\state`）⇒ 用 `ASTARRAY_DATA_DIR` 隔离，避免读写真实用户数据；
 >   ③ `gui` 在 CLI-only 构建不可用 ⇒ 相关检查如实标"不适用"而非通过/失败；[5] 切到 `mcp serve` 时误带 `--no-open` 已修正。
 > - 未跑：`verify:tarball-install`（下一轮）。
+
+> **包级验收：tarball-install 通过（2026-11-23 第 76 轮）**
+>
+> - `verify:tarball-install`：**exit 0** —— "tarball-isolation-install-ok: 安装后 CLI 版本 0.1.0"。
+> - 至此两条此前未确认的包级脚本均已通过：`entry-runtime-selection`（18/18）与 `tarball-install`；
+>   `security-coverage` 可运行并给出 21/22 的真实结果。
+> - `lint` 0；隐私 `privacy-ok`。
+> - 包级脚本合计：`verify:security-coverage` / `verify:entry-runtime-selection` / `verify:tarball-install` 全部**已执行确认**。

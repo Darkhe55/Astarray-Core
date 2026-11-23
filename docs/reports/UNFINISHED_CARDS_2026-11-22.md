@@ -161,3 +161,13 @@ BATCH6/WB00 等卡完成头行/状态对账。
 3. **覆盖率**：全局分支达 85%、`entrypoint` 剩余不可达行；
 4. **包级脚本**：`entry-runtime-selection`、`tarball-install` 结果确认；
 5. **实现后继**：`taskRevision` 独立盖章、逻辑派发重投复用 attempt、ALIGN-02 规划路径的端到端演练。
+## 包级脚本最终状态（2026-11-23，第 75–76 轮）
+
+| 脚本 | 结果 |
+|---|---|
+| `verify:security-coverage` | ✅ 可运行；关键安全模块 **21/22**（`entrypoint` 90.9%，剩余 7 行不可达/需注入） |
+| `verify:entry-runtime-selection` | ✅ **18/18 通过**（3 项不适用：公开构建无 Web GUI）；tarball sha256 `719fc4c0…f3704bb` |
+| `verify:tarball-install` | ✅ exit 0："tarball-isolation-install-ok: 安装后 CLI 版本 0.1.0" |
+
+此前归为"被 prepack 阻断"的三条脚本均**已执行并给出真实结论**；其中 entry-runtime 脚本的
+JSON 解析、状态目录隔离与 CLI-only 构建判定三处缺陷已修复。
