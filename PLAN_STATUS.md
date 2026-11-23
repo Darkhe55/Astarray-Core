@@ -7500,3 +7500,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 4 条；中间发现并修复"夹具无 updateTaskChain ⇒ 派发直接抛错"的回归（改为只读端口跳过写回）。
 > - 全量：**900 files（898 passed / 2 skipped），5744 tests（5737 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 未做：`taskRevision` 独立盖章、重投复用 attempt（无重投路径）。
+
+> **D8 覆盖率补测（2026-11-23 第 66 轮）**
+>
+> - 新增 8 条敏感内容判定分支用例（身份解析/硬链接别名/旧接口保守折叠/目录过滤）。
+> - 全量：**901 files（898 passed / 1 failed / 2 skipped），5752 tests（5744 passed / 1 failed / 7 skipped）**；
+>   唯一失败为 `cross-project-ledger-concurrency`（并发抖动，**隔离复跑通过**）；`lint` 0。
+> - 剩余待补：`policy-wrapper` 90.20%、`mailbox-journal` 92.75%、`feedback-process/entrypoint` 87.01%。

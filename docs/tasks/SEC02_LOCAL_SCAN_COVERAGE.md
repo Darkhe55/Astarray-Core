@@ -240,3 +240,16 @@ Azure/GCP 凭据、webhook 带签名链接）。**没有任何一行标"已验�
 **后继（明确）**：为上述 4 个模块补分支用例（优先 `sensitive-content-access-policy` 的截断/身份核对分支），
 并把全局分支提升到 ≥85%；在达标前，不宣称 SEC-02 覆盖完成。
 2026-11-23 施工入口：历史待决项按[当前产品决策与验收口径](../reports/PRODUCT_DECISIONS_2026-11-23.md)执行。实施进度与剩余证据仍按本卡记录。
+
+## D8 覆盖率补测（2026-11-23，第 66 轮）
+
+新增 `sec02-sensitive-access-branches.test.ts`（8 条）覆盖此前未命中的分支：
+
+- 身份解析：不存在路径（realPath/deviceInode=null）、**硬链接别名按 dev+inode 身份拦截**（管理员扩展路径）、
+  扩展路径不存在不误伤、管理员扩展正则命中；
+- 四态 → 旧布尔接口的**保守折叠**：命中=true 带类别、干净=false、超预算=incomplete 且 true；
+- 目录过滤：敏感名 + 管理员正则都过滤、普通名保留。
+
+`coverage-final.json`（定向）显示未命中语句已从 `sensitive-content-access-policy` 的 29 处降至
+覆盖上述区域后的剩余项；完整百分比待下一轮全量覆盖率复核。**未达标模块**：`policy-wrapper`（90.20%）、
+`mailbox-journal`（92.75%）、`feedback-process/entrypoint`（87.01%）仍待补测。
