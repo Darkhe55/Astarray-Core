@@ -8278,3 +8278,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **明确不执行任何进程**：在管理员会话完成"模拟调用方 + AppContainer 建进程"（E3-6）之前，不得当作强档可用。
 > - 4 条真实反例通过（ping/pong、unknown-request、frame-too-large、连接循环）；全量
 >   **966 files（964 passed / 2 skipped），6129 tests（6123 passed / 6 skipped），EXIT=0**；`lint`/typecheck 0。
+
+> **E3-6 broker 执行路径（2026-11-25，第 150 轮）**
+>
+> - `serve` 新增 `--allow-weak-execution` / `--allow-strong-execution`（缺省**不执行**，回 `execution-disabled`）；
+>   执行通过子进程 `run` 完成，弱档走 `--low-integrity --work-dir`，超时由 Job 真正终止。
+> - 请求校验：绝对路径 + 文件/目录存在、超时 ≤600s、内存 ≤8GiB、进程数 ≤64；请求标识去重。
+> - 修三个真实缺陷：响应 JSON 多一个 `}`、按 `payload.type` 分派（参数里含 "ping" 会误判）、
+>   参数解析用**源文本**长度推进游标（转义导致命令参数丢失）。
+> - 6 条真实反例：默认禁用、真实执行回传、重复请求、非法可执行文件、超时终止、写用户主目录被拒。
+> - 全量：**967 files（965 passed / 2 skipped），6135 tests（6129 passed / 6 skipped），EXIT=0**；`lint` 0。

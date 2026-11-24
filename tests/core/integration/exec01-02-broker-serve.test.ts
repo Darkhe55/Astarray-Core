@@ -116,7 +116,7 @@ describe.skipIf(!isAcceptanceHost)("E3-5 broker serve 骨架", () => {
     const harness = await startServe();
     const response = await roundTrip(
       harness.pipeName,
-      JSON.stringify({ schemaVersion: 1, requestIdentifier: "exec-1", payload: { type: "execute" } }),
+      JSON.stringify({ schemaVersion: 1, requestIdentifier: "exec-1", payload: { type: "inspect" } }),
     );
     expect(response).toMatchObject({
       requestIdentifier: "exec-1",

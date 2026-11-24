@@ -239,6 +239,7 @@ extern "system" {
     ) -> Handle;
     fn ConnectNamedPipe(pipe: Handle, overlapped: *mut c_void) -> Bool;
     fn DisconnectNamedPipe(pipe: Handle) -> Bool;
+    fn FlushFileBuffers(file: Handle) -> Bool;
     fn ReadFile(
         file: Handle,
         buffer: *mut u8,
@@ -899,6 +900,8 @@ fn write_pipe_text(pipe: Handle, text: &str) -> Result<(), String> {
     if bytes_written as usize != bytes.len() {
         return Err("WriteFile 未写全".to_string());
     }
+    /** 断开管道前必须 flush，否则客户端可能读不到刚写出的响应（实测超大帧响应丢失）。 */
+    unsafe { FlushFileBuffers(pipe) };
     Ok(())
 }
 
@@ -951,6 +954,217 @@ fn broker_response(request_identifier: &str, outcome: &str, reason_code: Option<
  * 真正的"模拟调用方 + AppContainer 建进程"留给管理员会话下的 E3-6；在此之前
  * 不得把本骨架当作强档可用。
  */
+// ----- E3-6（2026-11-25）：serve 的执行路径（显式开关，强档优先、弱档需显式） -----
+
+#[derive(Default, Clone)]
+struct ServeExecutionOptions {
+    allow_weak_execution: bool,
+    allow_strong_execution: bool,
+}
+
+fn parse_json_string_with_length(input: &str) -> Option<(String, usize)> {
+    let mut output = String::new();
+    let mut characters = input.char_indices();
+    while let Some((index, character)) = characters.next() {
+        match character {
+            '"' => return Some((output, index + 1)),
+            '\\' => match characters.next()?.1 {
+                'n' => output.push('\n'),
+                't' => output.push('\t'),
+                'r' => output.push('\r'),
+                '"' => output.push('"'),
+                '\\' => output.push('\\'),
+                _ => return None,
+            },
+            value if (value as u32) < 0x20 => return None,
+            value => output.push(value),
+        }
+    }
+    None
+}
+
+fn extract_json_string(frame: &str, key: &str) -> Option<String> {
+    let marker = format!("\"{key}\"");
+    let index = frame.find(&marker)?;
+    let rest = frame[index + marker.len()..].trim_start();
+    let rest = rest.strip_prefix(':')?.trim_start();
+    let rest = rest.strip_prefix('"')?;
+    parse_json_string_with_length(rest).map(|(value, _length)| value)
+}
+
+fn extract_json_number(frame: &str, key: &str) -> Option<u64> {
+    let marker = format!("\"{key}\"");
+    let index = frame.find(&marker)?;
+    let rest = frame[index + marker.len()..].trim_start();
+    let rest = rest.strip_prefix(':')?.trim_start();
+    let digits: String = rest.chars().take_while(|character| character.is_ascii_digit()).collect();
+    if digits.is_empty() {
+        None
+    } else {
+        digits.parse::<u64>().ok()
+    }
+}
+
+fn extract_json_string_array(frame: &str, key: &str) -> Option<Vec<String>> {
+    let marker = format!("\"{key}\"");
+    let index = frame.find(&marker)?;
+    let rest = frame[index + marker.len()..].trim_start();
+    let rest = rest.strip_prefix(':')?.trim_start();
+    let rest = rest.strip_prefix('[')?;
+    let mut values: Vec<String> = Vec::new();
+    let mut cursor = rest.trim_start();
+    if let Some(after_empty) = cursor.strip_prefix(']') {
+        let _ = after_empty;
+        return Some(values);
+    }
+    loop {
+        cursor = cursor.trim_start();
+        let cursor_without_quote = cursor.strip_prefix('"')?;
+        let (value, raw_length) = parse_json_string_with_length(cursor_without_quote)?;
+        values.push(value);
+        /** 用**源文本**长度推进游标（value 已去转义，长度会短于源）。 */
+        let consumed = 1 + raw_length;
+        cursor = cursor[consumed..].trim_start();
+        if let Some(after_comma) = cursor.strip_prefix(',') {
+            cursor = after_comma;
+            continue;
+        }
+        cursor.strip_prefix(']')?;
+        return Some(values);
+    }
+}
+
+fn json_escape(text: &str) -> String {
+    let mut output = String::new();
+    for character in text.chars() {
+        match character {
+            '\\' => output.push_str("\\\\"),
+            '"' => output.push_str("\\\""),
+            '\n' => output.push_str("\\n"),
+            '\r' => output.push_str("\\r"),
+            '\t' => output.push_str("\\t"),
+            value if (value as u32) < 0x20 => output.push_str(&format!("\\u{:04x}", value as u32)),
+            value => output.push(value),
+        }
+    }
+    output
+}
+
+fn truncate_for_response(text: &str) -> (String, bool) {
+    const LIMIT: usize = 8 * 1024;
+    if text.len() <= LIMIT {
+        return (text.to_string(), false);
+    }
+    let mut end = LIMIT;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    (text[..end].to_string(), true)
+}
+
+fn execute_broker_request(frame: &str, options: &ServeExecutionOptions) -> String {
+    let request_identifier = extract_json_string(frame, "requestIdentifier").unwrap_or_else(|| "unknown".to_string());
+    let identifier = safe_identifier(&request_identifier);
+    let reject = |reason: &str| {
+        format!(
+            "{{\"schemaVersion\":1,\"requestIdentifier\":\"{identifier}\",\"payload\":{{\"outcome\":\"rejected\",\"reasonCode\":\"{reason}\"}}}}\n"
+        )
+    };
+    if !options.allow_weak_execution && !options.allow_strong_execution {
+        return reject("execution-disabled");
+    }
+    let executable_path = extract_json_string(frame, "executablePath").unwrap_or_default();
+    let working_directory = extract_json_string(frame, "workingDirectory").unwrap_or_default();
+    let arguments = extract_json_string_array(frame, "arguments").unwrap_or_default();
+    let timeout_milliseconds = extract_json_number(frame, "timeoutMilliseconds").unwrap_or(0);
+    let maximum_memory_bytes = extract_json_number(frame, "maximumMemoryBytes").unwrap_or(0);
+    let maximum_process_count = extract_json_number(frame, "maximumProcessCount").unwrap_or(0);
+
+    let is_absolute = |value: &str| {
+        let bytes = value.as_bytes();
+        (bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && (bytes[2] == b'\\' || bytes[2] == b'/'))
+            || value.starts_with("\\\\")
+    };
+    if !is_absolute(&executable_path) || !std::path::Path::new(&executable_path).is_file() {
+        return reject("executable-not-allowed");
+    }
+    if !is_absolute(&working_directory) || !std::path::Path::new(&working_directory).is_dir() {
+        return reject("working-directory-not-allowed");
+    }
+    if timeout_milliseconds == 0 || timeout_milliseconds > 600_000 {
+        return reject("timeout-exceeded");
+    }
+    if maximum_memory_bytes == 0 || maximum_memory_bytes > 8 * 1024 * 1024 * 1024 {
+        return reject("resource-limit-exceeded");
+    }
+    if maximum_process_count == 0 || maximum_process_count > 64 {
+        return reject("resource-limit-exceeded");
+    }
+
+    let current_executable = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("current_exe 失败: {error}");
+            return reject("internal-error");
+        }
+    };
+    let mut command = std::process::Command::new(current_executable);
+    command.arg("run");
+    if options.allow_strong_execution {
+        command.args(["--profile", "astarray-broker-strong"]);
+    } else {
+        command.args(["--low-integrity", "--work-dir", &working_directory]);
+    }
+    command.args([
+        "--timeout-ms",
+        &timeout_milliseconds.to_string(),
+        "--max-memory-mb",
+        &(maximum_memory_bytes / (1024 * 1024)).max(1).to_string(),
+        "--max-processes",
+        &maximum_process_count.to_string(),
+        "--",
+        &executable_path,
+    ]);
+    command.args(&arguments);
+    let output = match command.output() {
+        Ok(output) => output,
+        Err(error) => {
+            eprintln!("执行失败: {error}");
+            return reject("internal-error");
+        }
+    };
+    let stdout_text = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr_text = String::from_utf8_lossy(&output.stderr).to_string();
+    let timed_out = stdout_text.contains("timed-out");
+    let exit_code = stdout_text
+        .lines()
+        .find_map(|line| line.strip_prefix("exit-code "))
+        .and_then(|value| value.trim().parse::<i32>().ok())
+        .or(output.status.code())
+        .unwrap_or(1);
+    let (stdout_value, stdout_truncated) = truncate_for_response(&stdout_text);
+    let (stderr_value, stderr_truncated) = truncate_for_response(&stderr_text);
+    /** 显式拼接，避免 format! 里大量花括号导致的 off-by-one（实测多出一个 `}` 使客户端解析失败）。 */
+    let mut response = String::new();
+    response.push_str("{\"schemaVersion\":1,\"requestIdentifier\":\"");
+    response.push_str(&identifier);
+    response.push_str("\",\"payload\":{\"outcome\":\"executed\",\"exitCode\":");
+    response.push_str(&exit_code.to_string());
+    response.push_str(",\"timedOut\":");
+    response.push_str(if timed_out { "true" } else { "false" });
+    response.push_str(",\"stdout\":\"");
+    response.push_str(&json_escape(&stdout_value));
+    response.push_str("\",\"stderr\":\"");
+    response.push_str(&json_escape(&stderr_value));
+    response.push_str("\",\"truncated\":");
+    response.push_str(if stdout_truncated || stderr_truncated {
+        "true"
+    } else {
+        "false"
+    });
+    response.push_str("}}\n");
+    response
+}
 fn run_serve(arguments: &[String]) {
     let pipe_name = arguments
         .iter()
@@ -962,6 +1176,10 @@ fn run_serve(arguments: &[String]) {
         eprintln!("serve 需要 --pipe-name <\\\\\\\\.\\\\pipe\\\\...>");
         std::process::exit(2);
     }
+    let options = ServeExecutionOptions {
+        allow_weak_execution: arguments.iter().any(|argument| argument == "--allow-weak-execution"),
+        allow_strong_execution: arguments.iter().any(|argument| argument == "--allow-strong-execution"),
+    };
     let own_sid = match unsafe { current_user_sid_string() } {
         Ok(sid) => sid,
         Err(message) => {
@@ -1007,6 +1225,7 @@ fn run_serve(arguments: &[String]) {
         std::process::exit(3);
     }
     println!("broker-ready {pipe_name}");
+    let mut seen_requests: std::collections::HashSet<String> = std::collections::HashSet::new();
     loop {
         let connected = unsafe { ConnectNamedPipe(pipe, ptr::null_mut()) };
         let connect_error = if connected == 0 { unsafe { GetLastError() } } else { 0 };
@@ -1041,8 +1260,16 @@ fn run_serve(arguments: &[String]) {
                 Ok(Some(frame)) => {
                     let identifier =
                         extract_request_identifier(&frame).unwrap_or_else(|| "unknown".to_string());
-                    let response = if frame.contains("\"ping\"") {
+                    /** 按 payload.type 判定，而不是"帧里出现 ping 字样"——参数里可能包含 ping。 */
+                    let payload_type = extract_json_string(&frame, "type").unwrap_or_default();
+                    let response = if payload_type == "ping" {
                         broker_response(&identifier, "pong", None)
+                    } else if payload_type == "execute" {
+                        if !seen_requests.insert(identifier.clone()) {
+                            broker_response(&identifier, "rejected", Some("duplicate-request"))
+                        } else {
+                            execute_broker_request(&frame, &options)
+                        }
                     } else {
                         broker_response(&identifier, "rejected", Some("unknown-request"))
                     };
