@@ -8119,3 +8119,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `verify-exec01-03-preconditions.mjs` 改为平台口径：Windows 查 helper/rustc/提权，Linux 查 bwrap/用户命名空间，macOS 如实未交付；
 >   新增 `--probes <json>` 使平台分支可确定性测试。
 > - 新增 6 条平台分支测试；全量：**957 files（955 passed / 2 skipped），6077 tests（6070 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B6：bwrap 探测修正（2026-11-24，用户实测反馈）**
+>
+> - 现象：`bwrap --unshare-all ... /usr,/dev,/proc ... true` 报 `execvp true: No such file or directory`。
+> - 原因：探测用了**比真实后端更宽松/不同的挂载集**，并让 PATH 解析 `true`；真实后端探测是「整根只读 bind + `/bin/true`」。
+> - 修正：`verify-exec01-03-preconditions.mjs` 与 `linux-b6-bootstrap.sh` 的探测改为
+>   `--ro-bind / / --dev /dev --proc /proc /bin/true`（与 `bubblewrap-sandbox-backend` 一致）。
+> - 全量：955 files / 6077 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。

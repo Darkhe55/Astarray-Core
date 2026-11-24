@@ -64,9 +64,28 @@ function probeBubblewrap() {
   if (version === null) {
     return { version: null, isUserNamespaceUsable: false };
   }
+  /**
+   * 与真实后端（bubblewrap-sandbox-backend）的探测形态保持一致：
+   * 整根只读 bind + 绝对路径 /bin/true。
+   *
+   * 教训（2026-11-24，用户实测）：只 bind /usr,/dev,/proc 再让 PATH 解析 `true`，
+   * 在部分 Ubuntu 镜像上会失败（execvp true: No such file or directory）。
+   * 探测必须"跑真实会用到的形态"，而不是一个更宽松的假形态。
+   */
   const probe = spawnSync(
     "bwrap",
-    ["--unshare-all", "--die-with-parent", "--ro-bind", "/usr", "/usr", "--dev", "/dev", "--proc", "/proc", "true"],
+    [
+      "--unshare-all",
+      "--die-with-parent",
+      "--ro-bind",
+      "/",
+      "/",
+      "--dev",
+      "/dev",
+      "--proc",
+      "/proc",
+      "/bin/true",
+    ],
     { encoding: "utf8", timeout: 30_000 },
   );
   return { version, isUserNamespaceUsable: probe.status === 0 };

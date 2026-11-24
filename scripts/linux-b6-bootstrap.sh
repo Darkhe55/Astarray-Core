@@ -63,10 +63,11 @@ done
 note "== 4. bubblewrap（Linux 沙箱后端） =="
 if command -v bwrap >/dev/null 2>&1; then
   ok "bwrap $(bwrap --version 2>/dev/null | head -n 1)"
-  if bwrap --unshare-all --die-with-parent --ro-bind /usr /usr --dev /dev --proc /proc true 2>/dev/null; then
+  # 与真实后端一致：整根只读 bind + 绝对路径 /bin/true（避免 PATH/最小挂载导致的 execvp 假失败）
+  if bwrap --unshare-all --die-with-parent --ro-bind / / --dev /dev --proc /proc /bin/true 2>/dev/null; then
     ok "bwrap 用户命名空间可用（--unshare-all 探测通过）"
   else
-    bad "bwrap 存在但探测失败：常见原因 = 未启用非特权用户命名空间，或 AppArmor 限制"
+    bad "bwrap 存在但探测失败：常见原因 = 未启用非特权用户命名空间、AppArmor 限制，或 /bin/true 不存在（极简镜像）"
     note "      Ubuntu 24.04 可尝试：sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"
   fi
 else
