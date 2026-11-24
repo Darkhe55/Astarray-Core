@@ -8244,3 +8244,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   请求去重、控制字符拒绝；路径按**段**比较（`project-a-evil` 不算子目录）。
 > - 9 条反例通过；文档补 §0.8（E3 威胁模型与后续 5 步）。
 > - 尚未做：命名管道 ACL、broker 宿主、调用者令牌建进程、安装期 ACL 授予、崩溃恢复/审计。
+
+> **E3-2 broker 传输契约（2026-11-25，第 146 轮）**
+>
+> - 新增 `sandbox-broker-transport.ts`：管道名按用户 SID 哈希派生（不含原始 SID）、
+>   连接判定（远程一律拒、未认证拒、SID 不匹配拒）、帧协议（64KiB 上限、schemaVersion=1、
+>   requestIdentifier 必填、payload 必须对象）、可用性判定（管道缺失/连接失败 ⇒ fail-closed）。
+> - 7 条反例通过；全量：**963 files（961 passed / 2 skipped），6111 tests（6105 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - 尚未做：Rust/服务侧命名管道实现（ACL、消息循环）、安装期宿主注册、调用者令牌建 AppContainer 进程。
+
+> **推送状态（2026-11-25 第 146 轮）**：`fa59b37a` 3 次推送失败（网络不可达）；留待下次合并推送。
