@@ -107,6 +107,28 @@
 2. **强档（B3 方案 A）**：安装期 broker/服务；协议先写反例（跨用户、未登记命令、越权路径）。
 3. **验收拆分**：强档跑全部隔离反例；弱档只跑"写入受限 + 默认离线 + 不静默降级"，
    并在卡片/文案中明确标注"读不设防"。
+## 0.8 E3 强档 broker：协议准入（已落地的反例）
+
+强档的核心风险不是"建不出进程"，而是 **broker 变成新的提权入口**。因此先把准入判定做成**纯函数**
+（`packages/core/src/execution/sandbox-broker-protocol.ts`），在写任何 IPC/服务之前先钉死：
+
+| 反例 | 判定 |
+|---|---|
+| 无认证身份 / SID 与绑定用户不一致 | `invalid-request` / `caller-sid-mismatch` |
+| 未登记环境 | `unknown-environment` |
+| 可执行文件不在登记清单，或用 PATH 相对名 | `executable-not-allowed`（只接受登记过的**绝对路径**） |
+| 工作目录越界（`..` 逃逸、同前缀兄弟目录 `project-a-evil`） | `working-directory-not-allowed`（按路径段比较） |
+| 资源上限/超时超过登记上限 | `resource-limit-exceeded` / `timeout-exceeded`（**只能收紧**） |
+| 重复请求标识 | `duplicate-request`（不重复副作用） |
+| 空请求标识、参数含 NUL/控制字符 | `invalid-request` |
+
+9 条反例已通过（`sandbox-broker-protocol`）。**尚未做**（按顺序）：
+
+1. **命名管道与 ACL**：只允许绑定用户 SID 连接、拒绝远程管道；调用方身份取自管道对端（不是请求体）；
+2. **broker 宿主**：Windows 服务或登录计划任务（安装期一次提权）；
+3. **用调用者令牌建 AppContainer 子进程**：broker 持高权限令牌仅用于"构造受限进程"，子进程仍是普通用户 + 容器 SID + Low IL；
+4. **安装期 ACL 授予**：Node 运行时目录/工作区快照目录追加 AppContainer SID 读（补 `--allow-dir` 缺口）；
+5. **崩溃恢复与审计**：请求日志（谁/何时/跑了什么）、broker 重启后 unknown 不重跑。
 ## 0. 评估维度
 
 | 维度 | 含义 |

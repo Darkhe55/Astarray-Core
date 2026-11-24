@@ -8237,3 +8237,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - SDK：`PublicApplicationOptions` 新增 `isSandboxBackendAutoDetected / isSandboxWeakIsolationEnabled / isSandboxWeakIsolationForced / sandboxApplicationRootPath`；
 >   **反例**：只开弱档不开探测 ⇒ `invalid-arguments`（提前拒绝，不静默降级）。
 > - 反例 2 条（sdk-weak-isolation-options）；全量：**961 files（959 passed / 2 skipped），6095 tests（6089 passed / 6 skipped），EXIT=0**；`lint` 0。
+
+> **E3 broker 协议准入（2026-11-25，第 145 轮）**
+>
+> - 新增 `sandbox-broker-protocol.ts`（纯判定）：调用方 SID、环境/可执行文件/工作目录登记、资源上限只能收紧、
+>   请求去重、控制字符拒绝；路径按**段**比较（`project-a-evil` 不算子目录）。
+> - 9 条反例通过；文档补 §0.8（E3 威胁模型与后续 5 步）。
+> - 尚未做：命名管道 ACL、broker 宿主、调用者令牌建进程、安装期 ACL 授予、崩溃恢复/审计。
