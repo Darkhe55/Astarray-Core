@@ -8184,3 +8184,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 真实执行验收测试改为平台自适应：Linux（bwrap 可用）**默认运行**；Windows 仍显式 opt-in。
 > - 移除误提交的调试文件 `zz-debug-probe.test.ts`。
 > - 本机（Windows）门禁：958 files / 6081 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。
+
+> **B3 四方案影响评估（2026-11-25）**
+>
+> - 新增 `docs/reports/B3_OPTIONS_IMPACT_2026-11-25.md`：A 服务 broker / B 会话 broker / C 换原语 / D fail-closed
+>   的安全强度、裁决兼容、成本、攻击面、验收可行性逐项分析 + 推荐 + 需拍板的 5 个点。
+> - 关键结论：C（受限令牌+Low IL）**读不设防且默认联网**，过不了卡内隔离反例；A 是唯一同时满足
+>   "运行期不提权"与"真实 AppContainer"的方案；B 可作过渡但需改写裁决。
+> - 隐私 `privacy-ok`。
