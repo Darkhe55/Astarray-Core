@@ -8073,3 +8073,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `docs/reports/INTERNAL_USER_TEST_READINESS_2026-11-24.md`：缺口量化（纯编码约 13–26 人日，其中可独立完成约 11–17 人日）、
 >   可用功能清单、完整使用说明、30 分钟走查脚本与通过标准。
 > - 隐私检查 `privacy-ok`（含新增文档）。
+
+> **内部走查脚本（2026-11-24 第 138 轮）**
+>
+> - 新增 `scripts/internal-user-test-walkthrough.mjs` + `npm run verify:internal-user-walkthrough`：
+>   12 步全自动走查（临时数据目录、不联网、结束清理），本机 **12/12 通过**（`gui` 按预期 fail-closed）。
+> - 修正 doc 中的 `history show` 用法为 `--mission`（骨架脚本实测发现）。
+> - 全量：**954 files（952 passed / 2 skipped），6061 tests（6054 passed / 7 skipped），EXIT=0**；`lint` 0。
