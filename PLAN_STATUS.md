@@ -8106,3 +8106,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `remote-resume-dispatch.ts`：把 `/resume` 解析结果接到**产品路径**（断点查找 → `requestContinuation`），
 >   普通文本不读断点；未认证/通道/格式拒绝；无可恢复断点不造卡；blocked 如实透传；幂等键确定性。反例 7 条。
 > - 全量：**956 files（954 passed / 2 skipped），6071 tests（6064 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B6 Linux 入口（2026-11-24）**
+>
+> - 新增 `scripts/linux-b6-bootstrap.sh`：只读自检（发行版/Node>=20/构建依赖/bwrap 用户命名空间/prlimit），
+>   `--install` 才显式安装 apt 包；不写仓库、不联网下载凭据。
+> - 说明：`verify-exec01-03-preconditions.mjs` 目前是 Windows 口径（helper.exe/AppContainer），
+>   Linux 上会**误报**；下一步改为平台自适应（Linux 检查 bwrap 而非 .exe）。
