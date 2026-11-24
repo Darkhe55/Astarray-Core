@@ -8067,3 +8067,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 4 条：写回缺索引（JSON exit 2）、绑定缺索引（文本 exit 2）、绑定显式索引但 mission 不存在（响亮失败）、
 >   写回显式索引但序列/mission 不存在（响亮失败）。
 > - 全量：**954 files（952 passed / 2 skipped），6061 tests（6054 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **内部用户测试就绪度与使用说明（2026-11-24）**
+>
+> - 新增 `docs/reports/INTERNAL_USER_TEST_READINESS_2026-11-24.md`：缺口量化（纯编码约 13–26 人日，其中可独立完成约 11–17 人日）、
+>   可用功能清单、完整使用说明、30 分钟走查脚本与通过标准。
+> - 隐私检查 `privacy-ok`（含新增文档）。
