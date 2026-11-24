@@ -7977,3 +7977,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `parseRemoteResumeCommand`：严格 `/resume <任务>`；普通文本（13 种）不触发；未认证/通道/格式分别拒绝；幂等键确定性。
 > - 反例 5 条；全量：**941 files（939 passed / 2 skipped），5992 tests（5985 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 说明：本轮只做命令解析层；远程投递/回执接线仍缺。
+
+> **B9：status/resume 命令分支（2026-11-24 第 125 轮）**
+>
+> - 新增 6 条：列表模式（文本/JSON）、单 mission（文本/JSON）、resume 已完成早返回、未知 mission 用法错误（exit 2）。
+> - 覆盖率复测（本轮前）：全局分支 **81.52%**（19990/24629），距 85% 约 860 条。
+> - 全量：**942 files（940 passed / 2 skipped），5998 tests（5991 passed / 7 skipped），EXIT=0**；`lint` 0。
