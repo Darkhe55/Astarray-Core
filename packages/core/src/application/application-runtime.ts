@@ -835,6 +835,14 @@ export interface ApplicationRuntimeOptions {
   sandboxApplicationRootPath?: string;
   /** 自动探测时显式指定辅助程序路径（高级部署/测试用）。 */
   sandboxHelperExecutablePathOverride?: string;
+  /**
+   * E2（2026-11-25）：允许强档不可用时回退到**弱档**（受限令牌 + Low IL）。
+   *
+   * 默认 false（fail-closed）。弱档**读不设防**，必须由用户显式开启（CLI `--sandbox-weak`）。
+   */
+  isSandboxWeakIsolationEnabled?: boolean;
+  /** 强制弱档（跳过强档探测；仍需 isSandboxWeakIsolationEnabled=true）。 */
+  isSandboxWeakIsolationForced?: boolean;
   stateDirectory: string;
   concurrency: number;
   failureThreshold: number;
@@ -1467,6 +1475,12 @@ export async function createApplicationRuntime(
           ...(options.sandboxHelperExecutablePathOverride === undefined
             ? {}
             : { helperExecutablePathOverride: options.sandboxHelperExecutablePathOverride }),
+          ...(options.isSandboxWeakIsolationEnabled === true
+            ? { isWeakIsolationAllowed: true }
+            : {}),
+          ...(options.isSandboxWeakIsolationForced === true
+            ? { isWeakIsolationForced: true }
+            : {}),
         })
       : null);
   const processExecutionController = new ProcessExecutionController({

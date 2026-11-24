@@ -116,6 +116,12 @@ export interface RunCommandOptions {
   missionToolCallBudget?: number | null;
   /** R100：模型任务分解（缺省关；开启后规划器可产出多节点）。 */
   isModelTaskPlanningEnabled?: boolean;
+  /**
+   * E2（2026-11-25）：显式启用**弱隔离**（受限令牌 + Low IL）。
+   *
+   * 语义：写受限、**读不设防**；仅在强档不可用时使用，且必须由用户显式传参。
+   */
+  isSandboxWeakIsolationEnabled?: boolean;
 }
 
 export async function executeRunCommand(options: RunCommandOptions): Promise<number> {
@@ -137,6 +143,11 @@ export async function executeRunCommand(options: RunCommandOptions): Promise<num
     );
   }
 
+  if (options.isSandboxWeakIsolationEnabled === true) {
+    logToStderr(
+      "弱隔离已启用：写入受限，但读取不设防（非 AppContainer）；仅在你明确接受时使用。",
+    );
+  }
   let runtimeSelection: RuntimeSelection;
   try {
     runtimeSelection = await buildRuntimeSelection({
@@ -202,6 +213,14 @@ const application = await AstarrayApplicationFacade.create({
     // GUI-02-01 片②：显式传入工作区根，使"项目标识"由**真实根目录名**推导，
     // 而不是在 CLI 里硬编码；运行时亦以此作为产物对账根（避免写入宿主仓库）。
     workspaceRootPath: process.cwd(),
+    ...(options.isSandboxWeakIsolationEnabled === true
+      ? {
+          isSandboxBackendAutoDetected: true,
+          isSandboxWeakIsolationEnabled: true,
+          isSandboxWeakIsolationForced: true,
+          sandboxApplicationRootPath: process.cwd(),
+        }
+      : {}),
     mode: runConfig.mode,
     ...runtimeSelection,
     concurrency: runConfig.concurrency,

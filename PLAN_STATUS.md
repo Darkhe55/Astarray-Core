@@ -8229,3 +8229,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 平台后端透传两个开关；新增 3 条后端反例 + 2 条真实验收（执行成功、写用户主目录被拒）。
 > - 全量：**960 files（958 passed / 2 skipped），6093 tests（6087 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - B6：Linux 真实执行待用户重跑（bwrap 已补"默认 bind 之外的可执行文件单独 --ro-bind"）。
+
+> **E2 产品入口（2026-11-25，第 144 轮）**
+>
+> - `run --sandbox-weak`：CLI 显式开关 → `run-command` 打开自动探测 + 弱档 + 强制弱档 + 应用根，并在 stderr 打印
+>   "弱隔离已启用：写入受限，但读取不设防（非 AppContainer）"。
+> - SDK：`PublicApplicationOptions` 新增 `isSandboxBackendAutoDetected / isSandboxWeakIsolationEnabled / isSandboxWeakIsolationForced / sandboxApplicationRootPath`；
+>   **反例**：只开弱档不开探测 ⇒ `invalid-arguments`（提前拒绝，不静默降级）。
+> - 反例 2 条（sdk-weak-isolation-options）；全量：**961 files（959 passed / 2 skipped），6095 tests（6089 passed / 6 skipped），EXIT=0**；`lint` 0。

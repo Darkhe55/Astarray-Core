@@ -250,6 +250,10 @@ program
   .option("--goal-budget <count>", "任务级工具调用预算（与目标上限取更严）")
   .option("--model-planning", "启用模型任务分解（规划器产出多节点；缺省单节点）")
   .option(
+    "--sandbox-weak",
+    "启用弱隔离（受限令牌+Low IL；写受限、读不设防；仅在强档不可用时显式选择）",
+  )
+  .option(
     "--conversation",
     "对话模式：无工具调用、无产物时纯文本回复不要求完成控制事件",
   )
@@ -270,6 +274,7 @@ program
         perfCollect?: boolean;
         emitExecutionEvents?: boolean;
         conversation?: boolean;
+        sandboxWeak?: boolean;
         goal?: string;
         goalEnforce?: boolean;
         goalRequireCompletion?: boolean;

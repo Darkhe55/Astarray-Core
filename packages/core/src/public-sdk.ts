@@ -2155,6 +2155,22 @@ export interface PublicApplicationOptions {
    * 缺省时运行时按既有约定回退为 `"workspace"`（**行为不变**）。
    */
   projectIdentifier?: string;
+  /**
+   * E2（2026-11-25）：按平台自动探测沙箱后端（缺省 false）。
+   *
+   * 产品入口（CLI `run --sandbox-weak`）显式开启；探测不到组件时后端为 null ⇒ 一律拒绝执行。
+   */
+  isSandboxBackendAutoDetected?: boolean;
+  /**
+   * E2：允许强档不可用时回退到**弱档**（受限令牌 + Low IL）。默认 false。
+   *
+   * 弱档**读不设防**，必须由用户显式开启；未开启 `isSandboxBackendAutoDetected` 时拒绝（不猜）。
+   */
+  isSandboxWeakIsolationEnabled?: boolean;
+  /** E2：强制弱档（跳过强档探测；仍需 isSandboxWeakIsolationEnabled=true）。 */
+  isSandboxWeakIsolationForced?: boolean;
+  /** E2：自动探测/弱档时用于定位随包辅助程序的根目录（缺省进程 cwd）。 */
+  sandboxApplicationRootPath?: string;
   /** GUI-04-06：开启时段检测器（缺省关闭；GUI 作为宿主显式开启）。 */
   isWorkWindowResumeMonitorEnabled?: boolean;
   /** GUI-04-06：rest→working 时自动恢复被休息挡住的 mission（缺省开启）。 */
@@ -2618,6 +2634,21 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     options: PublicApplicationOptions,
   ): Promise<AstarrayApplicationFacade> {
     const runtimeKind = options.runtime ?? "mock";
+    /**
+     * E2（2026-11-25）：弱档必须与自动探测同开。
+     *
+     * 只开弱档而不探测 = 后端为 null ⇒ 执行被拒（fail-closed），用户会误以为"开了弱档就能跑"。
+     * 这里提前拒绝并给出明确原因，而不是静默降级或静默失败。
+     */
+    if (
+      options.isSandboxWeakIsolationEnabled === true &&
+      options.isSandboxBackendAutoDetected !== true
+    ) {
+      throw new PublicApplicationError(
+        "invalid-arguments",
+        "启用弱隔离必须同时开启沙箱后端自动探测（isSandboxBackendAutoDetected: true）",
+      );
+    }
     let mainRuntimeFactory:
       | ((agentInstanceId: string) => AgentRuntime)
       | undefined;
@@ -2846,6 +2877,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       ...(options.isStartupRecoveryOnBootEnabled === undefined
         ? {}
         : { isStartupRecoveryOnBootEnabled: options.isStartupRecoveryOnBootEnabled }),
+      ...(options.isSandboxBackendAutoDetected === undefined
+        ? {}
+        : { isSandboxBackendAutoDetected: options.isSandboxBackendAutoDetected }),
+      ...(options.isSandboxWeakIsolationEnabled === undefined
+        ? {}
+        : { isSandboxWeakIsolationEnabled: options.isSandboxWeakIsolationEnabled }),
+      ...(options.isSandboxWeakIsolationForced === undefined
+        ? {}
+        : { isSandboxWeakIsolationForced: options.isSandboxWeakIsolationForced }),
+      ...(options.sandboxApplicationRootPath === undefined
+        ? {}
+        : { sandboxApplicationRootPath: options.sandboxApplicationRootPath }),
       concurrency: options.concurrency ?? 1,
       failureThreshold: options.failureThreshold ?? 1,
       maxLoopIterations: options.maximumLoopIterations ?? 8,
