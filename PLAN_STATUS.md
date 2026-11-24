@@ -8143,3 +8143,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 修复：前缀移到 bwrap **外层**（`prlimit … -- bwrap …`）；POSIX 用 `detached` + 进程组 kill；
 >   Windows 专属用例改 `runIf(win32)`；探测单测改断言外层形态。
 > - 全量（Windows）：**957 files（955 passed / 2 skipped），6077 tests（6070 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B3 构建旁路：Linux 交叉编译 Windows 产物（2026-11-25）**
+>
+> - 新增 `scripts/build-sandbox-helper-linux-cross.sh`：Linux 上 `rustup target add x86_64-pc-windows-gnu` +
+>   mingw 链接器 + 静态 CRT，交叉编译出 `sandbox-helper.exe`（避免 Windows 本机下载 Rust/MSVC）。
+> - 本机 rustup/MSVC 下载过慢时的备选路径；CI 产物仍是首选。
