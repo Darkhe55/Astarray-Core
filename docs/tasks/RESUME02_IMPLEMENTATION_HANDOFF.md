@@ -38,7 +38,8 @@ executeContinuationRequestCommand              packages/tui/src/cli/continuation
    └─ 领取：单调 fencingToken、2 分钟租约；写回文档
 ```
 
-**未接线**：领取成功后**不调用** `resumeRecoveredMission`，不装配上下文，不写派发回执。
+**已接线（2026-11-24）**：`ContinuationDispatchService.dispatch` 在领取成功/已领取后调用恢复端口
+（宿主注入 `resumeRecoveredMission`），显式确认由回执承担；blocked 保留领取可重试。
 调用链止于"可派发"状态，输出里明确标注。
 
 ### 1.3 纯装配层（无 I/O）
@@ -114,3 +115,10 @@ assembleContinuationPack                       packages/core/src/orchestration/c
 | `scripts/check-public-privacy.mjs` | `privacy-ok` |
 
 说明：以上均为**只读/显式请求**入口；`request` 成功也只到"已领取"，dispatch 仍未接线（见 §4）。
+
+## 8. dispatch 接线（2026-11-24，第 122 轮）
+
+- 新增 `orchestration/continuation-dispatch.ts`：`request → claim → resumePort.resumeMission`；
+- 端口与公开 SDK 的 `resumeRecoveredMission` 对齐（`hasExplicitUserConfirmation: true` 由回执承担，不给文本/模型确认入口）；
+- `resumed` 透出恢复节点与所需重新鉴权类型；`recovery-*` 映射为 blocked 并保留领取（重试复用同一 token）；
+- 端口抛错原样上抛（不伪装成功）；反例 5 条（无回执/运行中不派发、成功派发、blocked 可重试、抛错）。

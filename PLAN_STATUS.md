@@ -7956,3 +7956,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `entrypoint`：分支 **97.59%**、语句 98.72%、函数 100%、行 98.68% ⇒ **B10 的 95% 目标达成**。
 > - 全量：**938 files（936 passed / 2 skipped），5978 tests（5971 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 同步修订架构守卫（回复路由/重放去重）：仍断言"守卫必须构造并注入"，适配工厂化装配。
+
+> **RESUME-02 dispatch 接线（2026-11-24 第 122 轮）**
+>
+> - 新增 `ContinuationDispatchService`：领取→调用恢复门禁（显式确认=回执）；blocked 保留领取可重试；抛错原样上抛。
+> - 反例 5 条；全量：**939 files（937 passed / 2 skipped），5983 tests（5976 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 剩余：SDK 方法、远程通道、恢复包真实内容/扫描接线、观测、人工验收。
