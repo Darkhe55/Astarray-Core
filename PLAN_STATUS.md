@@ -8049,3 +8049,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 4 条：未认证权限放宽预览/确认拒绝、重新规划空说明、未知目标恢复拒绝；
 >   并锁定一项现状发现：`createApplicationRuntime` 当前**不校验 mode 取值**（待产品裁决，未臆造拒绝）。
 > - 全量：**951 files（949 passed / 2 skipped），6050 tests（6043 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B9：主控制器未知 mission 守卫（2026-11-24 第 135 轮）**
+>
+> - 新增 3 条：续接未知 mission 抛 mission-not-found、取消未知 mission 幂等成功、查询未知 mission 抛错。
+> - 发现（如实锁定）：`cancelMission` 对未知 mission **不报错**（幂等语义）；`queryMissionStatus` **抛错**而非返回 null。
+> - 全量：**952 files（950 passed / 2 skipped），6053 tests（6046 passed / 7 skipped），EXIT=0**；`lint` 0。
