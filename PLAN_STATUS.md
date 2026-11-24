@@ -8269,3 +8269,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 7 条反例通过：管道缺失不连接、连接失败不假装发送、写失败、超时只发一次、响应错配、非法响应、accepted/rejected 透传。
 > - 全量：**965 files（963 passed / 2 skipped），6125 tests（6119 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - 仍未做（E3 实现侧）：Rust 命名管道服务（ACL + 模拟调用方）、安装期注册、调用者令牌建 AppContainer 进程、安装期 ACL 授予、崩溃恢复/审计。
+
+> **E3-5 broker `serve` 骨架（2026-11-25，第 149 轮）**
+>
+> - helper 新增 `serve --pipe-name`：`CreateNamedPipeW`（ACL：SYSTEM + Owner；`PIPE_REJECT_REMOTE_CLIENTS`）、
+>   连接后用 `GetNamedPipeClientProcessId` → 令牌 TokenUser 与自身 SID 比对，不匹配即拒绝；
+>   帧上限 64 KiB；支持 `ping` → `pong`，其余如实回 `rejected/unknown-request`。
+> - **明确不执行任何进程**：在管理员会话完成"模拟调用方 + AppContainer 建进程"（E3-6）之前，不得当作强档可用。
+> - 4 条真实反例通过（ping/pong、unknown-request、frame-too-large、连接循环）；全量
+>   **966 files（964 passed / 2 skipped），6129 tests（6123 passed / 6 skipped），EXIT=0**；`lint`/typecheck 0。

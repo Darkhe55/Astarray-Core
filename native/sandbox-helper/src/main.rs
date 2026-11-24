@@ -58,6 +58,12 @@ struct SecurityCapabilities {
 /** Low IL 强制标签（TokenIntegrityLevel 的输入缓冲区）。 */
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
+struct TokenUser {
+    user: SidAndAttributes,
+}
+
+#[repr(C)]
+#[derive(Default, Clone, Copy)]
 struct TokenMandatoryLabel {
     label: SidAndAttributes,
 }
@@ -68,6 +74,21 @@ const SE_GROUP_INTEGRITY: Dword = 0x0000_0020;
 const TOKEN_INTEGRITY_LEVEL: Dword = 25;
 /** Low 完整性级别 SID（S-1-16-4096）。 */
 const LOW_INTEGRITY_SID_STRING: &str = "S-1-16-4096";
+
+/** E3-5（2026-11-25）：命名管道 broker 骨架用到的常量。 */
+const TOKEN_QUERY_ACCESS: Dword = 0x0008;
+const TOKEN_USER_INFORMATION_CLASS: Dword = 1;
+const PROCESS_QUERY_LIMITED_INFORMATION: Dword = 0x1000;
+const SDDL_REVISION_1: Dword = 1;
+const PIPE_ACCESS_DUPLEX: Dword = 0x0000_0003;
+const FILE_FLAG_FIRST_PIPE_INSTANCE: Dword = 0x0008_0000;
+const PIPE_TYPE_BYTE: Dword = 0x0000_0000;
+const PIPE_READMODE_BYTE: Dword = 0x0000_0000;
+const PIPE_WAIT: Dword = 0x0000_0000;
+const PIPE_REJECT_REMOTE_CLIENTS: Dword = 0x0000_0008;
+const BROKER_MAXIMUM_FRAME_BYTES: usize = 64 * 1024;
+/** 仅 SYSTEM 与管道 Owner（当前用户）可访问；远程连接在管道模式层已拒绝。 */
+const BROKER_PIPE_SECURITY_DESCRIPTOR: &str = "D:P(A;;GA;;;SY)(A;;GA;;;OW)";
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
 struct StartupInfoW {
@@ -205,6 +226,34 @@ extern "system" {
     fn GetLastError() -> Dword;
     fn LocalFree(memory: *mut c_void) -> *mut c_void;
     fn GetCurrentProcess() -> Handle;
+    fn GetNamedPipeClientProcessId(pipe: Handle, client_process_id: *mut Dword) -> Bool;
+    fn CreateNamedPipeW(
+        pipe_name: *const u16,
+        open_mode: Dword,
+        pipe_mode: Dword,
+        maximum_instances: Dword,
+        outbound_buffer_size: Dword,
+        inbound_buffer_size: Dword,
+        default_timeout_milliseconds: Dword,
+        security_attributes: *mut SecurityAttributes,
+    ) -> Handle;
+    fn ConnectNamedPipe(pipe: Handle, overlapped: *mut c_void) -> Bool;
+    fn DisconnectNamedPipe(pipe: Handle) -> Bool;
+    fn ReadFile(
+        file: Handle,
+        buffer: *mut u8,
+        bytes_to_read: Dword,
+        bytes_read: *mut Dword,
+        overlapped: *mut c_void,
+    ) -> Bool;
+    fn WriteFile(
+        file: Handle,
+        buffer: *const u8,
+        bytes_to_write: Dword,
+        bytes_written: *mut Dword,
+        overlapped: *mut c_void,
+    ) -> Bool;
+    fn OpenProcess(desired_access: Dword, inherit_handle: Bool, process_id: Dword) -> Handle;
 }
 
 #[link(name = "advapi32")]
@@ -242,6 +291,19 @@ extern "system" {
     ) -> Bool;
     fn ConvertStringSidToSidW(string_sid: *const u16, sid: *mut *mut c_void) -> Bool;
     fn GetLengthSid(sid: *mut c_void) -> Dword;
+    fn GetTokenInformation(
+        token: Handle,
+        token_information_class: Dword,
+        token_information: *mut c_void,
+        token_information_length: Dword,
+        return_length: *mut Dword,
+    ) -> Bool;
+    fn ConvertStringSecurityDescriptorToSecurityDescriptorW(
+        string_security_descriptor: *const u16,
+        string_sddl_revision: Dword,
+        security_descriptor: *mut *mut c_void,
+        security_descriptor_size: *mut Dword,
+    ) -> Bool;
 }
 
 const CREATE_SUSPENDED: Dword = 0x0000_0004;
@@ -446,6 +508,7 @@ fn main() {
         "probe" => run_probe(),
         "init-sandbox" => run_init_sandbox(&arguments[1..]),
         "run" => run_sandboxed(&arguments[1..]),
+        "serve" => run_serve(&arguments[1..]),
         "print-sid" => run_print_sid(&arguments[1..]),
         other => {
             eprintln!("未知子命令: {other}");
@@ -728,6 +791,281 @@ unsafe fn create_low_integrity_process(
         return Err(format!("CreateProcessAsUserW 失败: {}", GetLastError()));
     }
     Ok(())
+}
+// ----- E3-5（2026-11-25）：命名管道 broker 骨架 -----
+
+unsafe fn token_user_sid_string(token: Handle) -> Result<String, String> {
+    let mut needed: Dword = 0;
+    GetTokenInformation(
+        token,
+        TOKEN_USER_INFORMATION_CLASS,
+        ptr::null_mut(),
+        0,
+        &mut needed,
+    );
+    if needed == 0 {
+        return Err(format!("GetTokenInformation(尺寸) 失败: {}", GetLastError()));
+    }
+    let mut buffer = vec![0u8; needed as usize];
+    if GetTokenInformation(
+        token,
+        TOKEN_USER_INFORMATION_CLASS,
+        buffer.as_mut_ptr() as *mut c_void,
+        needed,
+        &mut needed,
+    ) == 0
+    {
+        return Err(format!("GetTokenInformation 失败: {}", GetLastError()));
+    }
+    let token_user = &*(buffer.as_ptr() as *const TokenUser);
+    let mut sid_string: *mut u16 = ptr::null_mut();
+    if ConvertSidToStringSidW(token_user.user.sid, &mut sid_string) == 0 {
+        return Err(format!("ConvertSidToStringSidW 失败: {}", GetLastError()));
+    }
+    let mut length = 0usize;
+    while *sid_string.add(length) != 0 {
+        length += 1;
+    }
+    let text = String::from_utf16_lossy(std::slice::from_raw_parts(sid_string, length));
+    LocalFree(sid_string as *mut c_void);
+    Ok(text)
+}
+
+unsafe fn current_user_sid_string() -> Result<String, String> {
+    let mut token: Handle = ptr::null_mut();
+    if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY_ACCESS, &mut token) == 0 {
+        return Err(format!("OpenProcessToken 失败: {}", GetLastError()));
+    }
+    let result = token_user_sid_string(token);
+    CloseHandle(token);
+    result
+}
+
+unsafe fn client_user_sid_string(pipe: Handle) -> Result<String, String> {
+    let mut process_id: Dword = 0;
+    if GetNamedPipeClientProcessId(pipe, &mut process_id) == 0 {
+        return Err(format!("GetNamedPipeClientProcessId 失败: {}", GetLastError()));
+    }
+    let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id);
+    if process.is_null() {
+        return Err(format!("OpenProcess(客户端 {process_id}) 失败: {}", GetLastError()));
+    }
+    let mut token: Handle = ptr::null_mut();
+    if OpenProcessToken(process, TOKEN_QUERY_ACCESS, &mut token) == 0 {
+        let error = GetLastError();
+        CloseHandle(process);
+        return Err(format!("OpenProcessToken(客户端) 失败: {error}"));
+    }
+    let result = token_user_sid_string(token);
+    CloseHandle(token);
+    CloseHandle(process);
+    result
+}
+
+fn read_pipe_frame(pipe: Handle) -> Result<Option<String>, String> {
+    let mut frame: Vec<u8> = Vec::new();
+    loop {
+        let mut byte = [0u8; 1];
+        let mut bytes_read: Dword = 0;
+        let ok = unsafe { ReadFile(pipe, byte.as_mut_ptr(), 1, &mut bytes_read, ptr::null_mut()) };
+        if ok == 0 || bytes_read == 0 {
+            return Ok(None);
+        }
+        if byte[0] == b'\n' {
+            return Ok(Some(String::from_utf8_lossy(&frame).to_string()));
+        }
+        frame.push(byte[0]);
+        if frame.len() > BROKER_MAXIMUM_FRAME_BYTES {
+            return Err(format!("frame-too-large：超过 {} 字节", BROKER_MAXIMUM_FRAME_BYTES));
+        }
+    }
+}
+
+fn write_pipe_text(pipe: Handle, text: &str) -> Result<(), String> {
+    let bytes = text.as_bytes();
+    let mut bytes_written: Dword = 0;
+    let ok = unsafe {
+        WriteFile(
+            pipe,
+            bytes.as_ptr(),
+            bytes.len() as Dword,
+            &mut bytes_written,
+            ptr::null_mut(),
+        )
+    };
+    if ok == 0 {
+        return Err(format!("WriteFile 失败: {}", unsafe { GetLastError() }));
+    }
+    if bytes_written as usize != bytes.len() {
+        return Err("WriteFile 未写全".to_string());
+    }
+    Ok(())
+}
+
+fn extract_request_identifier(frame: &str) -> Option<String> {
+    let marker = "\"requestIdentifier\"";
+    let index = frame.find(marker)?;
+    let rest = frame[index + marker.len()..].trim_start();
+    let rest = rest.strip_prefix(':')?.trim_start();
+    let rest = rest.strip_prefix('"')?;
+    let end = rest.find('"')?;
+    let value = &rest[..end];
+    if value.trim().is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
+fn safe_identifier(value: &str) -> String {
+    let filtered: String = value
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric() || *character == '-' || *character == '_')
+        .collect();
+    if filtered.is_empty() {
+        "unknown".to_string()
+    } else {
+        filtered
+    }
+}
+
+fn broker_response(request_identifier: &str, outcome: &str, reason_code: Option<&str>) -> String {
+    let identifier = safe_identifier(request_identifier);
+    match reason_code {
+        None => format!(
+            "{{\"schemaVersion\":1,\"requestIdentifier\":\"{identifier}\",\"payload\":{{\"outcome\":\"{outcome}\"}}}}\n"
+        ),
+        Some(code) => format!(
+            "{{\"schemaVersion\":1,\"requestIdentifier\":\"{identifier}\",\"payload\":{{\"outcome\":\"{outcome}\",\"reasonCode\":\"{code}\"}}}}\n"
+        ),
+    }
+}
+
+/**
+ * E3-5 最小骨架（**不执行任何进程**，只验证传输与身份）：
+ * - 管道 ACL 仅 SYSTEM + Owner；`PIPE_REJECT_REMOTE_CLIENTS` 拒远程；
+ * - 连接后校验客户端进程的 TokenUser SID == 本进程 SID，不匹配即拒绝；
+ * - 只支持 `ping` → `pong`，其余请求如实返回 `rejected/unknown-request`；
+ * - 帧上限 64 KiB，超限回 `rejected/frame-too-large`。
+ *
+ * 真正的"模拟调用方 + AppContainer 建进程"留给管理员会话下的 E3-6；在此之前
+ * 不得把本骨架当作强档可用。
+ */
+fn run_serve(arguments: &[String]) {
+    let pipe_name = arguments
+        .iter()
+        .position(|argument| argument == "--pipe-name")
+        .and_then(|index| arguments.get(index + 1))
+        .cloned()
+        .unwrap_or_default();
+    if pipe_name.is_empty() {
+        eprintln!("serve 需要 --pipe-name <\\\\\\\\.\\\\pipe\\\\...>");
+        std::process::exit(2);
+    }
+    let own_sid = match unsafe { current_user_sid_string() } {
+        Ok(sid) => sid,
+        Err(message) => {
+            eprintln!("读取当前用户 SID 失败: {message}");
+            std::process::exit(3);
+        }
+    };
+    let sddl = wide(BROKER_PIPE_SECURITY_DESCRIPTOR);
+    let mut security_descriptor: *mut c_void = ptr::null_mut();
+    let converted = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            SDDL_REVISION_1,
+            &mut security_descriptor,
+            ptr::null_mut(),
+        )
+    };
+    if converted == 0 {
+        eprintln!("SecurityDescriptor(SDDL) 转换失败: {}", unsafe { GetLastError() });
+        std::process::exit(3);
+    }
+    let mut security_attributes = SecurityAttributes {
+        n_length: std::mem::size_of::<SecurityAttributes>() as Dword,
+        lp_security_descriptor: security_descriptor,
+        b_inherit_handle: 0,
+    };
+    let pipe_name_wide = wide(&pipe_name);
+    let pipe = unsafe {
+        CreateNamedPipeW(
+            pipe_name_wide.as_ptr(),
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+            1,
+            BROKER_MAXIMUM_FRAME_BYTES as Dword,
+            BROKER_MAXIMUM_FRAME_BYTES as Dword,
+            0,
+            &mut security_attributes,
+        )
+    };
+    unsafe { LocalFree(security_descriptor) };
+    if pipe == INVALID_HANDLE_VALUE {
+        eprintln!("CreateNamedPipeW 失败: {}", unsafe { GetLastError() });
+        std::process::exit(3);
+    }
+    println!("broker-ready {pipe_name}");
+    loop {
+        let connected = unsafe { ConnectNamedPipe(pipe, ptr::null_mut()) };
+        let connect_error = if connected == 0 { unsafe { GetLastError() } } else { 0 };
+        /** ERROR_PIPE_CONNECTED(535) 表示客户端已先连上，属于正常。 */
+        if connected == 0 && connect_error != 535 {
+            eprintln!("ConnectNamedPipe 失败: {connect_error}");
+            std::process::exit(4);
+        }
+        let client_sid = unsafe { client_user_sid_string(pipe) };
+        match client_sid {
+            Ok(sid) if sid == own_sid => {}
+            Ok(_) => {
+                let _ = write_pipe_text(
+                    pipe,
+                    &broker_response("unknown", "rejected", Some("caller-sid-mismatch")),
+                );
+                unsafe {
+                    DisconnectNamedPipe(pipe);
+                }
+                continue;
+            }
+            Err(message) => {
+                eprintln!("无法识别客户端身份，拒绝连接: {message}");
+                unsafe {
+                    DisconnectNamedPipe(pipe);
+                }
+                continue;
+            }
+        }
+        loop {
+            match read_pipe_frame(pipe) {
+                Ok(Some(frame)) => {
+                    let identifier =
+                        extract_request_identifier(&frame).unwrap_or_else(|| "unknown".to_string());
+                    let response = if frame.contains("\"ping\"") {
+                        broker_response(&identifier, "pong", None)
+                    } else {
+                        broker_response(&identifier, "rejected", Some("unknown-request"))
+                    };
+                    if let Err(message) = write_pipe_text(pipe, &response) {
+                        eprintln!("写响应失败: {message}");
+                        break;
+                    }
+                }
+                Ok(None) => break,
+                Err(message) => {
+                    let _ = write_pipe_text(
+                        pipe,
+                        &broker_response("unknown", "rejected", Some("frame-too-large")),
+                    );
+                    eprintln!("{message}");
+                    break;
+                }
+            }
+        }
+        unsafe {
+            DisconnectNamedPipe(pipe);
+        }
+    }
 }
 fn run_sandboxed(arguments: &[String]) {
     let mut profile_name = String::from("astarray-exec");
