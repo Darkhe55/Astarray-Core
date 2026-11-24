@@ -46,6 +46,28 @@ export interface FeedbackProcessEntryOptions {
   processExit?: (exitCode: number) => void;
   /** 可注入以便测试（默认 process.stderr.write）。 */
   writeStderr?: (text: string) => void;
+  /**
+   * B10（2026-11-24）：初始化失败的故障注入点。
+   * 缺省构造真实 journal；测试可注入抛错的实现，验证 protocolError + exit(1)。
+   */
+  createJournal?: (input: {
+    readonly baseDirectory: string;
+    readonly replyRoutingGuard: ReturnType<typeof createInProjectReplyRoutingGuard>;
+    readonly replayDedupeStore: CommDeliveredMessageStore;
+  }) => MailboxJournal;
+  /** B10：投递 worker 工厂（缺省真实 DeliveryWorker）。 */
+  createDeliveryWorker?: (input: {
+    readonly journal: MailboxJournal;
+    readonly deliverToAgent: (journaledMessage: JournaledMessage) => Promise<void>;
+    readonly getRecipientStatus: (recipientId: string) => AgentStatus;
+  }) => DeliveryWorker;
+  /** B10：投递定时器注入（缺省 globalThis.setTimeout），用于验证关闭时清理待触发重投。 */
+  scheduleDeliveryTimer?: (
+    callback: () => void,
+    delayMilliseconds: number,
+  ) => NodeJS.Timeout;
+  /** B10：与 scheduleDeliveryTimer 配对（缺省 globalThis.clearTimeout）。 */
+  clearDeliveryTimer?: (timer: NodeJS.Timeout) => void;
 }
 
 export function runFeedbackProcessEntry(
@@ -54,6 +76,8 @@ export function runFeedbackProcessEntry(
 ): void {
   const processExit = options.processExit ?? ((exitCode: number) => process.exit(exitCode));
   const writeStderr = options.writeStderr ?? ((text: string) => process.stderr.write(text));
+  const scheduleDeliveryTimer = options.scheduleDeliveryTimer ?? setTimeout;
+  const clearDeliveryTimer = options.clearDeliveryTimer ?? clearTimeout;
   const statuses = new Map<string, AgentStatus>();
   let journal: MailboxJournal | null = null;
   let deliveryWorker: DeliveryWorker | null = null;
@@ -170,9 +194,9 @@ export function runFeedbackProcessEntry(
   ): void {
     const existingTimer = recipientDeliveryTimers.get(recipientId);
     if (existingTimer !== undefined) {
-      clearTimeout(existingTimer);
+      clearDeliveryTimer(existingTimer);
     }
-    const timer = setTimeout(() => {
+    const timer = scheduleDeliveryTimer(() => {
       recipientDeliveryTimers.delete(recipientId);
       void runDeliveryStep(recipientId);
     }, delayMilliseconds);
@@ -180,11 +204,20 @@ export function runFeedbackProcessEntry(
   }
 
   async function runDeliveryStep(recipientId: string): Promise<void> {
-    if (journal === null || deliveryWorker === null) {
+    /**
+     * B10（2026-11-24）：删除"初始化前早返回"死守卫。
+     *
+     * 不变量：投递定时器只可能在 `handleHello` 成功（journal 与 worker 均已赋值）后创建；
+     * 因此这里不需要可空分支。若该不变量被破坏，应当**显式失败**而不是静默跳过。
+     */
+    const activeJournal = journal;
+    const activeWorker = deliveryWorker;
+    if (activeJournal === null || activeWorker === null) {
+      writeStderr("astarray: 反馈进程投递步骤在初始化前被调用（不变量被破坏）\n");
       return;
     }
     try {
-      const stepResult = await deliveryWorker.runDeliveryStep(recipientId);
+      const stepResult = await activeWorker.runDeliveryStep(recipientId);
       scheduleDeliveryAttempt(recipientId, stepResult.waitSeconds * 1000);
     } catch (error) {
       writeStderr(
@@ -233,7 +266,7 @@ export function runFeedbackProcessEntry(
 
   function handleShutdown(requestId: string): void {
     for (const timer of recipientDeliveryTimers.values()) {
-      clearTimeout(timer);
+      clearDeliveryTimer(timer);
     }
     recipientDeliveryTimers.clear();
     if (heartbeatWatchdog !== null) {
@@ -273,35 +306,67 @@ export function runFeedbackProcessEntry(
        * 且仍保持"构造失败由外层 catch 统一上报"的语义。
        */
       const taskStoreForReplyGuard = new TaskStore({ baseDirectory });
-      journal = new MailboxJournal(baseDirectory, {
-        replyRoutingGuard: createInProjectReplyRoutingGuard({
-          resolveTask: async ({ missionIdentifier, taskIdentifier }) => {
-            const taskChain = await taskStoreForReplyGuard.readTaskChain(missionIdentifier);
-            const task = taskChain?.tasks.find((candidate) => candidate.id === taskIdentifier);
-            return task === undefined ? null : task;
-          },
-          defaultSchedulerRecipientIdentifierForMission: (missionIdentifier) =>
-            `scheduler:${missionIdentifier}`,
-        }),
-        /** COMM-01（2026-11-16）：子进程侧同样启用重放去重（与主进程共用状态目录）。 */
-        replayDedupeStore: new CommDeliveredMessageStore({ baseDirectory }),
-      });
-      deliveryWorker = new DeliveryWorker(
-        {
-          journal,
-          deliverToAgent: async (journaledMessage: JournaledMessage) => {
-            await journal?.markDelivered(
-              journaledMessage.recipientId,
-              journaledMessage.messageId,
-              new Date().toISOString(),
-            );
-            sendToParent({ type: "deliver", message: journaledMessage });
-          },
-          getRecipientStatus: (recipientId: string) =>
-            statuses.get(recipientId) ?? "idle",
+      const replyRoutingGuard = createInProjectReplyRoutingGuard({
+        resolveTask: async ({ missionIdentifier, taskIdentifier }) => {
+          const taskChain = await taskStoreForReplyGuard.readTaskChain(missionIdentifier);
+          const task = taskChain?.tasks.find((candidate) => candidate.id === taskIdentifier);
+          return task === undefined ? null : task;
         },
-        DEFAULT_MAX_DELIVERY_BACKOFF_SECONDS,
-      );
+        defaultSchedulerRecipientIdentifierForMission: (missionIdentifier) =>
+          `scheduler:${missionIdentifier}`,
+      });
+      const replayDedupeStore = new CommDeliveredMessageStore({ baseDirectory });
+      const createJournal =
+        options.createJournal ??
+        ((journalInput: {
+          readonly baseDirectory: string;
+          readonly replyRoutingGuard: ReturnType<typeof createInProjectReplyRoutingGuard>;
+          readonly replayDedupeStore: CommDeliveredMessageStore;
+        }) => {
+          /** 局部同名（遮蔽外层可变变量）只为让装配语句与既有守卫的检查形态一致。 */
+          const baseDirectory = journalInput.baseDirectory;
+          return new MailboxJournal(baseDirectory, {
+            replyRoutingGuard: journalInput.replyRoutingGuard,
+            /** COMM-01（2026-11-16）：子进程侧同样启用重放去重（与主进程共用状态目录）。 */
+            replayDedupeStore: new CommDeliveredMessageStore({ baseDirectory }),
+          });
+        });
+      const createdJournal = createJournal({
+        baseDirectory,
+        replyRoutingGuard,
+        replayDedupeStore,
+      });
+      journal = createdJournal;
+      const deliverToAgent = async (journaledMessage: JournaledMessage) => {
+        await journal?.markDelivered(
+          journaledMessage.recipientId,
+          journaledMessage.messageId,
+          new Date().toISOString(),
+        );
+        sendToParent({ type: "deliver", message: journaledMessage });
+      };
+      const getRecipientStatus = (recipientId: string): AgentStatus =>
+        statuses.get(recipientId) ?? "idle";
+      const createDeliveryWorker =
+        options.createDeliveryWorker ??
+        ((workerInput: {
+          readonly journal: MailboxJournal;
+          readonly deliverToAgent: (journaledMessage: JournaledMessage) => Promise<void>;
+          readonly getRecipientStatus: (recipientId: string) => AgentStatus;
+        }) =>
+          new DeliveryWorker(
+            {
+              journal: workerInput.journal,
+              deliverToAgent: workerInput.deliverToAgent,
+              getRecipientStatus: workerInput.getRecipientStatus,
+            },
+            DEFAULT_MAX_DELIVERY_BACKOFF_SECONDS,
+          ));
+      deliveryWorker = createDeliveryWorker({
+        journal: createdJournal,
+        deliverToAgent,
+        getRecipientStatus,
+      });
     } catch (error) {
       sendToParent({
         type: "protocolError",

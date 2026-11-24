@@ -70,7 +70,9 @@ describe("COMM-01 回复路由：反馈子进程同样必须注入", () => {
     const code = codeLines.join("\n");
 
     expect(code).toContain("new MailboxJournal(baseDirectory, {");
-    expect(code).toContain("replyRoutingGuard: createInProjectReplyRoutingGuard({");
+    /** B10 重构（2026-11-24）：守卫先构造再注入（工厂可注入）；仍必须真的构造并传入。 */
+    expect(code).toContain("createInProjectReplyRoutingGuard({");
+    expect(code).toContain("replyRoutingGuard");
     expect(code).toContain("readTaskChain(missionIdentifier)");
   }, 30_000);
 });
