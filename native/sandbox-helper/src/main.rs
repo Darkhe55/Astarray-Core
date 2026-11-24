@@ -55,6 +55,19 @@ struct SecurityCapabilities {
     reserved: Dword,
 }
 
+/** Low IL 强制标签（TokenIntegrityLevel 的输入缓冲区）。 */
+#[repr(C)]
+#[derive(Default, Clone, Copy)]
+struct TokenMandatoryLabel {
+    label: SidAndAttributes,
+}
+
+const DEFAULT_DESIRED_TOKEN_ACCESS: Dword = 0x0001 | 0x0002 | 0x0008 | 0x0080; // ASSIGN_PRIMARY | DUPLICATE | QUERY | ADJUST_DEFAULT
+const DISABLE_MAX_PRIVILEGE: Dword = 0x0000_0001;
+const SE_GROUP_INTEGRITY: Dword = 0x0000_0020;
+const TOKEN_INTEGRITY_LEVEL: Dword = 25;
+/** Low 完整性级别 SID（S-1-16-4096）。 */
+const LOW_INTEGRITY_SID_STRING: &str = "S-1-16-4096";
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
 struct StartupInfoW {
@@ -191,6 +204,44 @@ extern "system" {
     fn CloseHandle(handle: Handle) -> Bool;
     fn GetLastError() -> Dword;
     fn LocalFree(memory: *mut c_void) -> *mut c_void;
+    fn GetCurrentProcess() -> Handle;
+}
+
+#[link(name = "advapi32")]
+extern "system" {
+    fn OpenProcessToken(process: Handle, desired_access: Dword, token: *mut Handle) -> Bool;
+    fn CreateRestrictedToken(
+        existing_token: Handle,
+        flags: Dword,
+        disable_sid_count: Dword,
+        sids_to_disable: *const SidAndAttributes,
+        delete_privilege_count: Dword,
+        privileges_to_delete: *const c_void,
+        restricted_sid_count: Dword,
+        sids_to_restrict: *const SidAndAttributes,
+        new_token: *mut Handle,
+    ) -> Bool;
+    fn SetTokenInformation(
+        token: Handle,
+        token_information_class: Dword,
+        token_information: *mut c_void,
+        token_information_length: Dword,
+    ) -> Bool;
+    fn CreateProcessAsUserW(
+        token: Handle,
+        application_name: *const u16,
+        command_line: *mut u16,
+        process_attributes: *mut SecurityAttributes,
+        thread_attributes: *mut SecurityAttributes,
+        inherit_handles: Bool,
+        creation_flags: Dword,
+        environment: *mut c_void,
+        current_directory: *const u16,
+        startup_info: *mut StartupInfoW,
+        process_information: *mut ProcessInformation,
+    ) -> Bool;
+    fn ConvertStringSidToSidW(string_sid: *const u16, sid: *mut *mut c_void) -> Bool;
+    fn GetLengthSid(sid: *mut c_void) -> Dword;
 }
 
 const CREATE_SUSPENDED: Dword = 0x0000_0004;
@@ -587,6 +638,97 @@ fn run_init_sandbox(arguments: &[String]) {
 /// 在 AppContainer + Job 中启动子进程。
 ///
 /// 参数：`run --profile <name> [--max-memory-mb <n>] [--max-processes <n>] [--timeout-ms <n>] -- <exe> [args...]`
+/**
+ * E1 弱档（2026-11-25）：**不提权**的受限令牌 + Low 完整性级别。
+ *
+ * 语义（必须如实标注）：
+ * - 写入：Low IL 的 no-write-up ⇒ 对中等完整性对象（用户目录、仓库）**写被拒**；
+ * - 读取：**不设防**（Low IL 不阻止读）⇒ 这不是读隔离，产品文案不得宣称；
+ * - 网络：未在令牌层阻断（需要 WFP/AppContainer capability）⇒ 由环境级离线控制兜底。
+ *
+ * 与 AppContainer 的关系：不创建/不依赖档案；用于强档不可用时（普通用户会话）。
+ */
+unsafe fn create_low_integrity_process(
+    application_name: *const u16,
+    command_line: *mut u16,
+    current_directory: *const u16,
+    startup_info: *mut StartupInfoW,
+    process_information: *mut ProcessInformation,
+) -> Result<(), String> {
+    let mut current_token: Handle = ptr::null_mut();
+    if OpenProcessToken(
+        GetCurrentProcess(),
+        DEFAULT_DESIRED_TOKEN_ACCESS,
+        &mut current_token,
+    ) == 0
+    {
+        return Err(format!("OpenProcessToken 失败: {}", GetLastError()));
+    }
+    let mut restricted_token: Handle = ptr::null_mut();
+    if CreateRestrictedToken(
+        current_token,
+        DISABLE_MAX_PRIVILEGE,
+        0,
+        ptr::null(),
+        0,
+        ptr::null(),
+        0,
+        ptr::null(),
+        &mut restricted_token,
+    ) == 0
+    {
+        CloseHandle(current_token);
+        return Err(format!("CreateRestrictedToken 失败: {}", GetLastError()));
+    }
+    CloseHandle(current_token);
+
+    let sid_string = wide(LOW_INTEGRITY_SID_STRING);
+    let mut low_integrity_sid: *mut c_void = ptr::null_mut();
+    if ConvertStringSidToSidW(sid_string.as_ptr(), &mut low_integrity_sid) == 0 {
+        CloseHandle(restricted_token);
+        return Err(format!("ConvertStringSidToSidW 失败: {}", GetLastError()));
+    }
+    let mut mandatory_label = TokenMandatoryLabel {
+        label: SidAndAttributes {
+            sid: low_integrity_sid,
+            attributes: SE_GROUP_INTEGRITY,
+        },
+    };
+    let label_size =
+        std::mem::size_of::<TokenMandatoryLabel>() as Dword + GetLengthSid(low_integrity_sid);
+    if SetTokenInformation(
+        restricted_token,
+        TOKEN_INTEGRITY_LEVEL,
+        &mut mandatory_label as *mut _ as *mut c_void,
+        label_size,
+    ) == 0
+    {
+        let error = GetLastError();
+        LocalFree(low_integrity_sid);
+        CloseHandle(restricted_token);
+        return Err(format!("SetTokenInformation(TokenIntegrityLevel) 失败: {error}"));
+    }
+    LocalFree(low_integrity_sid);
+
+    let created = CreateProcessAsUserW(
+        restricted_token,
+        application_name,
+        command_line,
+        ptr::null_mut(),
+        ptr::null_mut(),
+        0,
+        CREATE_SUSPENDED,
+        ptr::null_mut(),
+        current_directory,
+        startup_info,
+        process_information,
+    );
+    CloseHandle(restricted_token);
+    if created == 0 {
+        return Err(format!("CreateProcessAsUserW 失败: {}", GetLastError()));
+    }
+    Ok(())
+}
 fn run_sandboxed(arguments: &[String]) {
     let mut profile_name = String::from("astarray-exec");
     let mut limits = Limits {
@@ -604,6 +746,10 @@ fn run_sandboxed(arguments: &[String]) {
      */
     let mut use_app_container = true;
     let mut use_lpac = false;
+    /** E1 弱档：受限令牌 + Low IL（不提权）；与 AppContainer 互斥。 */
+    let mut use_low_integrity = false;
+    /** 弱档可指定工作目录（强档由档案 Temp 决定；弱档不强制改写用户目录）。 */
+    let mut requested_work_directory: Option<String> = None;
     /** 诊断开关：传空属性列表（仍带 EXTENDED_STARTUPINFO），用于隔离"属性内容"与"标志本身"。 */
     let mut isEmptyAttributes = false;
     let mut index = 0;
@@ -639,6 +785,15 @@ fn run_sandboxed(arguments: &[String]) {
             "--empty-attributes" => {
                 isEmptyAttributes = true;
                 index += 1;
+            }
+            "--low-integrity" => {
+                use_low_integrity = true;
+                use_app_container = false;
+                index += 1;
+            }
+            "--work-dir" => {
+                requested_work_directory = arguments.get(index + 1).cloned();
+                index += 2;
             }
             "--lpac" => {
                 use_lpac = true;
@@ -765,7 +920,14 @@ fn run_sandboxed(arguments: &[String]) {
      * 旧实现找 `...\<profile>\Temp`（不存在）⇒ 回退 `C:\Windows\Temp`（容器无权进入）
      * ⇒ `CreateProcessW` 恒返回 **5 (ACCESS_DENIED)**。这里改为优先 `AC\Temp`，并**主动创建**。
      */
-    let working_directory: Vec<u16> = {
+    let working_directory: Vec<u16> = if use_low_integrity {
+        /** 弱档：Low IL 可读用户临时目录；写入会被 no-write-up 拒绝（正好用于验收）。 */
+        wide(
+            requested_work_directory
+                .as_deref()
+                .unwrap_or(&std::env::temp_dir().to_string_lossy()),
+        )
+    } else {
         let base = std::env::var("LOCALAPPDATA").ok();
         let mut chosen: Option<String> = None;
         if let Some(base_path) = base.as_deref() {
@@ -818,8 +980,25 @@ fn run_sandboxed(arguments: &[String]) {
         application_name.as_ptr()
     };
     let mut process_information = ProcessInformation::default();
-    let created = unsafe {
-        CreateProcessW(
+    let mut created: Bool = 0;
+    if use_low_integrity {
+        let spawn_result = unsafe {
+            create_low_integrity_process(
+                application_name_pointer,
+                command_line.as_mut_ptr(),
+                working_directory.as_ptr(),
+                &mut startup.startup_info,
+                &mut process_information,
+            )
+        };
+        if let Err(message) = spawn_result {
+            eprintln!("{message}");
+            std::process::exit(3);
+        }
+        created = 1;
+    } else {
+    unsafe {
+        created = CreateProcessW(
             application_name_pointer,
             command_line.as_mut_ptr(),
             ptr::null_mut(),
@@ -842,7 +1021,10 @@ fn run_sandboxed(arguments: &[String]) {
             &mut process_information,
         )
     };
-    unsafe { DeleteProcThreadAttributeList(attribute_list) };
+    }
+    if !attribute_list.is_null() {
+        unsafe { DeleteProcThreadAttributeList(attribute_list) };
+    }
     if created == 0 {
         eprintln!("CreateProcessW 失败: {}", unsafe { GetLastError() });
         std::process::exit(3);

@@ -52,6 +52,27 @@ describe("EXEC-01-02 bubblewrap 参数构造", () => {
     expect(bwrapArguments[separatorIndex + 1]).toBe("node");
   });
 
+  it("可执行文件在默认 bind 之外 ⇒ 单独 --ro-bind 该文件（nvm/node 场景）", () => {
+    const args = buildBubblewrapArguments({
+      workingDirectory: "/work",
+      executableEntryPoint: "/home/ubuntu/.nvm/versions/node/v22.23.2/bin/node",
+      arguments: ["-e", "1"],
+    });
+    const joined = args.join(" ");
+    expect(joined).toContain(
+      "--ro-bind /home/ubuntu/.nvm/versions/node/v22.23.2/bin/node /home/ubuntu/.nvm/versions/node/v22.23.2/bin/node",
+    );
+  });
+
+  it("可执行文件在 /usr 下 ⇒ 不重复 bind（避免参数膨胀）", () => {
+    const args = buildBubblewrapArguments({
+      workingDirectory: "/work",
+      executableEntryPoint: "/usr/bin/node",
+      arguments: [],
+    });
+    const bindCount = args.filter((token) => token === "/usr/bin/node").length;
+    expect(bindCount).toBe(1);
+  });
   it("内存上限以 prlimit --as 施加（该 bwrap 构建无 --rlimit-*）", () => {
     const prefix = buildResourceLimitPrefix({ maximumMemoryBytes: 268435456 });
     expect(prefix).toEqual(["prlimit", "--as=268435456", "--"]);

@@ -63,6 +63,21 @@ export function buildBubblewrapArguments(input: {
   for (const bindPath of readOnlyBindPaths) {
     bwrapArguments.push("--ro-bind", bindPath, bindPath);
   }
+  /**
+   * 可执行文件在默认只读 bind 之外时（如 nvm 安装的 node），必须**单独 bind 该文件**，
+   * 否则沙箱内 `execvp` 报 `No such file or directory`（2026-11-25 实测：
+   * `bwrap: execvp /home/ubuntu/.nvm/.../node: No such file or directory`）。
+   *
+   * 只 bind 文件本身（不 bind 整目录），保持最小可见面。
+   */
+  const executablePath = input.executableEntryPoint;
+  const isCoveredByReadOnlyBind = readOnlyBindPaths.some((bindPath) => {
+    const normalizedBind = bindPath.endsWith("/") ? bindPath : `${bindPath}/`;
+    return executablePath === bindPath || executablePath.startsWith(normalizedBind);
+  });
+  if (executablePath.startsWith("/") && !isCoveredByReadOnlyBind) {
+    bwrapArguments.push("--ro-bind", executablePath, executablePath);
+  }
   bwrapArguments.push(
     "--ro-bind",
     input.workingDirectory,

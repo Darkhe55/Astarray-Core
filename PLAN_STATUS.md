@@ -8207,3 +8207,15 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 实施顺序：弱档 MVP（helper `--low-integrity` + 后端接线 + 反例）→ 强档 broker（A）→ 验收拆分。
 > - Linux 验收：preconditions 已 `readyForAcceptance=true`（bwrap 0.9.0）；真实执行 2 条仍 failed，
 >   已放宽内存限额（256MB → 4GB；Node 的 RLIMIT_AS 需要更大地址空间）并补失败诊断（status/exitCode/reason/stderr）。
+
+> **E1 弱档落地 + B6 真实执行修正（2026-11-25，第 142 轮）**
+>
+> - **E1 弱档（helper 侧）已实现**：`run --low-integrity [--work-dir <dir>]` —— OpenProcessToken(含 ADJUST_DEFAULT)
+>   → CreateRestrictedToken(DISABLE_MAX_PRIVILEGE) → SetTokenInformation(TokenIntegrityLevel = Low) →
+>   CreateProcessAsUserW（受限令牌是自身令牌的受限版，不需要提权）；Job 限额/超时逻辑复用。
+> - 反例 4 条（`exec01-02-low-integrity-helper`）：能执行、写用户主目录被拒且不留文件、读**不被拦截**（如实证明不是读隔离）、
+>   `whoami /groups` 显示 `S-1-16-4096`（Low 强制级别）。
+> - **B6 真实执行根因修复**：bwrap 只 bind `/usr,/bin,/lib,/lib64`，nvm 安装的 node 在
+>   `/home/ubuntu/.nvm/...` ⇒ 沙箱内 `execvp ... No such file or directory`。现对**默认 bind 之外的可执行文件**
+>   单独 `--ro-bind <exe> <exe>`（只绑文件，不绑目录）；新增 2 条单测（nvm 路径必须 bind、`/usr` 下不重复）。
+> - 说明：E2（后端/产品接线、显式开关与文案）尚未做；强档 broker（E3）待排。
