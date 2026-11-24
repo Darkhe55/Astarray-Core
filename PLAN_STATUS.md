@@ -8192,3 +8192,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 关键结论：C（受限令牌+Low IL）**读不设防且默认联网**，过不了卡内隔离反例；A 是唯一同时满足
 >   "运行期不提权"与"真实 AppContainer"的方案；B 可作过渡但需改写裁决。
 > - 隐私 `privacy-ok`。
+
+> **B6：Linux 前置检查键名错配修复（2026-11-25）**
+>
+> - 用户 Ubuntu 实测：`bubblewrap-user-namespace: ok` 但 `bubblewrap-installed: blocked`
+>   ⇒ `probeBubblewrap()` 返回键是 `version`，而清单读取 `bwrapVersion`（真实探测永远报未安装）。
+> - 修复：探测返回统一为 `bwrapVersion`，并兼容旧键 `version`；新增回归用例（9 条前置测试）。
+> - 全量：958 files / 6082 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。

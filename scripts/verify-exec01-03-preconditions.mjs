@@ -63,9 +63,9 @@ function isElevated() {
 }
 
 function probeBubblewrap() {
-  const version = commandVersion("bwrap");
-  if (version === null) {
-    return { version: null, isUserNamespaceUsable: false };
+  const bwrapVersion = commandVersion("bwrap");
+  if (bwrapVersion === null) {
+    return { bwrapVersion: null, isUserNamespaceUsable: false };
   }
   /**
    * 与真实后端（bubblewrap-sandbox-backend）的探测形态保持一致：
@@ -91,7 +91,7 @@ function probeBubblewrap() {
     ],
     { encoding: "utf8", timeout: 30_000 },
   );
-  return { version, isUserNamespaceUsable: probe.status === 0 };
+  return { bwrapVersion, isUserNamespaceUsable: probe.status === 0 };
 }
 
 function realProbes() {
@@ -212,13 +212,20 @@ function buildPreconditionItems(probes) {
       },
     );
   } else if (platform === "linux") {
-    const hasBubblewrap = typeof probes.bwrapVersion === "string";
+    /** 真实探测键为 `bwrapVersion`；这里兼容旧键 `version`，避免"探测到了却报未安装"。 */
+    const bwrapVersion =
+      typeof probes.bwrapVersion === "string"
+        ? probes.bwrapVersion
+        : typeof probes.version === "string"
+          ? probes.version
+          : null;
+    const hasBubblewrap = bwrapVersion !== null;
     items.push(
       {
         itemIdentifier: "bubblewrap-installed",
         status: hasBubblewrap ? "ok" : "blocked",
         detail: hasBubblewrap
-          ? `bwrap: ${probes.bwrapVersion}`
+          ? `bwrap: ${bwrapVersion}`
           : "未找到 bwrap：apt-get install -y bubblewrap（Linux 后端不需要 .exe）",
       },
       {

@@ -143,6 +143,22 @@ describe("B3/B6：验收前置检查的平台分支", () => {
     expect(record.items.some((item) => item.itemIdentifier === "sandbox-helper-built")).toBe(false);
   });
 
+  it("③b Linux：兼容旧键 `version`（探测到了却报未安装的回归）", () => {
+    const { status, stdout } = runScript({
+      platform: "linux",
+      architecture: "x64",
+      nodeVersion: "v22.23.2",
+      version: "bubblewrap 0.8.0",
+      isUserNamespaceUsable: true,
+    });
+    expect(status).toBe(0);
+    const record = parseRecord(stdout);
+    expect(record.readyForAcceptance).toBe(true);
+    expect(
+      record.items.find((item) => item.itemIdentifier === "bubblewrap-installed")?.status,
+    ).toBe("ok");
+  });
+
   it("④ Linux 缺 bwrap ⇒ blocked 且 --strict exit 2", () => {
     const { status, stdout, stderr } = runScript(
       {
