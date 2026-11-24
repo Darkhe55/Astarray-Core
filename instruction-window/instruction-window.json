@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "windowCapacity": 3,
+  "instructions": [
+    {
+      "instructionIdentifier": "cli-instruction-2026-11-24T00:00:00.000Z-key-1",
+      "instructionRevision": 1,
+      "sourceKind": "user",
+      "instructionText": "改登录页",
+      "idempotencyKey": "key-1",
+      "contentHash": "115f46a4969ca9ed97c7a5f8e01790e798281b53fdc1767045d077eed69be8bd",
+      "state": "dispatched",
+      "admittedAtIso": "2026-11-24T00:00:00.000Z",
+      "updatedAtIso": "2026-11-24T00:00:00.000Z",
+      "linkedTaskIdentifiers": [],
+      "evidenceReferences": [],
+      "unresolvedQuestions": []
+    },
+    {
+      "instructionIdentifier": "cli-instruction-2026-11-24T00:00:00.000Z-key-2",
+      "instructionRevision": 1,
+      "sourceKind": "user",
+      "instructionText": "指令 2",
+      "idempotencyKey": "key-2",
+      "contentHash": "0617a40a74189a51ecdf53dc59062033ff1e643585eeb5204750557809d2cafe",
+      "state": "dispatched",
+      "admittedAtIso": "2026-11-24T00:00:00.000Z",
+      "updatedAtIso": "2026-11-24T00:00:00.000Z",
+      "linkedTaskIdentifiers": [],
+      "evidenceReferences": [],
+      "unresolvedQuestions": []
+    },
+    {
+      "instructionIdentifier": "cli-instruction-2026-11-24T00:00:00.000Z-key-3",
+      "instructionRevision": 1,
+      "sourceKind": "user",
+      "instructionText": "指令 3",
+      "idempotencyKey": "key-3",
+      "contentHash": "5d17e39db46f78f1980c8b3805a585a409cd36b13903c529bf79c3bef6d9838e",
+      "state": "dispatched",
+      "admittedAtIso": "2026-11-24T00:00:00.000Z",
+      "updatedAtIso": "2026-11-24T00:00:00.000Z",
+      "linkedTaskIdentifiers": [],
+      "evidenceReferences": [],
+      "unresolvedQuestions": []
+    },
+    {
+      "instructionIdentifier": "cli-instruction-2026-11-24T00:00:00.000Z-key-4",
+      "instructionRevision": 1,
+      "sourceKind": "user",
+      "instructionText": "指令 4",
+      "idempotencyKey": "key-4",
+      "contentHash": "8afebeb64d837900b4e15a727271fc0dad43b3d696e7a5d8181e5f012628ec22",
+      "state": "accepted",
+      "admittedAtIso": "2026-11-24T00:00:00.000Z",
+      "updatedAtIso": "2026-11-24T00:00:00.000Z",
+      "linkedTaskIdentifiers": [],
+      "evidenceReferences": [],
+      "unresolvedQuestions": []
+    }
+  ],
+  "queuedOrder": [
+    "cli-instruction-2026-11-24T00:00:00.000Z-key-4"
+  ],
+  "processedReceiptKeys": []
+}
