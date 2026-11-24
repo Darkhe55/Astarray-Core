@@ -127,13 +127,26 @@ describe.skipIf(!isAcceptanceHost)("EXEC-01-02 真实沙箱验收", () => {
       timeoutMilliseconds: 30_000,
       streamStorageLimitBytes: 64 * 1024,
       resourceLimits: {
-        maximumMemoryBytes: 256 * 1024 * 1024,
-        maximumProcessCount: 8,
+        maximumMemoryBytes: 4 * 1024 * 1024 * 1024,
+        maximumProcessCount: 16,
       },
     });
     expect(started.status).toBe("running");
 
     const terminal = await waitForTerminal(backend, started.backendExecutionHandle, 30_000);
+    if (terminal.status !== "succeeded") {
+      /** 失败时把真实原因带进断言消息（否则只看到 "failed" 无法定位）。 */
+      const stderrChunk = await backend.readOutputStream({
+        backendExecutionHandle: started.backendExecutionHandle,
+        stream: "stderr",
+        fromCursorBytes: 0,
+        maximumBytes: 64 * 1024,
+      });
+      throw new Error(
+        `沙箱执行未成功：status=${terminal.status} exitCode=${String(terminal.exitCode)} ` +
+          `reason=${String(terminal.failureReason)} stderr=${stderrChunk.text}`,
+      );
+    }
     expect(terminal.status).toBe("succeeded");
     expect(terminal.exitCode).toBe(0);
 
@@ -166,12 +179,24 @@ describe.skipIf(!isAcceptanceHost)("EXEC-01-02 真实沙箱验收", () => {
       timeoutMilliseconds: 800,
       streamStorageLimitBytes: 64 * 1024,
       resourceLimits: {
-        maximumMemoryBytes: 256 * 1024 * 1024,
-        maximumProcessCount: 8,
+        maximumMemoryBytes: 4 * 1024 * 1024 * 1024,
+        maximumProcessCount: 16,
       },
     });
 
     const terminal = await waitForTerminal(backend, started.backendExecutionHandle, 30_000);
+    if (terminal.status !== "timed-out") {
+      const stderrChunk = await backend.readOutputStream({
+        backendExecutionHandle: started.backendExecutionHandle,
+        stream: "stderr",
+        fromCursorBytes: 0,
+        maximumBytes: 64 * 1024,
+      });
+      throw new Error(
+        `超时未生效：status=${terminal.status} exitCode=${String(terminal.exitCode)} ` +
+          `reason=${String(terminal.failureReason)} stderr=${stderrChunk.text}`,
+      );
+    }
     expect(terminal.status).toBe("timed-out");
     expect(Date.now() - startedAt).toBeLessThan(20_000);
   });

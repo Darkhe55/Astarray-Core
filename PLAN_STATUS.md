@@ -8199,3 +8199,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   ⇒ `probeBubblewrap()` 返回键是 `version`，而清单读取 `bwrapVersion`（真实探测永远报未安装）。
 > - 修复：探测返回统一为 `bwrapVersion`，并兼容旧键 `version`；新增回归用例（9 条前置测试）。
 > - 全量：958 files / 6082 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。
+
+> **B3 裁决：采用 E 双档（2026-11-25）**
+>
+> - 用户裁决"提权按 E 做"：强档=安装期一次提权（AppContainer/broker），弱档=不提权（受限令牌+Low IL+Job），
+>   两档都不可用 ⇒ fail-closed；弱档**读不设防**，不得宣称读隔离。
+> - 实施顺序：弱档 MVP（helper `--low-integrity` + 后端接线 + 反例）→ 强档 broker（A）→ 验收拆分。
+> - Linux 验收：preconditions 已 `readyForAcceptance=true`（bwrap 0.9.0）；真实执行 2 条仍 failed，
+>   已放宽内存限额（256MB → 4GB；Node 的 RLIMIT_AS 需要更大地址空间）并补失败诊断（status/exitCode/reason/stderr）。
