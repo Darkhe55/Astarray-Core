@@ -720,13 +720,36 @@ fn run_sandboxed(arguments: &[String]) {
      * `%LOCALAPPDATA%\Packages\<profile>\Temp`（档案创建时由系统建好）。
      * 取不到时退回 `C:\Windows\Temp`（对 AppContainer 只读但可进入）。
      */
+    /**
+     * 容器内可写的工作目录（2026-11-25 修正）：
+     *
+     * AppContainer 档案的实际布局是 `%LOCALAPPDATA%\Packages\<profile>\AC`（OS 创建时带
+     * AppContainer SID 的 ACL），可写临时目录在其下的 `AC\Temp`。
+     *
+     * 旧实现找 `...\<profile>\Temp`（不存在）⇒ 回退 `C:\Windows\Temp`（容器无权进入）
+     * ⇒ `CreateProcessW` 恒返回 **5 (ACCESS_DENIED)**。这里改为优先 `AC\Temp`，并**主动创建**。
+     */
     let working_directory: Vec<u16> = {
-        let candidate = std::env::var("LOCALAPPDATA")
-            .ok()
-            .map(|base| format!("{base}\\Packages\\{profile_name}\\Temp"));
-        match candidate {
-            Some(path) if std::path::Path::new(&path).is_dir() => wide(&path),
-            _ => wide("C:\\Windows\\Temp"),
+        let base = std::env::var("LOCALAPPDATA").ok();
+        let mut chosen: Option<String> = None;
+        if let Some(base_path) = base.as_deref() {
+            for candidate in [
+                format!("{base_path}\\Packages\\{profile_name}\\AC\\Temp"),
+                format!("{base_path}\\Packages\\{profile_name}\\Temp"),
+            ] {
+                if std::path::Path::new(&candidate).is_dir() {
+                    chosen = Some(candidate);
+                    break;
+                }
+                if std::fs::create_dir_all(&candidate).is_ok() {
+                    chosen = Some(candidate);
+                    break;
+                }
+            }
+        }
+        match chosen {
+            Some(path) => wide(&path),
+            None => wide("C:\\Windows\\Temp"),
         }
     };
     let mut startup: StartupInfoExW = unsafe { std::mem::zeroed() };

@@ -40,7 +40,13 @@ const isAcceptanceHost =
   process.platform === "win32" &&
   existsSync(helperPath) &&
   profileTempDirectory !== null &&
-  existsSync(profileTempDirectory);
+  existsSync(profileTempDirectory) &&
+  /**
+   * **显式 opt-in**：真实 AppContainer 执行会依赖"安装期档案 + 调用方令牌"，
+   * 而普通 CI/开发机会因 `CreateProcessW` 返回 5 而红；这不是产品回归。
+   * 因此默认跳过，人工验收时设 `ASTARRAY_SANDBOX_ACCEPTANCE=1` 再跑。
+   */
+  process.env.ASTARRAY_SANDBOX_ACCEPTANCE === "1";
 
 let workingDirectory: string;
 

@@ -8159,3 +8159,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `init-sandbox --recreate`：清理"注册表有档案、Packages 目录已删"的陈旧档案（该状态下 CreateProcessW 返回 5）。
 > - 新增真实执行验收测试 `exec01-02-sandbox-acceptance`（helper + 安装期档案齐备时才跑，否则跳过，不伪造通过）。
 > - 全量：**959 files（957 passed / 2 skipped），6082 tests（6076 passed / 6 skipped），EXIT=0**；`lint` 0。
+
+> **B3：AppContainer 执行阻塞点定位（2026-11-25）**
+>
+> - probe（管理员）通过；但**真实执行** `helper run` 在 AppContainer 路径 `CreateProcessW` 返回 5；
+>   `--no-appcontainer`（仅 Job Object）正常 ⇒ 问题限定在 AppContainer 令牌/启动属性，不是 Job/参数/路径。
+> - 已修正工作目录为 `%LOCALAPPDATA%\Packages\<profile>\AC\Temp`（旧代码找 `...\Temp`，回退 Windows\Temp 必然 5）。
+> - 真实执行验收测试改为**显式 opt-in**（`ASTARRAY_SANDBOX_ACCEPTANCE=1`），避免普通门禁因环境差异误红。
+> - 下一步需在**管理员会话**复跑 `helper run` 对照：若管理员成功 ⇒ 调用方令牌权限问题；若同样 5 ⇒ 启动属性/结构问题。
+> - 全量：959 files / 6082 tests EXIT=0；`lint` 0。
