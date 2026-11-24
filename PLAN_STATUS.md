@@ -8080,3 +8080,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   12 步全自动走查（临时数据目录、不联网、结束清理），本机 **12/12 通过**（`gui` 按预期 fail-closed）。
 > - 修正 doc 中的 `history show` 用法为 `--mission`（骨架脚本实测发现）。
 > - 全量：**954 files（952 passed / 2 skipped），6061 tests（6054 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B9：目标模式运行时守卫（2026-11-24 第 139 轮）**
+>
+> - 新增 3 条：证据失效/在途组对账的未知目标拒绝；失活未知目标如实（不谎报已解绑）。
+> - 全量：**955 files（953 passed / 2 skipped），6064 tests（6057 passed / 7 skipped），EXIT=0**；`lint` 0。
