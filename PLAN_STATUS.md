@@ -8030,3 +8030,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**948 files（946 passed / 2 skipped），6036 tests（6029 passed / 7 skipped），EXIT=0**；`lint` 0。
 
 > **推送状态（2026-11-24 第 131 轮）**：`b4ccd9ec` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **B9：跨项目只读与 doctor 参数校验（2026-11-24 第 132 轮）**
+>
+> - 新增 5 条：跨项目授权空/有/三维过滤/文本视图；doctor errors 非法时间与 page-size（exit 2）、空事件库 exit 0。
+> - 全量：**949 files（947 passed / 2 skipped），6041 tests（6034 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **推送状态（2026-11-24 第 132 轮）**：`7a686f03` 3 次推送失败（网络不可达）；本地领先 5 个提交（`735c93e8`/`4a7301a2`/`997bd854`/`b4ccd9ec`/`7a686f03`），留待下次合并推送。
