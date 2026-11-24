@@ -8288,3 +8288,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   参数解析用**源文本**长度推进游标（转义导致命令参数丢失）。
 > - 6 条真实反例：默认禁用、真实执行回传、重复请求、非法可执行文件、超时终止、写用户主目录被拒。
 > - 全量：**967 files（965 passed / 2 skipped），6135 tests（6129 passed / 6 skipped），EXIT=0**；`lint` 0。
+
+> **E3-7 强档失败语义（2026-11-25，第 151 轮）**
+>
+> - `--allow-strong-execution` 在非管理员会话建进程失败时，broker 回 `rejected/strong-tier-unavailable`（detail 带 CreateProcessW 错误码），
+>   **不把失败伪装成 executed，也不回退弱档**；管理员会话下正常返回 executed。
+> - 反例 ⑦ 覆盖两种分支（executed⇒exitCode 0；否则⇒strong-tier-unavailable 且 detail 含 CreateProcessW）。
+> - 全量：**967 files（965 passed / 2 skipped），6136 tests（6130 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - E3 剩余（需管理员会话）：调用方令牌 DuplicateTokenEx + SECURITY_CAPABILITIES 建进程的完整实现与隔离反例；
+>   安装期服务注册与 ACL 授予。**在完成这些之前，强档仍不得宣称可用**。
+
+> **推送状态（2026-11-25 第 151 轮）**：`c06ebc6b` 3 次推送失败（网络不可达）；留待下次合并推送。

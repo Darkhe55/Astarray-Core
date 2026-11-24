@@ -191,6 +191,21 @@ describe.skipIf(!isAcceptanceHost)("E3-6 broker 执行路径", () => {
     expect(Date.now() - startedAt).toBeLessThan(20_000);
   });
 
+  it("⑦ 强档在非管理员会话 ⇒ rejected/strong-tier-unavailable（不回退弱档）", async () => {
+    const harness = await startServe(["--allow-strong-execution"]);
+    const response = await executeRequest(harness.pipeName, "strong-1");
+    const payload = response["payload"] as Record<string, unknown>;
+    /**
+     * 管理员机器上应成功；非管理员机器上必须**如实拒绝**。
+     * 两种都不允许"executed 但退出码非 0"这种把建进程失败伪装成执行结果的行为。
+     */
+    if (payload["outcome"] === "executed") {
+      expect(payload["exitCode"]).toBe(0);
+    } else {
+      expect(payload).toMatchObject({ outcome: "rejected", reasonCode: "strong-tier-unavailable" });
+      expect(String(payload["detail"] ?? "")).toContain("CreateProcessW");
+    }
+  });
   it("⑥ 弱档真实写限制：写用户主目录 ⇒ 退出码非 0", async () => {
     const harness = await startServe(["--allow-weak-execution"]);
     const response = await executeRequest(harness.pipeName, "write-denied", {

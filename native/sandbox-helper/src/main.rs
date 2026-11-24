@@ -1135,6 +1135,21 @@ fn execute_broker_request(frame: &str, options: &ServeExecutionOptions) -> Strin
     };
     let stdout_text = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr_text = String::from_utf8_lossy(&output.stderr).to_string();
+    /**
+     * E3-7（2026-11-25）：强档建进程失败（非管理员会话）必须**如实拒绝**，
+     * 不得把 helper 的"CreateProcessW 失败"当成 executed 回传，更不能回退弱档。
+     * helper 用退出码 3 表示"建进程失败"（见 run_sandboxed）。
+     */
+    if options.allow_strong_execution && output.status.code() == Some(3) {
+        let (detail_value, _detail_truncated) = truncate_for_response(&stderr_text);
+        let mut response = String::new();
+        response.push_str("{\"schemaVersion\":1,\"requestIdentifier\":\"");
+        response.push_str(&identifier);
+        response.push_str("\",\"payload\":{\"outcome\":\"rejected\",\"reasonCode\":\"strong-tier-unavailable\",\"detail\":\"");
+        response.push_str(&json_escape(&detail_value));
+        response.push_str("\"}}\n");
+        return response;
+    }
     let timed_out = stdout_text.contains("timed-out");
     let exit_code = stdout_text
         .lines()
