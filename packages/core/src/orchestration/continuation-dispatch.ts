@@ -1,5 +1,8 @@
 /**
- * RESUME-02（2026-11-24，检查点 03 的 **dispatch 接线**）：把"已领取"交给既有恢复门禁。
+ * RESUME-02 **实验性并行层**（2026-11-24）：把显式请求的"已领取"交给既有恢复门禁。
+ *
+ * 与产品路径的关系：产品入口是断点驱动（见 `continuation-breakpoint.ts` 与门面方法）；
+ * 本服务仅供实验/宿主自组装，不进入公开 SDK。
  *
  * 纪律：
  * - 领取成功后才调用 `resumeRecoveredMission` 风格的端口，且**显式确认 = 回执本身**
@@ -9,9 +12,9 @@
  * - 端口抛错原样上抛（不把失败写成成功）。
  */
 import type {
+  CheckpointContinuationController,
   ContinuationClaim,
   ContinuationClaimResult,
-  ContinuationController,
 } from "./continuation-controller.js";
 import type {
   ContinuationCandidate,
@@ -52,10 +55,10 @@ export interface ContinuationDispatchResult {
   readonly blockedDecisionItems: readonly string[];
 }
 
-export class ContinuationDispatchService {
+export class CheckpointContinuationDispatchService {
   constructor(
     private readonly options: {
-      readonly controller: ContinuationController;
+      readonly controller: CheckpointContinuationController;
       readonly resumePort: ContinuationResumePort;
     },
   ) {}

@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { ContinuationController } from "../../../core/src/orchestration/continuation-controller.js";
+import { CheckpointContinuationController } from "../../../core/src/orchestration/continuation-controller.js";
 import { ResumeIntentReceiptStore } from "../../../core/src/orchestration/continuation-receipt-store.js";
 import {
   evaluateContinuationRequest,
@@ -55,7 +55,7 @@ export async function executeContinuationStatusCommand(
   const nowIso = options.nowIso ?? new Date().toISOString();
   const setting = await readCheckpointContinuationSetting(options.stateDirectory);
   const receiptStore = new ResumeIntentReceiptStore({ baseDirectory: options.stateDirectory });
-  const controller = new ContinuationController({
+  const controller = new CheckpointContinuationController({
     baseDirectory: options.stateDirectory,
     receiptStore,
     setting,
@@ -172,7 +172,7 @@ export async function executeContinuationRequestCommand(
     sourceChannel: "cli",
     nowIso,
   });
-  const controller = new ContinuationController({ baseDirectory: options.stateDirectory, receiptStore, setting });
+  const controller = new CheckpointContinuationController({ baseDirectory: options.stateDirectory, receiptStore, setting });
   const result = await controller.requestContinuation({
     request: structuredRequest,
     candidates,

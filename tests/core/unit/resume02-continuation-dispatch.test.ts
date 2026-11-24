@@ -8,8 +8,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ContinuationController } from "../../../packages/core/src/orchestration/continuation-controller.js";
-import { ContinuationDispatchService } from "../../../packages/core/src/orchestration/continuation-dispatch.js";
+import { CheckpointContinuationController } from "../../../packages/core/src/orchestration/continuation-controller.js";
+import { CheckpointContinuationDispatchService } from "../../../packages/core/src/orchestration/continuation-dispatch.js";
 import { ResumeIntentReceiptStore } from "../../../packages/core/src/orchestration/continuation-receipt-store.js";
 import {
   resolveCheckpointContinuationSetting,
@@ -51,7 +51,7 @@ function candidate(overrides: Partial<ContinuationCandidate> = {}): Continuation
 
 async function build(options: { readonly withReceipt: boolean }) {
   const receiptStore = new ResumeIntentReceiptStore({ baseDirectory });
-  const controller = new ContinuationController({
+  const controller = new CheckpointContinuationController({
     baseDirectory,
     receiptStore,
     setting: resolveCheckpointContinuationSetting({ configuredValue: true }),
@@ -72,7 +72,7 @@ async function build(options: { readonly withReceipt: boolean }) {
     requiresHandoffIdentity: false,
     requiredReauthorizationTypes: [] as string[],
   }));
-  const service = new ContinuationDispatchService({
+  const service = new CheckpointContinuationDispatchService({
     controller,
     resumePort: { resumeMission },
   });

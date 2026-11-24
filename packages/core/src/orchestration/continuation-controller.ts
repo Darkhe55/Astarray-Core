@@ -1,5 +1,9 @@
 /**
- * RESUME-02（2026-11-24）：续接的**本地对账 + 原子领取**（检查点 03 的可行性最小版）。
+ * RESUME-02 **实验性并行层**（2026-11-24）：显式请求的本地对账 + 原子领取。
+ *
+ * 注意：用户裁决的 RESUME-02 产品路径是**断点驱动**（`continuation-breakpoint.ts` 的
+ * `ContinuationController` / 门面 `queryContinuationBreakpoints` / `requestContinuation`）。
+ * 本类不进入公开 SDK，只作为显式请求判定与诊断的实验层；类名加 `Checkpoint` 前缀以区分。
  *
  * 流程：validate-request → reconcile（状态由本地权威记录推导）→ claim（单调 revision + fencing token）
  * → 返回"可派发/不可派发"。**不派发 worker、不装配上下文**；这两步的接线仍在卡内未完成。
@@ -49,7 +53,7 @@ export interface ContinuationClaimResult {
   readonly candidateTaskIdentifiers: readonly string[];
 }
 
-export class ContinuationController {
+export class CheckpointContinuationController {
   private readonly claimFilePath: string;
 
   constructor(

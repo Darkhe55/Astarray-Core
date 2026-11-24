@@ -13,7 +13,7 @@ import {
   executeContinuationStatusCommand,
   readCheckpointContinuationSetting,
 } from "../../../packages/tui/src/cli/continuation-command.js";
-import { ContinuationController } from "../../../packages/core/src/orchestration/continuation-controller.js";
+import { CheckpointContinuationController } from "../../../packages/core/src/orchestration/continuation-controller.js";
 import { ResumeIntentReceiptStore } from "../../../packages/core/src/orchestration/continuation-receipt-store.js";
 import { resolveCheckpointContinuationSetting } from "../../../packages/core/src/orchestration/continuation-request.js";
 
@@ -98,7 +98,7 @@ describe("RESUME-02：continuation status", () => {
       sourceChannel: "cli",
       nowIso,
     });
-    const controller = new ContinuationController({
+    const controller = new CheckpointContinuationController({
       baseDirectory: stateDirectory,
       receiptStore,
       setting: resolveCheckpointContinuationSetting({ configuredValue: true }),

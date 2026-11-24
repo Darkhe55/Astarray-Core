@@ -7962,3 +7962,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `ContinuationDispatchService`：领取→调用恢复门禁（显式确认=回执）；blocked 保留领取可重试；抛错原样上抛。
 > - 反例 5 条；全量：**939 files（937 passed / 2 skipped），5983 tests（5976 passed / 7 skipped），EXIT=0**；`lint` 0。
 > - 剩余：SDK 方法、远程通道、恢复包真实内容/扫描接线、观测、人工验收。
+
+> **RESUME-02 产品路径 CLI（2026-11-24 第 123 轮）**
+>
+> - 新增 `continuation breakpoints`（只读断点卡）与 `continuation resume`（幂等键+版本复核+既有恢复门禁），均经公共门面。
+> - 澄清方向冲突：用户裁决的产品路径是**断点驱动**；此前的「实验开关」层改名 `CheckpointContinuation*` 并标注非产品路径。
+> - 反例 4 条；全量：**940 files（938 passed / 2 skipped），5987 tests（5980 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 剩余：远程 `/resume` 适配、恢复包真实内容/扫描、观测、人工验收。
+
+> **推送状态（2026-11-24 第 123 轮）**：`8bed63a4` 3 次推送失败（网络不可达）；留待下次合并推送。

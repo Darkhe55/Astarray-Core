@@ -17,6 +17,10 @@ import {
   executeContinuationRequestCommand,
   executeContinuationStatusCommand,
 } from "./cli/continuation-command.js";
+import {
+  executeContinuationBreakpointsCommand,
+  executeContinuationResumeCommand,
+} from "./cli/continuation-breakpoint-command.js";
 // RELOCATE-01-04（2026-10-18）：冷启动重定位状态只读查询（命令名经用户确认=项目状态）。
 import {
   executeProjectReconcileCommand,
@@ -2562,7 +2566,7 @@ workflowCommand
 /** RESUME-02：断点续接的只读状态（默认关闭；领取不等于已恢复）。 */
 const continuationCommand = program
   .command("continuation")
-  .description("断点续接（实验性；默认关闭，只读状态）");
+  .description("断点续接：产品路径为 breakpoints/resume；status/request 为实验性显式判定层（默认关闭）");
 continuationCommand
   .command("status")
   .description("查看续接配置、有效回执与活动领取（只读，不派发）")
@@ -2606,6 +2610,47 @@ continuationCommand
       });
     },
   );
+continuationCommand
+  .command("breakpoints")
+  .description("列出某会话的断点卡（只读；产品路径，不恢复）")
+  .requiredOption("--conversation <id>", "会话标识")
+  .option("--json", "机器可读输出")
+  .action(async (options: { conversation: string; json?: boolean }) => {
+    process.exitCode = await executeContinuationBreakpointsCommand({
+      stateDirectory: defaultStateDirectory(),
+      conversationIdentifier: options.conversation,
+      isJsonOutput: options.json === true,
+    });
+  });
+
+continuationCommand
+  .command("resume")
+  .description("显式请求续接（断点驱动；幂等键 + 版本复核 + 既有恢复门禁）")
+  .requiredOption("--breakpoint <id>", "断点标识")
+  .requiredOption("--mission <id>", "mission 标识")
+  .requiredOption("--revision <n>", "断点当前 revision（防陈旧操作）")
+  .requiredOption("--request <id>", "幂等键（断线重连复用同一 ID）")
+  .option("--json", "机器可读输出")
+  .action(
+    async (options: {
+      breakpoint: string;
+      mission: string;
+      revision: string;
+      request: string;
+      json?: boolean;
+    }) => {
+      const expectedRevision = Number.parseInt(options.revision, 10);
+      process.exitCode = await executeContinuationResumeCommand({
+        stateDirectory: defaultStateDirectory(),
+        breakpointIdentifier: options.breakpoint,
+        missionIdentifier: options.mission,
+        expectedRevision,
+        requestIdentifier: options.request,
+        isJsonOutput: options.json === true,
+      });
+    },
+  );
+
 const sandboxCommand = program
   .command("sandbox")
   .description("受控执行沙箱诊断（只读；不启动进程）");

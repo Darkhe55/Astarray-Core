@@ -12,7 +12,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ContinuationController } from "../../../packages/core/src/orchestration/continuation-controller.js";
+import { CheckpointContinuationController } from "../../../packages/core/src/orchestration/continuation-controller.js";
 import { ResumeIntentReceiptStore } from "../../../packages/core/src/orchestration/continuation-receipt-store.js";
 import {
   resolveCheckpointContinuationSetting,
@@ -54,7 +54,7 @@ function candidate(overrides: Partial<ContinuationCandidate> = {}): Continuation
 
 async function build(options: { readonly isEnabled: boolean }) {
   const receiptStore = new ResumeIntentReceiptStore({ baseDirectory });
-  const controller = new ContinuationController({
+  const controller = new CheckpointContinuationController({
     baseDirectory,
     receiptStore,
     setting: resolveCheckpointContinuationSetting({ configuredValue: options.isEnabled }),
