@@ -8219,3 +8219,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `/home/ubuntu/.nvm/...` ⇒ 沙箱内 `execvp ... No such file or directory`。现对**默认 bind 之外的可执行文件**
 >   单独 `--ro-bind <exe> <exe>`（只绑文件，不绑目录）；新增 2 条单测（nvm 路径必须 bind、`/usr` 下不重复）。
 > - 说明：E2（后端/产品接线、显式开关与文案）尚未做；强档 broker（E3）待排。
+
+> **E2 弱档接线（2026-11-25，第 143 轮）**
+>
+> - `SandboxHelperBackend` 新增 `isWeakIsolationAllowed`（默认 false = fail-closed）与 `isWeakIsolationForced`
+>   （跳过强档探测；仍要求 allowed=true 双重显式）；弱档能力标识 `sandbox-helper-weak`，
+>   描述明确写"写受限；读不设防；非 AppContainer"。
+> - 弱档探测真实跑一次 `run --low-integrity ... cmd /c exit 0`；弱档执行自动带 `--work-dir <cwd>`。
+> - 平台后端透传两个开关；新增 3 条后端反例 + 2 条真实验收（执行成功、写用户主目录被拒）。
+> - 全量：**960 files（958 passed / 2 skipped），6093 tests（6087 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - B6：Linux 真实执行待用户重跑（bwrap 已补"默认 bind 之外的可执行文件单独 --ro-bind"）。

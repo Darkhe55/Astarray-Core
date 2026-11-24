@@ -29,6 +29,18 @@ export interface SandboxHelperBackendOptions {
   readonly helperArguments?: readonly string[];
   /** 每个执行实例的隔离档案名（缺省由后端按执行标识生成）。 */
   readonly profileNamePrefix?: string;
+  /**
+   * 是否允许**弱档**（受限令牌 + Low IL）作为强档不可用时的回退。
+   *
+   * 默认 **false**（fail-closed）：弱档**读不设防**，必须由产品/用户显式允许，
+   * 且不得对外宣称"读隔离"。
+   */
+  readonly isWeakIsolationAllowed?: boolean;
+  /**
+   * 强制使用弱档（跳过强档探测）。用于"用户显式选择弱隔离"或弱档验收；
+   * 仍要求 `isWeakIsolationAllowed` 为 true（双重显式，避免误开）。
+   */
+  readonly isWeakIsolationForced?: boolean;
   /** 探测结果缓存时长（毫秒）；缺省 60 秒。 */
   readonly probeCacheMilliseconds?: number;
   /** 依赖注入：替换进程启动（测试用；生产用默认 `spawn`）。 */
@@ -96,6 +108,16 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
      */
     let probeOutput = "";
     try {
+      if (this.options.isWeakIsolationForced === true) {
+        /** 强制弱档：不跑强档探测（强档可能"探测通过但普通会话建不了进程"）。 */
+        if (this.options.isWeakIsolationAllowed !== true) {
+          throw new Error("强制弱档必须同时设置 isWeakIsolationAllowed=true");
+        }
+        const capability = await this.probeWeakIsolation();
+        this.cachedCapability = capability;
+        this.cachedCapabilityAtMilliseconds = nowMilliseconds;
+        return capability;
+      }
       const probeProcess = this.startHelper(["probe"]);
       for await (const chunk of probeProcess.standardOutput) {
         probeOutput += chunk;
@@ -112,12 +134,64 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
       this.cachedCapabilityAtMilliseconds = nowMilliseconds;
       return capability;
     }
-    const capability = interpretProbeOutput(probeOutput);
+    const strongCapability = interpretProbeOutput(probeOutput);
+    /**
+     * E2（2026-11-25）：强档不可用且**显式允许**弱档时，做一次弱档可用性探测。
+     *
+     * 弱档真实语义：受限令牌 + Low 完整性级别 ⇒ **写受限、读不设防**。
+     * 因此能力标识必须与强档区分（`sandbox-helper-weak`），上层文案不得宣称读隔离。
+     */
+    let capability = strongCapability;
+    if (!strongCapability.isAvailable && this.options.isWeakIsolationAllowed === true) {
+      capability = await this.probeWeakIsolation();
+    }
     this.cachedCapability = capability;
     this.cachedCapabilityAtMilliseconds = nowMilliseconds;
     return capability;
   }
 
+  /** 弱档可用性探测（真实跑一次 `run --low-integrity`，要求退出码 0）。 */
+  private async probeWeakIsolation(): Promise<SandboxCapabilityProfile> {
+    const systemRoot = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
+    let weakProbeOutput = "";
+    try {
+      const weakProbe = this.startHelper([
+        "run",
+        "--low-integrity",
+        "--timeout-ms",
+        "5000",
+        "--max-memory-mb",
+        "64",
+        "--max-processes",
+        "4",
+        "--",
+        systemRoot + "\\System32\\cmd.exe",
+        "/c",
+        "exit 0",
+      ]);
+      for await (const chunk of weakProbe.standardOutput) {
+        weakProbeOutput += chunk;
+      }
+      await weakProbe.exited;
+    } catch {
+      weakProbeOutput = "";
+    }
+    if (weakProbeOutput.includes("exit-code 0")) {
+      return {
+        isAvailable: true,
+        backendIdentifier: "sandbox-helper-weak",
+        isolationPrimitiveDescription:
+          "受限令牌 + Low 完整性级别（写受限；读不设防；非 AppContainer）",
+        reasonUnavailable: null,
+      };
+    }
+    return {
+      isAvailable: false,
+      backendIdentifier: "sandbox-helper-weak",
+      isolationPrimitiveDescription: "受限令牌 + Low 完整性级别",
+      reasonUnavailable: "弱档探测失败：--low-integrity 执行未返回 exit-code 0",
+    };
+  }
   async start(input: {
     readonly identity: {
       readonly executionId: string;
@@ -171,10 +245,12 @@ export class SandboxHelperBackend implements SandboxExecutionBackend {
       1,
       Math.floor(input.resourceLimits.maximumMemoryBytes / (1024 * 1024)),
     );
+    const isWeakCapability = capability.backendIdentifier === "sandbox-helper-weak";
     const helperProcess = this.startHelper([
       "run",
       "--profile",
       profileName,
+      ...(isWeakCapability ? ["--low-integrity", "--work-dir", input.workingDirectory] : []),
       "--timeout-ms",
       String(input.timeoutMilliseconds),
       "--max-memory-mb",

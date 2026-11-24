@@ -71,6 +71,96 @@ const FULL_SUCCESS_PROBE = [
   "job-created",
 ].join("\n");
 
+describe("E2 弱档回退（受限令牌 + Low IL）", () => {
+  const WEAK_UNAVAILABLE = "appcontainer-unavailable CreateAppContainerProfile HRESULT=0x80070005";
+
+  it("强档不可用 + 显式允许弱档 ⇒ 判可用，但标识为 weak（不冒充强隔离）", async () => {
+    const helper = buildFakeHelper({
+      probeOutput: WEAK_UNAVAILABLE,
+      runOutput: "job-assigned\nexit-code 0",
+      exitCode: 0,
+    });
+    const backend = new SandboxHelperBackend({
+      helperExecutablePath: "helper.exe",
+      isWeakIsolationAllowed: true,
+      spawnHelper: helper.spawnHelper,
+    });
+    const capability = await backend.probeCapability();
+    expect(capability.isAvailable).toBe(true);
+    expect(capability.backendIdentifier).toBe("sandbox-helper-weak");
+    expect(capability.isolationPrimitiveDescription).toContain("读不设防");
+  });
+
+  it("强档不可用 + 未允许弱档 ⇒ 仍判不可用（默认 fail-closed）", async () => {
+    const helper = buildFakeHelper({ probeOutput: WEAK_UNAVAILABLE });
+    const backend = new SandboxHelperBackend({
+      helperExecutablePath: "helper.exe",
+      spawnHelper: helper.spawnHelper,
+    });
+    const capability = await backend.probeCapability();
+    expect(capability.isAvailable).toBe(false);
+    expect(capability.reasonUnavailable).toContain("不可建");
+  });
+
+  it("弱档执行参数带 --low-integrity 与 --work-dir；强档不带", async () => {
+    const weakHelper = buildFakeHelper({
+      probeOutput: WEAK_UNAVAILABLE,
+      runOutput: "job-assigned\nexit-code 0",
+    });
+    const weakBackend = new SandboxHelperBackend({
+      helperExecutablePath: "helper.exe",
+      isWeakIsolationAllowed: true,
+      spawnHelper: weakHelper.spawnHelper,
+    });
+    await weakBackend.probeCapability();
+    await weakBackend.start({
+      identity: { executionId: "weak-1", projectIdentifier: "project-a" },
+      executableEntryPoint: "C:\\Windows\\System32\\cmd.exe",
+      arguments: ["/c", "echo x"],
+      workingDirectory: "C:\\work",
+      timeoutMilliseconds: 5_000,
+      streamStorageLimitBytes: 1024,
+      resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
+    });
+    const weakRun = weakHelper.invocations.find(
+      (invocation) =>
+        invocation.includes("run") &&
+        invocation.includes("--profile") &&
+        invocation.includes("--low-integrity"),
+    );
+    expect(weakRun).toBeDefined();
+    expect(weakRun).toContain("--work-dir");
+    expect(weakRun).toContain("C:\\work");
+
+    const strongHelper = buildFakeHelper({
+      probeOutput: [
+        "appcontainer-created sid-present=true",
+        "appcontainer-deleted hresult=0x00000000",
+        "job-created",
+      ].join("\n"),
+      runOutput: "job-assigned\nexit-code 0",
+    });
+    const strongBackend = new SandboxHelperBackend({
+      helperExecutablePath: "helper.exe",
+      spawnHelper: strongHelper.spawnHelper,
+    });
+    await strongBackend.probeCapability();
+    await strongBackend.start({
+      identity: { executionId: "strong-1", projectIdentifier: "project-a" },
+      executableEntryPoint: "C:\\Windows\\System32\\cmd.exe",
+      arguments: [],
+      workingDirectory: "C:\\work",
+      timeoutMilliseconds: 5_000,
+      streamStorageLimitBytes: 1024,
+      resourceLimits: { maximumMemoryBytes: 64 * 1024 * 1024, maximumProcessCount: 4 },
+    });
+    const strongRun = strongHelper.invocations.find(
+      (invocation) => invocation.includes("run") && invocation.includes("--profile"),
+    );
+    expect(strongRun).toBeDefined();
+    expect(strongRun).not.toContain("--low-integrity");
+  });
+});
 describe("EXEC-01-02 沙箱辅助程序后端", () => {
   it("探测完整成功 ⇒ 判定可用", () => {
     const capability = interpretProbeOutput(FULL_SUCCESS_PROBE);

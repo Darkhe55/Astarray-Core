@@ -18,6 +18,14 @@ export interface PlatformSandboxBackendInput {
   readonly applicationRootPath: string;
   /** 显式覆盖辅助程序路径（测试与高级部署用）。 */
   readonly helperExecutablePathOverride?: string;
+  /**
+   * E2（2026-11-25）：强档不可用时是否允许回退到**弱档**（受限令牌 + Low IL）。
+   *
+   * 默认 false（fail-closed）。弱档读不设防，必须由用户显式允许。
+   */
+  readonly isWeakIsolationAllowed?: boolean;
+  /** 强制弱档（跳过强档探测；仍需 isWeakIsolationAllowed=true）。 */
+  readonly isWeakIsolationForced?: boolean;
 }
 
 /**
@@ -66,5 +74,9 @@ export function createPlatformSandboxExecutionBackend(
   if (helperExecutablePath === null) {
     return null;
   }
-  return new SandboxHelperBackend({ helperExecutablePath });
+  return new SandboxHelperBackend({
+    helperExecutablePath,
+    ...(input.isWeakIsolationAllowed === true ? { isWeakIsolationAllowed: true } : {}),
+    ...(input.isWeakIsolationForced === true ? { isWeakIsolationForced: true } : {}),
+  });
 }
