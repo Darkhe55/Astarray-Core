@@ -8254,3 +8254,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 尚未做：Rust/服务侧命名管道实现（ACL、消息循环）、安装期宿主注册、调用者令牌建 AppContainer 进程。
 
 > **推送状态（2026-11-25 第 146 轮）**：`fa59b37a` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **E3-3 broker 安装/运行时契约（2026-11-25，第 147 轮）**
+>
+> - 新增 `sandbox-broker-install.ts`：安装前置（显式同意 + 提权 + 合法模式/版本）、注册记录生成与解析
+>   （管道名必须与 SID 派生一致，篡改即判损坏）、运行时就绪（未安装/损坏/版本不符/未运行 ⇒ fail-closed）、卸载幂等。
+> - 宿主形态：文档记录 service（SYSTEM 常驻 + 模拟调用方令牌）与 scheduled-task（登录后可用）的取舍。
+> - 7 条反例通过；全量：**964 files（962 passed / 2 skipped），6118 tests（6112 passed / 6 skipped），EXIT=0**；`lint` 0。
