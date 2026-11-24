@@ -8100,3 +8100,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `scripts/build-sandbox-helper.mjs` + `npm run build:sandbox-helper`：只构建不安装；缺工具链时打印确切安装命令并退出 2。
 > - 新增 `docs/reports/B3_B8_UNBLOCK_ACTIONS_2026-11-24.md`：逐条列出 B3/B5/B6/B7/B8 的阻塞、你需要做的命令、以及解除后我接续的验收动作。
 > - 本机实测：`rustc/cargo/link/cl` 均缺失、会话非管理员 ⇒ B3 前置 `readyForAcceptance=false`（如实）。
+
+> **RESUME-02 远程投递接线（2026-11-24）**
+>
+> - 新增 `remote-resume-dispatch.ts`：把 `/resume` 解析结果接到**产品路径**（断点查找 → `requestContinuation`），
+>   普通文本不读断点；未认证/通道/格式拒绝；无可恢复断点不造卡；blocked 如实透传；幂等键确定性。反例 7 条。
+> - 全量：**956 files（954 passed / 2 skipped），6071 tests（6064 passed / 7 skipped），EXIT=0**；`lint` 0。
