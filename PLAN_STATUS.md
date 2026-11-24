@@ -8037,3 +8037,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**949 files（947 passed / 2 skipped），6041 tests（6034 passed / 7 skipped），EXIT=0**；`lint` 0。
 
 > **推送状态（2026-11-24 第 132 轮）**：`7a686f03` 3 次推送失败（网络不可达）；本地领先 5 个提交（`735c93e8`/`4a7301a2`/`997bd854`/`b4ccd9ec`/`7a686f03`），留待下次合并推送。
+
+> **B9：公共门面错误面（2026-11-24 第 133 轮）**
+>
+> - 新增 5 条：空指导拒绝、未认证拒绝、未知会话 session-not-found、关闭后 application-closed（两个入口）、
+>   未知 mission 原始状态抛错（不伪造）。
+> - 全量：**950 files（948 passed / 2 skipped），6046 tests（6039 passed / 7 skipped），EXIT=0**；`lint` 0。
