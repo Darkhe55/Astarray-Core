@@ -8085,3 +8085,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > - 新增 3 条：证据失效/在途组对账的未知目标拒绝；失活未知目标如实（不谎报已解绑）。
 > - 全量：**955 files（953 passed / 2 skipped），6064 tests（6057 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **窗口收尾核验（2026-11-24 第 140 轮）**
+>
+> - 全量：**955 files（953 passed / 2 skipped），6064 tests（6057 passed / 7 skipped），EXIT=0**；`lint` 0；隐私 `privacy-ok`。
+> - 覆盖率（收尾复测）：语句 **89.06%**、分支 **82.01%**（20200/24629）、函数 **89.29%**、行 **89.45%**；
+>   分支阈值 85% 未达，差约 **735 条**（B9 仍开放）。
+> - 内部走查：`npm run verify:internal-user-walkthrough` **12/12 通过**（`gui` 按预期 fail-closed）。
+> - 阻塞不变：B3/B5（Rust/MSVC + 提权）、B6（Linux/macOS 设备）、B7（平台租户）、B8（人工验收）。
+> - 结论：**目标未完成**（B9 与外部条件项仍开放）；本轮不宣称完成，不调整阈值（阈值属用户裁决）。
