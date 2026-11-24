@@ -7983,3 +7983,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 6 条：列表模式（文本/JSON）、单 mission（文本/JSON）、resume 已完成早返回、未知 mission 用法错误（exit 2）。
 > - 覆盖率复测（本轮前）：全局分支 **81.52%**（19990/24629），距 85% 约 860 条。
 > - 全量：**942 files（940 passed / 2 skipped），5998 tests（5991 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B9：profile 命令群分支（2026-11-24 第 126 轮）**
+>
+> - 新增 8 条：列表（JSON/分页/当前标记）、创建+切换、导出（stdout/文件）、导入往返、删除当前组保护、
+>   show 未选择/内置 JSON、改名/重置不存在组失败路径。
+> - 全量：**943 files（941 passed / 2 skipped），6006 tests（5999 passed / 7 skipped），EXIT=0**；`lint` 0。
+> - 说明：新增测试文件需显式 `testTimeout`（架构守卫 RELIABILITY-01），已补。
+
+> **推送状态（2026-11-24 第 126 轮）**：`74cc7328` 3 次推送失败（网络不可达）；留待下次合并推送。
