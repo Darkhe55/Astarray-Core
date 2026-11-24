@@ -1,0 +1,57 @@
+# 目的：本机下载 Rust 工具链/链接器很慢时，用 GitHub 的 Windows runner 构建
+# `native/sandbox-helper/sandbox-helper.exe`，下载产物后放回仓库即可继续 B3 验收。
+#
+# 纪律：
+# - 只构建、不签名、不上传任何凭据；
+# - 产物仅来自本仓库 `native/sandbox-helper/src/main.rs`（无第三方 crate）；
+# - probe 在 runner 上以非管理员运行，预期报 `appcontainer-unavailable`（属正常，不是失败）。
+name: build-sandbox-helper
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "native/sandbox-helper/**"
+      - "scripts/build-sandbox-helper.mjs"
+      - ".github/workflows/build-sandbox-helper.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable-msvc, minimal)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-x86_64-pc-windows-msvc
+          components: ""
+
+      - name: Build helper
+        working-directory: native/sandbox-helper
+        run: rustc -O src/main.rs -o sandbox-helper.exe
+
+      - name: Show artifact hash
+        shell: pwsh
+        run: |
+          Get-FileHash native/sandbox-helper/sandbox-helper.exe -Algorithm SHA256 |
+            Format-List
+
+      - name: Probe (non-admin; appcontainer-unavailable is expected)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          & .\native\sandbox-helper\sandbox-helper.exe probe
+          "probe exit code: $LASTEXITCODE"
+
+      - name: Upload helper
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-helper-windows-x64
+          path: native/sandbox-helper/sandbox-helper.exe
+          if-no-files-found: error
+          retention-days: 14

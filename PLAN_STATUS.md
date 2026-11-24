@@ -8127,3 +8127,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 修正：`verify-exec01-03-preconditions.mjs` 与 `linux-b6-bootstrap.sh` 的探测改为
 >   `--ro-bind / / --dev /dev --proc /proc /bin/true`（与 `bubblewrap-sandbox-backend` 一致）。
 > - 全量：955 files / 6077 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。
+
+> **B3 构建旁路：CI 产物（2026-11-24）**
+>
+> - 新增 `.github/workflows/build-sandbox-helper.yml`：GitHub Windows runner 构建 `sandbox-helper.exe` 并上传 artifact，
+>   供本机下载慢时直接取用（只构建、无凭据、无第三方 crate）。
+> - 全量：957 files / 6077 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。
