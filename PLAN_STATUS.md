@@ -7998,3 +7998,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 5 条：提升列表（空/文本/JSON）、创建提升、撤销（存在/不存在）、会话关闭（文本/JSON）、
 >   安装开关读写与 revision 单调。
 > - 全量：**944 files（942 passed / 2 skipped），6011 tests（6004 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B9：任务台账 CLI 只读视图（2026-11-24 第 128 轮）**
+>
+> - 新增 7 条：绑定索引（空/非空，文本/JSON）、推迟插入队列（空/过滤，文本/JSON）、
+>   缺参 missing-inputs、索引缺失 index-missing（exit 2）、单任务预检失败（exit 2）。
+> - 全量：**945 files（943 passed / 2 skipped），6018 tests（6011 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **推送状态（2026-11-24 第 128 轮）**：`735c93e8` 3 次推送失败（网络不可达）；留待下次合并推送。
