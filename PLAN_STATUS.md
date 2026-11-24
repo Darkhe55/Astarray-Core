@@ -8261,3 +8261,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   （管道名必须与 SID 派生一致，篡改即判损坏）、运行时就绪（未安装/损坏/版本不符/未运行 ⇒ fail-closed）、卸载幂等。
 > - 宿主形态：文档记录 service（SYSTEM 常驻 + 模拟调用方令牌）与 scheduled-task（登录后可用）的取舍。
 > - 7 条反例通过；全量：**964 files（962 passed / 2 skipped），6118 tests（6112 passed / 6 skipped），EXIT=0**；`lint` 0。
+
+> **E3-4 broker 客户端（2026-11-25，第 148 轮）**
+>
+> - 新增 `sandbox-broker-client.ts`：可用性判定 → 连接 → 发帧 → 等响应（超时**不重发**）→ 校验请求标识 → 映射 accepted/rejected；
+>   连接无论成败都关闭。
+> - 7 条反例通过：管道缺失不连接、连接失败不假装发送、写失败、超时只发一次、响应错配、非法响应、accepted/rejected 透传。
+> - 全量：**965 files（963 passed / 2 skipped），6125 tests（6119 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - 仍未做（E3 实现侧）：Rust 命名管道服务（ACL + 模拟调用方）、安装期注册、调用者令牌建 AppContainer 进程、安装期 ACL 授予、崩溃恢复/审计。
