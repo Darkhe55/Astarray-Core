@@ -10,6 +10,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { BubblewrapSandboxBackend } from "../../../packages/core/src/execution/bubblewrap-sandbox-backend.js";
 import {
   createPlatformSandboxExecutionBackend,
   resolveSandboxHelperExecutablePath,
@@ -26,14 +27,21 @@ afterEach(async () => {
 });
 
 describe("EXEC-01-02 默认后端装配", () => {
-  it("没有辅助程序 ⇒ 解析为 null，且不构造任何后端（不降级到宿主执行）", () => {
+  it("没有辅助程序 ⇒ 解析为 null（Windows 不构造后端，不降级到宿主执行）", () => {
     const helperExecutablePath = resolveSandboxHelperExecutablePath({
       applicationRootPath: temporaryRootPath,
     });
+    /** 所有平台都不存在"辅助程序路径"这种兜底；Linux 走另一实现。 */
     expect(helperExecutablePath).toBeNull();
-    expect(
-      createPlatformSandboxExecutionBackend({ applicationRootPath: temporaryRootPath }),
-    ).toBeNull();
+    const backend = createPlatformSandboxExecutionBackend({
+      applicationRootPath: temporaryRootPath,
+    });
+    if (process.platform === "linux") {
+      /** Linux 的默认后端是 bubblewrap（系统组件），与 helper.exe 无关。 */
+      expect(backend).toBeInstanceOf(BubblewrapSandboxBackend);
+    } else {
+      expect(backend).toBeNull();
+    }
   }, 30_000);
 
   it("显式覆盖指向不存在的文件 ⇒ 同样为 null（不假设可用）", () => {

@@ -77,6 +77,14 @@ export async function runInternalCommandAsync(input: {
       cwd: input.workingDirectoryPath,
       shell: true,
       windowsHide: true,
+      /**
+       * POSIX：让 shell 成为**进程组组长**，终止时按组杀。
+       *
+       * 教训（2026-11-24，Linux 实测）：只 kill shell 时，`node -e "setTimeout(…)"`
+       * 这类孙进程仍活着并占着 stdout/stderr 管道 ⇒ `close` 永不触发，
+       * 调用方会一直等到自己的超时（表现为"超时/取消失效"）。
+       */
+      detached: process.platform !== "win32",
       /** SEC-02-07：配置命令不继承宿主凭据环境（只带运行必需变量）。 */
       env: buildRestrictedSubprocessEnvironment({ hostEnvironment: process.env }).environment,
       stdio: ["ignore", "pipe", "pipe"],
@@ -105,6 +113,16 @@ export async function runInternalCommandAsync(input: {
         );
         killer.on("error", () => undefined);
         return;
+      }
+      /** 先按进程组杀（detached ⇒ pgid = child.pid），失败再退回单进程。 */
+      const childProcessIdentifier = child.pid;
+      if (childProcessIdentifier !== undefined) {
+        try {
+          process.kill(-childProcessIdentifier, "SIGKILL");
+          return;
+        } catch {
+          // 进程组不存在/已退出：退回单进程杀。
+        }
       }
       try {
         child.kill("SIGKILL");

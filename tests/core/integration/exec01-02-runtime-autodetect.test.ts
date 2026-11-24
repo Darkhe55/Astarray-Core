@@ -96,12 +96,12 @@ describe("EXEC-01-02 平台后端自动探测", () => {
     expect(message).toContain("未装配");
   }, 60_000);
 
-  it("开启探测但本机无组件 ⇒ 仍拒绝，原因同样如实", async () => {
+  it.runIf(process.platform === "win32")("开启探测但本机无组件 ⇒ 仍拒绝，原因同样如实", async () => {
     const message = await startAndCatch({ isAutoDetected: true });
     expect(message).toMatch(/未装配|不可用/u);
   }, 60_000);
 
-  it("开启探测且组件存在 ⇒ 装配后端并**探测后拒绝**（不降级到宿主执行）", async () => {
+  it.runIf(process.platform === "win32")("开启探测且组件存在 ⇒ 装配后端并**探测后拒绝**（不降级到宿主执行）", async () => {
     /** 空文件：能被解析为"存在"，但探测不会给出成功标记 ⇒ 必须判不可用。 */
     const helperPath = path.join(helperRootPath, "helper.exe");
     await fs.writeFile(helperPath, "", "utf8");

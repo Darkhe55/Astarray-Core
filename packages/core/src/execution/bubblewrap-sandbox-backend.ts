@@ -147,8 +147,10 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
        * 于是"探测通过、真实执行全失败"。现在探测跑的就是真实命令形态，
        * 前缀本身坏掉会被探测直接判为不可用。
        */
-      const probeProcess = this.spawnProcess([
-        ...buildResourceLimitPrefix({ maximumMemoryBytes: PROBE_ADDRESS_SPACE_BYTES }),
+      const probePrefix = buildResourceLimitPrefix({
+        maximumMemoryBytes: PROBE_ADDRESS_SPACE_BYTES,
+      });
+      const probeProcess = this.spawnProcess(probePrefix, [
         "--unshare-all",
         "--die-with-parent",
         "--ro-bind",
@@ -219,11 +221,11 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
      *
      * 上限来自环境登记表（经控制器传入），后端不自行决定"给多少"。
      */
-    const process = this.spawnProcess([
-      ...buildResourceLimitPrefix({
+    const process = this.spawnProcess(
+      buildResourceLimitPrefix({
         maximumMemoryBytes: input.resourceLimits.maximumMemoryBytes,
       }),
-      ...buildBubblewrapArguments({
+      buildBubblewrapArguments({
         workingDirectory: input.workingDirectory,
         executableEntryPoint: input.executableEntryPoint,
         arguments: input.arguments,
@@ -231,7 +233,7 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
           ? {}
           : { readOnlyBindPaths: this.options.readOnlyBindPaths }),
       }),
-    ]);
+    );
     const entry: BubblewrapExecutionEntry = {
       process,
       stdoutChunks: [],
@@ -317,13 +319,29 @@ export class BubblewrapSandboxBackend implements SandboxExecutionBackend {
     return entry;
   }
 
-  private spawnProcess(bwrapArguments: readonly string[]): SandboxHelperProcess {
+  /**
+   * 启动外层命令（通常是 `prlimit`），由它再 exec `bwrap`。
+   *
+   * **教训（2026-11-24，Linux 实测）**：旧实现把 `prlimit` 前缀塞进 bwrap 的**参数**里，
+   * 实际命令变成 `bwrap prlimit --as=… -- --unshare-all …` —— bwrap 会把 `prlimit`
+   * 当成**沙箱子进程**去 exec，于是出现 `bwrap: execvp prlimit: No such file or directory`，
+   * 而真正的 bwrap 参数一个都没生效。前缀必须在外层。
+   */
+  private spawnProcess(
+    prefix: readonly string[],
+    bwrapArguments: readonly string[],
+  ): SandboxHelperProcess {
     const spawnProcess = this.options.spawnProcess;
-    const command = this.options.bubblewrapExecutablePath ?? "bwrap";
+    const bwrapCommand = this.options.bubblewrapExecutablePath ?? "bwrap";
+    const command = prefix.length === 0 ? bwrapCommand : (prefix[0] ?? bwrapCommand);
+    const argumentsList =
+      prefix.length === 0
+        ? [...bwrapArguments]
+        : [...prefix.slice(1), bwrapCommand, ...bwrapArguments];
     if (spawnProcess !== undefined) {
-      return spawnProcess({ command, arguments: bwrapArguments });
+      return spawnProcess({ command, arguments: argumentsList });
     }
-    const child = spawn(command, [...bwrapArguments], {
+    const child = spawn(command, [...argumentsList], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     const exited = new Promise<number | null>((resolve) => {

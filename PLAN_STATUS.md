@@ -8133,3 +8133,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `.github/workflows/build-sandbox-helper.yml`：GitHub Windows runner 构建 `sandbox-helper.exe` 并上传 artifact，
 >   供本机下载慢时直接取用（只构建、无凭据、无第三方 crate）。
 > - 全量：957 files / 6077 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。
+
+> **B6 实测反哺修复（2026-11-25，Linux 用户机）**
+>
+> - 用户 Ubuntu 全量跑出 5 失败，定位到 3 个真实缺陷：
+>   ① `BubblewrapSandboxBackend` 把 `prlimit` 前缀塞进 bwrap 参数 ⇒ 实际执行 `bwrap prlimit …`（Linux 上必然失败）；
+>   ② `runInternalCommandAsync` 在 POSIX 只 kill shell，孙进程占着管道 ⇒ 超时/取消不返回；
+>   ③ 两个测试是 Windows 专属断言，未平台化。
+> - 修复：前缀移到 bwrap **外层**（`prlimit … -- bwrap …`）；POSIX 用 `detached` + 进程组 kill；
+>   Windows 专属用例改 `runIf(win32)`；探测单测改断言外层形态。
+> - 全量（Windows）：**957 files（955 passed / 2 skipped），6077 tests（6070 passed / 7 skipped），EXIT=0**；`lint` 0。
