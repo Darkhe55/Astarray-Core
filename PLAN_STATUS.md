@@ -8043,3 +8043,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 5 条：空指导拒绝、未认证拒绝、未知会话 session-not-found、关闭后 application-closed（两个入口）、
 >   未知 mission 原始状态抛错（不伪造）。
 > - 全量：**950 files（948 passed / 2 skipped），6046 tests（6039 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B9：应用运行时守卫分支（2026-11-24 第 134 轮）**
+>
+> - 新增 4 条：未认证权限放宽预览/确认拒绝、重新规划空说明、未知目标恢复拒绝；
+>   并锁定一项现状发现：`createApplicationRuntime` 当前**不校验 mode 取值**（待产品裁决，未臆造拒绝）。
+> - 全量：**951 files（949 passed / 2 skipped），6050 tests（6043 passed / 7 skipped），EXIT=0**；`lint` 0。
