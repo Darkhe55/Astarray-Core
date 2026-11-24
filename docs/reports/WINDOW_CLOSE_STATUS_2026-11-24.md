@@ -50,3 +50,21 @@ node scripts/verify-entry-runtime-selection.mjs
 node scripts/verify-tarball-isolation-install.mjs
 node scripts/verify-exec01-03-preconditions.mjs   # --strict 未就绪 exit 2
 ```
+
+## 6. 窗口最终门禁（第 120 轮，2026-11-24）
+
+- `npm test`：**937 files（935 passed / 2 skipped），5973 tests（5966 passed / 7 skipped），EXIT=0**；
+- `npm run lint`：0；隐私检查：`privacy-ok`；
+- 覆盖率（2026-11-24 复测）：全局分支 **81.33%**（阈值 85% 未达，按 B9 处理）；
+- 本窗口测试净增：5790 → 5966（+176 条），新增 24 个测试文件（含 e2e/夹具）。
+
+### 本轮后仍需你裁决（不变）
+
+1. **B9**：专题投入至 85%（8–12 人日）或接受 81.33% 并调整阈值；
+2. **B10**：剩余故障路径是否做故障注入重构；
+3. **RESUME-02**：是否继续做 dispatch 接线（接 `resumeRecoveredMission`）与 SDK 方法。
+
+### 需要外部条件（非代码可解）
+
+- RELEASE-01-03（B3）：Rust/MSVC 工具链 + 一次提权；
+- B5–B8 / REMOTE-01：平台租户、Linux/macOS 设备、人工验收。
