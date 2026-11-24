@@ -5,6 +5,9 @@
  * 用法：
  *   node scripts/verify-exec01-03-preconditions.mjs            # 记录（exit 0）
  *   node scripts/verify-exec01-03-preconditions.mjs --strict   # 未就绪则 exit 2
+ *   node scripts/verify-exec01-03-preconditions.mjs --with-probe --strict
+ *     # 额外执行一次 helper probe（创建并删除一个 AppContainer 档案 + Job），
+ *     # 用实测证据替代"是否管理员"的代理判断
  *
  * 纪律：
  * - 只读：不执行受控进程、不安装工具链、不提权；
@@ -121,6 +124,24 @@ function readProbesArgument() {
   }
 }
 
+/**
+ * 运行 helper 的 `probe`（显式 --with-probe 才执行）。
+ *
+ * 副作用：创建并删除一个 AppContainer 档案、创建一个 Job Object（均即时回收）。
+ * 这是当前 Windows 构建上**唯一能证明"AppContainer 真的可用"的证据**；
+ * 2026-11-25 实测：非管理员会话也能创建档案（旧假设"必须提权"不成立）。
+ */
+function probeAppContainer(helperPath) {
+  const result = spawnSync(helperPath, ["probe"], { encoding: "utf8", timeout: 30_000 });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
+  const hasProfile =
+    output.includes("appcontainer-created sid-present=true") ||
+    output.includes("appcontainer-existing sid-present=true");
+  const passed =
+    result.status === 0 && hasProfile && output.includes("job-created") && !output.includes("appcontainer-unavailable");
+  return { passed, output, exitCode: result.status };
+}
+
 /** 纯构造：给定探测值 ⇒ 平台化清单（导出给测试不可用时也可被脚本内联使用）。 */
 function buildPreconditionItems(probes) {
   const platform = probes.platform ?? process.platform;
@@ -173,12 +194,21 @@ function buildPreconditionItems(probes) {
             : "未找到 rustc/cargo：安装 Rust（含 MSVC 目标与 Windows SDK 链接器）需要用户授权",
       },
       {
-        itemIdentifier: "elevated-for-appcontainer",
-        status: probes.elevated === true ? "ok" : "blocked",
+        itemIdentifier: "appcontainer-availability",
+        /**
+         * 优先用 **helper probe 实测**（appcontainer-created + job-created）；
+         * 没跑 probe 时退回"提权代理判断"（保守），并明确说明这只是代理。
+         */
+        status:
+          probes.appContainerProbePassed === true || probes.elevated === true
+            ? "ok"
+            : "blocked",
         detail:
-          probes.elevated === true
-            ? "当前进程具有管理员权限（可预建 AppContainer 档案）"
-            : "非管理员：CreateAppContainerProfile 会返回 E_ACCESSDENIED；需在安装期预建档案或在提权会话中执行",
+          probes.appContainerProbePassed === true
+            ? "helper probe 实测通过：AppContainer 档案可创建/删除（sid-present=true）+ Job 可创建（本机非管理员亦可）"
+            : probes.elevated === true
+              ? "当前进程具有管理员权限（可预建 AppContainer 档案；未跑实测 probe）"
+              : "未跑实测 probe 且非管理员：旧假设认为 CreateAppContainerProfile 会返回 E_ACCESSDENIED；可加 --with-probe 获取实测证据",
       },
     );
   } else if (platform === "linux") {
@@ -206,7 +236,25 @@ function buildPreconditionItems(probes) {
 }
 
 const probesArgument = readProbesArgument();
-const recordBase = probesArgument ?? realProbes();
+const recordBase = { ...(probesArgument ?? realProbes()) };
+if (
+  process.argv.includes("--with-probe") &&
+  (probesArgument === null || probesArgument.appContainerProbePassed === undefined)
+) {
+  const helperPath = path.join(
+    repositoryRoot,
+    "native",
+    "sandbox-helper",
+    "sandbox-helper.exe",
+  );
+  if (existsSync(helperPath) && (recordBase.platform ?? process.platform) === "win32") {
+    const probe = probeAppContainer(helperPath);
+    recordBase.appContainerProbePassed = probe.passed;
+    if (!probe.passed) {
+      recordBase.appContainerProbeOutput = probe.output;
+    }
+  }
+}
 const items = buildPreconditionItems(recordBase);
 const blockers = items
   .filter((item) => item.status !== "ok")
@@ -224,8 +272,9 @@ const record = {
   items,
   readyForAcceptance: blockers.length === 0,
   blockers,
-  note:
-    "本检查只读：不执行受控进程、不安装工具链、不提权。readyForAcceptance=false 表示实测验收还不能开始，不代表产品缺陷。",
+  note: process.argv.includes("--with-probe")
+    ? "本检查不安装工具链、不提权；--with-probe 会执行一次 helper probe（创建并删除一个 AppContainer 档案 + 一个 Job，均即时回收）。readyForAcceptance=false 表示实测验收还不能开始，不代表产品缺陷。"
+    : "本检查只读：不执行受控进程、不安装工具链、不提权。readyForAcceptance=false 表示实测验收还不能开始，不代表产品缺陷。",
 };
 
 process.stdout.write(`${JSON.stringify(record, null, 2)}\n`);

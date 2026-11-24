@@ -297,10 +297,20 @@ export function interpretProbeOutput(probeOutput: string): SandboxCapabilityProf
         "AppContainer 档案不可建：" + unavailableLine.replace("appcontainer-unavailable", "").trim(),
     };
   }
+  /**
+   * 两种合法成功：
+   * - 本进程创建档案（需要提权）⇒ `appcontainer-created` + 删除成功；
+   * - 安装期已预建档案，本进程只派生 SID（运行期非管理员）⇒ `appcontainer-existing`。
+   *
+   * 删除失败**不再**单独判为不可用（档案可能是共享的安装期资产，或删除时序抖动）；
+   * 但"什么都没建、也没派生出 SID"必须判不可用（旧实现曾把这种情况谎报为可用）。
+   */
   const hasCreated = lines.some((line) => line.startsWith("appcontainer-created"));
   const hasDeleted = lines.some((line) => line.startsWith("appcontainer-deleted hresult=0x00000000"));
+  const hasExisting = lines.some((line) => line.startsWith("appcontainer-existing sid-present=true"));
   const hasJob = lines.some((line) => line === "job-created");
-  if (!hasCreated || !hasDeleted || !hasJob) {
+  const hasUsableProfile = (hasCreated && hasDeleted) || hasExisting;
+  if (!hasUsableProfile || !hasJob) {
     return {
       isAvailable: false,
       backendIdentifier: "sandbox-helper",

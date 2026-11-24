@@ -59,7 +59,7 @@ describe("B3/B6：验收前置检查的平台分支", () => {
       "node-version-supported",
       "sandbox-helper-built",
       "rust-toolchain",
-      "elevated-for-appcontainer",
+      "appcontainer-availability",
     ]);
     expect(record.items.filter((item) => item.status === "blocked")).toHaveLength(3);
   });
@@ -79,6 +79,48 @@ describe("B3/B6：验收前置检查的平台分支", () => {
     const record = parseRecord(stdout);
     expect(record.readyForAcceptance).toBe(true);
     expect(record.blockers).toEqual([]);
+  });
+
+  it("②b Windows：helper probe 实测通过 ⇒ 即使非管理员也可验收", () => {
+    const { status, stdout } = runScript(
+      {
+        platform: "win32",
+        architecture: "x64",
+        nodeVersion: "v26.13.1",
+        helperExists: true,
+        rustcVersion: "rustc 1.100.0",
+        cargoVersion: "cargo 1.100.0",
+        elevated: false,
+        appContainerProbePassed: true,
+      },
+      ["--strict"],
+    );
+    expect(status).toBe(0);
+    const record = parseRecord(stdout);
+    expect(record.readyForAcceptance).toBe(true);
+    const item = record.items.find(
+      (candidate) => candidate.itemIdentifier === "appcontainer-availability",
+    );
+    expect(item?.status).toBe("ok");
+  });
+
+  it("②c Windows：未跑 probe 且非管理员 ⇒ 仍 blocked（保守，不假设）", () => {
+    const { status, stdout } = runScript({
+      platform: "win32",
+      architecture: "x64",
+      nodeVersion: "v26.13.1",
+      helperExists: true,
+      rustcVersion: "rustc 1.100.0",
+      cargoVersion: "cargo 1.100.0",
+      elevated: false,
+    });
+    expect(status).toBe(0);
+    const record = parseRecord(stdout);
+    expect(record.readyForAcceptance).toBe(false);
+    expect(
+      record.items.find((candidate) => candidate.itemIdentifier === "appcontainer-availability")
+        ?.status,
+    ).toBe("blocked");
   });
 
   it("③ Linux：bwrap 与用户命名空间齐全 ⇒ ready；不要求 .exe", () => {

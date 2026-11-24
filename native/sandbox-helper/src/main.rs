@@ -417,14 +417,55 @@ fn run_probe() {
             derived_sid.is_null()
         );
     }
-    match ensure_app_container(&profile_name) {
-        Ok(sid) => {
-            println!("appcontainer-created sid-present={}", !sid.is_null());
-            let deleted = unsafe { DeleteAppContainerProfile(wide(&profile_name).as_ptr()) };
-            println!("appcontainer-deleted hresult=0x{:08X}", deleted as u32);
+    /**
+     * 探测必须区分两种"可用"，否则会**谎报**（2026-11-25 实测）：
+     *
+     * - `created`：档案是本进程刚建的（需要提权）⇒ 探测完要删除；
+     * - `existing`：档案由安装期（提权）预先建好，本进程只是**派生 SID**（运行期非管理员）
+     *   ⇒ **绝不删除**（那是安装期资产，删了会让后续运行不可用）。
+     *
+     * 旧实现把"创建失败但派生成功"也打印成 `appcontainer-created`，且删除失败仍以 0 退出，
+     * 导致上层把"根本没有档案、也建不了"误判为可用。
+     */
+    let name = wide(&profile_name);
+    let display = wide(&profile_name);
+    let description = wide("Astarray 受控执行沙箱");
+    let mut sid: *mut c_void = ptr::null_mut();
+    let create_result = unsafe {
+        CreateAppContainerProfile(
+            name.as_ptr(),
+            display.as_ptr(),
+            description.as_ptr(),
+            ptr::null(),
+            0,
+            &mut sid,
+        )
+    };
+    if create_result >= 0 {
+        println!("appcontainer-created sid-present={}", !sid.is_null());
+        let mut deleted = unsafe { DeleteAppContainerProfile(name.as_ptr()) };
+        let mut delete_attempts: u32 = 1;
+        while deleted != 0 && delete_attempts < 8 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            deleted = unsafe { DeleteAppContainerProfile(name.as_ptr()) };
+            delete_attempts += 1;
         }
-        Err(message) => {
-            println!("appcontainer-unavailable {message}");
+        println!(
+            "appcontainer-deleted hresult=0x{:08X} attempts={}",
+            deleted as u32, delete_attempts
+        );
+    } else {
+        /** 已存在（ERROR_ALREADY_EXISTS）或非管理员（E_ACCESSDENIED）⇒ 派生 SID。 */
+        let mut derived: *mut c_void = ptr::null_mut();
+        let derive_result =
+            unsafe { DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &mut derived) };
+        if derive_result >= 0 && !derived.is_null() {
+            println!("appcontainer-existing sid-present=true");
+        } else {
+            println!(
+                "appcontainer-unavailable CreateAppContainerProfile HRESULT=0x{:08X}，派生 SID 失败 HRESULT=0x{:08X}（非管理员且未做安装期初始化）",
+                create_result as u32, derive_result as u32
+            );
             std::process::exit(1);
         }
     }
@@ -454,6 +495,7 @@ fn run_probe() {
 fn run_init_sandbox(arguments: &[String]) {
     let mut profile_name = String::from("astarray-exec");
     let mut has_confirmation = false;
+    let mut recreate_profile = false;
     let mut index = 0;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -464,6 +506,11 @@ fn run_init_sandbox(arguments: &[String]) {
             "--profile" => {
                 profile_name = arguments.get(index + 1).cloned().unwrap_or(profile_name);
                 index += 2;
+            }
+            /** 安装期重建：先删掉**陈旧档案**再建（仅显式确认时使用）。 */
+            "--recreate" => {
+                recreate_profile = true;
+                index += 1;
             }
             other => {
                 eprintln!("未知参数: {other}");
@@ -477,6 +524,15 @@ fn run_init_sandbox(arguments: &[String]) {
         );
         eprintln!("说明：本步骤只需在安装期执行一次，运行期不需要管理员权限。");
         std::process::exit(2);
+    }
+    /**
+     * 陈旧档案：注册表里有、但 `%LOCALAPPDATA%\Packages\<profile>\Temp` 已被删掉。
+     * 这种档案**能派生 SID 却不能跑进程**（cwd 不可用 ⇒ CreateProcessW 错误 5）。
+     * 安装期允许显式 `--recreate` 重建它。
+     */
+    if recreate_profile {
+        let deleted = unsafe { DeleteAppContainerProfile(wide(&profile_name).as_ptr()) };
+        println!("profile-recreate-delete hresult=0x{:08X}", deleted as u32);
     }
     match ensure_app_container(&profile_name) {
         Ok(sid) => {

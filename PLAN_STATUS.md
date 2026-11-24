@@ -8149,3 +8149,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `scripts/build-sandbox-helper-linux-cross.sh`：Linux 上 `rustup target add x86_64-pc-windows-gnu` +
 >   mingw 链接器 + 静态 CRT，交叉编译出 `sandbox-helper.exe`（避免 Windows 本机下载 Rust/MSVC）。
 > - 本机 rustup/MSVC 下载过慢时的备选路径；CI 产物仍是首选。
+
+> **B3：Windows 实测推进（2026-11-25）**
+>
+> - 用户已装 Rust、构建 helper 并运行 probe（管理员）：`appcontainer-created/deleted` + `job-created` 全通过。
+> - 修正 probe 语义：区分 `appcontainer-created`（本进程建，需删）与 `appcontainer-existing`（安装期预建，只派生 SID，**不删**）；
+>   旧实现把"建不了但派生成功"谎报为 created，且删除失败仍退出 0。
+> - `--with-probe` 前置检查用实测证据替代"是否管理员"代理判断；本机实测：`readyForAcceptance=true`。
+> - 新增 `init-sandbox --recreate`：清理"注册表有档案、Packages 目录已删"的陈旧档案（该状态下 CreateProcessW 返回 5）。
+> - 新增真实执行验收测试 `exec01-02-sandbox-acceptance`（helper + 安装期档案齐备时才跑，否则跳过，不伪造通过）。
+> - 全量：**959 files（957 passed / 2 skipped），6082 tests（6076 passed / 6 skipped），EXIT=0**；`lint` 0。

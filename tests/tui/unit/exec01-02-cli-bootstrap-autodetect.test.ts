@@ -76,9 +76,16 @@ describe("EXEC-01-02 CLI 引导接线", () => {
         })
         .then(() => "started")
         .catch((error: unknown) => (error as Error).message);
-      expect(message).not.toBe("started");
+      /**
+       * 两种**都算接线成功**的诚实结果：
+       * - 本机没有可用组件 ⇒ 拒绝原因来自**探测**（不是"未装配"）；
+       * - 本机组件可用（helper + 安装期档案）⇒ 真的启动了（`started`）。
+       * 关键断言是"**不是未装配**"：探测开关已被引导层打开。
+       */
       expect(message).not.toContain("未装配");
-      expect(message).toContain("没有可用的隔离执行后端");
+      if (message !== "started") {
+        expect(message).toContain("没有可用的隔离执行后端");
+      }
     } finally {
       await runtime.shutdown().catch(() => undefined);
     }
