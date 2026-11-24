@@ -8175,3 +8175,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 普通会话：同一命令 → `CreateProcessW 失败: 5`；LPAC 实验 → `UpdateProcThreadAttribute` 返回 50（本机不支持）。
 > - 结论：**非提权父进程无法创建 AppContainer 子进程**；与"运行期非管理员"裁决冲突，需方案裁决（A 安装期 broker / B 会话级提权 / C 换原语 / D 维持 fail-closed）。
 > - 工作目录缺陷已修（`Packages\<profile>\AC\Temp`）；`--lpac` 作为实验开关保留并标注不支持。
+
+> **B6：Linux 全量门禁通过（2026-11-25，用户 Ubuntu 机）**
+>
+> - `npm test`：**959 files（956 passed / 3 skipped），6081 tests（6070 passed / 11–12 skipped）**，全绿；
+>   仅 Windows 专属用例被跳过（`runIf(win32)`）。
+> - `probeCapability` 实测：`bubblewrap` **isAvailable=true**（`--unshare-all` 探测通过）。
+> - 真实执行验收测试改为平台自适应：Linux（bwrap 可用）**默认运行**；Windows 仍显式 opt-in。
+> - 移除误提交的调试文件 `zz-debug-probe.test.ts`。
+> - 本机（Windows）门禁：958 files / 6081 tests EXIT=0；`lint` 0；隐私 `privacy-ok`。

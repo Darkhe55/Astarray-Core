@@ -1,7 +1,8 @@
 /**
- * EXEC-01-02 真实沙箱验收（2026-11-25，B3/B5 证据）。
+ * EXEC-01-02 真实沙箱验收（B3/B5 Windows helper；B6 Linux bubblewrap）。
  *
- * 只在 **helper 已构建** 的 Windows 主机上运行；其它平台/未构建时 **跳过**（不伪造通过）。
+ * - **Linux**：`bwrap` 可用即运行（bubblewrap 不需要提权；`--unshare-all` 探测通过才算可用）；
+ * - **Windows**：仅在 helper 已构建 + 安装期档案存在 + 显式 `ASTARRAY_SANDBOX_ACCEPTANCE=1` 时运行。
  *
  * 验三件事：
  * 1. 真实后端 probeCapability 判定可用；
@@ -10,6 +11,7 @@
  *
  * 纪律：不写仓库文件、不联网；工作目录用 os.tmpdir() 下的临时目录。
  */
+import { spawnSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { existsSync } from "node:fs";
 import os from "node:os";
@@ -17,9 +19,7 @@ import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import {
-  createPlatformSandboxExecutionBackend,
-} from "../../../packages/core/src/execution/platform-sandbox-backend.js";
+import { createPlatformSandboxExecutionBackend } from "../../../packages/core/src/execution/platform-sandbox-backend.js";
 import type { SandboxExecutionSnapshot } from "../../../packages/core/src/execution/process-execution-controller.js";
 import { buildProcessExecutionIdentity } from "../../../packages/core/src/execution/execution-contract.js";
 
@@ -27,26 +27,30 @@ vi.setConfig({ testTimeout: 120_000 });
 
 const helperPath = path.join(process.cwd(), "native", "sandbox-helper", "sandbox-helper.exe");
 /**
- * 真实执行还要求**安装期初始化**已做过：`%LOCALAPPDATA%\Packages\<profile>\Temp` 存在。
+ * Windows 真实执行还要求**安装期初始化**已做过：`%LOCALAPPDATA%\Packages\<profile>\AC` 存在。
  *
  * 只建了档案注册项、却删掉了 Packages 目录的"陈旧档案"能派生 SID，但 cwd 不可用
  * ⇒ CreateProcessW 返回 5（2026-11-25 实测）。这种环境**跳过真实执行**，不伪造通过。
+ *
+ * 另外平台事实（2026-11-25 对照实测）：**非提权父进程**创建 AppContainer 子进程会被拒
+ * （管理员会话成功、普通会话 Access Denied）。因此 Windows 侧必须显式 opt-in，
+ * 避免普通开发机/CI 因环境权限差异把门禁误染红；Linux（bubblewrap）不需要提权，默认可跑。
  */
-const profileTempDirectory =
+const profileDirectory =
   process.env.LOCALAPPDATA === undefined
     ? null
-    : path.join(process.env.LOCALAPPDATA, "Packages", "astarray-exec", "Temp");
-const isAcceptanceHost =
+    : path.join(process.env.LOCALAPPDATA, "Packages", "astarray-exec", "AC");
+const isWindowsAcceptanceHost =
   process.platform === "win32" &&
   existsSync(helperPath) &&
-  profileTempDirectory !== null &&
-  existsSync(profileTempDirectory) &&
-  /**
-   * **显式 opt-in**：真实 AppContainer 执行会依赖"安装期档案 + 调用方令牌"，
-   * 而普通 CI/开发机会因 `CreateProcessW` 返回 5 而红；这不是产品回归。
-   * 因此默认跳过，人工验收时设 `ASTARRAY_SANDBOX_ACCEPTANCE=1` 再跑。
-   */
+  profileDirectory !== null &&
+  existsSync(profileDirectory) &&
   process.env.ASTARRAY_SANDBOX_ACCEPTANCE === "1";
+
+const isLinuxBubblewrapAvailable =
+  process.platform === "linux" && spawnSync("bwrap", ["--version"], { encoding: "utf8" }).status === 0;
+
+const isAcceptanceHost = isWindowsAcceptanceHost || isLinuxBubblewrapAvailable;
 
 let workingDirectory: string;
 
@@ -99,7 +103,7 @@ async function waitForTerminal(
   }
 }
 
-describe.skipIf(!isAcceptanceHost)("EXEC-01-02 真实沙箱验收（Windows helper）", () => {
+describe.skipIf(!isAcceptanceHost)("EXEC-01-02 真实沙箱验收", () => {
   it("① 探测可用 + 真实执行回传成功（不是宿主直跑）", async () => {
     const backend = createPlatformSandboxExecutionBackend({
       applicationRootPath: process.cwd(),
