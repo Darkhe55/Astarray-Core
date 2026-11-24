@@ -7992,3 +7992,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 说明：新增测试文件需显式 `testTimeout`（架构守卫 RELIABILITY-01），已补。
 
 > **推送状态（2026-11-24 第 126 轮）**：`74cc7328` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **B9：session/config 命令分支（2026-11-24 第 127 轮）**
+>
+> - 新增 5 条：提升列表（空/文本/JSON）、创建提升、撤销（存在/不存在）、会话关闭（文本/JSON）、
+>   安装开关读写与 revision 单调。
+> - 全量：**944 files（942 passed / 2 skipped），6011 tests（6004 passed / 7 skipped），EXIT=0**；`lint` 0。
