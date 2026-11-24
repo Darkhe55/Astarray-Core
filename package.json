@@ -29,6 +29,7 @@
     "test:coverage": "vitest run --coverage",
     "verify:privacy": "node scripts/check-public-privacy.mjs",
     "verify:internal-user-walkthrough": "node scripts/internal-user-test-walkthrough.mjs",
+    "build:sandbox-helper": "node scripts/build-sandbox-helper.mjs",
     "check": "npm run verify:privacy && npm run typecheck && npm run lint && npm run build && npm run test",
     "check:low-parallel": "npm run verify:privacy && npm run typecheck && npm run lint && npm run build && vitest run --maxWorkers=2",
     "prepack": "npm run typecheck && npm run lint && npm run build && npm run test:serial",

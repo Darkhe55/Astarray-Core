@@ -8094,3 +8094,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 内部走查：`npm run verify:internal-user-walkthrough` **12/12 通过**（`gui` 按预期 fail-closed）。
 > - 阻塞不变：B3/B5（Rust/MSVC + 提权）、B6（Linux/macOS 设备）、B7（平台租户）、B8（人工验收）。
 > - 结论：**目标未完成**（B9 与外部条件项仍开放）；本轮不宣称完成，不调整阈值（阈值属用户裁决）。
+
+> **优先级调整：B3–B8 先做，B9 最后（2026-11-24）**
+>
+> - 新增 `scripts/build-sandbox-helper.mjs` + `npm run build:sandbox-helper`：只构建不安装；缺工具链时打印确切安装命令并退出 2。
+> - 新增 `docs/reports/B3_B8_UNBLOCK_ACTIONS_2026-11-24.md`：逐条列出 B3/B5/B6/B7/B8 的阻塞、你需要做的命令、以及解除后我接续的验收动作。
+> - 本机实测：`rustc/cargo/link/cl` 均缺失、会话非管理员 ⇒ B3 前置 `readyForAcceptance=false`（如实）。
