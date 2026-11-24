@@ -8299,3 +8299,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   安装期服务注册与 ACL 授予。**在完成这些之前，强档仍不得宣称可用**。
 
 > **推送状态（2026-11-25 第 151 轮）**：`c06ebc6b` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **RESUME-02 恢复包真实读取/扫描（2026-11-25，第 152 轮）**
+>
+> - `assembleContinuationPackFromDisk`：内容经注入的读取器从磁盘读取，**不信任调用方 excerpt**；
+>   注入扫描器在**注入前**扫描，命中即扣留（记 `withheldTaskIdentifiers`，不回填、不做"扫完照抄"）；
+>   扫描抛错 ⇒ `blocked/scan-failed`（不当作干净）；全部扣留 ⇒ `blocked/sensitive-content-withheld`；
+>   token 以字符/4 保守估算并标 `isTokenEstimate=true`；预算仍由原装配层执行（能读盘也不能绕过预算）。
+> - 6 条反例（真实读取、命中扣留、扫描失败、全扣留、读失败、预算不足）。
+> - 全量：**968 files（966 passed / 2 skipped），6142 tests（6136 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - RESUME-02 剩余：观测计数（下一轮）、真实 IM 适配器（B7 阻塞）、人工验收。

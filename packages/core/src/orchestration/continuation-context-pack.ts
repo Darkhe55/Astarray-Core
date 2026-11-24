@@ -166,3 +166,148 @@ export function assembleContinuationPack(
     securityConstraintCount,
   };
 }
+
+/**
+ * RESUME-02 补口（2026-11-25）：**真实内容读取 + 注入前扫描**的装配入口。
+ *
+ * 卡内要求："内容扫描与权限检查必须发生在实际注入前"。此处的纪律：
+ * - 内容来自磁盘（注入的读取器），**不信任调用方直接给的 excerpt**；
+ * - 扫描器报出敏感内容 ⇒ **该节点不回填**（留在磁盘、记入 `withheldTaskIdentifiers`），
+ *   不做"扫描后照抄"的假动作；
+ * - 扫描器抛错 ⇒ 整体 **blocked（scan-failed）**，不降级为"当作干净"；
+ * - 所有必要节点都被扣留 ⇒ `blocked/sensitive-content-withheld`（不静默拼一个空包）。
+ * - token 用"字符数/4"保守估算并标记 `isTokenEstimate=true`（没有 tokenizer）。
+ */
+export interface ContinuationDiskNode {
+  readonly taskIdentifier: string;
+  readonly revision: number;
+  readonly contentHash: string;
+  readonly filePath: string;
+  readonly isClosedOrIrrelevant: boolean;
+  readonly isCurrentPrerequisite: boolean;
+  readonly securityConstraints: readonly string[];
+}
+
+export interface ContinuationDiskScanFinding {
+  readonly ruleIdentifier: string;
+}
+
+export type ContinuationPackFromDiskResult =
+  | {
+      readonly kind: "assembled";
+      readonly pack: Extract<ContinuationPackResult, { kind: "assembled" }>;
+      /** 因敏感内容被扣留、只留在磁盘的节点。 */
+      readonly withheldTaskIdentifiers: readonly string[];
+      /** 读取失败、未参与装配的节点。 */
+      readonly unreadableTaskIdentifiers: readonly string[];
+    }
+  | {
+      readonly kind: "blocked";
+      readonly reasonCode:
+        | "scan-failed"
+        | "sensitive-content-withheld"
+        | "no-readable-nodes"
+        | "model-window-unknown"
+        | "budget-non-positive"
+        | "security-constraints-exceed-budget"
+        | "minimal-pack-exceeds-budget";
+      readonly detail: string;
+      readonly withheldTaskIdentifiers: readonly string[];
+      readonly unreadableTaskIdentifiers: readonly string[];
+    };
+
+function estimateTokensFromText(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function buildExcerpt(text: string, maximumCharacters = 600): string {
+  if (text.length <= maximumCharacters) return text;
+  return `${text.slice(0, maximumCharacters)}…（已截断，原文留磁盘）`;
+}
+
+export async function assembleContinuationPackFromDisk(input: {
+  readonly request: Omit<ContinuationPackRequest, "nodes" | "isTokenEstimate">;
+  readonly nodes: readonly ContinuationDiskNode[];
+  readonly readFile: (filePath: string) => Promise<string>;
+  readonly scan: (content: string) => Promise<readonly ContinuationDiskScanFinding[]>;
+}): Promise<ContinuationPackFromDiskResult> {
+  const withheldTaskIdentifiers: string[] = [];
+  const unreadableTaskIdentifiers: string[] = [];
+  const packNodes: ContinuationPackNode[] = [];
+
+  for (const node of input.nodes) {
+    let content: string;
+    try {
+      content = await input.readFile(node.filePath);
+    } catch {
+      unreadableTaskIdentifiers.push(node.taskIdentifier);
+      continue;
+    }
+    let findings: readonly ContinuationDiskScanFinding[];
+    try {
+      findings = await input.scan(content);
+    } catch (error) {
+      return {
+        kind: "blocked",
+        reasonCode: "scan-failed",
+        detail: `扫描失败，拒绝回填（不当作干净内容）：${(error as Error).message}`,
+        withheldTaskIdentifiers,
+        unreadableTaskIdentifiers,
+      };
+    }
+    if (findings.length > 0) {
+      withheldTaskIdentifiers.push(node.taskIdentifier);
+      continue;
+    }
+    packNodes.push({
+      taskIdentifier: node.taskIdentifier,
+      revision: node.revision,
+      contentHash: node.contentHash,
+      estimatedTokens: estimateTokensFromText(content),
+      isClosedOrIrrelevant: node.isClosedOrIrrelevant,
+      isCurrentPrerequisite: node.isCurrentPrerequisite,
+      securityConstraints: node.securityConstraints,
+      excerpt: buildExcerpt(content),
+    });
+  }
+
+  if (packNodes.length === 0) {
+    if (withheldTaskIdentifiers.length > 0) {
+      return {
+        kind: "blocked",
+        reasonCode: "sensitive-content-withheld",
+        detail: "所有候选节点的内容都被扫描规则扣留：不得用空包冒充恢复包。",
+        withheldTaskIdentifiers,
+        unreadableTaskIdentifiers,
+      };
+    }
+    return {
+      kind: "blocked",
+      reasonCode: "no-readable-nodes",
+      detail: "没有任何可读节点：无法装配恢复包。",
+      withheldTaskIdentifiers,
+      unreadableTaskIdentifiers,
+    };
+  }
+
+  const pack = assembleContinuationPack({
+    ...input.request,
+    nodes: packNodes,
+    isTokenEstimate: true,
+  });
+  if (pack.kind === "blocked") {
+    return {
+      kind: "blocked",
+      reasonCode: pack.reasonCode,
+      detail: pack.detail,
+      withheldTaskIdentifiers,
+      unreadableTaskIdentifiers,
+    };
+  }
+  return {
+    kind: "assembled",
+    pack,
+    withheldTaskIdentifiers,
+    unreadableTaskIdentifiers,
+  };
+}
