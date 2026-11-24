@@ -8113,3 +8113,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `--install` 才显式安装 apt 包；不写仓库、不联网下载凭据。
 > - 说明：`verify-exec01-03-preconditions.mjs` 目前是 Windows 口径（helper.exe/AppContainer），
 >   Linux 上会**误报**；下一步改为平台自适应（Linux 检查 bwrap 而非 .exe）。
+
+> **B3/B6 前置检查平台自适应（2026-11-24 第 141 轮）**
+>
+> - `verify-exec01-03-preconditions.mjs` 改为平台口径：Windows 查 helper/rustc/提权，Linux 查 bwrap/用户命名空间，macOS 如实未交付；
+>   新增 `--probes <json>` 使平台分支可确定性测试。
+> - 新增 6 条平台分支测试；全量：**957 files（955 passed / 2 skipped），6077 tests（6070 passed / 7 skipped），EXIT=0**；`lint` 0。
