@@ -8006,3 +8006,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**945 files（943 passed / 2 skipped），6018 tests（6011 passed / 7 skipped），EXIT=0**；`lint` 0。
 
 > **推送状态（2026-11-24 第 128 轮）**：`735c93e8` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **B9：goal-mode 只读入口分支（2026-11-24 第 129 轮）**
+>
+> - 新增 6 条：未知目标（exit 2）、空状态只读汇总（文本/JSON）、空判定记录、导出空路径拒绝、导出到文件。
+> - 全量：**946 files（943 passed / 1 failed / 2 skipped），6024 tests（6016 passed / 1 failed / 7 skipped）**；
+>   唯一失败为已知负载抖动 `b6r10-wait-for-task-terminal` ⑤（历史隔离复跑通过）；`lint` 0。
+
+> **推送状态（2026-11-24 第 129 轮）**：`4a7301a2` 3 次推送失败（网络不可达）；留待下次合并推送。
