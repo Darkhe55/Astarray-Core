@@ -8168,3 +8168,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 真实执行验收测试改为**显式 opt-in**（`ASTARRAY_SANDBOX_ACCEPTANCE=1`），避免普通门禁因环境差异误红。
 > - 下一步需在**管理员会话**复跑 `helper run` 对照：若管理员成功 ⇒ 调用方令牌权限问题；若同样 5 ⇒ 启动属性/结构问题。
 > - 全量：959 files / 6082 tests EXIT=0；`lint` 0。
+
+> **B3 决定性对照（2026-11-25）**
+>
+> - 管理员会话：`helper run … cmd /c echo` → `job-assigned` + 输出 + `exit-code 0`；
+> - 普通会话：同一命令 → `CreateProcessW 失败: 5`；LPAC 实验 → `UpdateProcThreadAttribute` 返回 50（本机不支持）。
+> - 结论：**非提权父进程无法创建 AppContainer 子进程**；与"运行期非管理员"裁决冲突，需方案裁决（A 安装期 broker / B 会话级提权 / C 换原语 / D 维持 fail-closed）。
+> - 工作目录缺陷已修（`Packages\<profile>\AC\Temp`）；`--lpac` 作为实验开关保留并标注不支持。

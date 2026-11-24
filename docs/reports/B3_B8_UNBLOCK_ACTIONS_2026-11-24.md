@@ -59,6 +59,31 @@ node scripts/verify-exec01-03-preconditions.mjs --strict
 - 跑 EXEC-01 验收（受控执行、资源上限、超时、输出扫描），把结果写进 EXEC-01 卡；
 - 若 probe 仍失败，我按输出分类排查（Job Object 半区可先用 `--no-appcontainer` 单独验证）。
 
+## 1.5 B3 实测结论（2026-11-25，用户机）
+
+| 会话 | `helper run ... cmd /c echo` | 结论 |
+|---|---|---|
+| **管理员** | `job-assigned` + 输出 + `exit-code 0` | AppContainer 进程创建成功 |
+| **普通用户** | `CreateProcessW 失败: 5`（ACCESS_DENIED） | 非提权父进程无法创建 AppContainer 子进程 |
+
+补充实验：尝试 LPAC（`--lpac`，退出 ALL APPLICATION PACKAGES）在普通会话下同样不可用
+（`UpdateProcThreadAttribute` 返回 **50 / ERROR_NOT_SUPPORTED**）。工作目录已修正为
+`%LOCALAPPDATA%\Packages\<profile>\AC\Temp`（并主动创建），排除"cwd 不可访问"这一假设。
+
+**这不再是代码缺陷，而是平台约束 + 产品裁决冲突**：
+
+- 裁决要求"客户端整体不提权、运行期非管理员"；
+- 但本机（Windows 10.0.26300）上，**非提权进程无法把子进程放进 AppContainer**。
+
+可选方案（需要你裁决）：
+
+| 方案 | 做法 | 代价 | 与既有裁决 |
+|---|---|---|---|
+| A. 安装期常驻 broker/service | 提权一次安装服务；普通会话经 IPC 请求它创建沙箱子进程 | 3–5 人日 + 安全评审 | **兼容**（运行期不提权） |
+| B. 会话级提权 broker | 用户每次会话手动起一个提权 helper 进程 | 0.5–1 人日 | 冲突（需显式同意"提权会话"） |
+| C. 换隔离原语 | 受限令牌 + Low IL + Job（不用 AppContainer） | 1–2 人日 | 冲突（隔离强度下降） |
+| D. 维持 fail-closed | 不实现非提权执行；如实拒绝 | 0 | 兼容，但 B3 长期 blocked |
+
 ## 2. B6：Linux / macOS 平台证据
 
 ### 卡在哪

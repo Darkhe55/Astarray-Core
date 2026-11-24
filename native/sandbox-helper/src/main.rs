@@ -196,6 +196,18 @@ extern "system" {
 const CREATE_SUSPENDED: Dword = 0x0000_0004;
 const EXTENDED_STARTUPINFO_PRESENT: Dword = 0x0008_0000;
 const PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES: usize = 0x0002_0009;
+/**
+ * LPAC（Less Privileged AppContainer）：从创建属性里**退出** "ALL APPLICATION PACKAGES"。
+ *
+ * 2026-11-25 实验：普通用户会话里带 SECURITY_CAPABILITIES 的 CreateProcessW 返回 5；
+ * Chrome 的 network service 用 LPAC 在非提权父进程下创建成功，故尝试同一路径。
+ * 取值：ProcThreadAttributeValue(27, FALSE, FALSE, FALSE) = 0x0002001B；
+ * 值 `PROCESS_CREATION_ALL_APPLICATION_PACKAGES_OPT_OUT = 1`。
+ */
+/** 实测（2026-11-25）：该属性是 ProcThreadAttributeValue(27, FALSE, FALSE, FALSE) = 0x1B，
+ *  不带 0x00020000（INPUT）位；写成 0x2001B 会得到 ERROR_GEN_FAILURE(31)。 */
+const PROC_THREAD_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY: usize = 0x0000_001B;
+const PROCESS_CREATION_ALL_APPLICATION_PACKAGES_OPT_OUT: Dword = 1;
 const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS: i32 = 9;
 const JOB_OBJECT_LIMIT_PROCESS_MEMORY: Dword = 0x0000_0100;
 const JOB_OBJECT_LIMIT_JOB_MEMORY: Dword = 0x0000_0200;
@@ -591,6 +603,7 @@ fn run_sandboxed(arguments: &[String]) {
      * 该开关让 Job Object 半区可以被独立、真实地验证（不是替代 AppContainer）。
      */
     let mut use_app_container = true;
+    let mut use_lpac = false;
     /** 诊断开关：传空属性列表（仍带 EXTENDED_STARTUPINFO），用于隔离"属性内容"与"标志本身"。 */
     let mut isEmptyAttributes = false;
     let mut index = 0;
@@ -625,6 +638,10 @@ fn run_sandboxed(arguments: &[String]) {
             }
             "--empty-attributes" => {
                 isEmptyAttributes = true;
+                index += 1;
+            }
+            "--lpac" => {
+                use_lpac = true;
                 index += 1;
             }
             "--no-appcontainer" => {
@@ -674,7 +691,7 @@ fn run_sandboxed(arguments: &[String]) {
         unsafe {
             InitializeProcThreadAttributeList(
                 ptr::null_mut(),
-                if isEmptyAttributes { 0 } else { 1 },
+                if isEmptyAttributes { 0 } else if use_lpac { 2 } else { 1 },
                 0,
                 &mut attribute_size,
             );
@@ -685,7 +702,7 @@ fn run_sandboxed(arguments: &[String]) {
         if unsafe {
             InitializeProcThreadAttributeList(
                 attribute_list,
-                if isEmptyAttributes { 0 } else { 1 },
+                if isEmptyAttributes { 0 } else if use_lpac { 2 } else { 1 },
                 0,
                 &mut attribute_size,
             )
@@ -712,6 +729,25 @@ fn run_sandboxed(arguments: &[String]) {
         if update_ok == 0 {
             eprintln!("UpdateProcThreadAttribute 失败: {}", unsafe { GetLastError() });
             std::process::exit(3);
+        }
+        if use_lpac {
+            let mut all_application_packages_policy: Dword =
+                PROCESS_CREATION_ALL_APPLICATION_PACKAGES_OPT_OUT;
+            let lpac_ok = unsafe {
+                UpdateProcThreadAttribute(
+                    attribute_list,
+                    0,
+                    PROC_THREAD_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY,
+                    &mut all_application_packages_policy as *mut _ as *const c_void,
+                    std::mem::size_of::<Dword>(),
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                )
+            };
+            if lpac_ok == 0 {
+                eprintln!("UpdateProcThreadAttribute(LPAC) 失败: {}", unsafe { GetLastError() });
+                std::process::exit(3);
+            }
         }
     }
 
