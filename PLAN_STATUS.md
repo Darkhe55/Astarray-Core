@@ -8061,3 +8061,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 4 条：提案 JSON 解析失败（exit 2）、合法提案生成 proposal（JSON/文本）、
 >   未显式 --yes 拒绝确认（exit 2）、确认不存在提案响亮失败。
 > - 全量：**953 files（951 passed / 2 skipped），6057 tests（6050 passed / 7 skipped），EXIT=0**；`lint` 0。
+
+> **B9：任务台账写入拒绝路径（2026-11-24 第 137 轮）**
+>
+> - 新增 4 条：写回缺索引（JSON exit 2）、绑定缺索引（文本 exit 2）、绑定显式索引但 mission 不存在（响亮失败）、
+>   写回显式索引但序列/mission 不存在（响亮失败）。
+> - 全量：**954 files（952 passed / 2 skipped），6061 tests（6054 passed / 7 skipped），EXIT=0**；`lint` 0。
