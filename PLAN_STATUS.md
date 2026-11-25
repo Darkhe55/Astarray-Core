@@ -8682,3 +8682,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   此前两轮 flaky 已修复，覆盖率跑无失败。
 > - 新增 5 条：触发矩阵（成功/未尝试/进行中不保全；网络失败与其他失败保全）、同步成功不建保全点、
 >   空目录 list 与缺失点读取报错、清单非法 JSON/哈希不符 fail-closed、list 跳过 .tmp- 与损坏目录。
+
+> **B9：任务序列控制器守卫（2026-11-25，第 196 轮）**
+>
+> - 新增 6 条：actor 越权拒绝（用户来源允许）、重复发布序列拒绝、publishOrInsert 首建与幂等、
+>   claim 一次成功/二次拒绝且节点转 running、非法目标状态拒绝、未知序列快照不伪造节点。
+> - 契约观察：`firstTask.externalReference` 必填且非空；`claimTask` 返回 boolean（非对象）；`transitionTaskStatus` 对非法状态抛错。
+> - 覆盖率待下轮统一测量（当前 83.00%）。
