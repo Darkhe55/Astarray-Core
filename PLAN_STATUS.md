@@ -8703,3 +8703,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   但实现会把 `*` 条目一并删除（单任务删除会连带丢掉整 mission 映射）——
 >   已改为：输入为 `*` 直接返回 0；且永不删除 `missionTaskIdentifier === "*"` 的条目。
 > - 回归：既有 `mission-task-sequence-map.test.ts` 4 条通过。
+
+> **B9：目标↔mission 绑定存储（2026-11-25，第 199 轮）**
+>
+> - 新增 5 条：缺标识拒绝、绑定幂等、改绑拒绝（须先解绑）、解绑未知 false/已知 true、未知读取 null 与缺 bindings 文档为空。
+> - 观察（未改）：`GoalMissionBindingStore.read` 不像 map store 那样逐条校验，条目字段缺失会原样返回；
+>   当前调用方只按 `missionIdentifier` 查询，风险有限，记为后续硬化项。
+> - 下一步：最终全量覆盖率 + `npm test` 门禁 + B9 终稿。
