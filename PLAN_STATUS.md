@@ -8689,3 +8689,8 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   claim 一次成功/二次拒绝且节点转 running、非法目标状态拒绝、未知序列快照不伪造节点。
 > - 契约观察：`firstTask.externalReference` 必填且非空；`claimTask` 返回 boolean（非对象）；`transitionTaskStatus` 对非法状态抛错。
 > - 覆盖率待下轮统一测量（当前 83.00%）。
+
+> **B9：推迟插入队列 + 覆盖率达 83.01%（2026-11-25，第 197 轮）**
+>
+> - 覆盖率：分支 **83.00% → 83.01%**；语句 90.34%、函数 91.17%、行 90.76%；6357 tests（6351 passed / 6 skipped），无失败。
+> - 新增 5 条：缺标识拒绝、同请求幂等/异任务冲突、按 mission 过滤、未知消费 false/已知消费移出、消费历史有界并累计丢弃计数。
