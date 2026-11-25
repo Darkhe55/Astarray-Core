@@ -8460,3 +8460,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 如实结论：小文件边际收益低；后续必须按**函数级**缺口集中补 `main-controller` / `cli/commands` / `runtime` / `sdk`。
 
 > **推送状态（2026-11-25 第 166 轮）**：`bae4c3cd` 3 次推送失败（网络不可达）；留待下次合并推送。
+
+> **B9：CLI 参数校验补测 + 策略调整（2026-11-25，第 167 轮）**
+>
+> - 新增 7 条 CLI 校验/幂等分支（usage/perf 的 --detail、usage --page-size、doctor-errors 时间/分页、
+>   guide-change 空文本/非法意图、config-init 备份后覆盖、summary-show 缺失源）。
+> - 覆盖率：分支 **82.23% → 82.25%**（≈+5 条）；语句 89.36%、函数 89.58%、行 89.76%。
+> - **策略结论（如实）**：参数校验类分支单条收益约 1 条/用例，无法在剩余轮次内补 680 条。
+>   下一阶段改为**生命周期 E2E**（完整 mission 的成功/失败/取消/恢复/裁决各跑一遍）——
+>   一次可同时覆盖 `main-controller` / `application-runtime` / `public-sdk` 数十至上百条分支。
