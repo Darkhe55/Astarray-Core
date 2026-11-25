@@ -8562,3 +8562,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   doctor 同时统计损坏 mission / 活动租约 / 过期租约并判 failed（commands 318–321、401）。
 > - 断言：退出码 1 + 拒绝原因含"其他进程"；doctor JSON 的 corruptedCount/activeLeaseCount/staleLeaseCount 均 ≥1。
 > - 覆盖率待下轮统一测量（当前 82.69%）。
+
+> **B9：recover show/list 存在分支 + 覆盖率（2026-11-25，第 180 轮）**
+>
+> - 覆盖率：分支 **82.69% → 82.80%**（≈+28 条）；语句 90.2%、函数 91.15%、行 90.61%。
+> - 新增 3 条：recover show 存在 mission 的文本/JSON 输出、recover list 存在 mission 的文本/JSON。
+> - 下一批继续按行级补 `main-controller` 深层分支（陈旧 revision 有界重试、权限组合判定）。
