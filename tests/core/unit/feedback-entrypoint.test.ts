@@ -593,7 +593,11 @@ describe("runFeedbackProcessEntry（进程内 FakeParent）", () => {
       "scheduler-1.json",
     );
     await fs.writeFile(journalFilePath, "{ 损坏", "utf8");
-    const deadline = Date.now() + 6_000;
+    /**
+     * 2026-11-25：重试间隔固定 5 秒；原先 6 秒窗口在全量并行负载下过窄（定时器回调被挤后
+     * 偶尔落到 6 秒之外）。放宽到 10 秒只吸收调度抖动，不改变"必须记录投递失败"的断言。
+     */
+    const deadline = Date.now() + 10_000;
     while (stderrLines.length === 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }

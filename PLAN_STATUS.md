@@ -8327,3 +8327,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 6 条反例（度量、账本累加、重复判定、换 revision/换个体不重复、快照不含正文、空 payload 不抛错）。
 > - 全量：**970 files（968 passed / 2 skipped），6156 tests（6150 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - COORD-05 剩余：秘书激活状态与投递器的真实宿主实现（需产品/宿主接线）、整卡三路径运行时端到端。
+
+> **WIRING-04-02 投递回执顺序（2026-11-25，第 155 轮）**
+>
+> - 修真实缺陷：`entrypoint.deliverToAgent` 原先**先 markDelivered 再 sendToParent**，两步之间崩溃 ⇒ 消息记为已投递却从未送达且不再重试（丢消息）。
+>   现改为 `deliverThenRecordReceipt`：投递成功后才写回执；投递抛错不写（交工作者重试）；回执写失败向上抛（消息已送达，可能重投，接收端按 messageId 去重）。
+> - 反例 4 条（顺序、投递失败不写、回执失败上抛、只写一次）。
+> - 顺带修正一处过窄测试窗口（`feedback-entrypoint` 损坏重试等待 6s→10s，只吸收并行负载抖动，不放松断言）。
+> - 全量：**971 files（969 passed / 2 skipped），6160 tests（6154 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - WIRING-04 剩余：02 适配器侧生命周期（anthropic 运行时未发布 prepared/dispatched/acknowledged）、03 完成门禁生产版本来源、04 映射读取、05 关闭节点回访/整链。

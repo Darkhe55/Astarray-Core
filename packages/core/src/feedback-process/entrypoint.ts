@@ -9,6 +9,7 @@ import {
 } from "../core/types.js";
 import type { AgentStatus, FeedbackMessage, TransportHealth } from "../core/types.js";
 import { feedbackMessageSchema } from "../core/schemas.js";
+import { deliverThenRecordReceipt } from "./delivery-receipt.js";
 import { DeliveryWorker } from "./delivery-worker.js";
 import { createInProjectReplyRoutingGuard } from "../orchestration/in-project-reply-routing-guard.js";
 import { CommDeliveredMessageStore } from "../orchestration/comm-delivered-message-store.js";
@@ -337,13 +338,26 @@ export function runFeedbackProcessEntry(
         replayDedupeStore,
       });
       journal = createdJournal;
+      /**
+       * WIRING-04-02 修正（2026-11-25）：**先投递、后写回执**。
+       *
+       * 原顺序是先 markDelivered 再 sendToParent：两步之间崩溃 ⇒ 消息被记为已投递却从未送达，
+       * 且不会再重试（丢消息）。现改为投递成功后才写回执；投递抛错则不写，交由工作者重试。
+       * 回执写失败时消息已送达但未标记 ⇒ 可能重投，接收端按 messageId 去重（既有 replay 去重）。
+       */
       const deliverToAgent = async (journaledMessage: JournaledMessage) => {
-        await journal?.markDelivered(
-          journaledMessage.recipientId,
-          journaledMessage.messageId,
-          new Date().toISOString(),
-        );
-        sendToParent({ type: "deliver", message: journaledMessage });
+        await deliverThenRecordReceipt({
+          dispatch: () => {
+            sendToParent({ type: "deliver", message: journaledMessage });
+          },
+          recordReceipt: async () => {
+            await journal?.markDelivered(
+              journaledMessage.recipientId,
+              journaledMessage.messageId,
+              new Date().toISOString(),
+            );
+          },
+        });
       };
       const getRecipientStatus = (recipientId: string): AgentStatus =>
         statuses.get(recipientId) ?? "idle";
