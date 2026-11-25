@@ -8725,3 +8725,21 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   最终数字（分支 83.05%）、推进轨迹、**4 个真实缺陷/漂移修复**、≈460 槽位缺口分布、
 >   未达标的量化原因与四条可选路径。
 > - 结论：**85% 未达标**；不做虚假完成声明。
+
+> **收尾总览（2026-11-26，第 200 轮，goal 轮次用尽）**
+>
+> **最终门禁**：`npm test` 1015 files / 6373 tests 全过；`test:coverage` 分支 **83.05%**（未达 85%）；
+> `test:scripts` 51/51；`typecheck`/`lint` 0；隐私 `privacy-ok`；`origin/main = 6576c664`。
+>
+> **已完成（本地可交付）**：EXEC-01 Windows 沙箱（E 方案两档：AppContainer 强档 + 受限令牌/Low IL 弱档、broker 命名管道、失败映射、真实拒绝降级）；
+> EXEC-01 Linux bwrap（含 out-of-tree 可执行 ro-bind，真机 2 passed）；WIRING-04 全部（05 回访块、03 受信信封、04 固定版本、投递回执/生命周期、
+> **方案 ③ 端到端载荷证据**）；COORD-05 本地部分（payload 统计、秘书激活/投递主机、消费对账）；RESUME-02；MERGE-01；GUI/CLI 只读入口与校验；
+> 真实缺陷 4 项（参数授权校验器、mission 任务映射通配、scripts fixture 漂移、3 个 flaky 测试）。
+>
+> **未完成（外部前置，已如实记录）**：
+> - **B3 强档提权**：需管理员会话做安装期服务注册/ACL 授予；
+> - **B7 REMOTE-01**：等平台方提供测试租户、签名算法+测试向量、回执 API、限流语义、凭据注入方式（清单见 `docs/reports/B7_PLATFORM_INPUTS_2026-11-25.md`）；
+> - **B8**：需人工走查/签收与私有 UI 构建；
+> - **B9 覆盖率**：**83.05% < 85%**，结论与可选路径见 `docs/reports/B9_COVERAGE_STATUS_2026-11-25.md`。
+>
+> **结论**：本轮次内不再有可独立推进的本地分项；以上四项均为明确的阻塞点或未达标项，不做虚假完成声明。
