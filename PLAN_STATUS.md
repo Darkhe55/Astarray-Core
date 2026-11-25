@@ -8346,3 +8346,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 全量：**972 files（970 passed / 2 skipped），6164 tests（6158 passed / 6 skipped），EXIT=0**；`lint` 0。
 
 > **推送状态（2026-11-25 第 156 轮）**：`ef250386` 3 次推送失败（网络不可达/reset）；留待下次合并推送。
+
+> **WIRING-04-03 受信信封盖章（2026-11-25，第 157 轮）**
+>
+> - 新增 `trusted-feedback-envelope.ts`：信封字段**只**取自受信执行登记；载荷自报字段仅用于一致性核对，
+>   不一致即拒绝（`draft-claims-mismatch`）；登记缺 source/project/taskRevision/executionAttempt ⇒ 拒绝且不补默认值
+>   （尤其不把 attempt 补成 1）。输出信封不含任何模型可写字段。
+> - 6 条反例（无自报、来源不符、旧 revision/attempt、串项目、登记缺字段、自报一致仍以登记为准）。
+> - 全量：**973 files（971 passed / 2 skipped），6170 tests（6164 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - 上一轮 `8653e695` 推送曾失败；本轮随新提交一并重试。
+
+> **推送状态（2026-11-25 第 157 轮）**：`bd703d11`（含上一轮 `8653e695`）3 次推送失败（网络 reset/不可达）；留待下次合并推送。
