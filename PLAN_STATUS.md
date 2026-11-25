@@ -8598,3 +8598,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   ② 正常文档的 `perToolRulesEnabled` 校验永远不执行（非法布尔值可被保存）。
 >   已改为先判空返回，再校验 perToolRulesEnabled。
 > - 门禁：typecheck 0、lint 0；覆盖率待下轮统一测量（当前 82.81%）。
+
+> **B9：跨项目访问目标校验（2026-11-25，第 185 轮）**
+>
+> - 新增 4 条：同一文件放行并返回解析路径、声明与实际不是同一文件拒绝（access-target-mismatch）、
+>   同一不存在路径按"最近存在祖先+剩余段"规范化后放行（由后续读取失败）、声明存在但实际不存在 ⇒ 拒绝。
+> - 该函数是 SDK 入口的"先自证再 I/O"护栏，直接覆盖 `cross-project-authorization-store.ts` 150–190 行分支。
+> - 门禁：typecheck 0、lint 0、隐私 ok。
