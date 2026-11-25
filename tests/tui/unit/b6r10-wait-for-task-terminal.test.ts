@@ -64,9 +64,10 @@ describe("B6R-10：waitForTaskTerminal 的等待契约", () => {
 
   it("⑤ 给了上限且耗尽仍在跑 ⇒ 返回 running（如实报未完成，不假装 done）", async () => {
     const fake = buildFakeApplication(["running"]);
+    /** 覆盖率插桩/并行负载下 20ms 上限可能连第二次轮询都来不及；提高上限但保持同一契约。 */
     const status = await waitForTaskTerminal(fake.application, "s", "t", {
-      timeoutMilliseconds: 20,
-      pollIntervalMilliseconds: 2,
+      timeoutMilliseconds: 200,
+      pollIntervalMilliseconds: 3,
     });
     expect(status).toBe("running");
     expect(fake.getQueryCount()).toBeGreaterThan(1);

@@ -8659,3 +8659,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   同项目无传输仍 sent 且标记投递结果、同 requestIdentifier 幂等为 duplicate 且复用 messageIdentifier。
 > - 覆盖 `collaboration-request-service.ts`（31 个未覆盖槽位）的拒绝与幂等分支。
 > - 门禁：typecheck 0、lint 0、隐私 ok；覆盖率待下轮统一测量。
+
+> **B9：会话身份存储 + 修 flaky 测试（2026-11-25，第 193 轮）**
+>
+> - 新增 6 条：派生标识识别、显式开会话幂等/换主个体冲突、未登记/已关闭拒绝 beginRun、
+>   同 mission 重放复用 run、运行记录有界并累计 dropped、文档损坏 fail-closed。
+> - **修复 flaky**：`b6r10-wait-for-task-terminal` ⑤ 在覆盖率插桩 + 并行负载下 20ms 上限可能来不及第二次轮询；
+>   上限提高到 200ms、间隔 3ms，**契约不变**（给上限且耗尽仍跑 ⇒ running）。全量覆盖率跑已复现一次，隔离跑通过。
+> - 覆盖率测量因该 flaky 中断（1 failed），下轮重测。
