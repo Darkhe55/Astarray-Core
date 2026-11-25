@@ -8392,3 +8392,17 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   无映射⇒mapping-missing；回访块按任务隔离。
 > - 全量：**977 files（975 passed / 2 skipped），6193 tests（6187 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - 仍未完成（如实单列）：真实模型请求载荷端到端（假 Provider 装配）、原子提交单元、真实双进程接管。
+
+> **WIRING-04 整链验收：确认阻塞点（2026-11-25，第 162 轮）**
+>
+> 尝试用本地假 Provider 跑"生产入口 → 请求载荷"端到端，**确认为装配缝隙而非产品缺陷**：
+>
+> - `submitTask` 只接受 session/taskIdentifier/prompt 等，**mission 标识由运行时内部生成**，调用方无法预知；
+> - 而 `missionRelationIndexStore` 的精确映射/序列关联必须在提交前写入（提交后运行时已用 relation 解析）；
+> - 现有公共选项也没有"预置 mission 关系/映射"的入口 ⇒ 端到端测试**无法在生产入口下稳定播种**。
+>
+> 结论：整链验收需要一个**显式测试缝**（三选一）：① 允许 `submitTask` 指定 mission；② 允许注入预置 relation/map 的运行时选项；
+> ③ 提供"任务创建后、首次 provider 请求前"的钩子。**未获裁决前不伪造 E2E**，组件级证据（真实存储 + 固定版本 + 回访块）
+> 已单独记录在 `wiring04-chain-real-stores`。
+>
+> 该阻塞不影响已交付能力（WIRING-04 01–05 主体均绿），只影响"整卡 done"的端到端证据口径。
