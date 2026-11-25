@@ -8568,3 +8568,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 覆盖率：分支 **82.69% → 82.80%**（≈+28 条）；语句 90.2%、函数 91.15%、行 90.61%。
 > - 新增 3 条：recover show 存在 mission 的文本/JSON 输出、recover list 存在 mission 的文本/JSON。
 > - 下一批继续按行级补 `main-controller` 深层分支（陈旧 revision 有界重试、权限组合判定）。
+
+> **B9：CLI 取消/续接分支（2026-11-25，第 181 轮）**
+>
+> - 新增 2 条：存在的 mission 取消（文本 + JSON 成功路径）、已完成的 mission 续接（`already-complete`，不再派发）。
+> - 覆盖 `commands.ts` 174/232/237 等此前仅走到"mission 不存在"的守卫分支的另一侧。
+> - 覆盖率待下轮统一测量（当前 82.80%）。
