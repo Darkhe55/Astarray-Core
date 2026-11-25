@@ -8442,3 +8442,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   首个请求体包含 `[上下文包]`，且选定正文**只出现 1 次**（防止两处重复注入）。
 > - 全量：**979 files（977 passed / 2 skipped），6201 tests（6195 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - WIRING-04 整卡在"生产入口 → 请求载荷"维度取得端到端证据；仍单列：原子提交单元、真实双进程接管。
+
+> **裁决落地：macOS 不立项 + B7 资料清单（2026-11-25）**
+>
+> - macOS：用户裁决**不立项**。EXEC-01 平台矩阵改为"首版支持 Windows + Linux；macOS 暂不支持"，
+>   不实现 App Sandbox 后端；B6 的 macOS 项随之关闭为"已裁决"。
+> - B7：新增 [`B7_PLATFORM_INPUTS_2026-11-25.md`](docs/reports/B7_PLATFORM_INPUTS_2026-11-25.md)，
+>   逐项列出测试租户、签名算法+测试向量、回执 API、限流/重试语义、凭据注入方式（含格式与验收口径）。
+> - B9：维持 85% 门槛不降；继续按 `report-coverage-gaps` 补分支（当前 82.16%）。

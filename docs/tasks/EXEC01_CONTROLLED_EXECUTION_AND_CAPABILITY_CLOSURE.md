@@ -273,7 +273,7 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 非提权降级档，网络不封、强度更弱）。详见
 `docs/reports/EXEC01_02_B1_WINDOWS_SANDBOX_VERIFICATION_2026-11-09.md` §4。
 
-**仍未验证**：macOS（App Sandbox）—— 本机与现有设备均无 macOS 环境。
+**macOS：用户裁决不立项（2026-11-25）** —— 首版对外口径为"支持 Windows + Linux；macOS 暂不支持"，不实现 App Sandbox 后端；安装前如实提示不支持（不得以"请自行安装依赖"代替）。
 
 **Linux（bubblewrap）已验收（2026-11-25，Ubuntu 22.04 VM，`8f1eaab6`）**：
 
