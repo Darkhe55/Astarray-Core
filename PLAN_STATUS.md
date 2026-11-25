@@ -8424,3 +8424,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   ① 真实执行回传成功（非宿主直跑）② 800ms 超时由执行层真实终止并落 `timed-out`（813ms）。
 > - 前置 `verify-exec01-03-preconditions --strict`：ready=true、blockers=[]、bwrap 0.9.0、非特权 user namespace 可用。
 > - 结论：**B6 的 Linux 证据闭环**（EXEC-01 平台矩阵已更新）；B6 仅剩 macOS（无后端实现，需产品决定）。
+
+> **B9 覆盖缺口报告工具（2026-11-25，第 164 轮）**
+>
+> - 新增 `scripts/report-coverage-gaps.mjs`（只读）：读取 `coverage/coverage-final.json`，
+>   按文件汇总未覆盖分支槽位；`--file <子串>` 输出行级缺口。用于把补测预算放到杠杆最大处。
+> - 实测：全仓未覆盖分支槽位 **4465**；Top：`main-controller` 404、`cli/commands` 314、
+>   `application-runtime` 312、`public-sdk` 297；`commands.ts` 行级缺口含 `142`(4)、`318`(4)、
+>   `3406/3407`(4+4)、`3865`(4)、`401`(3)。
+> - 门禁：`lint` 0；隐私 `privacy-ok`；本轮仅新增只读脚本与文档，不改运行行为。
