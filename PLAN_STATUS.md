@@ -8357,3 +8357,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 上一轮 `8653e695` 推送曾失败；本轮随新提交一并重试。
 
 > **推送状态（2026-11-25 第 157 轮）**：`bd703d11`（含上一轮 `8653e695`）3 次推送失败（网络 reset/不可达）；留待下次合并推送。
+
+> **WIRING-04-04 固定版本读取（2026-11-25，第 158 轮）**
+>
+> - `resolveContextPackForMissionTask` 支持 `pinnedRevision` + `expectedContentHash`：
+>   旧版本经**不可变版本存储**读取；读不到 ⇒ `declared-but-missing`（必要输入 blocked，不自动换最新）；
+>   哈希不符 ⇒ blocked；`pinnedRevision=0` ⇒ 拒绝；最新版前进只给 `revisionAdvancedNotice`，**仍用固定旧版本**。
+> - 端口新增可选 `readSequenceTaskAtRevision`（未提供时请求旧版本即 blocked，不静默用最新）。
+> - 7 条反例；全量：**974 files（972 passed / 2 skipped），6177 tests（6171 passed / 6 skipped），EXIT=0**；`lint` 0。

@@ -32,6 +32,18 @@ export interface ContextPackResolutionPort {
     readonly sequenceOwnerAgentInstanceIdentifier: string;
     readonly sequenceTaskIdentifier: string;
   }): Promise<{ readonly contextPack: ContextPack | null; readonly revision: number } | null>;
+  /**
+   * WIRING-04-04（2026-11-25）：**按固定 revision 读取历史版本**（不可变版本对象）。
+   *
+   * 缺省未提供 ⇒ 无法读取旧版本：请求固定旧版本时按"必要输入不可得"阻塞，
+   * 而不是悄悄换成最新版。
+   */
+  readSequenceTaskAtRevision?(input: {
+    readonly sequenceIdentifier: string;
+    readonly sequenceOwnerAgentInstanceIdentifier: string;
+    readonly sequenceTaskIdentifier: string;
+    readonly revision: number;
+  }): Promise<{ readonly contextPack: ContextPack | null; readonly revision: number } | null>;
 }
 
 /**
@@ -158,6 +170,8 @@ export type ContextPackResolution =
       readonly pack: ContextPack;
       readonly revision: number;
       readonly contentHash: string;
+      /** 固定版本比最新版旧时的**提示**（不自动换版本、不因此拒绝）。 */
+      readonly revisionAdvancedNotice?: string | null;
     }
   | { readonly kind: "mapping-missing"; readonly reason: string }
   | { readonly kind: "declared-but-missing"; readonly reason: string };
@@ -186,6 +200,16 @@ export async function resolveContextPackForMissionTask(input: {
   readonly sequenceIdentifier: string;
   readonly sequenceOwnerAgentInstanceIdentifier: string;
   readonly port: ContextPackResolutionPort;
+  /**
+   * WIRING-04-04：固定的包版本与内容哈希（当前任务包/声明的依赖包都必须固定）。
+   *
+   * - `pinnedRevision` 缺省 ⇒ 用最新 revision（保持既有行为）；
+   * - 显式给 0 ⇒ **拒绝**（卡内禁止 `pinnedRevision=0` 占位）；
+   * - 旧版本读不到 ⇒ `declared-but-missing`（必要输入 blocked，不自动换最新）；
+   * - 最新版已前进 ⇒ `revisionAdvancedNotice` 提示，但**仍用固定旧版本**。
+   */
+  readonly pinnedRevision?: number | null;
+  readonly expectedContentHash?: string | null;
 }): Promise<ContextPackResolution> {
   const binding = await input.port.findExactBinding({
     missionIdentifier: input.missionIdentifier,
@@ -213,6 +237,57 @@ export async function resolveContextPackForMissionTask(input: {
   }
   if (sequenceTask.contextPack === null) {
     return { kind: "no-pack-declared" };
+  }
+  /**
+   * 固定旧版本：必须经由不可变版本存储读取；读不到即阻塞，不悄悄换最新版。
+   */
+  if (input.pinnedRevision !== undefined && input.pinnedRevision !== null) {
+    if (!Number.isInteger(input.pinnedRevision) || input.pinnedRevision <= 0) {
+      return {
+        kind: "declared-but-missing",
+        reason: "pinnedRevision 必须是正整数（禁止用 0 占位）。",
+      };
+    }
+    if (input.port.readSequenceTaskAtRevision === undefined) {
+      return {
+        kind: "declared-but-missing",
+        reason: "请求固定旧版本，但解析端口未提供历史版本读取：必要输入不可得（不自动换最新版）。",
+      };
+    }
+    const pinned = await input.port.readSequenceTaskAtRevision({
+      sequenceIdentifier: input.sequenceIdentifier,
+      sequenceOwnerAgentInstanceIdentifier: input.sequenceOwnerAgentInstanceIdentifier,
+      sequenceTaskIdentifier: binding.sequenceTaskIdentifier,
+      revision: input.pinnedRevision,
+    });
+    if (pinned === null || pinned.contextPack === null) {
+      return {
+        kind: "declared-but-missing",
+        reason: `固定版本 revision=${String(input.pinnedRevision)} 不存在或没有包内容（不自动换最新版）。`,
+      };
+    }
+    const pinnedHash = computeContextPackContentHash(pinned.contextPack);
+    if (
+      input.expectedContentHash !== undefined &&
+      input.expectedContentHash !== null &&
+      input.expectedContentHash !== pinnedHash
+    ) {
+      return {
+        kind: "declared-but-missing",
+        reason: `固定版本内容哈希不符（期望 ${input.expectedContentHash}，实得 ${pinnedHash}）：必要输入 blocked。`,
+      };
+    }
+    const latestRevision = sequenceTask.revision;
+    return {
+      kind: "pack",
+      pack: pinned.contextPack,
+      revision: input.pinnedRevision,
+      contentHash: pinnedHash,
+      revisionAdvancedNotice:
+        latestRevision > input.pinnedRevision
+          ? `最新 revision=${String(latestRevision)} 已前进；本次仍使用固定 revision=${String(input.pinnedRevision)}（不自动换版本）。`
+          : null,
+    };
   }
   if (sequenceTask.revision <= 0) {
     /** 卡内明确禁止 `pinnedRevision=0` 占位：没有真实 revision 就不能固定版本。 */
