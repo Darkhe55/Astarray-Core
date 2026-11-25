@@ -8498,3 +8498,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   GoalDispatchVerdictJournal 损坏（抛错或空记录，不返回旧判定）、goal-mode verdicts 导出到目录路径（退出 2、不谎报）、
 >   doctor provider 未登记（抛错，不返回虚假健康）。
 > - 测试数 6238；覆盖率按节奏延后统一测量。
+
+> **B9：空状态只读命令 + 矩阵实测（2026-11-25，第 172 轮）**
+>
+> - 新增 5 条空状态命令用例（usage/perf 概览、doctor-errors 合法窗、agent-tree/concurrent/workset、recover/summary/instruction/provider 列表、context-metrics）。
+> - 覆盖率：**82.32%**（与 82.33% 基本持平）——**存储损坏/空状态类分支也已被既有测试覆盖**，
+>   新建用例大多是重复路径。
+> - 如实结论：按"猜测同类场景"补测无效；必须拿行级覆盖数据逐点补。
+> - 下一轮：先跑一次 json reporter 生成 `coverage-final.json`，再按 Top 未覆盖行逐点写用例。
