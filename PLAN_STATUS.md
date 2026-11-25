@@ -8637,3 +8637,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 已写出 [`docs/reports/B9_COVERAGE_STATUS_2026-11-25.md`](docs/reports/B9_COVERAGE_STATUS_2026-11-25.md)：
 >   逐文件缺口、已尝试手段的效果、**85% 在剩余轮次内不可达的结论**与四个可选路径（A 维持/ B 口径排除 /
 >   C 降门槛已否决 / D 立项 goal-mode 整机夹具）。
+
+> **B9：作用域授权判定矩阵（2026-11-25，第 190 轮）**
+>
+> - 新增 6 条：deny 优先（含放权/只读）、思索模式只读放行/非只读拒绝、专用流程 ask-user、
+>   安装范围 S5（开关关/协同/放权 ask|allow）、项目内受控安装 S1（开关关/assist allow|ask/devolve ask）、
+>   升级路径（逐级深度递减、以 secondary 收尾、≤3 层、无重复；允许跨级）。
+> - 覆盖 `scope-resolution.ts` 的授权矩阵与升级路径校验分支。
+> - 门禁：typecheck 0、lint 0、隐私 ok；覆盖率待下轮统一测量。
