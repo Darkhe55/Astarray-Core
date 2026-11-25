@@ -8652,3 +8652,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 5 条：非认证用户来源拒绝且不落记录（含空白用户名）、有效授权 granted/重授权代际递增、
 >   撤销后按状态过滤、回执记录/查询/计数/列表与未知键 null、状态文件损坏按空继续。
 > - 观察：`listAuthorizations` 的过滤参数只有项目/接收个体，状态需调用方自行筛（已按此断言）。
+
+> **B9：协作请求服务拒绝分支（2026-11-25，第 192 轮）**
+>
+> - 新增 6 条：自指拒绝、收件人未登记拒绝、四级越级直达 relay-required、跨项目缺授权拒绝、
+>   同项目无传输仍 sent 且标记投递结果、同 requestIdentifier 幂等为 duplicate 且复用 messageIdentifier。
+> - 覆盖 `collaboration-request-service.ts`（31 个未覆盖槽位）的拒绝与幂等分支。
+> - 门禁：typecheck 0、lint 0、隐私 ok；覆盖率待下轮统一测量。
