@@ -8491,3 +8491,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   ResumeIntentReceiptStore（损坏不返回可用回执）。
 > - 覆盖率暂不重复测量（按上轮节奏，每 3–4 轮统一测）；测试数 6234。
 > - 下一批：AgentTaskSequenceStore / GoalContractStore / GoalModeStateStore / DecisionWritebackStore 同矩阵。
+
+> **B9：损坏矩阵续 + 失败分支（2026-11-25，第 171 轮）**
+>
+> - 新增 4 条：AgentTaskSequenceStore 损坏（允许显式失败或 .bak 恢复，不得改写内容）、
+>   GoalDispatchVerdictJournal 损坏（抛错或空记录，不返回旧判定）、goal-mode verdicts 导出到目录路径（退出 2、不谎报）、
+>   doctor provider 未登记（抛错，不返回虚假健康）。
+> - 测试数 6238；覆盖率按节奏延后统一测量。
