@@ -8589,3 +8589,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   有绑定但 mission 无该任务（invalid-task-chain）、哨兵 `*` 不得伪造 bound。
 > - 经验：本仓库运行时会在 mission 创建时自动绑定 `sequence-scheduler:<mission>`，
 >   再手动 `bind` 别的序列会被拒（journal-corrupted）；测试应使用既有绑定。
+
+> **B9：参数授权设置校验 + 修真实缺陷（2026-11-25，第 184 轮）**
+>
+> - 新增 3 条用例：校验器结构/版本/开关/规则形态拒绝矩阵、规则字段/重复 ID/未知匹配/未知工具拒绝、存储缺文件默认值（不创建文件）/损坏抛错/写回读。
+> - **发现并修复真实缺陷**：`validateSettingsDocument` 中 `perToolRulesEnabled` 校验块被错误嵌进
+>   "settings 为 null"分支 ⇒ ① null 文档触发 `TypeError` 而不是返回 `isValid:false`；
+>   ② 正常文档的 `perToolRulesEnabled` 校验永远不执行（非法布尔值可被保存）。
+>   已改为先判空返回，再校验 perToolRulesEnabled。
+> - 门禁：typecheck 0、lint 0；覆盖率待下轮统一测量（当前 82.81%）。

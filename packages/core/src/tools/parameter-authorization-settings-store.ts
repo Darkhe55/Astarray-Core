@@ -202,6 +202,8 @@ export function validateSettingsDocument(
   }
   const settings = document.settings;
   if (settings === null || typeof settings !== "object") {
+    return { isValid: false, reason: "settings 缺失" };
+  }
   const perToolRulesEnabled = (settings as Record<string, unknown>)["perToolRulesEnabled"];
   if (perToolRulesEnabled !== undefined) {
     if (perToolRulesEnabled === null || typeof perToolRulesEnabled !== "object") {
@@ -217,8 +219,6 @@ export function validateSettingsDocument(
         };
       }
     }
-  }
-    return { isValid: false, reason: "settings 缺失" };
   }
   if (
     typeof settings.isParameterAuthorizationEnabled !== "boolean" ||

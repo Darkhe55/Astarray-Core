@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ASTARRAY_PARAMETER_AUTHORIZATION_SETTINGS_V1",
+  "settings": {
+    "isParameterAuthorizationEnabled": true,
+    "isParameterRulesEnabled": true,
+    "perToolRulesEnabled": {}
+  },
+  "rules": [],
+  "configurationRevision": 1
+}
