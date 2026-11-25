@@ -303,3 +303,90 @@ export async function resolveContextPackForMissionTask(input: {
     contentHash: computeContextPackContentHash(sequenceTask.contextPack),
   };
 }
+
+/**
+ * WIRING-04-04 生产适配器（2026-11-25）：把**真实映射存储 + 序列存储**接成解析端口。
+ *
+ * - `findExactBinding`：只按 mission task 精确查映射（不做名称/最近任务匹配）；
+ * - `readSequenceTask`：读序列文档里的节点包与**文档 revision**；
+ * - `readSequenceTaskAtRevision`：当前没有不可变版本存储 ⇒ 仅当 `revision` 恰好等于当前
+ *   文档 revision 时返回；否则返回 null（由解析层 blocked，**不用最新版冒充旧版本**）。
+ */
+export function createSequenceContextPackResolutionPort(input: {
+  readonly mapStore: {
+    listForMission(input: {
+      readonly missionIdentifier: string;
+      readonly sequenceIdentifier: string;
+    }): Promise<
+      ReadonlyArray<{
+        readonly missionTaskIdentifier: string;
+        readonly sequenceTaskIdentifier: string;
+        readonly sequenceIdentifier: string;
+        readonly ownerAgentInstanceIdentifier: string;
+      }>
+    >;
+  };
+  readonly sequenceStore: {
+    readSequence(
+      ownerAgentInstanceIdentifier: string,
+      sequenceIdentifier: string,
+    ): Promise<{
+      readonly revision: number;
+      readonly nodes: ReadonlyArray<{
+        readonly taskId: string;
+        readonly contextPack?: ContextPack;
+      }>;
+    } | null>;
+  };
+}): ContextPackResolutionPort {
+  return {
+    async findExactBinding(bindingInput) {
+      const entries = await input.mapStore.listForMission({
+        missionIdentifier: bindingInput.missionIdentifier,
+        sequenceIdentifier: bindingInput.sequenceIdentifier,
+      });
+      const entry = entries.find(
+        (candidate) =>
+          candidate.missionTaskIdentifier === bindingInput.missionTaskIdentifier &&
+          candidate.sequenceIdentifier === bindingInput.sequenceIdentifier &&
+          candidate.ownerAgentInstanceIdentifier ===
+            bindingInput.sequenceOwnerAgentInstanceIdentifier,
+      );
+      return entry === undefined ? null : { sequenceTaskIdentifier: entry.sequenceTaskIdentifier };
+    },
+    async readSequenceTask(readInput) {
+      const document = await input.sequenceStore.readSequence(
+        readInput.sequenceOwnerAgentInstanceIdentifier,
+        readInput.sequenceIdentifier,
+      );
+      if (document === null) return null;
+      const node = document.nodes.find(
+        (candidate) => candidate.taskId === readInput.sequenceTaskIdentifier,
+      );
+      if (node === undefined) return null;
+      return {
+        contextPack: node.contextPack ?? null,
+        revision: document.revision,
+      };
+    },
+    async readSequenceTaskAtRevision(readInput) {
+      const document = await input.sequenceStore.readSequence(
+        readInput.sequenceOwnerAgentInstanceIdentifier,
+        readInput.sequenceIdentifier,
+      );
+      if (document === null) return null;
+      if (document.revision !== readInput.revision) {
+        /** 没有历史版本存储：不能把当前内容冒充旧版本。 */
+        return null;
+      }
+      const node = document.nodes.find(
+        (candidate) => candidate.taskId === readInput.sequenceTaskIdentifier,
+      );
+      if (node === undefined) return null;
+      return {
+        contextPack: node.contextPack ?? null,
+        revision: document.revision,
+      };
+    },
+  };
+}

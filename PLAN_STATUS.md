@@ -8382,3 +8382,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - WIRING-04 剩余：整卡端到端（映射→包/回访→真实请求载荷，需本地假 Provider 装配）、原子提交单元、真实双进程接管。
 
 > **推送状态（2026-11-25 第 160 轮）**：`de59da02` 3 次推送失败（网络 reset/不可达）；留待下次合并推送。
+
+> **WIRING-04 真实存储整链（2026-11-25，第 161 轮）**
+>
+> - 新增生产适配器 `createSequenceContextPackResolutionPort`（真实 `MissionTaskSequenceMapStore` + `AgentTaskSequenceStore`）：
+>   精确映射查询、读序列节点包与文档 revision；无历史版本存储时 `readSequenceTaskAtRevision` 只认当前 revision
+>   （不用最新内容冒充旧版本）。
+> - 组件级整链证据 4 条（真实文件存储）：映射→固定当前版本包与 64 位内容哈希；固定旧版本⇒blocked；
+>   无映射⇒mapping-missing；回访块按任务隔离。
+> - 全量：**977 files（975 passed / 2 skipped），6193 tests（6187 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - 仍未完成（如实单列）：真实模型请求载荷端到端（假 Provider 装配）、原子提交单元、真实双进程接管。
