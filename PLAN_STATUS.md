@@ -8718,3 +8718,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `test:scripts`：**51 passed / 0 failed**。此前该套件因**既有 fixture 漂移**（新增 9 条判据但 fixture 未更新）为 17/26 失败；
 >   本轮补齐 `exploreVerification/curateView/foldAuthorization/foldCostBenefit/folderApproval` 期望值后全绿。
 > - `typecheck`/`lint` 0；隐私 `privacy-ok`。
+
+> **B9 终稿（2026-11-26，第 201 轮）**
+>
+> - [`docs/reports/B9_COVERAGE_STATUS_2026-11-25.md`](docs/reports/B9_COVERAGE_STATUS_2026-11-25.md) 已更新为终稿：
+>   最终数字（分支 83.05%）、推进轨迹、**4 个真实缺陷/漂移修复**、≈460 槽位缺口分布、
+>   未达标的量化原因与四条可选路径。
+> - 结论：**85% 未达标**；不做虚假完成声明。
