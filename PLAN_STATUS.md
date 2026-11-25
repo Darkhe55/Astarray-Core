@@ -8555,3 +8555,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   无租约文件 ⇒ 不被租约拦截（走到后续安全对账判定）。
 > - 这两条直接命中 `main-controller.ts` 的 `3768/3774` 未覆盖行。
 > - 覆盖率待下轮统一测量（当前 82.69%）。
+
+> **B9：CLI 租约门禁 + doctor 扫描（2026-11-25，第 179 轮）**
+>
+> - 新增 2 条：跨进程取消被拒（`refuseIfMissionActiveElsewhere`，commands 142/145）、
+>   doctor 同时统计损坏 mission / 活动租约 / 过期租约并判 failed（commands 318–321、401）。
+> - 断言：退出码 1 + 拒绝原因含"其他进程"；doctor JSON 的 corruptedCount/activeLeaseCount/staleLeaseCount 均 ≥1。
+> - 覆盖率待下轮统一测量（当前 82.69%）。
