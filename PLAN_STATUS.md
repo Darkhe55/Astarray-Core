@@ -8613,3 +8613,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 覆盖 `builtins.ts` 的 processExecution 分派与守卫分支（含安全关键的"拒绝降级到宿主进程"）。
 > - 契约观察：`processExecution` 作为统一入口时，未知 action 在统一入口层被拦截；
 >   `cancel` 传入 `reason` 会被动作参数校验拒绝（不是静默忽略）。
+
+> **B9：文档视图适配器 + 覆盖率（2026-11-25，第 187 轮）**
+>
+> - 覆盖率：分支 **82.81% → 82.94%**（≈+33 条）；语句 90.30%、函数 91.11%、行 90.71%。
+> - 新增 8 条：扩展名识别、不支持格式 unsupported、NUL 字节 corrupted、U+FFFD 占比高/
+>   低两路、空文件说明、markdown 块提取、html 实体解码且不执行脚本、text 按行成块。
+> - 覆盖 `document-view-adapter.ts`（35 个未覆盖槽位）的提取/降级分支。
