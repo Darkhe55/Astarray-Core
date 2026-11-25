@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckpointContinuationController } from "../../../packages/core/src/orchestration/continuation-controller.js";
 import { CheckpointContinuationDispatchService } from "../../../packages/core/src/orchestration/continuation-dispatch.js";
+import { ContinuationMetrics } from "../../../packages/core/src/orchestration/continuation-metrics.js";
 import { ResumeIntentReceiptStore } from "../../../packages/core/src/orchestration/continuation-receipt-store.js";
 import {
   resolveCheckpointContinuationSetting,
@@ -49,7 +50,7 @@ function candidate(overrides: Partial<ContinuationCandidate> = {}): Continuation
   };
 }
 
-async function build(options: { readonly withReceipt: boolean }) {
+async function build(options: { readonly withReceipt: boolean; readonly metrics?: ContinuationMetrics }) {
   const receiptStore = new ResumeIntentReceiptStore({ baseDirectory });
   const controller = new CheckpointContinuationController({
     baseDirectory,
@@ -75,6 +76,7 @@ async function build(options: { readonly withReceipt: boolean }) {
   const service = new CheckpointContinuationDispatchService({
     controller,
     resumePort: { resumeMission },
+    ...(options.metrics === undefined ? {} : { metrics: options.metrics }),
   });
   return { service, resumeMission, receiptStore, controller };
 }
@@ -155,5 +157,41 @@ describe("RESUME-02：dispatch 接线", () => {
     resumeMission.mockRejectedValueOnce(new Error("恢复门禁内部错误"));
     await expect(service.dispatch(baseInput)).rejects.toThrow("恢复门禁内部错误");
     expect(await controller.listClaims(nowIso)).toHaveLength(1);
+  });
+});
+
+describe("RESUME-02 dispatch 观测计数", () => {
+  it("⑦ resumed 与 blocked 都被计入一次（带原因码，不重复）", async () => {
+    const metrics = new ContinuationMetrics();
+    const harness = await build({ withReceipt: true, metrics });
+    const result = await harness.service.dispatch({
+      missionIdentifier: "mission-1",
+      request: request(),
+      candidates: [candidate()],
+      principalIdentifier: "user-1",
+      requestIdentifier: "req-1",
+      nowIso,
+    });
+    expect(result.status).toBe("resumed");
+    const snapshot = metrics.snapshot();
+    expect(snapshot.total).toBe(1);
+    expect(snapshot.entries).toEqual([{ outcome: "resumed", reasonCode: "resumed", count: 1 }]);
+  });
+
+  it("⑧ 未领取（状态推导拒绝）也如实计数，原因码透传", async () => {
+    const metrics = new ContinuationMetrics();
+    const harness = await build({ withReceipt: false, metrics });
+    const result = await harness.service.dispatch({
+      missionIdentifier: "mission-1",
+      request: request(),
+      candidates: [candidate()],
+      principalIdentifier: "user-1",
+      requestIdentifier: "req-1",
+      nowIso,
+    });
+    expect(result.status).not.toBe("resumed");
+    const snapshot = metrics.snapshot();
+    expect(snapshot.total).toBe(1);
+    expect(snapshot.entries[0]?.reasonCode).toBe(result.reasonCode);
   });
 });

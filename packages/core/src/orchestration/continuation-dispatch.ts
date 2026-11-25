@@ -20,6 +20,10 @@ import type {
   ContinuationCandidate,
   StructuredContinuationRequest,
 } from "./continuation-request.js";
+import type {
+  ContinuationMetricOutcome,
+  ContinuationMetrics,
+} from "./continuation-metrics.js";
 
 /** 与公开 SDK 的 `resumeRecoveredMission` 对齐的最小端口（注入以避免核心依赖环）。 */
 export interface ContinuationResumePort {
@@ -60,6 +64,8 @@ export class CheckpointContinuationDispatchService {
     private readonly options: {
       readonly controller: CheckpointContinuationController;
       readonly resumePort: ContinuationResumePort;
+      /** RESUME-02 观测：可选注入；不传则不计（测试/嵌入方不被迫接入）。 */
+      readonly metrics?: ContinuationMetrics;
     },
   ) {}
 
@@ -82,6 +88,10 @@ export class CheckpointContinuationDispatchService {
       claimResult.claim === null ||
       (claimResult.status !== "claimed" && claimResult.status !== "already-claimed")
     ) {
+      this.options.metrics?.record({
+        outcome: this.toMetricOutcome(claimResult.status),
+        reasonCode: claimResult.reasonCode,
+      });
       return {
         status: claimResult.status,
         reasonCode: claimResult.reasonCode,
@@ -100,6 +110,7 @@ export class CheckpointContinuationDispatchService {
     });
 
     if (resumeOutcome.outcome === "resumed") {
+      this.options.metrics?.record({ outcome: "resumed", reasonCode: "resumed" });
       return {
         status: "resumed",
         reasonCode: "resumed",
@@ -110,6 +121,10 @@ export class CheckpointContinuationDispatchService {
         blockedDecisionItems: [],
       };
     }
+    this.options.metrics?.record({
+      outcome: "blocked",
+      reasonCode: resumeOutcome.outcome,
+    });
     return {
       status: "blocked",
       reasonCode: resumeOutcome.outcome,
@@ -119,5 +134,22 @@ export class CheckpointContinuationDispatchService {
       requiredReauthorizationTypes: [...(resumeOutcome.requiredReauthorizationTypes ?? [])],
       blockedDecisionItems: [...(resumeOutcome.blockedDecisionItems ?? [])],
     };
+  }
+
+  /** claimResult.status 与指标枚举对齐（未知状态归 unknown，不抛错、不丢计数）。 */
+  private toMetricOutcome(status: string): ContinuationMetricOutcome {
+    const known = new Set([
+      "claimed",
+      "already-claimed",
+      "still-running",
+      "needs-selection",
+      "needs-answer",
+      "needs-authorization",
+      "reconciling",
+      "nothing-to-resume",
+      "disabled",
+      "cancelled",
+    ]);
+    return (known.has(status) ? status : "unknown") as never;
   }
 }

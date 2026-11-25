@@ -8309,3 +8309,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 6 条反例（真实读取、命中扣留、扫描失败、全扣留、读失败、预算不足）。
 > - 全量：**968 files（966 passed / 2 skipped），6142 tests（6136 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - RESUME-02 剩余：观测计数（下一轮）、真实 IM 适配器（B7 阻塞）、人工验收。
+
+> **RESUME-02 观测计数（2026-11-25，第 153 轮）**
+>
+> - 新增 `ContinuationMetrics`：outcome × reasonCode 聚合计数；原因码上限 32（超出归 other，防内存膨胀）；
+>   空白原因码归一为 null；快照冻结只读；reset 清空。**只记枚举与原因码，不记正文/参数/凭据**。
+> - 接入 `CheckpointContinuationDispatchService`（可选注入）：每次 dispatch 按最终状态记一次（不漏不重）。
+> - 反例 8 条（6 条计数 + 2 条 dispatch 接线）。
+> - 全量：**969 files（967 passed / 2 skipped），6150 tests（6144 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - RESUME-02 剩余：真实 IM 适配器（B7 平台阻塞）、人工验收（B8）。
