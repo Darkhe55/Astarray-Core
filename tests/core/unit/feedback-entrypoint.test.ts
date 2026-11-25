@@ -592,6 +592,18 @@ describe("runFeedbackProcessEntry（进程内 FakeParent）", () => {
       "mailboxes",
       "scheduler-1.json",
     );
+    /**
+     * 2026-11-25：投递回执现在**在 deliver 之后**才落盘（先投递后写回执，避免丢消息）。
+     * 必须等回执真正写完再损坏文件；否则在途的回执写入会把损坏文件覆盖回合法 JSON，
+     * 测试就测不到"损坏后投递失败"。
+     */
+    const receiptDeadline = Date.now() + 3_000;
+    for (;;) {
+      const raw = await fs.readFile(journalFilePath, "utf8").catch(() => null);
+      if (raw !== null && raw.includes("\"delivered\": true")) break;
+      if (Date.now() > receiptDeadline) throw new Error("回执未在期限内落盘");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     await fs.writeFile(journalFilePath, "{ 损坏", "utf8");
     /**
      * 2026-11-25：重试间隔固定 5 秒；原先 6 秒窗口在全量并行负载下过窄（定时器回调被挤后
@@ -821,6 +833,24 @@ describe("runFeedbackProcessEntry（进程内 FakeParent）", () => {
       3_000,
       "deliver",
     );
+    /**
+     * 2026-11-25（投递回执顺序修正后的同步点）：`deliver` 发出与"回执落盘"不是同一时刻
+     * （现在先投递、后写回执，避免丢消息）。replay 只重放**已投递**消息，
+     * 因此等回执真正落盘后再触发 replay，而不是拿 deliver 消息当作已落盘。
+     */
+    const journalPath = path.join(
+      temporaryDirectory,
+      "feedback",
+      "mailboxes",
+      "recipient-single.json",
+    );
+    const journalDeadline = Date.now() + 3_000;
+    for (;;) {
+      const raw = await fs.readFile(journalPath, "utf8").catch(() => null);
+      if (raw !== null && raw.includes("\"delivered\": true")) break;
+      if (Date.now() > journalDeadline) throw new Error("回执未在期限内落盘");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     fakeParent.emitMessage({
       type: "replay",
       requestId: "r-replay-one",

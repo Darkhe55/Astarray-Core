@@ -8336,3 +8336,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 顺带修正一处过窄测试窗口（`feedback-entrypoint` 损坏重试等待 6s→10s，只吸收并行负载抖动，不放松断言）。
 > - 全量：**971 files（969 passed / 2 skipped），6160 tests（6154 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - WIRING-04 剩余：02 适配器侧生命周期（anthropic 运行时未发布 prepared/dispatched/acknowledged）、03 完成门禁生产版本来源、04 映射读取、05 关闭节点回访/整链。
+
+> **WIRING-04-02 适配器生命周期（2026-11-25，第 156 轮）**
+>
+> - `anthropic-messages-runtime` 补齐请求生命周期事实：本地门禁拒绝 ⇒ `failed-before-dispatch`（且不调用传输）；
+>   传输前 ⇒ `dispatched`；拿到响应（含 4xx/5xx）⇒ `acknowledged`；断网/超时/取消 ⇒ `outcome-unknown`。
+> - 反例 4 条（成功顺序、HTTP 500 也算 acknowledged、断网 outcome-unknown、扫描拦截不发送）。
+> - 修正两处由"先投递后回执"引出的测试同步点（等回执落盘再 replay / 再损坏文件），断言不变。
+> - 全量：**972 files（970 passed / 2 skipped），6164 tests（6158 passed / 6 skipped），EXIT=0**；`lint` 0。
+
+> **推送状态（2026-11-25 第 156 轮）**：`ef250386` 3 次推送失败（网络不可达/reset）；留待下次合并推送。

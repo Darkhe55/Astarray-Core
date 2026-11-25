@@ -195,11 +195,31 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
        * 只扫请求体（消息内容），不扫请求头（`x-api-key` 是协议要求）；
        * 缺省 `record`：命中只记录不拦截；`block` 由用户显式开启。
        */
-      applyProviderEgressScan({
-        providerIdentifier:
-          this.options.providerIdentifier ?? ANTHROPIC_MESSAGES_PROTOCOL,
-        requestBodyJson: serializedRequestBody,
-        options: this.egressScanOptions,
+      /**
+       * WIRING-04-02（2026-11-25）：**本地门禁拒绝 ⇒ failed-before-dispatch**。
+       *
+       * 出口扫描在传输 API 之前执行；被拦截时请求根本没发出去，
+       * 因此只能报"未派发"，不能报 dispatched，也不能报 outcome-unknown。
+       */
+      try {
+        applyProviderEgressScan({
+          providerIdentifier:
+            this.options.providerIdentifier ?? ANTHROPIC_MESSAGES_PROTOCOL,
+          requestBodyJson: serializedRequestBody,
+          options: this.egressScanOptions,
+        });
+      } catch (error) {
+        agentRunInput.requestLifecycleObserver?.({
+          kind: "failed-before-dispatch",
+          requestIdentifier,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+      /** 传输边界事实：`dispatched` 在真正调用传输 API 之前发布。 */
+      agentRunInput.requestLifecycleObserver?.({
+        kind: "dispatched",
+        requestIdentifier,
       });
       try {
         response = await this.fetchImpl(this.options.baseUrl, {
@@ -214,6 +234,15 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
           signal: abortController.signal,
         });
       } catch (error) {
+        /**
+         * 已调用传输 API 但拿不到可靠对端响应（断网/超时/取消）⇒ outcome-unknown。
+         * 这不是 delivered，也不是 failed-before-dispatch。
+         */
+        agentRunInput.requestLifecycleObserver?.({
+          kind: "outcome-unknown",
+          requestIdentifier,
+          reason: error instanceof Error ? error.message : String(error),
+        });
         if (cancellationSignal.aborted) {
           yield {
             kind: "runFinished",
@@ -229,6 +258,11 @@ export class AnthropicMessagesRuntime implements AgentRuntime {
           timeoutMilliseconds: this.options.requestTimeoutMilliseconds,
         });
       }
+      /** 拿到对端响应即 acknowledged（HTTP 4xx/5xx 也算对端作答，不表示业务成功）。 */
+      agentRunInput.requestLifecycleObserver?.({
+        kind: "acknowledged",
+        requestIdentifier,
+      });
       if (!response.ok || !response.body) {
         throw await describeProviderHttpFailure(response);
       }
