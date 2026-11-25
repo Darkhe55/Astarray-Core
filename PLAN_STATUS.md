@@ -8365,3 +8365,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   哈希不符 ⇒ blocked；`pinnedRevision=0` ⇒ 拒绝；最新版前进只给 `revisionAdvancedNotice`，**仍用固定旧版本**。
 > - 端口新增可选 `readSequenceTaskAtRevision`（未提供时请求旧版本即 blocked，不静默用最新）。
 > - 7 条反例；全量：**974 files（972 passed / 2 skipped），6177 tests（6171 passed / 6 skipped），EXIT=0**；`lint` 0。
+
+> **WIRING-04-05 回访块登记与注入（2026-11-25，第 159 轮）**
+>
+> - 新增 `RecalledContextBlockStore`：按（mission/个体/任务/节点/revision）幂等登记；换 revision 视为新块；
+>   非法输入拒绝；文件损坏视为未登记且**不覆盖原文件**；按任务/个体隔离。
+> - 运行时接线：`recalledContextBlocksProvider` 只注入**显式登记**的块（未请求不自动注入、不做相似度召回）。
+> - 6 条反例；全量：**975 files（973 passed / 2 skipped），6183 tests（6177 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - 修正一处类型误用：`readJsonWithBackupRecovery` 返回**已解析对象**（content: unknown），不是字符串。

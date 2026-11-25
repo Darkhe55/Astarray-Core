@@ -328,6 +328,7 @@ import {
 import { RecoveryCheckpointStore } from "../orchestration/recovery-checkpoint-store.js";
 import { ContinuationBreakpointStore } from "../orchestration/continuation-breakpoint.js";
 import { LocalContextGraphStore } from "../orchestration/local-context-graph-store.js";
+import { RecalledContextBlockStore } from "../orchestration/recalled-context-block-store.js";
 import {
   createContextPromptProvider,
   type ContextPromptProvider,
@@ -3184,6 +3185,10 @@ export async function createApplicationRuntime(
   const contextClosureCapsuleStore = new ContextClosureCapsuleStore({
     baseDirectory: stateDirectory,
   });
+  /** WIRING-04-05：显式回访后登记的块（只由回访工具写入，不自动召回）。 */
+  const recalledContextBlockStore = new RecalledContextBlockStore({
+    baseDirectory: stateDirectory,
+  });
   /**
    * ALIGN-04-05（2026-10-28）：**胶囊 → 回访**的真实消费者。
    *
@@ -3224,6 +3229,22 @@ export async function createApplicationRuntime(
       graphStore: contextGraphStore,
       maximumGlobalContextTokenCount: options.globalContextBudgetTokens ?? 4096,
       mandatoryConditions: options.mandatoryContextConditions,
+      /**
+       * WIRING-04-05：只注入**显式请求并登记**的回访块；
+       * 未请求正文不自动注入，也不做相似度召回。
+       */
+      recalledContextBlocksProvider: async (providerInput) => {
+        const blocks = await recalledContextBlockStore.listFor({
+          missionIdentifier: providerInput.missionIdentifier,
+          agentInstanceIdentifier: providerInput.agentInstanceIdentifier,
+          missionTaskIdentifier: providerInput.missionTaskIdentifier,
+        });
+        return blocks.map((block) => ({
+          contextNodeIdentifier: block.contextNodeIdentifier,
+          sourceRevision: block.sourceRevision,
+          text: block.text,
+        }));
+      },
       /**
        * WIRING-04-04（返修卡方案 C）：当前任务包经 **mission↔序列精确映射** 解析。
        * 缺映射 / 声明有包却读不到 ⇒ 返回失败由提供者阻塞（不按名称或最近任务猜）。
