@@ -137,6 +137,10 @@ export class MissionTaskSequenceMapStore {
     readonly missionIdentifier: string;
     readonly missionTaskIdentifier: string;
   }): Promise<{ readonly removedCount: number }> {
+    /** 与文档一致：整 mission 通配映射（`*`）代表"整个任务集合"，删除单任务时不得连带删除。 */
+    if (input.missionTaskIdentifier.trim() === "*") {
+      return { removedCount: 0 };
+    }
     return this.writeLock.runExclusive(async () => {
       /** 跨实例：并发绑定会互相覆盖（丢映射 ⇒ 解析层判"必要输入不可得"）。 */
       return withFileLock({ lockFilePath: `${this.filePath}.lock` }, async () => {
@@ -145,7 +149,8 @@ export class MissionTaskSequenceMapStore {
         (entry) =>
           !(
             entry.missionIdentifier === input.missionIdentifier &&
-            entry.missionTaskIdentifier === input.missionTaskIdentifier
+            entry.missionTaskIdentifier === input.missionTaskIdentifier &&
+            entry.missionTaskIdentifier !== "*"
           ),
       );
       const removedCount = document.maps.length - kept.length;

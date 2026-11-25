@@ -8694,3 +8694,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >
 > - 覆盖率：分支 **83.00% → 83.01%**；语句 90.34%、函数 91.17%、行 90.76%；6357 tests（6351 passed / 6 skipped），无失败。
 > - 新增 5 条：缺标识拒绝、同请求幂等/异任务冲突、按 mission 过滤、未知消费 false/已知消费移出、消费历史有界并累计丢弃计数。
+
+> **B9：mission 任务映射 + 修真实缺陷（2026-11-25，第 198 轮）**
+>
+> - 新增 6 条：精确绑定三字段齐全/缺字段/通配跳过、同任务同节点幂等、同任务改绑拒绝、
+>   listForMission 过滤、removeForMissionTask 匹配/通配/不存在、损坏条目过滤为空。
+> - **发现并修复真实缺陷**：`removeForMissionTask` 文档声明"`*`（整 mission）不动"，
+>   但实现会把 `*` 条目一并删除（单任务删除会连带丢掉整 mission 映射）——
+>   已改为：输入为 `*` 直接返回 0；且永不删除 `missionTaskIdentifier === "*"` 的条目。
+> - 回归：既有 `mission-task-sequence-map.test.ts` 4 条通过。
