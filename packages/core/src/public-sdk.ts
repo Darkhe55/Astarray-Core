@@ -2171,6 +2171,19 @@ export interface PublicApplicationOptions {
   isSandboxWeakIsolationForced?: boolean;
   /** E2：自动探测/弱档时用于定位随包辅助程序的根目录（缺省进程 cwd）。 */
   sandboxApplicationRootPath?: string;
+  /**
+   * WIRING-04 整链验收缝（方案 ③，2026-11-25）：任务创建后、首次 provider 请求前的钩子。
+   *
+   * 只用于测试/宿主集成；缺省不调用，不改变生产行为。
+   */
+  onMissionPrepared?: (observation: {
+    readonly missionIdentifier: string;
+    readonly projectIdentifier: string | null;
+    readonly conversationIdentifier: string | null;
+    readonly taskIdentifiers: readonly string[];
+    readonly taskSequenceIdentifier: string | null;
+    readonly sequenceOwnerAgentInstanceIdentifier: string | null;
+  }) => Promise<void> | void;
   /** GUI-04-06：开启时段检测器（缺省关闭；GUI 作为宿主显式开启）。 */
   isWorkWindowResumeMonitorEnabled?: boolean;
   /** GUI-04-06：rest→working 时自动恢复被休息挡住的 mission（缺省开启）。 */
@@ -2889,6 +2902,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       ...(options.sandboxApplicationRootPath === undefined
         ? {}
         : { sandboxApplicationRootPath: options.sandboxApplicationRootPath }),
+      ...(options.onMissionPrepared === undefined
+        ? {}
+        : { onMissionPrepared: options.onMissionPrepared }),
       concurrency: options.concurrency ?? 1,
       failureThreshold: options.failureThreshold ?? 1,
       maxLoopIterations: options.maximumLoopIterations ?? 8,

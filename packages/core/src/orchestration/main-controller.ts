@@ -200,7 +200,26 @@ export interface GoalDispatchVerdictRecord {
   readonly observedAtIso: string;
 }
 
+export interface MissionPreparedObservation {
+  readonly missionIdentifier: string;
+  readonly projectIdentifier: string | null;
+  readonly conversationIdentifier: string | null;
+  readonly taskIdentifiers: readonly string[];
+  /** 用户任务序列（assist 路径有；devolve 可能为 null）。 */
+  readonly taskSequenceIdentifier: string | null;
+  readonly sequenceOwnerAgentInstanceIdentifier: string | null;
+}
+
 export interface MainControllerOptions {
+  /**
+   * WIRING-04 整链验收缝（2026-11-25，用户裁决方案 ③）：
+   * **任务创建后、首次 provider 请求前**的钩子。
+   *
+   * 用途：让端到端测试在真实 mission 标识下播种精确映射/序列包/回访块，
+   * 又不改变生产行为（缺省不调用）。钩子在 `launch*Mission` **之前** await，
+   * 因此写入的映射/序列对本次执行的首个请求可见；抛错 ⇒ 任务启动失败（不静默）。
+   */
+  onMissionPrepared?: (observation: MissionPreparedObservation) => Promise<void> | void;
   /**
    * EVENT-01（2026-10-24）：控制通道门禁（缺省 ⇒ 不门禁）。
    */
@@ -1648,6 +1667,18 @@ export class MainController {
       await this.options.bindMissionGoalPort({
         missionIdentifier: missionId,
         goalIdentifier: requestedGoalIdentifier,
+      });
+    }
+    if (this.options.onMissionPrepared !== undefined) {
+      const preparedSequence = this.missionTaskSequences.get(missionId) ?? null;
+      await this.options.onMissionPrepared({
+        missionIdentifier: missionId,
+        projectIdentifier: projectIdentifier ?? null,
+        conversationIdentifier: conversationIdentity?.conversationIdentifier ?? null,
+        taskIdentifiers: taskNodes.map((node) => node.id),
+        taskSequenceIdentifier: preparedSequence?.taskSequenceIdentifier ?? null,
+        sequenceOwnerAgentInstanceIdentifier:
+          preparedSequence?.ownerAgentInstanceIdentifier ?? null,
       });
     }
     if (mode === "assist") {

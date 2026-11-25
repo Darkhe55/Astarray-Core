@@ -61,6 +61,7 @@ import {
   buildDiagnosticClusterToolDescriptor,
   executeDiagnosticClusterAction,
 } from "../orchestration/diagnostic-cluster-tools.js";
+import type { MissionPreparedObservation } from "../orchestration/main-controller.js";
 import { MainController } from "../orchestration/main-controller.js";
 // OBS-01／PERF-01-02（第 83 轮）：性能样本落库（此前只在生产里被构造用于"查询"）
 import { PerfEventStore } from "../orchestration/perf-event-store.js";
@@ -844,6 +845,12 @@ export interface ApplicationRuntimeOptions {
   isSandboxWeakIsolationEnabled?: boolean;
   /** 强制弱档（跳过强档探测；仍需 isSandboxWeakIsolationEnabled=true）。 */
   isSandboxWeakIsolationForced?: boolean;
+  /**
+   * WIRING-04 整链验收缝（方案 ③，2026-11-25）：任务创建后、首次 provider 请求前的钩子。
+   *
+   * 缺省不调用；测试用它在真实 mission 标识下播种映射/序列包/回访块。
+   */
+  onMissionPrepared?: (observation: MissionPreparedObservation) => Promise<void> | void;
   stateDirectory: string;
   concurrency: number;
   failureThreshold: number;
@@ -4592,6 +4599,9 @@ const controller = new MainController({
     modeMachine,
     missionRuntimeRegistry,
     artifactRecordStore,
+    ...(options.onMissionPrepared === undefined
+      ? {}
+      : { onMissionPrepared: options.onMissionPrepared }),
     workWindowDeferredMissionStore,
     workWindowGateDecisionProvider: async (input) => {
       const workWindowRules = await projectWorkWindowStore.readRules(

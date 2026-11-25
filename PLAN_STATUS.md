@@ -8433,3 +8433,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `application-runtime` 312、`public-sdk` 297；`commands.ts` 行级缺口含 `142`(4)、`318`(4)、
 >   `3406/3407`(4+4)、`3865`(4)、`401`(3)。
 > - 门禁：`lint` 0；隐私 `privacy-ok`；本轮仅新增只读脚本与文档，不改运行行为。
+
+> **WIRING-04 整链端到端（方案 ③，2026-11-25，第 165 轮）**
+>
+> - 新增验收缝 `onMissionPrepared`（MainController → Runtime → SDK 透传）：**任务创建后、首次 provider 请求前** await；
+>   生产缺省不调用；抛错 ⇒ 启动失败（不静默）。
+> - `wiring04-end-to-end-payload`（真实本地假 Provider）：钩子用真实 mission 标识播种序列包与精确映射 ⇒
+>   首个请求体包含 `[上下文包]`，且选定正文**只出现 1 次**（防止两处重复注入）。
+> - 全量：**979 files（977 passed / 2 skipped），6201 tests（6195 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - WIRING-04 整卡在"生产入口 → 请求载荷"维度取得端到端证据；仍单列：原子提交单元、真实双进程接管。
