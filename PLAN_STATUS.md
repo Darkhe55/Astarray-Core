@@ -8537,3 +8537,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   独立审查与通知偏好。
 > - 剩余零覆盖方法清单已缩减至约 15 个（工具包 zip、`dispatchDirectTask`、`requestRuntimeTaskInsertion`、
 >   `verifyArtifact`、`queryMissionStatus`/`cancelMission`/`transitionMode` 等）。
+
+> **B9：门面零覆盖方法第四批 + 覆盖率实测（2026-11-25，第 177 轮）**
+>
+> - 新增 5 条：mission 控制（未知查询/幂等取消/模式切换/非法模式）、直接派发缺序列、运行时插入、
+>   工具包 zip 预览与安装缺失文件、工件核验与查询。
+> - 覆盖率：分支 **82.67% → 82.69%**；语句 90.11%、函数 91.09%、行 90.52%。
+> - 如实结论：门面方法烟囱的**边际收益已明显下降**（+0.02）。剩余 ≈580 条分支分布在
+>   `main-controller`（约 409）、`cli/commands`（约 314）、`application-runtime`（约 309）、
+>   `public-sdk`（约 297）的**深层分支**，需要逐条构造复杂状态。
+> - 按当前速度（≈+5～20/轮）推算，25 轮内**很可能达不到 85%**。如需按期达标，
+>   只剩"统计口径排除交付接线文件"（方案 B）这一条路，需用户裁决。
