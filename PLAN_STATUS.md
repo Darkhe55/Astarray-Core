@@ -8574,3 +8574,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 2 条：存在的 mission 取消（文本 + JSON 成功路径）、已完成的 mission 续接（`already-complete`，不再派发）。
 > - 覆盖 `commands.ts` 174/232/237 等此前仅走到"mission 不存在"的守卫分支的另一侧。
 > - 覆盖率待下轮统一测量（当前 82.80%）。
+
+> **B9：goal-mode 与 run 入口校验（2026-11-25，第 182 轮）**
+>
+> - 新增 4 条：goal-mode status 空状态（文本/JSON）、未知目标（退出 2）、
+>   verdicts 空记录与**导出成功/空路径拒绝**、run 非法配置与缺少 `--json`（均用法错误）。
+> - 覆盖 `goal-mode-command.ts`（77 个未覆盖槽位）与 `run-command.ts`（63 个）的入口分支。
+> - 覆盖率待下轮统一测量（当前 82.80%）。
