@@ -8710,3 +8710,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 观察（未改）：`GoalMissionBindingStore.read` 不像 map store 那样逐条校验，条目字段缺失会原样返回；
 >   当前调用方只按 `missionIdentifier` 查询，风险有限，记为后续硬化项。
 > - 下一步：最终全量覆盖率 + `npm test` 门禁 + B9 终稿。
+
+> **B9：最终全量门禁（2026-11-26，第 200 轮）**
+>
+> - `npm test`：**1015 files（1013 passed / 2 skipped），6373 tests（6367 passed / 6 skipped），EXIT=0**。
+> - `test:coverage`：分支 **83.05%**、语句 90.38%、函数 91.19%、行 90.80%（门槛 85% ⇒ **未达标**，如实记录）。
+> - `test:scripts`：**51 passed / 0 failed**。此前该套件因**既有 fixture 漂移**（新增 9 条判据但 fixture 未更新）为 17/26 失败；
+>   本轮补齐 `exploreVerification/curateView/foldAuthorization/foldCostBenefit/folderApproval` 期望值后全绿。
+> - `typecheck`/`lint` 0；隐私 `privacy-ok`。

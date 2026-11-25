@@ -35,6 +35,38 @@ function acceptedObservation() {
     explore: { realDataReasonCode: "real-user-data-forbidden", restoredMaximumTrials: 0 },
     curate: { secondLockKind: "already-running", coalescedRunCount: 1 },
     history: { sanitizedChanged: true, containsEscape: false, evidenceAnchor: "run-history:mission-1#7" },
+    /** 以下段落对应后加的判据（早期 fixture 缺失导致 17/26；现补齐期望值）。 */
+    exploreVerification: {
+      singleSuccessKind: "insufficient-evidence",
+      sufficientKind: "verified-candidate",
+      sufficientIsAutoMerged: false,
+      sufficientNegativeCount: 1,
+    },
+    curateView: {
+      visibleCount: 1,
+      unsourcedCount: 1,
+      filteredCount: 1,
+      isOriginalHistoryDeleted: false,
+      inferenceFlagged: true,
+    },
+    foldAuthorization: {
+      irreversibleKind: "ask-step",
+      irreversibleFlag: true,
+      isIrreversibleGrantPersistent: false,
+      outsideScopeKind: "deny",
+      outsideScopeReasonCode: "outside-declared-scope",
+      isBlocked: true,
+    },
+    foldCostBenefit: {
+      thinSamplesKind: "insufficient-evidence",
+      thinIsAutoPromoted: false,
+    },
+    folderApproval: {
+      withoutHumanKind: "rejected",
+      withHumanKind: "issued",
+      deniedOutcome: "denied",
+      deniedReasonCode: "not-covered-by-any-scope",
+    },
   };
 }
 
