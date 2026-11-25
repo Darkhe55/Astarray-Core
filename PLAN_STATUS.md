@@ -8450,3 +8450,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - B7：新增 [`B7_PLATFORM_INPUTS_2026-11-25.md`](docs/reports/B7_PLATFORM_INPUTS_2026-11-25.md)，
 >   逐项列出测试租户、签名算法+测试向量、回执 API、限流/重试语义、凭据注入方式（含格式与验收口径）。
 > - B9：维持 85% 门槛不降；继续按 `report-coverage-gaps` 补分支（当前 82.16%）。
+
+> **B9 补测：MERGE-01 + CLI 校验分支（2026-11-25，第 166 轮）**
+>
+> - 新增 8 条 MERGE-01 分支（合并开关关闭只记候选、缺资格 fail-closed、建组/引用失效、组派生物恒 `group-derivative`、
+>   逐成员结算与取消权限、完成核验、窗口计数、落盘/恢复往返）。
+> - 新增 4 条 CLI 校验/只读分支（recover show 不存在文本/JSON、sandbox self-check 文本/JSON、工具升级授权缺版本、doctor 损坏状态）。
+> - 覆盖率：分支 **82.17% → 82.23%**（≈+15 条）；语句 89.31%、函数 89.58%、行 89.71%。
+> - 如实结论：小文件边际收益低；后续必须按**函数级**缺口集中补 `main-controller` / `cli/commands` / `runtime` / `sdk`。
+
+> **推送状态（2026-11-25 第 166 轮）**：`bae4c3cd` 3 次推送失败（网络不可达）；留待下次合并推送。
