@@ -8406,3 +8406,14 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > 已单独记录在 `wiring04-chain-real-stores`。
 >
 > 该阻塞不影响已交付能力（WIRING-04 01–05 主体均绿），只影响"整卡 done"的端到端证据口径。
+
+> **B9 覆盖率基线与同类补充（2026-11-25，第 163 轮）**
+>
+> - 覆盖率基线（全量 `test:coverage`）：语句 **89.15%**、分支 **82.16%**、函数 89.45%、行 89.54%；
+>   分支阈值 85% 仍差 ≈700 条（总分支约 24.6k）。
+> - 缺口集中：`main-controller.ts`（404 条）、`cli/commands.ts`（314）、`application-runtime.ts`（312）、
+>   `public-sdk.ts`（295）——四文件占缺口约 45%。
+> - 本轮补 `task-ledger` 只读分支 7 条（索引空/有、推迟队列空/过滤、missing-inputs、index-missing、汇总视图）；
+>   该文件缺口 89→88（收益小，说明高杠杆在四个大文件）。
+> - 全量：**977 files（975 passed / 2 skipped）？**（以 `test:coverage` 输出为准：**6200 tests，6194 passed / 6 skipped**）；`lint` 0。
+> - 下一轮策略：按文件逐个补 `main-controller` 的错误/守卫分支（已有 `main-controller-guard-branches` 打底）。
