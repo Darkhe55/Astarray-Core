@@ -8675,3 +8675,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   ① `align02-project-summary-planning` 首查可能遇 `mission-not-found` ⇒ 视为"还没落盘"继续等；
 >   ② `mission-task-sequence-query` 15s 等待不足 ⇒ 放宽到 60s 且以任务链全 done 为准。
 > - 覆盖率测量再次因 flaky 中断（2 failed），下轮重测；当前有效值 82.97%。
+
+> **B9：本地保全分支 + 覆盖率达 83.00%（2026-11-25，第 195 轮）**
+>
+> - **覆盖率测量恢复稳定**：6346 tests（6340 passed / 6 skipped），分支 **83.00%**、语句 90.34%、函数 91.19%、行 90.75%。
+>   此前两轮 flaky 已修复，覆盖率跑无失败。
+> - 新增 5 条：触发矩阵（成功/未尝试/进行中不保全；网络失败与其他失败保全）、同步成功不建保全点、
+>   空目录 list 与缺失点读取报错、清单非法 JSON/哈希不符 fail-closed、list 跳过 .tmp- 与损坏目录。
