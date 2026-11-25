@@ -8581,3 +8581,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   verdicts 空记录与**导出成功/空路径拒绝**、run 非法配置与缺少 `--json`（均用法错误）。
 > - 覆盖 `goal-mode-command.ts`（77 个未覆盖槽位）与 `run-command.ts`（63 个）的入口分支。
 > - 覆盖率待下轮统一测量（当前 82.80%）。
+
+> **B9：task-ledger 写回/绑定守卫 + 覆盖率（2026-11-25，第 183 轮）**
+>
+> - 覆盖率：分支 **82.80% → 82.81%**（近两轮各 +0.01，收益趋平）。
+> - 新增 4 条：apply-write-back 无绑定（JSON/文本 index-missing）、bind-task-map 无绑定（JSON/文本）、
+>   有绑定但 mission 无该任务（invalid-task-chain）、哨兵 `*` 不得伪造 bound。
+> - 经验：本仓库运行时会在 mission 创建时自动绑定 `sequence-scheduler:<mission>`，
+>   再手动 `bind` 别的序列会被拒（journal-corrupted）；测试应使用既有绑定。
