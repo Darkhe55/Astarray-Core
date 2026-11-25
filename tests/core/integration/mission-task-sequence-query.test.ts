@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.setConfig({ testTimeout: 60_000 });
+vi.setConfig({ testTimeout: 120_000 });
 
 import { createApplicationRuntime } from "../../../packages/core/src/application/application-runtime.js";
 
@@ -44,11 +44,18 @@ describe("mission 任务序列只读查询", () => {
       const missionId = await runtime.controller.handleUserMessage("序列查询", {
         projectIdentifier: "project-a",
       });
-      const deadline = Date.now() + 15_000;
-      let status = await runtime.controller.queryMissionStatus(missionId);
-      while (status?.summary?.status !== "done" && Date.now() < deadline) {
+      /** 覆盖率插桩 + 并行负载下 15s 可能不够：放宽到 60s，并以任务链为权威。 */
+      const deadline = Date.now() + 60_000;
+      let status = null;
+      while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 50));
-        status = await runtime.controller.queryMissionStatus(missionId);
+        status = await runtime.controller
+          .queryMissionStatus(missionId)
+          .catch(() => null);
+        const taskStatuses = status?.taskChain?.tasks.map((task) => task.status) ?? [];
+        if (status?.summary?.status === "done" && taskStatuses.every((value) => value === "done")) {
+          break;
+        }
       }
       const sequence = await runtime.controller.queryMissionTaskSequence(missionId);
       expect(sequence).not.toBeNull();

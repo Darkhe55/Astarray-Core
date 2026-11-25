@@ -67,11 +67,15 @@ describe("ALIGN-02 项目摘要与规划", () => {
       expect(summaryProvider).toHaveBeenCalledWith(
         expect.objectContaining({ projectIdentifier: "project-a" }),
       );
+      /** 并发负载下 mission 可能尚未落盘：mission-not-found 视为"还没好"，继续等。 */
       const deadline = Date.now() + 20_000;
-      let status = await runtime.controller.queryMissionStatus(missionId);
-      while (status?.summary?.status !== "done" && Date.now() < deadline) {
+      let status = null;
+      while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 50));
-        status = await runtime.controller.queryMissionStatus(missionId);
+        status = await runtime.controller
+          .queryMissionStatus(missionId)
+          .catch(() => null);
+        if (status?.summary?.status === "done") break;
       }
       expect(status?.summary?.taskPlanningOutcome).toBe("model");
       expect(status?.taskChain?.tasks).toHaveLength(1);

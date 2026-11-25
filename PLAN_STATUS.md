@@ -8667,3 +8667,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **修复 flaky**：`b6r10-wait-for-task-terminal` ⑤ 在覆盖率插桩 + 并行负载下 20ms 上限可能来不及第二次轮询；
 >   上限提高到 200ms、间隔 3ms，**契约不变**（给上限且耗尽仍跑 ⇒ running）。全量覆盖率跑已复现一次，隔离跑通过。
 > - 覆盖率测量因该 flaky 中断（1 failed），下轮重测。
+
+> **B9：可观测性命令 + 再修 2 个 flaky（2026-11-25，第 194 轮）**
+>
+> - 新增 4 条：obs perf 无样本 JSON/文本（`hasSamples=false` + 说明）、obs diag 空数据、obs process 空样本与 `--summary` 聚合、obs diag export 窗口非法**拒绝且不写文件**。
+> - **再修 2 个并发脆弱测试**（覆盖率插桩下复现）：
+>   ① `align02-project-summary-planning` 首查可能遇 `mission-not-found` ⇒ 视为"还没落盘"继续等；
+>   ② `mission-task-sequence-query` 15s 等待不足 ⇒ 放宽到 60s 且以任务链全 done 为准。
+> - 覆盖率测量再次因 flaky 中断（2 failed），下轮重测；当前有效值 82.97%。
