@@ -8417,3 +8417,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   该文件缺口 89→88（收益小，说明高杠杆在四个大文件）。
 > - 全量：**977 files（975 passed / 2 skipped）？**（以 `test:coverage` 输出为准：**6200 tests，6194 passed / 6 skipped**）；`lint` 0。
 > - 下一轮策略：按文件逐个补 `main-controller` 的错误/守卫分支（已有 `main-controller-guard-branches` 打底）。
+
+> **B6 Linux 收口（2026-11-25，用户实测回贴）**
+>
+> - Ubuntu 22.04 VM 上 `tests/core/integration/exec01-02-sandbox-acceptance.test.ts`：**2 passed**
+>   ① 真实执行回传成功（非宿主直跑）② 800ms 超时由执行层真实终止并落 `timed-out`（813ms）。
+> - 前置 `verify-exec01-03-preconditions --strict`：ready=true、blockers=[]、bwrap 0.9.0、非特权 user namespace 可用。
+> - 结论：**B6 的 Linux 证据闭环**（EXEC-01 平台矩阵已更新）；B6 仅剩 macOS（无后端实现，需产品决定）。

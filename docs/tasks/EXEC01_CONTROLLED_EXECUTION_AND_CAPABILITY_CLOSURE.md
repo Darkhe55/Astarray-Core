@@ -273,8 +273,20 @@ stdout/stderr 分流，readOutput 使用字节游标及单次有界输出（默�
 非提权降级档，网络不封、强度更弱）。详见
 `docs/reports/EXEC01_02_B1_WINDOWS_SANDBOX_VERIFICATION_2026-11-09.md` §4。
 
-**仍未验证**：Linux（bubblewrap）、macOS（App Sandbox）—— 本机无对应环境。
-辅助程序尚未接入 `ProcessExecutionController` 的 `SandboxExecutionBackend` 端口。
+**仍未验证**：macOS（App Sandbox）—— 本机与现有设备均无 macOS 环境。
+
+**Linux（bubblewrap）已验收（2026-11-25，Ubuntu 22.04 VM，`8f1eaab6`）**：
+
+- `verify-exec01-03-preconditions --strict`：`readyForAcceptance=true`、`blockers=[]`、
+  bwrap 0.9.0、非特权用户命名空间可用；
+- `exec01-02-sandbox-acceptance`：**2 passed**（① 真实执行回传成功；② 800ms 超时由 Job/进程组真实终止并落 `timed-out`）；
+- 修复记录：nvm 安装的 node 位于 `/home/ubuntu/.nvm/...`，bwrap 原先只 bind `/usr` 等目录 ⇒ 沙箱内
+  `execvp ... No such file or directory`；现对**默认 bind 之外的可执行文件**单独 `--ro-bind <exe> <exe>`
+  （只绑文件，不绑目录），并有单测钉住。
+
+**Windows（AppContainer）状态不变**：管理员会话可创建/执行；普通会话建进程返回 5；
+已按用户裁决走 E 双档（强档=安装期提权 broker；弱档=受限令牌+Low IL，显式开启）。
+辅助程序已接入 `ProcessExecutionController` 的 `SandboxExecutionBackend` 端口。
 
 ## 04 公开 SDK 执行面（2026-11-09，`d840b386`）
 
