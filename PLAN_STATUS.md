@@ -8529,3 +8529,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   委派通信/工具帮助/模型绑定解析与清除。
 > - 断言按语义区分"抛错/空结果/明确值"，不写成"调用即绿"。
 > - 覆盖率待下轮统一测量（上轮 82.59%）。
+
+> **B9：门面零覆盖方法第三批（2026-11-25，第 176 轮）**
+>
+> - 覆盖率上一测 **82.67%**（+0.08）；本批新增 5 条：目标模式（激活/状态/解绑/停用/关闭实验）、
+>   非法目标合同拒绝、协调控制（agent 来源不生效）、会话提权（列表/创建/撤销/排队优先）、
+>   独立审查与通知偏好。
+> - 剩余零覆盖方法清单已缩减至约 15 个（工具包 zip、`dispatchDirectTask`、`requestRuntimeTaskInsertion`、
+>   `verifyArtifact`、`queryMissionStatus`/`cancelMission`/`transitionMode` 等）。
