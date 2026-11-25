@@ -8483,3 +8483,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 覆盖率：分支 **82.27% → 82.33%**（≈+15 条）；函数 89.7%、行 89.84%。
 > - 节奏调整：不再每轮跑全量覆盖率（7 分钟/次），改为**连续补 3–4 轮再测一次**；
 >   下一批按"存储损坏矩阵 + 导出/查询类分支"批量编写。
+
+> **B9：存储损坏矩阵（2026-11-25，第 170 轮）**
+>
+> - 新增 6 条损坏矩阵用例：DecisionSubmissionStore（corrupted + 拒绝覆盖）、CoordinationTaskApplicationLedger（不静默当空）、
+>   MissionSequenceBindingStore（不伪造绑定）、DeferredInsertionQueueStore（回空队列）、MissionTaskSequenceMapStore（不伪造映射）、
+>   ResumeIntentReceiptStore（损坏不返回可用回执）。
+> - 覆盖率暂不重复测量（按上轮节奏，每 3–4 轮统一测）；测试数 6234。
+> - 下一批：AgentTaskSequenceStore / GoalContractStore / GoalModeStateStore / DecisionWritebackStore 同矩阵。
