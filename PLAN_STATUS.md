@@ -8605,3 +8605,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   同一不存在路径按"最近存在祖先+剩余段"规范化后放行（由后续读取失败）、声明存在但实际不存在 ⇒ 拒绝。
 > - 该函数是 SDK 入口的"先自证再 I/O"护栏，直接覆盖 `cross-project-authorization-store.ts` 150–190 行分支。
 > - 门禁：typecheck 0、lint 0、隐私 ok。
+
+> **B9：processExecution 守卫与参数契约（2026-11-25，第 186 轮）**
+>
+> - 新增 5 条：非法 action（统一入口拦截）、未装配沙箱后端拒绝且不降级、缺调用主体拒绝、
+>   readOutput 缺 stream 拒绝、cancel 多余 reason 被参数校验拒绝。
+> - 覆盖 `builtins.ts` 的 processExecution 分派与守卫分支（含安全关键的"拒绝降级到宿主进程"）。
+> - 契约观察：`processExecution` 作为统一入口时，未知 action 在统一入口层被拦截；
+>   `cancel` 传入 `reason` 会被动作参数校验拒绝（不是静默忽略）。
