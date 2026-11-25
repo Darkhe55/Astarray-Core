@@ -8373,3 +8373,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 运行时接线：`recalledContextBlocksProvider` 只注入**显式登记**的块（未请求不自动注入、不做相似度召回）。
 > - 6 条反例；全量：**975 files（973 passed / 2 skipped），6183 tests（6177 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - 修正一处类型误用：`readJsonWithBackupRecovery` 返回**已解析对象**（content: unknown），不是字符串。
+
+> **WIRING-04-01 旧状态迁移对账（2026-11-25，第 160 轮）**
+>
+> - 新增 `reconcileLegacyAppliedWithoutIntent`：journal=applied 但无业务意图时——有同消息权威证据且指纹一致 ⇒ 只补 completed；
+>   无证据 ⇒ `needs-reconciliation`（不重放、不按任务恰好 done 推断）；指纹冲突 ⇒ `conflict`；已有意图 ⇒ 跳过。
+> - 6 条反例；全量：**976 files（974 passed / 2 skipped），6189 tests（6183 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - WIRING-04 剩余：整卡端到端（映射→包/回访→真实请求载荷，需本地假 Provider 装配）、原子提交单元、真实双进程接管。
+
+> **推送状态（2026-11-25 第 160 轮）**：`de59da02` 3 次推送失败（网络 reset/不可达）；留待下次合并推送。

@@ -231,3 +231,78 @@ async function applyOneCoordinationMessage(input: {
     throw error;
   }
 }
+/**
+ * WIRING-04-01 补口（2026-11-25）：**旧状态迁移对账**（journal=applied 但无业务意图）。
+ *
+ * 卡内固定："旧 journal applied 但无业务意图时，记录 needs-reconciliation。仅有权威任务的
+ * 同消息应用证据才能补 completed；证据不足保留 blocked 并报告，不自动重放可能有副作用的旧消息，
+ * 不根据任务恰好 done 推断该消息已经应用。"
+ *
+ * 本函数是纯判定：
+ * - 已有意图 ⇒ 不属于旧状态，跳过（`already-tracked`）；
+ * - 无证据 ⇒ `needs-reconciliation`（**不重放**，交人工/诊断）；
+ * - 有证据且内容指纹一致 ⇒ `backfillable-completed`（只补回执）；
+ * - 有证据但指纹冲突 ⇒ `conflict`（不补、不重放，保留待复核）。
+ */
+export interface LegacyAppliedMessageRecord {
+  readonly messageIdentifier: string;
+  readonly missionIdentifier: string | null;
+  /** 消息内容指纹（旧记录可能没有）。 */
+  readonly contentFingerprint: string | null;
+}
+
+export type LegacyAppliedReconciliationOutcome =
+  | "already-tracked"
+  | "backfillable-completed"
+  | "needs-reconciliation"
+  | "conflict";
+
+export interface LegacyAppliedReconciliationResult {
+  readonly messageIdentifier: string;
+  readonly outcome: LegacyAppliedReconciliationOutcome;
+  readonly reason: string;
+}
+
+export function reconcileLegacyAppliedWithoutIntent(input: {
+  readonly appliedMessages: readonly LegacyAppliedMessageRecord[];
+  readonly trackedMessageIdentifiers: ReadonlySet<string>;
+  readonly authoritativeEvidence: ReadonlyMap<
+    string,
+    { readonly contentFingerprint: string | null }
+  >;
+}): readonly LegacyAppliedReconciliationResult[] {
+  return input.appliedMessages.map((message) => {
+    if (input.trackedMessageIdentifiers.has(message.messageIdentifier)) {
+      return {
+        messageIdentifier: message.messageIdentifier,
+        outcome: "already-tracked" as const,
+        reason: "已有业务意图：不属于旧状态迁移范围。",
+      };
+    }
+    const evidence = input.authoritativeEvidence.get(message.messageIdentifier);
+    if (evidence === undefined) {
+      return {
+        messageIdentifier: message.messageIdentifier,
+        outcome: "needs-reconciliation" as const,
+        reason:
+          "journal 记为 applied 但无业务意图、权威状态也无同消息应用证据：记录待对账，不自动重放。",
+      };
+    }
+    if (
+      message.contentFingerprint !== null &&
+      evidence.contentFingerprint !== null &&
+      message.contentFingerprint !== evidence.contentFingerprint
+    ) {
+      return {
+        messageIdentifier: message.messageIdentifier,
+        outcome: "conflict" as const,
+        reason: "权威证据的内容指纹与消息不一致：不补 completed、不重放，保留待复核。",
+      };
+    }
+    return {
+      messageIdentifier: message.messageIdentifier,
+      outcome: "backfillable-completed" as const,
+      reason: "权威状态已有同消息应用证据：只补 completed，不产生新副作用。",
+    };
+  });
+}
