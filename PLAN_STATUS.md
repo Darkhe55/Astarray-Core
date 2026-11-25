@@ -8318,3 +8318,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 8 条（6 条计数 + 2 条 dispatch 接线）。
 > - 全量：**969 files（967 passed / 2 skipped），6150 tests（6144 passed / 6 skipped），EXIT=0**；`lint` 0。
 > - RESUME-02 剩余：真实 IM 适配器（B7 平台阻塞）、人工验收（B8）。
+
+> **COORD-05 05-06 请求体统计采集端（2026-11-25，第 154 轮）**
+>
+> - 新增 `escalation-payload-stats.ts`：对**实际要注入的 payload** 度量字节数与保守 token 估算（字符/4，标 isTokenEstimate）；
+>   文档读取按真实内容度量并复用 `EscalationObservationLedger` 判"未变版本重复读取"（个体×文档×revision）；
+>   观测本身**不保留正文**（只记长度/字段数/身份/revision），快照不含内容。
+> - 6 条反例（度量、账本累加、重复判定、换 revision/换个体不重复、快照不含正文、空 payload 不抛错）。
+> - 全量：**970 files（968 passed / 2 skipped），6156 tests（6150 passed / 6 skipped），EXIT=0**；`lint` 0。
+> - COORD-05 剩余：秘书激活状态与投递器的真实宿主实现（需产品/宿主接线）、整卡三路径运行时端到端。
