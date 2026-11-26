@@ -354,7 +354,7 @@ export async function executeGoalModeConfirmCommand(
     runtime: "mock",
   });
   try {
-    const activation = application.activateGoalMode({
+    const activation = application.goal.activateGoalMode({
       isExplicitUserRequest: true,
       isAuthenticatedUser: true,
       isExplicitlyEnabled: true,

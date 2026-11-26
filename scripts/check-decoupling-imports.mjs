@@ -11,6 +11,7 @@ import path from "node:path";
 import {
   collectDecouplingMetrics,
   collectTsFiles,
+  findFacadeBypassViolations,
   findImportViolations,
 } from "./lib/decoupling-import-rules.mjs";
 
@@ -22,17 +23,26 @@ for (const directory of ["packages/core/src/public-sdk-facets", "packages/core/s
 }
 
 const violations = findImportViolations(files);
+const cliFiles = await collectTsFiles(repositoryRoot, "packages/tui/src");
+const bypassViolations = findFacadeBypassViolations(cliFiles);
 const isJsonRequested = process.argv.includes("--json");
 const metrics = isJsonRequested ? await collectDecouplingMetrics(repositoryRoot) : null;
 
-if (violations.length > 0) {
-  console.error(`decoupling-imports: ${String(violations.length)} 处违规`);
+if (violations.length > 0 || bypassViolations.length > 0) {
+  console.error(
+    `decoupling-imports: ${String(violations.length + bypassViolations.length)} 处违规`,
+  );
   for (const violation of violations) {
     console.error(`  [${violation.rule}] ${violation.path} → ${violation.specifier}`);
   }
+  for (const violation of bypassViolations) {
+    console.error(
+      `  [${violation.rule}] ${violation.path}:${String(violation.line)} → ${violation.methodName}`,
+    );
+  }
   process.exitCode = 1;
 } else {
-  console.log("decoupling-imports-ok: facet/服务单向依赖规则未发现违规");
+  console.log("decoupling-imports-ok: facet/服务单向依赖与 CLI 窄依赖规则均未发现违规");
 }
 
 if (metrics !== null) {

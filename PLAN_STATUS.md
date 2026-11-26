@@ -8881,3 +8881,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   隐私 ok / import 规则零违规。
 > - 新增 `docs/reports/DECOUPLING_REFACTOR_SUMMARY_2026-11-26.md`：五阶段交付物、指标对比（控制器 imports 107→85、
 >   5 facet、5 服务、69 条反例、覆盖率 83.05%→83.3%）与**未关闭项**（Mission 写路径、CLI 未全量、门面行数、85% 缺口）。
+
+> **全面解耦改造 P2 第十二切片：CLI 窄依赖规则强制（2026-11-26）**
+>
+> - `activateGoalMode` 最后 2 处直接调用改走 `application.goal.*`。
+> - `decoupling-import-rules.mjs` 新增 `findFacadeBypassViolations`：扫描 CLI 中 `application.<facet 方法>(` 直接调用；
+>   并入 `check-decoupling-imports` 与 `test:scripts`（51→62 条脚本测试）。
+> - 反例 4 条（直接调用报错、合规不误报、非 tui 不参与、真实仓库零违规）。
+> - 门禁：`npm test` **1027 files / 6445 tests 全过**；test:scripts **62/62**；lint 0；隐私 ok。

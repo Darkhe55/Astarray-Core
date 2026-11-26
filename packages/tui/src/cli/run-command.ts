@@ -346,7 +346,7 @@ try {
      * 未给 `--goal` ⇒ 不激活、行为不变。
      */
     if (options.goalIdentifier !== undefined) {
-      const activation = application.activateGoalMode({
+      const activation = application.goal.activateGoalMode({
         isExplicitUserRequest: true,
         isAuthenticatedUser: true,
         isExplicitlyEnabled: true,

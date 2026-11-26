@@ -127,3 +127,72 @@ export async function collectDecouplingMetrics(rootDirectory) {
   metrics.facets = facetNames.sort();
   return metrics;
 }
+
+/** 子门面已覆盖的方法名（CLI 必须经由 facade.<facet>.* 调用，不得直接调用整门面）。 */
+export const FACET_COVERED_METHOD_NAMES = [
+  // goal
+  "activateGoalMode",
+  "getGoalModeActivation",
+  "proposeGoalContract",
+  "confirmGoalContract",
+  "createGoalContract",
+  "bindMissionToGoal",
+  "unbindMissionFromGoal",
+  "describeGoalStatus",
+  "deactivateGoal",
+  "closeGoalExperiment",
+  "bindRequirementTaskMapping",
+  "invalidateGoalEvidence",
+  // permission
+  "listPermissionToolOverview",
+  "previewToolPermission",
+  "queryPermissionToolOverview",
+  "queryParameterAuthorizationSettings",
+  "queryParameterAuthorizationRuleDetails",
+  "updateParameterAuthorizationSettings",
+  "updateParameterAuthorizationRules",
+  // ops
+  "queryStartupRecoveryState",
+  "queryExperimentCatalog",
+  "queryArtifacts",
+  "queryMissionArtifacts",
+  // context
+  "queryContextSettings",
+  "updateContextBudget",
+  // mission
+  "queryMissionStatus",
+  "queryMissionTaskSequence",
+  "queryMission",
+  "queryMissionRawStatus",
+  "queryTask",
+  "submitTask",
+  "cancelTask",
+];
+
+const FACET_BYPASS_PATTERN = new RegExp(
+  "\\bapplication\\.(" + FACET_COVERED_METHOD_NAMES.join("|") + ")\\(",
+);
+
+/**
+ * CLI 绕过子门面的检查：输入 `{ relativePath, source }[]`（packages/tui/src 下）。
+ * 违规 = `application.<facet 方法>(...)` 直接调用。
+ */
+export function findFacadeBypassViolations(files) {
+  const violations = [];
+  for (const file of files) {
+    const normalized = file.relativePath.split(path.sep).join("/");
+    if (!normalized.startsWith("packages/tui/src/")) continue;
+    const lines = file.source.split("\n");
+    for (const [index, line] of lines.entries()) {
+      const match = FACET_BYPASS_PATTERN.exec(line);
+      if (match === null) continue;
+      violations.push({
+        path: normalized,
+        line: index + 1,
+        methodName: match[1],
+        rule: "cli-must-use-facet-getters",
+      });
+    }
+  }
+  return violations;
+}

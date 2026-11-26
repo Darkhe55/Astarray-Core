@@ -12,6 +12,8 @@ import assert from "node:assert/strict";
 import {
   collectDecouplingMetrics,
   collectImportSpecifiers,
+  collectTsFiles,
+  findFacadeBypassViolations,
   findImportViolations,
 } from "./decoupling-import-rules.mjs";
 
@@ -129,5 +131,49 @@ describe("解耦 import 规则", () => {
     const violations = findImportViolations(files);
     assert.equal(violations.length, 1);
     assert.equal(violations[0].path, "packages/core/src/public-sdk-facets/bad.ts");
+  });
+});
+
+describe("CLI 子门面窄依赖规则", () => {
+  it("⑧ 反例：CLI 直接调 application.queryTask ⇒ 违规", () => {
+    const violations = findFacadeBypassViolations([
+      {
+        relativePath: "packages/tui/src/cli/bad-command.ts",
+        source: 'const task = await application.queryTask({ sessionId, taskIdentifier });\n',
+      },
+    ]);
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].methodName, "queryTask");
+    assert.equal(violations[0].rule, "cli-must-use-facet-getters");
+  });
+
+  it("⑨ 合规：application.mission.queryTask / application.goal.* 不误报", () => {
+    const violations = findFacadeBypassViolations([
+      {
+        relativePath: "packages/tui/src/cli/good-command.ts",
+        source: [
+          "await application.mission.queryTask({ sessionId, taskIdentifier });",
+          "await application.goal.activateGoalMode({ requestedBy: 'user' });",
+          "await application.permission.queryParameterAuthorizationSettings();",
+        ].join("\n"),
+      },
+    ]);
+    assert.deepEqual(violations, []);
+  });
+
+  it("⑩ 非 tui 目录不参与该规则（只约束 CLI 层）", () => {
+    const violations = findFacadeBypassViolations([
+      {
+        relativePath: "packages/core/src/somewhere.ts",
+        source: "application.queryTask({});\n",
+      },
+    ]);
+    assert.deepEqual(violations, []);
+  });
+
+  it("⑪ 真实仓库 CLI 当前零违规（CLI 只用子门面）", async () => {
+    const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
+    const files = await collectTsFiles(repositoryRoot, "packages/tui/src");
+    assert.deepEqual(findFacadeBypassViolations(files), []);
   });
 });
