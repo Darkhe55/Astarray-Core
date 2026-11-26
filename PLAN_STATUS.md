@@ -8753,3 +8753,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 计划文档：`docs/design/REFACTOR_PLAN_2026-11-26.md`（P1 done；P2 门面拆分 / P3 权限服务 /
 >   P4 目标门禁适配器 / P5 矩阵治理 待做）。
 > - 门禁：`npm test` 1016 files / 6380 tests 全过；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P2 第一切片：权限域子门面（2026-11-26）**
+>
+> - 新增 `public-sdk-facets/permission-facet.ts`：4 个权限查询/预览方法迁出，宿主为窄接口（controller 两个查询入口 + 参数授权设置存储 + `assertOpen`）；门面保留同名方法委托，导出面不变。
+> - `public-sdk.ts` 8540 → 8525 行；新增 4 条子门面单测（含关闭态不触达 controller）；`gui03-parameter-authorization` 回归通过。
+> - 门禁：`npm test` **1017 files / 6384 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
+> - P1 后覆盖率实测：分支 **83.13%**（基线 83.05%，未下降）。

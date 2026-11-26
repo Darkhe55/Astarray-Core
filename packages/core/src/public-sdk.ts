@@ -259,6 +259,7 @@ import {
   type ParameterAuthorizationSettingChangeOutcome,
   type ToolAuthorizationShape,
 } from "./tools/parameter-authorization-settings-store.js";
+import { PermissionFacet } from "./public-sdk-facets/permission-facet.js";
 
 // ─── MERGE-01 §1.3：参数授权**设置入口**与"关闭细分不得静默扩大权限" ───
 // 卡内："关闭细分若会从 deny/ask 回退 allow，必须明确提示放宽范围，
@@ -4434,10 +4435,23 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
   }
 
+  /**
+   * AXIOMATIC-DESIGN P2：权限域子门面的**窄接口装配**。
+   *
+   * 只暴露 controller 的两个查询入口与参数授权设置存储；子门面不感知门面其余状态。
+   */
+  private createPermissionFacet(): PermissionFacet {
+    return new PermissionFacet({
+      permissionController: this.runtime.controller,
+      assertOpen: () => this.assertOpen(),
+      createParameterAuthorizationSettingsStore: () =>
+        this.createParameterAuthorizationSettingsStore(),
+    });
+  }
+
   /** 与主控制器同名的门面转发（PublicApplicationService 形状要求）。 */
   async listPermissionToolOverview() {
-    this.assertOpen();
-    return this.runtime.controller.listPermissionToolOverview();
+    return await this.createPermissionFacet().listPermissionToolOverview();
   }
 
   /** 与主控制器同名的门面转发（PublicApplicationService 形状要求）。 */
@@ -4445,25 +4459,12 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     readonly toolName: string;
     readonly action: string;
   }) {
-    this.assertOpen();
-    return this.runtime.controller.previewToolPermission(input);
+    return await this.createPermissionFacet().previewToolPermission(input);
   }
 
   /** AUTH-UI-01：真实工具权限概览（工具/action/当前基线）。 */
-  async queryPermissionToolOverview(): Promise<
-    Array<{
-      toolName: string;
-      isActionOnly: boolean;
-      capabilityIds: string[];
-      actions: Array<{ action: string; capabilityIds: string[] }>;
-      baselineDecision: "allow" | "ask" | "deny" | null;
-      baselineSource: "profile-capabilities" | "unknown";
-      isRegistered: boolean;
-      isExecutable: boolean;
-    }>
-  > {
-    this.assertOpen();
-    return this.runtime.controller.listPermissionToolOverview();
+  async queryPermissionToolOverview() {
+    return await this.createPermissionFacet().queryPermissionToolOverview();
   }
 
   /**
@@ -4607,23 +4608,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   /** GUI-03-03：读取参数授权规则明细（只读；供设置页展示，不含凭据）。 */
-  async queryParameterAuthorizationRuleDetails(): Promise<{
-    isParameterAuthorizationEnabled: boolean;
-    isParameterRulesEnabled: boolean;
-    perToolRulesEnabled: Record<string, boolean>;
-    configurationRevision: number;
-    rules: ParameterAuthorizationRule[];
-  }> {
-    this.assertOpen();
-    const store = this.createParameterAuthorizationSettingsStore();
-    const document = await store.readSettings();
-    return {
-      isParameterAuthorizationEnabled: document.settings.isParameterAuthorizationEnabled,
-      isParameterRulesEnabled: document.settings.isParameterRulesEnabled,
-      perToolRulesEnabled: document.settings.perToolRulesEnabled ?? {},
-      configurationRevision: document.configurationRevision ?? 0,
-      rules: document.rules,
-    };
+  async queryParameterAuthorizationRuleDetails() {
+    return await this.createPermissionFacet().queryParameterAuthorizationRuleDetails();
   }
 
   /**
