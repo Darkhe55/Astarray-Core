@@ -8889,3 +8889,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   并入 `check-decoupling-imports` 与 `test:scripts`（51→62 条脚本测试）。
 > - 反例 4 条（直接调用报错、合规不误报、非 tui 不参与、真实仓库零违规）。
 > - 门禁：`npm test` **1027 files / 6445 tests 全过**；test:scripts **62/62**；lint 0；隐私 ok。
+
+> **全面解耦改造最终验证（2026-11-26）**
+>
+> - 最终覆盖率实测：语句 90.56% / 分支 **83.32%** / 函数 91.38% / 行 90.95% ⇒ 高于改造前基线 83.05%（+0.27pp）。
+> - 最终门禁：typecheck 0、lint 0、test **1027 files / 6445 tests 全过**、test:scripts **62/62**、隐私 ok、解耦规则零违规。
+> - 总结报告已更新为最终版（含 CLI 窄依赖证据与 85% 阈值缺口记录）。

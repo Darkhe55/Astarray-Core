@@ -25,7 +25,7 @@
 | 新增反例测试 | — | **69 条**（含 7 条脚本反例） |
 | 全量测试 | 6374 | **6445** |
 | `test:scripts` | 51 | **58** |
-| 分支覆盖率 | 83.05% | **83.3%** |
+| 分支覆盖率 | 83.05% | **83.32%**（最终实测） |
 
 ## 二·补充：CLI 窄依赖的证据
 
@@ -53,4 +53,12 @@ npm run verify:privacy
 npm run verify:decoupling-imports
 ```
 
-最近一次结果：`typecheck` 0、`lint` 0、`test` 1027 files / 6445 tests 全过、`test:scripts` 58/58、隐私 `privacy-ok`、import 规则零违规。
+最终结果（2026-11-26）：
+
+- `typecheck`：0
+- `lint`：0
+- `npm test`：**1027 files / 6445 tests 全过**（6 skipped）
+- `test:scripts`：**62/62**
+- 隐私：`privacy-ok`
+- 解耦规则：`decoupling-imports-ok`（facet/服务单向依赖 + CLI 窄依赖）
+- 覆盖率：语句 90.56% / **分支 83.32%** / 函数 91.38% / 行 90.95%（基线 83.05% ✅；85% 全局阈值仍差 1.68pp，属既有 B9 缺口）
