@@ -17,6 +17,10 @@ import { ModeMachine } from "../core/mode-machine.js";
 import { SessionAuthorizationManager } from "../core/permission-policy.js";
 import { PermissionDecider } from "../core/permission-policy.js";
 import { TaskStore } from "../infra/task-store.js";
+import {
+  resolveRuntimeOptionGroups,
+  type RuntimeOptionGroups,
+} from "./runtime-option-groups.js";
 import { MissionLeaseStore } from "../infra/mission-lease-store.js";
 import { ToolRegistry } from "../tools/registry.js";
 import {
@@ -810,6 +814,12 @@ export interface ApplicationRuntime {
 }
 
 export interface ApplicationRuntimeOptions {
+  /**
+   * AXIOMATIC-DESIGN P5：**分组选项入口**（可选；旧平铺字段继续有效）。
+   *
+   * 同一语义字段同时以分组与平铺给出且值不同 ⇒ 显式报错（见 runtime-option-groups.ts）。
+   */
+  optionGroups?: RuntimeOptionGroups;
   /** R147：主 Agent 自动提交提案（缺省关；ponder 模式）。 */
   isMainAgentProposalAutoSubmitEnabled?: boolean;
   missionRuntimePreparer?: (input: {
@@ -1117,6 +1127,8 @@ function deriveMainAgentInstanceIdFromStateDirectory(stateDirectory: string): st
 export async function createApplicationRuntime(
   options: ApplicationRuntimeOptions,
 ): Promise<ApplicationRuntime> {
+  /** AXIOMATIC-DESIGN P5：分组入口先归一化为平铺字段（冲突显式报错）。 */
+  options = resolveRuntimeOptionGroups(options);
   const stateDirectory = options.stateDirectory;
   /**
    * SHUTDOWN-01（2026-11-17）：登记**后台派生写**，让 `shutdown()` 能有界地等它们结束。

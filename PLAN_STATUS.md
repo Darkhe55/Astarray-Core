@@ -8840,3 +8840,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 规则：facet 不得反向 import 门面/应用层；已抽出的 orchestration 模块不得回指控制器/门面/应用层。
 > - 反例 7 条并入 `test:scripts`（**51 → 58 全过**），真实仓库当前零违规；同时导出解耦指标。
 > - 门禁：`npm test` **1026 files / 6433 tests 全过**；lint 0；隐私 ok。
+
+> **全面解耦改造 P5 第二切片：运行时选项分组 + 矩阵复核（2026-11-26）**
+>
+> - 新增 `application/runtime-option-groups.ts`：分组入口（execution/observability/mission）归一化为平铺字段；
+>   旧平铺字段继续有效；分组+平铺冲突 ⇒ `RuntimeOptionConflictError`（列出字段，不静默择一）。
+> - `createApplicationRuntime` 入口先归一化；反例 6 条。
+> - 设计矩阵报告追加「改造后复核」：控制器 imports 107→85、5 个子门面、5 个新服务、条件/未关闭耦合清单。
+> - 门禁：`npm test` **1027 files / 6439 tests 全过**；test:scripts 58/58；typecheck/lint 0；隐私 ok。

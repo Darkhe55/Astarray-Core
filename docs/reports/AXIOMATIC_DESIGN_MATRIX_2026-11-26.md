@@ -138,3 +138,38 @@ receipt → verdict → goal gate → lease owner → done
 | 建议主轴 | 先显式化"完成判定"（三角化），再按 FR 拆分门面与控制器，最后以矩阵 + import 规则治理 |
 
 > 局限：本矩阵基于源码结构、import 统计、卡状态与测试观测得出，是**结构级**判断；未对每个 DP 做形式化耦合度量（如传递闭包分析）。若要更严格，可在 CI 中生成 import 图并计算"FR 分组间耦合度"。
+
+---
+
+## 改造后复核（2026-11-26，P1–P5 阶段成果）
+
+> 数据由 `node scripts/check-decoupling-imports.mjs --json` 实测；纪律：先反例、后实现、每轮全量门禁。
+
+### 结构变化
+
+| 位置 | 改造前 | 改造后 | 说明 |
+|---|---|---|---|
+| `orchestration/main-controller.ts` | 6183 行 / 107 imports | **6219 行 / 85 imports** | imports 减少 22，权限/完成/门禁逻辑迁出 |
+| `public-sdk.ts` | 8540 行 / 101 imports | **8599 行 / 205 imports** | 5 个子门面 + getter + 委托；逻辑迁出、签名保留 |
+| 子门面 | 无 | **5 个**（mission/permission/goal/context/ops） | 23 个方法、31 条独立单测 |
+| 新服务/适配器 | 无 | **5 个**（完成判定、权限纯判定、权限概览、权限服务、目标门禁适配器） | 28 条反例单测 |
+
+### FR/DP 复核
+
+| FR | 改造前耦合 | 改造后 | 证据 |
+|---|---|---|---|
+| FR1 完成判定 | 控制器内联 receipt→verdict→goal gate | `decideMissionCompletion` 固定顺序聚合器 | 7 条反例；strict-off 两步 skipped |
+| FR3 权限判定 | `strictest` 与 `computeCapabilityBaseline` 两份实现 | `resolveToolBaselineDecision` + `PermissionResolutionService` | 17 条反例 |
+| FR4 目标门禁 | 控制器内联观察/强制 | `GoalDispatchGateAdapter`（端口注入） | 5 条反例 |
+| FR5 概览/预览 | 控制器内联装配 | `buildPermissionToolOverview` + 服务 | 11 条反例 |
+| FR6 context 预算 | 门面内联读写 | `ContextFacet` | 5 条反例 |
+| 门面 fan-in | 128 处依赖整门面 | 可按需依赖 5 个子门面 | `facade.goal` 等 getter |
+| 依赖方向 | 无强制 | `verify:decoupling-imports` 规则检查 | 7 条脚本反例，并入 `test:scripts` |
+
+### 仍未关闭的耦合（诚实记录）
+
+1. **Mission 写路径**（submit/cancel/resume）仍在门面：状态机与幂等账本跨方法共享，尚未按 facet 拆；
+2. **CLI 仅 Goal 命令**改为窄依赖；其余命令仍直接调用整门面；
+3. `public-sdk.ts` 行数**未降**（签名与委托保留），"单文件 < 3000 行"目标依赖 Mission/Context 大块实现迁出；
+4. `main-controller` 仍有 `projectMissionCompletionGate` 的端口装配与多处编排职责（P1 已收敛判定顺序，但控制器仍大）。
+
