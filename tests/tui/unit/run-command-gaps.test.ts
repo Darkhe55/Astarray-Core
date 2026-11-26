@@ -35,9 +35,11 @@ function buildNeverTerminalApplication(): {
 } {
   let queryCount = 0;
   const application = {
-    queryTask: async () => {
+    mission: {
+      queryTask: async () => {
       queryCount += 1;
       return { taskIdentifier: "cli-task", status: "running" as const, missionIdentifier: "m1" };
+    },
     },
   } as unknown as AstarrayApplicationFacade;
   return { application, queryCount: () => queryCount };

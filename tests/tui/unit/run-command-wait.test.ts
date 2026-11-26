@@ -12,13 +12,13 @@ afterEach(() => {
 
 function makeApplication(statusSequence: string[]) {
   let callIndex = 0;
-  return {
-    queryTask: vi.fn(async () => {
-      const status = statusSequence[Math.min(callIndex, statusSequence.length - 1)]!;
-      callIndex += 1;
-      return { taskIdentifier: "task-1", status, missionIdentifier: "mission-1", summaryPreview: null };
-    }),
-  } as unknown as AstarrayApplicationFacade;
+  const queryTask = vi.fn(async () => {
+    const status = statusSequence[Math.min(callIndex, statusSequence.length - 1)]!;
+    callIndex += 1;
+    return { taskIdentifier: "task-1", status, missionIdentifier: "mission-1", summaryPreview: null };
+  });
+  /** AXIOMATIC P2：CLI 已改走 facade.mission 子门面。 */
+  return { mission: { queryTask } } as unknown as AstarrayApplicationFacade;
 }
 
 describe("T07D-R2-03：CLI 任务等待策略", () => {

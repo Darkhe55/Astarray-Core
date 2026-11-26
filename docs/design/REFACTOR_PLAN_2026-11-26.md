@@ -43,7 +43,7 @@ task-chain → receipts → independent-verdict
 **子门面入口与 CLI 窄依赖（第七切片）**：
 - 门面新增只读 getter：`facade.permission/ops/goal/context/mission`（首次访问构造并缓存）；
 - `goal-mode-command.ts` 的 5 处调用改走 `application.goal.*`；`parameter-authorization-settings-command.ts`
-  的 3 处调用改走 `application.permission.*`；
+  的 3 处调用改走 `application.permission.*`；`run-command.ts` 的 4 处 `queryTask` 改走 `application.mission.*`；
   验证"CLI 只依赖所需子门面"；`recomputeGoalPotential` 尚不在 goal facet，暂留门面；
 - 单测 3 条：getter 缓存同一实例、窄方法面不含整门面方法、关闭态拒绝。
 

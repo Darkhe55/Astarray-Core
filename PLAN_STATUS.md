@@ -8862,3 +8862,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 覆盖率实测：语句 90.55% / 分支 **83.3%** / 函数 91.41% / 行 90.94%（基线 83.05% ⇒ **未下降**，+0.25pp）；
 >   `--coverage` 仍因全局 85% 阈值退出 1（既有 B9 缺口，非本轮回归）。
 > - 门禁：`npm test` **1027 files / 6443 tests 全过**；typecheck/lint 0；隐私 ok；import 规则零违规。
+
+> **全面解耦改造 P2 第十切片：run 命令改走 mission 子门面（2026-11-26）**
+>
+> - `run-command.ts` 4 处 `queryTask` 改走 `application.mission.queryTask`；三处测试假端口同步补 `mission` 子门面。
+> - 回归：`run-command-*`、`b6r10-wait-for-task-terminal` 全过。
+> - 门禁：`npm test` **1027 files / 6443 tests 全过**；`test:scripts` 58/58；typecheck/lint 0；隐私 ok。

@@ -383,7 +383,7 @@ try {
       options.permissionDecisionPort ?? new InteractivePermissionAskDecisionPort();
     let hasObservedTerminalTaskFailure = false;
     const refreshTerminalTaskFailure = async (): Promise<void> => {
-      const currentTask = await application.queryTask({
+      const currentTask = await application.mission.queryTask({
         sessionId: "cli-run",
         taskIdentifier: "cli-task",
       });
@@ -442,7 +442,7 @@ try {
       const permissionAsk = await waitForPermissionAsk(
         escalationMessages,
         PERMISSION_ASK_WAIT_MILLISECONDS,
-        () => application.queryTask({ sessionId: "cli-run", taskIdentifier: "cli-task" }),
+        () => application.mission.queryTask({ sessionId: "cli-run", taskIdentifier: "cli-task" }),
         0,
         () => hasObservedTerminalTaskFailure,
         // 第 2 轮起（已授权、任务正在重跑）：给推进窗口，等新询问或终态，
@@ -456,7 +456,7 @@ try {
        * 裁决层并得到 `requires-human-resubmission`，从而在输出里伪造一个不存在的权限询问。
        */
       if (permissionAsk === null) {
-        const currentTask = await application.queryTask({
+        const currentTask = await application.mission.queryTask({
           sessionId: "cli-run",
           taskIdentifier: "cli-task",
         });
@@ -617,7 +617,7 @@ export async function waitForTaskTerminal(
   }
   while (deadlineMilliseconds === null || Date.now() < deadlineMilliseconds) {
     // 任务状态优先：一旦进入终态或 blocked，立即返回，不再空等整体上限。
-    const result = await application.queryTask({ sessionId, taskIdentifier });
+    const result = await application.mission.queryTask({ sessionId, taskIdentifier });
     if (result.status === "done" || result.status === "cancelled") {
       return result.status;
     }

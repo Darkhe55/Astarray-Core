@@ -26,7 +26,7 @@ function buildFakeApplication(statusSequence: string[]) {
     return { status: status ?? "running" };
   };
   return {
-    application: { queryTask } as unknown as Parameters<typeof waitForTaskTerminal>[0],
+    application: { mission: { queryTask } } as unknown as Parameters<typeof waitForTaskTerminal>[0],
     getQueryCount: () => callIndex,
   };
 }
