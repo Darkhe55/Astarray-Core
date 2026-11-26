@@ -257,6 +257,7 @@ import {
 } from "./tools/parameter-authorization-settings-store.js";
 import { PermissionFacet } from "./public-sdk-facets/permission-facet.js";
 import { OpsFacet } from "./public-sdk-facets/ops-facet.js";
+import { GoalFacet } from "./public-sdk-facets/goal-facet.js";
 import type { PublicParameterAuthorizationSettings } from "./public-sdk-facets/permission-facet.js";
 
 // ─── MERGE-01 §1.3：参数授权**设置入口**与"关闭细分不得静默扩大权限" ───
@@ -4409,6 +4410,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     });
   }
 
+  /**
+   * AXIOMATIC-DESIGN P2：目标域子门面的**窄接口装配**。
+   *
+   * 只暴露 runtime 的目标服务；子门面不感知门面其余状态。
+   */
+  private createGoalFacet(): GoalFacet {
+    return new GoalFacet({
+      assertOpen: () => this.assertOpen(),
+      goalService: this.runtime,
+    });
+  }
+
   /** 与主控制器同名的门面转发（PublicApplicationService 形状要求）。 */
   async listPermissionToolOverview() {
     return await this.createPermissionFacet().listPermissionToolOverview();
@@ -7816,13 +7829,11 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     readonly isExplicitlyEnabled: boolean;
     readonly requestedBy: "user" | "model" | "tertiary-agent";
   }): { readonly isActive: boolean; readonly reason: string } {
-    this.assertOpen();
-    return this.runtime.activateGoalMode(input);
+    return this.createGoalFacet().activateGoalMode(input);
   }
 
   getGoalModeActivation(): { readonly isActive: boolean; readonly reason: string } {
-    this.assertOpen();
-    return this.runtime.getGoalModeActivation();
+    return this.createGoalFacet().getGoalModeActivation();
   }
 
   proposeGoalContract(input: {
@@ -7830,8 +7841,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     readonly sourceRequestReference: string;
     readonly expiresInSeconds?: number;
   }): Promise<{ readonly proposalIdentifier: string; readonly expiresAtIso: string }> {
-    this.assertOpen();
-    return this.runtime.proposeGoalContract(input);
+    return this.createGoalFacet().proposeGoalContract(input);
   }
 
   confirmGoalContract(input: {
@@ -7841,54 +7851,47 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     readonly activation: GoalModeActivationInput;
     readonly isUserConfirmation: boolean;
   }): Promise<{ readonly goalIdentifier: string; readonly revision: number }> {
-    this.assertOpen();
-    return this.runtime.confirmGoalContract(input);
+    return this.createGoalFacet().confirmGoalContract(input);
   }
 
   createGoalContract(input: {
     readonly contract: GoalContract;
     readonly activation: GoalModeActivationInput;
   }): Promise<{ readonly isActive: boolean; readonly reason: string }> {
-    this.assertOpen();
-    return this.runtime.createGoalContract(input);
+    return this.createGoalFacet().createGoalContract(input);
   }
 
   bindMissionToGoal(input: {
     readonly missionIdentifier: string;
     readonly goalIdentifier: string;
   }): Promise<{ readonly goalIdentifier: string }> {
-    this.assertOpen();
-    return this.runtime.bindMissionToGoal(input);
+    return this.createGoalFacet().bindMissionToGoal(input);
   }
 
   unbindMissionFromGoal(
     missionIdentifier: string,
   ): Promise<{ readonly didUnbind: boolean }> {
-    this.assertOpen();
-    return this.runtime.unbindMissionFromGoal(missionIdentifier);
+    return this.createGoalFacet().unbindMissionFromGoal(missionIdentifier);
   }
 
   describeGoalStatus(
     goalIdentifier: string,
   ): Promise<GoalModeStatusView | null> {
-    this.assertOpen();
-    return this.runtime.describeGoalStatus(goalIdentifier);
+    return this.createGoalFacet().describeGoalStatus(goalIdentifier);
   }
 
   deactivateGoal(input: {
     readonly goalIdentifier: string;
     readonly reason: string;
   }): Promise<{ readonly closedAtIso: string; readonly unboundMissionCount: number }> {
-    this.assertOpen();
-    return this.runtime.deactivateGoal(input);
+    return this.createGoalFacet().deactivateGoal(input);
   }
 
   closeGoalExperiment(input: {
     readonly goalIdentifier: string;
     readonly reason: string;
   }): Promise<{ readonly isExperimentClosed: boolean; readonly closedAtIso: string }> {
-    this.assertOpen();
-    return this.runtime.closeGoalExperiment(input);
+    return this.createGoalFacet().closeGoalExperiment(input);
   }
 
   bindRequirementTaskMapping(input: {
@@ -7896,8 +7899,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     readonly requirementIdentifier: string;
     readonly taskNodeIdentifiers: readonly string[];
   }): Promise<{ readonly mappingCount: number; readonly documentRevision: number }> {
-    this.assertOpen();
-    return this.runtime.bindRequirementTaskMapping(input);
+    return this.createGoalFacet().bindRequirementTaskMapping(input);
   }
 
   invalidateGoalEvidence(input: {
@@ -7908,8 +7910,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     readonly potentialValueAfterInvalidation: number | null;
     readonly invalidatedRequirementIdentifiers: readonly string[];
   }> {
-    this.assertOpen();
-    return this.runtime.invalidateGoalEvidence(input);
+    return this.createGoalFacet().invalidateGoalEvidence(input);
   }
 
   async shutdown(): Promise<void> {

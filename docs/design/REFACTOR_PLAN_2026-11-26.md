@@ -13,7 +13,7 @@
 | 阶段 | 内容 | 状态 | 主要产出 |
 |---|---|---|---|
 | **P1** | 完成判定三角化（`CompletionDecision` 聚合器） | **done（2026-11-26）** | `mission-completion-decision.ts`（134 行）+ 7 条反例；`main-controller` 该段 −53 行 |
-| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限 + 运维两个域已迁出）** | `permission-facet.ts`（349 行/8 方法/8 单测）、`ops-facet.ts`（4 方法/5 单测）；`public-sdk.ts` 8540 → ≈8210 |
+| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限/运维/目标三个域已迁出）** | `permission-facet.ts`（349 行/8 方法/8 单测）、`ops-facet.ts`（4 方法/5 单测）、`goal-facet.ts`（166 行/12 方法/5 单测） |
 | **P3** | 权限判定迁出 `PermissionResolutionService` | 未开始 | 从 `main-controller` 抽出组合判定与 `previewToolPermission` |
 | **P4** | 目标门禁适配器 `GoalDispatchGateAdapter` | 未开始 | 封装 `goal-gate-cache` + 契约/状态读取 |
 | **P5** | 矩阵治理 + `createApplicationRuntime` 选项分组 | 未开始 | `docs/design/DESIGN_MATRIX.md`、import 规则、子配置对象 |
@@ -39,6 +39,15 @@ task-chain → receipts → independent-verdict
 **指标**：`main-controller.ts` 6183 → 6160 行；该段 −53 行；新模块 134 行、无跨 FR import（只依赖 `completion-receipt.ts` 纯判定）。
 
 ## P2：`public-sdk` 按 FR 拆子门面（进行中）
+
+**目标域（第四切片）**：
+- 新文件 `public-sdk-facets/goal-facet.ts`：12 个目标模式方法（激活/提案/确认/创建/绑定/解绑/状态/停用/关闭实验/需求映射/证据失效）；
+- 宿主窄接口 `goalService`（结构上与 runtime 目标服务一致）；门面保留同名委托；
+- 单测 5 条：同步/异步委托、参数原样透传、未定义语义保留、关闭态不触达服务；
+- 说明：这些方法原本就是"逐字委托 runtime"，迁出后**逻辑位置**解耦（门面不再持有目标域语义），
+  但 `public-sdk.ts` 行数下降有限（签名仍需保留），符合计划中"先切依赖面、再迁大块实现"的顺序。
+
+
 
 **运维只读域（第三切片）**：
 - 新文件 `public-sdk-facets/ops-facet.ts`：`queryStartupRecoveryState`、`queryExperimentCatalog`、
@@ -92,5 +101,5 @@ task-chain → receipts → independent-verdict
 | `main-controller.ts` 行数 | 6183 | 6160 | < 4500 |
 | `main-controller.ts` import 数 | 107 | 107（P1 未减） | < 70 |
 | `application-runtime.ts` 行数 | 5734 | 5734 | < 4500 |
-| `public-sdk.ts` 行数 | 8540 | 8290 | 拆分后单文件 < 3000 |
+| `public-sdk.ts` 行数 | 8540 | 8252 | 拆分后单文件 < 3000 |
 | 分支覆盖率 | 83.05% | 83.13%（P1 后实测） | ≥ 83.05% |

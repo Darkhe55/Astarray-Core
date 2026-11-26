@@ -8775,3 +8775,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   宿主窄接口（策略/报告、实验设置、成果记录、任务链查询），门面保留同名委托。
 > - `public-sdk.ts` 再瘦身（移除未使用导入）；新增 5 条子门面单测。
 > - 门禁（切出后全量）：`npm test` **1018 files / 6393 tests 全过**；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P2 第四切片：目标域（2026-11-26）**
+>
+> - 新增 `public-sdk-facets/goal-facet.ts`：12 个目标模式方法迁出（宿主 `goalService` 窄接口），门面保留同名委托。
+> - 新增 5 条子门面单测（同步/异步委托、参数透传、undefined 语义、关闭态不触达）。
+> - 门禁：`npm test` **1019 files / 6398 tests 全过**；typecheck/lint 0；隐私 ok。
+> - 注：目标域方法原是逐字委托 runtime，迁出后逻辑归属解耦，但 `public-sdk.ts` 行数下降有限（签名必须保留）。
