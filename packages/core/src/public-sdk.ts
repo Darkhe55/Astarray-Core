@@ -44,7 +44,6 @@ import { redactSensitiveText } from "./orchestration/diagnostic-event-store.js";
 import type { ScopedSettingsDocument } from "./orchestration/scoped-settings-store.js";
 import type { StartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
 import { parseStartupRecoveryPolicy } from "./orchestration/startup-recovery-policy.js";
-import type { StartupRecoveryBootReport } from "./orchestration/startup-recovery-report.js";
 import type { ToolHelpResponseV1 } from "./tools/tool-help-recall-controller.js";
 import type {
   ContinuationBreakpointView,
@@ -58,7 +57,6 @@ import type {
 import type { StartupRecoveryReport } from "./orchestration/startup-recovery-scanner.js";
 import type { StartupRecoveryRunReport } from "./orchestration/startup-recovery-runner.js";
 import type { ArtifactRecord } from "./orchestration/artifact-record-store.js";
-import { EXPERIMENT_CATALOG } from "./orchestration/experiment-catalog.js";
 import { AgentModelBindingStore } from "./orchestration/agent-model-binding-store.js";
 import { ModelRuntimePool } from "./runtime/model-runtime-pool.js";
 import type {
@@ -258,6 +256,7 @@ import {
   type ToolAuthorizationShape,
 } from "./tools/parameter-authorization-settings-store.js";
 import { PermissionFacet } from "./public-sdk-facets/permission-facet.js";
+import { OpsFacet } from "./public-sdk-facets/ops-facet.js";
 import type { PublicParameterAuthorizationSettings } from "./public-sdk-facets/permission-facet.js";
 
 // ─── MERGE-01 §1.3：参数授权**设置入口**与"关闭细分不得静默扩大权限" ───
@@ -3755,15 +3754,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.runtime.controller.answerToolHelpRequest(input);
   }
 
-  async queryStartupRecoveryState(): Promise<{
-    policy: StartupRecoveryPolicy;
-    isPersisted: boolean;
-    report: StartupRecoveryBootReport | null;
-  }> {
-    this.assertOpen();
-    const { policy, isPersisted } = await this.runtime.startupRecoveryPolicyStore.readPolicy();
-    const report = await this.runtime.readStartupRecoveryReport();
-    return { policy, isPersisted, report };
+  async queryStartupRecoveryState() {
+    return await this.createOpsFacet().queryStartupRecoveryState();
   }
 
   async updateStartupRecoveryPolicy(input: unknown): Promise<StartupRecoveryPolicy> {
@@ -3781,18 +3773,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.runtime.runStartupRecovery();
   }
   async queryExperimentCatalog() {
-    this.assertOpen();
-    const settings = await this.runtime.experimentSettingsStore.read();
-    return {
-      settings,
-      entries: EXPERIMENT_CATALOG.map((entry) => ({
-        ...entry,
-        isEnabled: settings.enabledExperimentIdentifiers.includes(
-          entry.experimentIdentifier,
-        ),
-        canEnable: entry.runtimeConsumerWired,
-      })),
-    };
+    return await this.createOpsFacet().queryExperimentCatalog();
   }
 
   async updateExperimentSettings(input: {
@@ -3835,20 +3816,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     this.assertOpen();
     return this.runtime.toolPackageLifecycleService.list();
   }
-  /** GUI-03-06：读取成果记录；可按项目/任务过滤。 */
-  async queryArtifacts(input?: {
-    projectIdentifier?: string;
-    missionIdentifier?: string;
-  }): Promise<ArtifactRecord[]> {
-    this.assertOpen();
-    const document = await this.runtime.artifactRecordStore.read();
-    return document.records.filter(
-      (record) =>
-        (input?.projectIdentifier === undefined ||
-          record.projectIdentifier === input.projectIdentifier) &&
-        (input?.missionIdentifier === undefined ||
-          record.missionIdentifier === input.missionIdentifier),
-    );
+  /** GUI-03-06：读取成果记录；可按项目/任务过滤（已迁入 ops-facet）。 */
+  async queryArtifacts(input?: { projectIdentifier?: string; missionIdentifier?: string }) {
+    return await this.createOpsFacet().queryArtifacts(input);
   }
 
   /** GUI-03-06：显式登记成果（工具成功路径应调用此入口）。 */
@@ -4074,35 +4044,11 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    *   「现在是否真在跑」由**租约**判定 —— 租约**属于本进程实例**且活跃才算运行中，
    *   否则（含进程重启后）呈现为 `interrupted-needs-reconciliation`，**不会**显示成运行中。
    */
-  /** GUI-03-06：任务成果记录（仅投影任务链已有的 resultLocation，不扫描项目树）。 */
-  async queryMissionArtifacts(missionId: string): Promise<
-    Array<{
-      artifactIdentifier: string;
-      taskIdentifier: string;
-      description: string;
-      status: string;
-      location: string;
-      source: "task-result-location";
-    }>
-  > {
-    this.assertOpen();
-    const status = await this.runtime.controller.queryMissionStatus(missionId);
-    if (status.taskChain === null) return [];
-    return status.taskChain.tasks
-      .filter(
-        (task) =>
-          typeof task.resultLocation === "string" &&
-          task.resultLocation.trim() !== "",
-      )
-      .map((task) => ({
-        artifactIdentifier: "task-result:" + task.id,
-        taskIdentifier: task.id,
-        description: task.description,
-        status: task.status,
-        location: task.resultLocation ?? "",
-        source: "task-result-location" as const,
-      }));
+  /** GUI-03-06：任务成果记录（已迁入 ops-facet）。 */
+  async queryMissionArtifacts(missionId: string) {
+    return await this.createOpsFacet().queryMissionArtifacts(missionId);
   }
+
   async queryMissionHistory(input?: {
     pageSize?: number;
     pageIndex?: number;
@@ -4442,6 +4388,24 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         this.createParameterAuthorizationSettingsStore(),
       createSettingsWriteRejectedError: (message: string) =>
         new PublicApplicationError("settings-write-rejected", message),
+    });
+  }
+
+  /**
+   * AXIOMATIC-DESIGN P2：运维只读子门面的**窄接口装配**。
+   *
+   * 只暴露只读存储读取与任务链查询；子门面不感知门面其余状态。
+   */
+  private createOpsFacet(): OpsFacet {
+    return new OpsFacet({
+      assertOpen: () => this.assertOpen(),
+      readStartupRecoveryPolicy: async () =>
+        await this.runtime.startupRecoveryPolicyStore.readPolicy(),
+      readStartupRecoveryReport: async () => await this.runtime.readStartupRecoveryReport(),
+      readExperimentSettings: async () => await this.runtime.experimentSettingsStore.read(),
+      readArtifactRecords: async () => await this.runtime.artifactRecordStore.read(),
+      queryMissionStatus: async (missionId: string) =>
+        await this.runtime.controller.queryMissionStatus(missionId),
     });
   }
 

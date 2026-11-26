@@ -8768,3 +8768,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `public-sdk.ts` 8525 → **8290 行**（累计 −250）；新增子门面单测 4 条（累计 8 条），覆盖非法 JSON/未知工具/不可读、
 >   总开关关闭、revision 冲突、放宽需确认、写入被拒。
 > - 门禁：`npm test` **1017 files / 6388 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P2 第三切片：运维只读域（2026-11-26）**
+>
+> - 新增 `public-sdk-facets/ops-facet.ts`：启动恢复状态、实验目录、成果记录、任务级成果投影 4 个只读方法；
+>   宿主窄接口（策略/报告、实验设置、成果记录、任务链查询），门面保留同名委托。
+> - `public-sdk.ts` 再瘦身（移除未使用导入）；新增 5 条子门面单测。
+> - 门禁（切出后全量）：`npm test` **1018 files / 6393 tests 全过**；typecheck/lint 0；隐私 ok。
