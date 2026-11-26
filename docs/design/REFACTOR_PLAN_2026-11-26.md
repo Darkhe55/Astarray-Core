@@ -14,7 +14,7 @@
 |---|---|---|---|
 | **P1** | 完成判定三角化（`CompletionDecision` 聚合器） | **done（2026-11-26）** | `mission-completion-decision.ts`（134 行）+ 7 条反例；`main-controller` 该段 −53 行 |
 | **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（五域 + 只读 getter + CLI 起步接入）** | 5 个 facet、23 个方法、31 条单测；`facade.goal/permission/ops/context/mission` |
-| **P3** | 权限判定迁出 `PermissionResolutionService` | **进行中**（纯判定 + 概览装配已抽出） | `permission-resolution.ts` + `permission-overview.ts` + 11 条反例 |
+| **P3** | 权限判定迁出 `PermissionResolutionService` | **完成** | `permission-resolution-service.ts`（端口注入）+ 17 条反例；控制器只注入端口 |
 | **P4** | 目标门禁适配器 `GoalDispatchGateAdapter` | 未开始 | 封装 `goal-gate-cache` + 契约/状态读取 |
 | **P5** | 矩阵治理 + `createApplicationRuntime` 选项分组 | 未开始 | `docs/design/DESIGN_MATRIX.md`、import 规则、子配置对象 |
 
@@ -118,8 +118,11 @@ task-chain → receipts → independent-verdict
 - 反例 5 条：缺目录空数组、并集排序与纯动作标记、无 profile 来源 unknown、最严聚合、
   目录已映射未注册两字段都 false。
 
-**下一步（第三切片）**：引入 `PermissionResolutionService` 类，把 profile 读取 + 概览 + 预览 + 判定
-组装为一个可注入服务，控制器只保留一个端口字段。
+**第三切片：服务化（已完成）**
+- 新文件 `permission-resolution-service.ts`：`listToolOverview` / `previewToolPermission` / `computeBaseline`；
+- 端口：`readProfile` + 能力目录 + 工具注册表；`main-controller` 只保留惰性 getter 与端口装配；
+- 反例 6 条：排序概览、动作命中重算、未命中回退、未知工具、无 profile ⇒ null、缺目录空概览。
+- P3 收尾：三处实现（判定/装配/服务）都在 `orchestration/` 下，控制器内不再有权限规则副本。
 
 
 

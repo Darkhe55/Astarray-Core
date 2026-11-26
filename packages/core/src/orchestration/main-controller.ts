@@ -126,8 +126,7 @@ import {
 } from "./task-ledger-divergence-journal.js";
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { decideMissionCompletion } from "./mission-completion-decision.js";
-import { resolveToolBaselineDecision } from "./permission-resolution.js";
-import { buildPermissionToolOverview } from "./permission-overview.js";
+import { PermissionResolutionService } from "./permission-resolution-service.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { CompletionVerdictStore } from "./completion-verdict-store.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
@@ -2394,13 +2393,8 @@ export class MainController {
       isExecutable: boolean;
     }>
   > {
-    /** AXIOMATIC-DESIGN P3：装配逻辑已迁到 permission-overview.ts（纯函数 + 端口）。 */
-    const profile = await this.readCurrentPermissionProfileOrNull();
-    return buildPermissionToolOverview({
-      profile,
-      capabilityCatalog: this.options.permissionCapabilityCatalog ?? null,
-      registry: this.options.registry,
-    });
+    /** AXIOMATIC-DESIGN P3：概览装配已迁入 PermissionResolutionService。 */
+    return await this.getPermissionResolutionService().listToolOverview();
   }
 
   /** AUTH-UI-01：预览某次工具调用的授权结论（无副作用）。 */
@@ -2412,24 +2406,22 @@ export class MainController {
     baselineDecision: PermissionDecision | null;
     capabilityIds: string[];
   }> {
-    const overview = await this.listPermissionToolOverview();
-    const tool = overview.find((entry) => entry.toolName === input.toolName);
-    if (tool === undefined) {
-      return { status: "unknown-tool", baselineDecision: null, capabilityIds: [] };
+    /** AXIOMATIC-DESIGN P3：预览判定已迁入 PermissionResolutionService。 */
+    return await this.getPermissionResolutionService().previewToolPermission(input);
+  }
+
+  // ─── AXIOMATIC-DESIGN P3：权限解析服务（端口注入，首次构造后缓存） ───
+  private permissionResolutionServiceInstance: PermissionResolutionService | null = null;
+
+  private getPermissionResolutionService(): PermissionResolutionService {
+    if (this.permissionResolutionServiceInstance === null) {
+      this.permissionResolutionServiceInstance = new PermissionResolutionService({
+        readProfile: async () => await this.readCurrentPermissionProfileOrNull(),
+        capabilityCatalog: this.options.permissionCapabilityCatalog ?? null,
+        registry: this.options.registry,
+      });
     }
-    const actionMatched = tool.actions.find((entry) => entry.action === input.action);
-    if (actionMatched !== undefined) {
-      return {
-        status: "ok",
-        baselineDecision: await this.computeCapabilityBaseline(actionMatched.capabilityIds, input.toolName),
-        capabilityIds: [...actionMatched.capabilityIds],
-      };
-    }
-    return {
-      status: "ok",
-      baselineDecision: tool.baselineDecision,
-      capabilityIds: [...tool.capabilityIds],
-    };
+    return this.permissionResolutionServiceInstance;
   }
 
   private async readCurrentPermissionProfileOrNull(): Promise<{
@@ -2453,9 +2445,8 @@ export class MainController {
     capabilityIds: string[],
     toolName: string,
   ): Promise<PermissionDecision | null> {
-    /** AXIOMATIC-DESIGN P3：读 profile 后交给纯函数判定（不再在此复制规则）。 */
-    const profile = await this.readCurrentPermissionProfileOrNull();
-    return resolveToolBaselineDecision(profile, capabilityIds, toolName);
+    /** AXIOMATIC-DESIGN P3：基线计算已迁入 PermissionResolutionService。 */
+    return await this.getPermissionResolutionService().computeBaseline(capabilityIds, toolName);
   }
 
   /** 读取权限组可配置明细（内置组同样可读，只读）。 */

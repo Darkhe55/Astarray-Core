@@ -8817,3 +8817,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   只读 profile 后调用纯装配，控制器不再拼 catalog/registry 逻辑。
 > - 反例 5 条（缺目录空数组、并集排序/纯动作、未知来源、最严聚合、未注册两字段 false）。
 > - 门禁：`npm test` **1024 files / 6422 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P3 完成：权限解析服务化（2026-11-26）**
+>
+> - 新增 `orchestration/permission-resolution-service.ts`（端口注入 `readProfile` + 能力目录 + registry）。
+> - `main-controller` 的 `listPermissionToolOverview`/`previewToolPermission`/`computeCapabilityBaseline`
+>   都改为调用服务；控制器内不再有权限规则副本。
+> - 反例 6 条（动作命中重算、未知工具、无 profile ⇒ null、缺目录空概览等），累计 P3 反例 17 条。
+> - 门禁：`npm test` **1025 files / 6428 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
