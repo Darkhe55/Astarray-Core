@@ -23,6 +23,24 @@ function buildHost(overrides: Record<string, unknown> = {}) {
     readyTaskIdentifiers: [],
     nodes: [],
   }));
+  const requireSession = vi.fn();
+  const requireTask = vi.fn(() => ({
+    status: "running" as const,
+    missionIdentifier: "mission-1",
+    summaryPreview: null as string | null,
+  }));
+  const isTerminalStatus = vi.fn(
+    (status: string) => status === "done" || status === "failed" || status === "cancelled",
+  );
+  const captureAuthoritativeResult = vi.fn(async () => undefined);
+  const toTaskResult = vi.fn(
+    (taskIdentifier: string, record: { status: string; missionIdentifier: string | null; summaryPreview: string | null }) => ({
+      taskIdentifier,
+      status: record.status,
+      missionIdentifier: record.missionIdentifier,
+      summaryPreview: record.summaryPreview,
+    }),
+  );
   const mapMissionStatus = vi.fn((status: { summary?: { status?: string } | null }) => {
     if (status.summary?.status === "done") return "done" as const;
     if (status.summary?.status === "cancelled") return "cancelled" as const;
@@ -33,9 +51,22 @@ function buildHost(overrides: Record<string, unknown> = {}) {
     queryMissionStatus,
     queryMissionTaskSequence,
     mapMissionStatus,
+    requireSession,
+    requireTask,
+    isTerminalStatus,
+    captureAuthoritativeResult,
+    toTaskResult,
     ...overrides,
   };
-  return { host: host as never, assertOpen, queryMissionStatus, queryMissionTaskSequence, mapMissionStatus };
+  return {
+    host: host as never,
+    assertOpen,
+    queryMissionStatus,
+    queryMissionTaskSequence,
+    mapMissionStatus,
+    requireTask,
+    captureAuthoritativeResult,
+  };
 }
 
 describe("AXIOMATIC P2：mission 只读查询子门面", () => {
@@ -96,5 +127,65 @@ describe("AXIOMATIC P2：mission 只读查询子门面", () => {
     await expect(facet.queryMissionRawStatus("m")).rejects.toThrow("application-closed");
     expect(queryMissionStatus).not.toHaveBeenCalled();
     expect(queryMissionTaskSequence).not.toHaveBeenCalled();
+  });
+
+  it("⑥ queryTask：终态任务直接投影，不再查询 mission", async () => {
+    const requireTask = vi.fn(() => ({
+      status: "done" as const,
+      missionIdentifier: "mission-1",
+      summaryPreview: "结果",
+    }));
+    const { host, queryMissionStatus } = buildHost({ requireTask });
+    const facet = new MissionFacet(host);
+    const result = await facet.queryTask({ sessionId: "session-1", taskIdentifier: "T-1" });
+    expect(result).toMatchObject({ taskIdentifier: "T-1", status: "done" });
+    expect(requireTask).toHaveBeenCalledWith("T-1", "session-1");
+    expect(queryMissionStatus).not.toHaveBeenCalled();
+  });
+
+  it("⑦ queryTask：无 mission 标识 ⇒ 直接投影（不猜 running）", async () => {
+    const { host, queryMissionStatus } = buildHost({
+      requireTask: vi.fn(() => ({
+        status: "queued" as const,
+        missionIdentifier: null,
+        summaryPreview: null,
+      })),
+    });
+    const result = await new MissionFacet(host).queryTask({
+      sessionId: "session-1",
+      taskIdentifier: "T-2",
+    });
+    expect(result).toMatchObject({ status: "queued", missionIdentifier: null });
+    expect(queryMissionStatus).not.toHaveBeenCalled();
+  });
+
+  it("⑧ queryTask：非终态 ⇒ 以 mission 状态更新记录；转终态且无摘要 ⇒ 捕获权威结果", async () => {
+    const record = {
+      status: "running" as const,
+      missionIdentifier: "mission-1",
+      summaryPreview: null as string | null,
+    };
+    const { host, captureAuthoritativeResult } = buildHost({
+      requireTask: vi.fn(() => record),
+      queryMissionStatus: async () => ({ missionId: "mission-1", summary: { status: "done" }, taskChain: null }),
+    });
+    const result = await new MissionFacet(host).queryTask({
+      sessionId: "session-1",
+      taskIdentifier: "T-3",
+    });
+    expect(result.status).toBe("done");
+    expect(captureAuthoritativeResult).toHaveBeenCalledTimes(1);
+  });
+
+  it("⑨ queryTask：关闭态 ⇒ 在触达记录前拒绝", async () => {
+    const { host, requireTask } = buildHost({
+      assertOpen: () => {
+        throw new Error("application-closed");
+      },
+    });
+    await expect(
+      new MissionFacet(host).queryTask({ sessionId: "session-1", taskIdentifier: "T-4" }),
+    ).rejects.toThrow("application-closed");
+    expect(requireTask).not.toHaveBeenCalled();
   });
 });

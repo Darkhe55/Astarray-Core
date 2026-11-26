@@ -8848,3 +8848,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `createApplicationRuntime` 入口先归一化；反例 6 条。
 > - 设计矩阵报告追加「改造后复核」：控制器 imports 107→85、5 个子门面、5 个新服务、条件/未关闭耦合清单。
 > - 门禁：`npm test` **1027 files / 6439 tests 全过**；test:scripts 58/58；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P2 第八切片：任务查询迁入 mission-facet（2026-11-26）**
+>
+> - `queryTask` 迁入 `mission-facet`：门面仍持有权威记录，facet 通过端口读取/更新（终态短路、无 mission 短路、
+>   转终态且无摘要时捕获权威结果、关闭态拒绝）。
+> - 新增 4 条反例（累计 mission-facet 9 条）。
+> - 门禁：`npm test` **1027 files / 6443 tests 全过**；typecheck/lint 0；隐私 ok；import 规则零违规。

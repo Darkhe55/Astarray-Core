@@ -53,7 +53,8 @@ task-chain → receipts → independent-verdict
   `queryMission`、`queryMissionRawStatus`；
 - 兼容性细节：`queryMissionStatus` 原实现**不校验关闭态**，迁出后同样不校验（其余三个保留 `assertOpen`）；
 - 单测 5 条：透传且不触发 assertOpen、序列先校验、状态映射、原始状态缺省 running、关闭态不触达；
-- mission 写路径（submit/cancel/resume）仍留门面，待 P2 后续切片单独处理。
+- mission 写路径（submit/cancel/resume）仍留门面；**任务查询 `queryTask` 已迁入**（记录仍由门面持有，
+  facet 通过端口读取/更新）；新增 4 条反例（终态短路、无 mission 短路、转终态捕获、关闭态拒绝）。
 
 
 

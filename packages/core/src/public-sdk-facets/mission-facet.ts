@@ -45,6 +45,25 @@ export interface MissionFacetHost {
     summary?: { status?: string } | null;
     taskChain?: { tasks: Array<{ status: string }> } | null;
   }): MissionTaskStatus;
+  /** 任务记录的最小可写视图（门面持有权威记录，facet 只按既有规则更新）。 */
+  requireTask(taskIdentifier: string, sessionId: string): MissionTaskRecordView;
+  requireSession(sessionId: string): unknown;
+  isTerminalStatus(status: MissionTaskStatus): boolean;
+  captureAuthoritativeResult(record: MissionTaskRecordView): Promise<void>;
+  toTaskResult(taskIdentifier: string, record: MissionTaskRecordView): MissionTaskResultView;
+}
+
+export interface MissionTaskRecordView {
+  status: MissionTaskStatus;
+  missionIdentifier: string | null;
+  summaryPreview: string | null;
+}
+
+export interface MissionTaskResultView {
+  taskIdentifier: string;
+  status: MissionTaskStatus;
+  missionIdentifier: string | null;
+  summaryPreview: string | null;
 }
 
 export class MissionFacet {
@@ -87,4 +106,26 @@ export class MissionFacet {
     };
     return missionStatus.summary?.status ?? "running";
   }
+  /** 查询任务：以本地权威 mission 状态为准（非字符串占位）。 */
+  async queryTask(input: {
+    sessionId: string;
+    taskIdentifier: string;
+  }): Promise<MissionTaskResultView> {
+    this.host.assertOpen();
+    this.host.requireSession(input.sessionId);
+    const record = this.host.requireTask(input.taskIdentifier, input.sessionId);
+    if (this.host.isTerminalStatus(record.status) || record.missionIdentifier === null) {
+      return this.host.toTaskResult(input.taskIdentifier, record);
+    }
+    const missionStatus = (await this.host.queryMissionStatus(record.missionIdentifier)) as {
+      summary?: { status?: string } | null;
+      taskChain?: { tasks: Array<{ status: string }> } | null;
+    };
+    record.status = this.host.mapMissionStatus(missionStatus);
+    if (this.host.isTerminalStatus(record.status) && record.summaryPreview === null) {
+      await this.host.captureAuthoritativeResult(record);
+    }
+    return this.host.toTaskResult(input.taskIdentifier, record);
+  }
+
 }

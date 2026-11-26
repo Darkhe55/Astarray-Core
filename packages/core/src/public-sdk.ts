@@ -4420,6 +4420,14 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         queryMissionTaskSequence: async (missionIdentifier: string) =>
           await this.runtime.controller.queryMissionTaskSequence(missionIdentifier),
         mapMissionStatus: (missionStatus) => this.mapMissionStatus(missionStatus),
+        requireTask: (taskIdentifier: string, sessionId: string) =>
+          this.requireTask(taskIdentifier, sessionId),
+        requireSession: (sessionId: string) => this.requireSession(sessionId),
+        isTerminalStatus: (status) => this.isTerminalStatus(status),
+        captureAuthoritativeResult: async (record) =>
+          await this.captureAuthoritativeResult(record as TaskRecord),
+        toTaskResult: (taskIdentifier: string, record) =>
+          this.toTaskResult(taskIdentifier, record as TaskRecord),
       });
     }
     return this.missionFacetInstance;
@@ -6720,23 +6728,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     sessionId: string;
     taskIdentifier: string;
   }): Promise<PublicTaskResult> {
-    this.assertOpen();
-    this.requireSession(input.sessionId);
-    const record = this.requireTask(input.taskIdentifier, input.sessionId);
-    if (this.isTerminalStatus(record.status) || record.missionIdentifier === null) {
-      return this.toTaskResult(input.taskIdentifier, record);
-    }
-    const missionStatus = (await this.runtime.controller.queryMissionStatus(
-      record.missionIdentifier,
-    )) as {
-      summary?: { status?: string } | null;
-      taskChain?: { tasks: Array<{ status: string }> } | null;
-    };
-    record.status = this.mapMissionStatus(missionStatus);
-    if (this.isTerminalStatus(record.status) && record.summaryPreview === null) {
-      await this.captureAuthoritativeResult(record);
-    }
-    return this.toTaskResult(input.taskIdentifier, record);
+    /** AXIOMATIC-DESIGN P2：任务查询已迁入 mission-facet（记录仍由门面持有）。 */
+    return await this.createMissionFacet().queryTask(input);
   }
 
   /** 取消任务：委托控制器取消并记录终态。 */
