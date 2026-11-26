@@ -8832,3 +8832,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `GoalDispatchVerdictRecord` 定义迁到适配器并在控制器再导出（`application-runtime` 等导入路径不变）。
 > - 反例 5 条（未装配、允许、拒绝仅观察、拒绝强制、端口时间/项目来源）。
 > - 门禁：`npm test` **1026 files / 6433 tests 全过**；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P5 第一切片：import 规则治理（2026-11-26）**
+>
+> - 新增 `scripts/lib/decoupling-import-rules.mjs`（纯规则）+ `scripts/check-decoupling-imports.mjs` 入口
+>   与 `npm run verify:decoupling-imports`。
+> - 规则：facet 不得反向 import 门面/应用层；已抽出的 orchestration 模块不得回指控制器/门面/应用层。
+> - 反例 7 条并入 `test:scripts`（**51 → 58 全过**），真实仓库当前零违规；同时导出解耦指标。
+> - 门禁：`npm test` **1026 files / 6433 tests 全过**；lint 0；隐私 ok。

@@ -76,7 +76,8 @@
     "verify:event01-criteria": "npx tsx scripts/verify-event01-criteria.mjs --criteria docs/reports/EVENT01_ACCEPTANCE_CRITERIA_TEMPLATE.json --allow-incomplete",
     "verify:event01-package": "node scripts/verify-event01-package.mjs --package-dir .tmp/comm-install/node_modules/astarray",
     "test:serial": "vitest run --no-file-parallelism",
-    "verify:exec01-03-preconditions": "node scripts/verify-exec01-03-preconditions.mjs"
+    "verify:exec01-03-preconditions": "node scripts/verify-exec01-03-preconditions.mjs",
+    "verify:decoupling-imports": "node scripts/check-decoupling-imports.mjs"
   },
   "dependencies": {
     "commander": "^15.0.0",
