@@ -8810,3 +8810,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   `strictest` 与 `computeCapabilityBaseline` 的重复规则；控制器只读 profile 后调用纯函数。
 > - 反例 6 条（含"能力级 deny 先于显式工具决定"的兼容性反例）。
 > - 门禁：`npm test` **1023 files / 6417 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P3 第二切片：权限概览装配抽出（2026-11-26）**
+>
+> - 新增 `orchestration/permission-overview.ts`（`buildPermissionToolOverview`）；`main-controller.listPermissionToolOverview`
+>   只读 profile 后调用纯装配，控制器不再拼 catalog/registry 逻辑。
+> - 反例 5 条（缺目录空数组、并集排序/纯动作、未知来源、最严聚合、未注册两字段 false）。
+> - 门禁：`npm test` **1024 files / 6422 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。

@@ -127,6 +127,7 @@ import {
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { decideMissionCompletion } from "./mission-completion-decision.js";
 import { resolveToolBaselineDecision } from "./permission-resolution.js";
+import { buildPermissionToolOverview } from "./permission-overview.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { CompletionVerdictStore } from "./completion-verdict-store.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
@@ -2393,42 +2394,12 @@ export class MainController {
       isExecutable: boolean;
     }>
   > {
-    const capabilityCatalog = this.options.permissionCapabilityCatalog;
-    if (capabilityCatalog === null || capabilityCatalog === undefined) return [];
+    /** AXIOMATIC-DESIGN P3：装配逻辑已迁到 permission-overview.ts（纯函数 + 端口）。 */
     const profile = await this.readCurrentPermissionProfileOrNull();
-    /** AXIOMATIC-DESIGN P3：最严判定已抽为纯函数（permission-resolution.ts）。 */
-    const strictest = (capabilityIds: string[], toolName: string): PermissionDecision | null =>
-      resolveToolBaselineDecision(profile, capabilityIds, toolName);
-    const wholeTools = capabilityCatalog.listToolMappings();
-    const actionMappings = capabilityCatalog.listToolActionMappings();
-    const registry = this.options.registry;
-    const registeredNames = registry.listRegisteredNames();
-    const toolNames = new Set<string>([
-      ...wholeTools.map((entry) => entry.toolName),
-      ...actionMappings.map((entry) => entry.toolName),
-      ...registeredNames,
-    ]);
-    return [...toolNames].sort().map((toolName) => {
-      const whole = wholeTools.find((entry) => entry.toolName === toolName);
-      const actionEntry = actionMappings.find((entry) => entry.toolName === toolName);
-      const capabilityIds = whole?.capabilityIds ?? [];
-      const actions = actionEntry === undefined
-        ? []
-        : Object.entries(actionEntry.actions).map(([action, ids]) => ({
-            action,
-            capabilityIds: [...ids],
-          }));
-      return {
-        toolName,
-        isActionOnly: capabilityIds.length === 0 && actions.length > 0,
-        capabilityIds: [...capabilityIds],
-        actions,
-        baselineDecision: strictest(capabilityIds, toolName),
-        baselineSource: profile === null ? ("unknown" as const) : ("profile-capabilities" as const),
-        // 注册即可调用（执行端口按注册表装配）；未注册 = 目录已映射但当前内核不可调用。
-        isRegistered: registry.isRegistered(toolName),
-        isExecutable: registry.isRegistered(toolName),
-      };
+    return buildPermissionToolOverview({
+      profile,
+      capabilityCatalog: this.options.permissionCapabilityCatalog ?? null,
+      registry: this.options.registry,
     });
   }
 
