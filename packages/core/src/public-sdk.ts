@@ -258,6 +258,8 @@ import {
 import { PermissionFacet } from "./public-sdk-facets/permission-facet.js";
 import { OpsFacet } from "./public-sdk-facets/ops-facet.js";
 import { GoalFacet } from "./public-sdk-facets/goal-facet.js";
+import { ContextFacet } from "./public-sdk-facets/context-facet.js";
+import type { PublicContextSettings } from "./public-sdk-facets/context-facet.js";
 import type { PublicParameterAuthorizationSettings } from "./public-sdk-facets/permission-facet.js";
 
 // ─── MERGE-01 §1.3：参数授权**设置入口**与"关闭细分不得静默扩大权限" ───
@@ -773,7 +775,6 @@ export type {
 } from "./orchestration/legacy-identity-migration.js";
 import { createApplicationRuntime } from "./application/application-runtime.js";
 import { DomainError } from "./core/errors.js";
-import { resolveContextBudget } from "./orchestration/context-prompt-assembler.js";
 import type { RecoveryCenterController } from "./orchestration/recovery-center-controller.js";
 import {
   createManifestChunkReader,
@@ -1779,16 +1780,8 @@ export interface PublicMissionState {
  * 公开上下文预算与装配实际值（GUI-01-R-03）。
  * 只含配置值、有效值、revision 与样本数；不含状态目录、凭据或模型上下文正文。
  */
-export interface PublicContextSettings {
-  configuredMaximumGlobalContextTokenCount: number;
-  effectiveMaximumGlobalContextTokenCount: number;
-  budgetPolicyRevision: number;
-  budgetReductionReason: string | null;
-  /** 已记录的上下文装配事件样本数（实际值分母）。 */
-  assemblySampleSize: number;
-  /** 最近一次真实装配使用的预算 revision（证明"下一次请求已按新配置生效"）。 */
-  lastAssemblyBudgetPolicyRevision: number | null;
-}
+/** 公开上下文预算视图（定义已迁到 context-facet，对外导出保持不变）。 */
+export type { PublicContextSettings };
 
 /** 公开恢复 mission 视图（不含租约持有进程标识等内部字段）。 */
 export interface PublicRecoveryMissionView {
@@ -3587,64 +3580,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.runtime.controller.switchPermissionProfile(reference);
   }
 
-  /**
-   * GUI-01-R-03：读取上下文预算配置与真实装配实际值。
-   * 数据来自全局预算权威存储与真实装配事件，不复制状态机、不引入前端缓存。
-   */
+  /** GUI-01-R-03：读取上下文预算配置与真实装配实际值（已迁入 context-facet）。 */
   async queryContextSettings(): Promise<PublicContextSettings> {
-    this.assertOpen();
-    const policy = await this.runtime.globalContextBudgetStore.readPolicy();
-    const resolution = resolveContextBudget({
-      configuredMaximumGlobalContextTokenCount:
-        policy.configuredMaximumGlobalContextTokenCount,
-      budgetPolicyRevision: policy.globalContextBudgetPolicyRevision,
-    });
-    const assemblyEvents = await this.runtime.contextRuntimeEventStore.readAll();
-    const lastAssembly = assemblyEvents.at(-1) ?? null;
-    return {
-      configuredMaximumGlobalContextTokenCount:
-        resolution.configuredMaximumGlobalContextTokenCount,
-      effectiveMaximumGlobalContextTokenCount:
-        resolution.effectiveMaximumGlobalContextTokenCount,
-      budgetPolicyRevision: resolution.budgetPolicyRevision,
-      budgetReductionReason: resolution.budgetReductionReason,
-      assemblySampleSize: assemblyEvents.length,
-      lastAssemblyBudgetPolicyRevision: lastAssembly?.budgetPolicyRevision ?? null,
-    };
+    return await this.createContextFacet().queryContextSettings();
   }
 
-  /**
-   * GUI-01-R-03：以 CAS 写入预算策略；下一模型请求的装配按新 revision 生效
-   * （装配提供者从同一存储读取，revision 变化使选择缓存失效）。
-   */
+  /** GUI-01-R-03：以 CAS 写入预算策略（已迁入 context-facet；成功后发事件）。 */
   async updateContextBudget(input: {
     expectedRevision: number;
     configuredMaximumGlobalContextTokenCount: number;
   }): Promise<PublicContextSettings> {
-    this.assertOpen();
-    try {
-      await this.runtime.globalContextBudgetStore.updatePolicy({
-        expectedRevision: input.expectedRevision,
-        configuredMaximumGlobalContextTokenCount:
-          input.configuredMaximumGlobalContextTokenCount,
-        updatedByUserId: "authenticated-user",
-      });
-    } catch (error) {
-      if (error instanceof DomainError) {
-        throw new PublicApplicationError(error.errorCode, error.message);
-      }
-      throw error;
-    }
-    const settings = await this.queryContextSettings();
-    this.emit({
-      eventType: "budget-policy-updated",
-      budgetPolicyRevision: settings.budgetPolicyRevision,
-      configuredMaximumGlobalContextTokenCount:
-        settings.configuredMaximumGlobalContextTokenCount,
-      revision: settings.budgetPolicyRevision,
-      idempotencyId: this.nextEventIdempotencyId(),
-    });
-    return settings;
+    return await this.createContextFacet().updateContextBudget(input);
   }
 
   /** GUI-03 / 方案 A：当前可切换的模型候选（只含 provider/model，不含凭据）。 */
@@ -4419,6 +4365,36 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return new GoalFacet({
       assertOpen: () => this.assertOpen(),
       goalService: this.runtime,
+    });
+  }
+
+  /**
+   * AXIOMATIC-DESIGN P2：上下文预算子门面的**窄接口装配**。
+   */
+  private createContextFacet(): ContextFacet {
+    return new ContextFacet({
+      assertOpen: () => this.assertOpen(),
+      readBudgetPolicy: async () => await this.runtime.globalContextBudgetStore.readPolicy(),
+      readAssemblyEvents: async () => await this.runtime.contextRuntimeEventStore.readAll(),
+      updateBudgetPolicy: async (input) => {
+        await this.runtime.globalContextBudgetStore.updatePolicy(input);
+      },
+      createPublicErrorFrom: (error: unknown) => {
+        if (error instanceof DomainError) {
+          return new PublicApplicationError(error.errorCode, error.message);
+        }
+        return error instanceof Error ? error : new Error(String(error));
+      },
+      emitBudgetPolicyUpdated: (settings) => {
+        this.emit({
+          eventType: "budget-policy-updated",
+          budgetPolicyRevision: settings.budgetPolicyRevision,
+          configuredMaximumGlobalContextTokenCount:
+            settings.configuredMaximumGlobalContextTokenCount,
+          revision: settings.budgetPolicyRevision,
+          idempotencyId: this.nextEventIdempotencyId(),
+        });
+      },
     });
   }
 

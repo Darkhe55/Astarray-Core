@@ -13,7 +13,7 @@
 | 阶段 | 内容 | 状态 | 主要产出 |
 |---|---|---|---|
 | **P1** | 完成判定三角化（`CompletionDecision` 聚合器） | **done（2026-11-26）** | `mission-completion-decision.ts`（134 行）+ 7 条反例；`main-controller` 该段 −53 行 |
-| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限/运维/目标三个域已迁出）** | `permission-facet.ts`（349 行/8 方法/8 单测）、`ops-facet.ts`（4 方法/5 单测）、`goal-facet.ts`（166 行/12 方法/5 单测） |
+| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限/运维/目标/上下文四个域已迁出）** | 4 个 facet 文件、19 个方法、23 条单测 |
 | **P3** | 权限判定迁出 `PermissionResolutionService` | 未开始 | 从 `main-controller` 抽出组合判定与 `previewToolPermission` |
 | **P4** | 目标门禁适配器 `GoalDispatchGateAdapter` | 未开始 | 封装 `goal-gate-cache` + 契约/状态读取 |
 | **P5** | 矩阵治理 + `createApplicationRuntime` 选项分组 | 未开始 | `docs/design/DESIGN_MATRIX.md`、import 规则、子配置对象 |
@@ -39,6 +39,14 @@ task-chain → receipts → independent-verdict
 **指标**：`main-controller.ts` 6183 → 6160 行；该段 −53 行；新模块 134 行、无跨 FR import（只依赖 `completion-receipt.ts` 纯判定）。
 
 ## P2：`public-sdk` 按 FR 拆子门面（进行中）
+
+**上下文预算域（第五切片）**：
+- 新文件 `public-sdk-facets/context-facet.ts`：`queryContextSettings`、`updateContextBudget`；
+- 宿主窄接口：预算策略读写、装配事件读取、领域错误转换、`budget-policy-updated` 事件发射；
+- 单测 5 条：生效值与样本数、无事件为 null、CAS 写入后重读并发事件、领域错误转换且不发事件、关闭态不触达存储；
+- `PublicContextSettings` 定义迁到 facet 并在门面再导出（对外导出不变）。
+
+
 
 **目标域（第四切片）**：
 - 新文件 `public-sdk-facets/goal-facet.ts`：12 个目标模式方法（激活/提案/确认/创建/绑定/解绑/状态/停用/关闭实验/需求映射/证据失效）；

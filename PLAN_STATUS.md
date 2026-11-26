@@ -8782,3 +8782,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 5 条子门面单测（同步/异步委托、参数透传、undefined 语义、关闭态不触达）。
 > - 门禁：`npm test` **1019 files / 6398 tests 全过**；typecheck/lint 0；隐私 ok。
 > - 注：目标域方法原是逐字委托 runtime，迁出后逻辑归属解耦，但 `public-sdk.ts` 行数下降有限（签名必须保留）。
+
+> **全面解耦改造 P2 第五切片：上下文预算域（2026-11-26）**
+>
+> - 新增 `public-sdk-facets/context-facet.ts`：`queryContextSettings`、`updateContextBudget`；宿主窄接口（预算策略读写/装配事件/错误转换/事件发射）。
+> - `PublicContextSettings` 定义迁出并在门面再导出（导出面不变）；新增 5 条子门面单测。
+> - 门禁：`npm test` **1020 files / 6403 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
