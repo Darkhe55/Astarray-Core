@@ -115,7 +115,7 @@ export async function executeParameterAuthorizationSettingsCommand(
         options.shouldDisableParameterAuthorization ||
         shapes.length > 0;
       if (!isWriteRequested) {
-        const settings = await application.queryParameterAuthorizationSettings();
+        const settings = await application.permission.queryParameterAuthorizationSettings();
         if (options.isJsonOutput) {
           printJson({
             isParameterAuthorizationEnabled: settings.isParameterAuthorizationEnabled,
@@ -139,8 +139,8 @@ export async function executeParameterAuthorizationSettingsCommand(
         return EXIT_CODES.SUCCESS;
       }
 
-      const currentSettings = await application.queryParameterAuthorizationSettings();
-      const updateOutcome = await application.updateParameterAuthorizationSettings({
+      const currentSettings = await application.permission.queryParameterAuthorizationSettings();
+      const updateOutcome = await application.permission.updateParameterAuthorizationSettings({
         isParameterAuthorizationEnabled: options.shouldDisableParameterAuthorization
           ? false
           : currentSettings.isParameterAuthorizationEnabled,

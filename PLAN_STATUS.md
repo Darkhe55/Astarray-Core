@@ -8855,3 +8855,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   转终态且无摘要时捕获权威结果、关闭态拒绝）。
 > - 新增 4 条反例（累计 mission-facet 9 条）。
 > - 门禁：`npm test` **1027 files / 6443 tests 全过**；typecheck/lint 0；隐私 ok；import 规则零违规。
+
+> **全面解耦改造 P2 第九切片 + 覆盖率复核（2026-11-26）**
+>
+> - `parameter-authorization-settings-command.ts` 3 处调用改走 `application.permission.*`；相关 15 条测试通过。
+> - 覆盖率实测：语句 90.55% / 分支 **83.3%** / 函数 91.41% / 行 90.94%（基线 83.05% ⇒ **未下降**，+0.25pp）；
+>   `--coverage` 仍因全局 85% 阈值退出 1（既有 B9 缺口，非本轮回归）。
+> - 门禁：`npm test` **1027 files / 6443 tests 全过**；typecheck/lint 0；隐私 ok；import 规则零违规。

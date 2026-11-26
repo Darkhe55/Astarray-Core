@@ -13,7 +13,7 @@
 | 阶段 | 内容 | 状态 | 主要产出 |
 |---|---|---|---|
 | **P1** | 完成判定三角化（`CompletionDecision` 聚合器） | **done（2026-11-26）** | `mission-completion-decision.ts`（134 行）+ 7 条反例；`main-controller` 该段 −53 行 |
-| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（五域 + 只读 getter + CLI 起步接入）** | 5 个 facet、23 个方法、31 条单测；`facade.goal/permission/ops/context/mission` |
+| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中**（五域 + getter + Goal/Permission CLI 已切；Mission 写路径保留） | 5 个 facet、24 个方法、35 条单测 |
 | **P3** | 权限判定迁出 `PermissionResolutionService` | **完成** | `permission-resolution-service.ts`（端口注入）+ 17 条反例；控制器只注入端口 |
 | **P4** | 目标门禁适配器 `GoalDispatchGateAdapter` | 未开始 | 封装 `goal-gate-cache` + 契约/状态读取 |
 | **P5** | 矩阵治理 + `createApplicationRuntime` 选项分组 | 未开始 | `docs/design/DESIGN_MATRIX.md`、import 规则、子配置对象 |
@@ -42,7 +42,8 @@ task-chain → receipts → independent-verdict
 
 **子门面入口与 CLI 窄依赖（第七切片）**：
 - 门面新增只读 getter：`facade.permission/ops/goal/context/mission`（首次访问构造并缓存）；
-- `goal-mode-command.ts` 的 5 处调用改走 `application.goal.*`（提案/确认/绑定/需求映射/证据失效），
+- `goal-mode-command.ts` 的 5 处调用改走 `application.goal.*`；`parameter-authorization-settings-command.ts`
+  的 3 处调用改走 `application.permission.*`；
   验证"CLI 只依赖所需子门面"；`recomputeGoalPotential` 尚不在 goal facet，暂留门面；
 - 单测 3 条：getter 缓存同一实例、窄方法面不含整门面方法、关闭态拒绝。
 
@@ -159,4 +160,4 @@ task-chain → receipts → independent-verdict
 | `main-controller.ts` import 数 | 107 | 107（P1 未减） | < 70 |
 | `application-runtime.ts` 行数 | 5734 | 5734 | < 4500 |
 | `public-sdk.ts` 行数 | 8540 | 8252 | 拆分后单文件 < 3000 |
-| 分支覆盖率 | 83.05% | 83.13%（P1 后实测） | ≥ 83.05% |
+| 分支覆盖率 | 83.05% | **83.3%**（P5 后实测） | ≥ 83.05%（达 85% 全局阈值仍差 1.7pp，属既有 B9 缺口） |
