@@ -13,7 +13,7 @@
 | 阶段 | 内容 | 状态 | 主要产出 |
 |---|---|---|---|
 | **P1** | 完成判定三角化（`CompletionDecision` 聚合器） | **done（2026-11-26）** | `mission-completion-decision.ts`（134 行）+ 7 条反例；`main-controller` 该段 −53 行 |
-| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限/运维/目标/上下文四个域已迁出）** | 4 个 facet 文件、19 个方法、23 条单测 |
+| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限/运维/目标/上下文/mission 只读五个域已迁出）** | 5 个 facet 文件、23 个方法、28 条单测 |
 | **P3** | 权限判定迁出 `PermissionResolutionService` | 未开始 | 从 `main-controller` 抽出组合判定与 `previewToolPermission` |
 | **P4** | 目标门禁适配器 `GoalDispatchGateAdapter` | 未开始 | 封装 `goal-gate-cache` + 契约/状态读取 |
 | **P5** | 矩阵治理 + `createApplicationRuntime` 选项分组 | 未开始 | `docs/design/DESIGN_MATRIX.md`、import 规则、子配置对象 |
@@ -39,6 +39,15 @@ task-chain → receipts → independent-verdict
 **指标**：`main-controller.ts` 6183 → 6160 行；该段 −53 行；新模块 134 行、无跨 FR import（只依赖 `completion-receipt.ts` 纯判定）。
 
 ## P2：`public-sdk` 按 FR 拆子门面（进行中）
+
+**mission 只读域（第六切片）**：
+- 新文件 `public-sdk-facets/mission-facet.ts`：`queryMissionStatus`、`queryMissionTaskSequence`、
+  `queryMission`、`queryMissionRawStatus`；
+- 兼容性细节：`queryMissionStatus` 原实现**不校验关闭态**，迁出后同样不校验（其余三个保留 `assertOpen`）；
+- 单测 5 条：透传且不触发 assertOpen、序列先校验、状态映射、原始状态缺省 running、关闭态不触达；
+- mission 写路径（submit/cancel/resume）仍留门面，待 P2 后续切片单独处理。
+
+
 
 **上下文预算域（第五切片）**：
 - 新文件 `public-sdk-facets/context-facet.ts`：`queryContextSettings`、`updateContextBudget`；

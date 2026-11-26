@@ -8788,3 +8788,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 `public-sdk-facets/context-facet.ts`：`queryContextSettings`、`updateContextBudget`；宿主窄接口（预算策略读写/装配事件/错误转换/事件发射）。
 > - `PublicContextSettings` 定义迁出并在门面再导出（导出面不变）；新增 5 条子门面单测。
 > - 门禁：`npm test` **1020 files / 6403 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P2 第六切片：mission 只读域（2026-11-26）**
+>
+> - 新增 `public-sdk-facets/mission-facet.ts`：mission 状态/任务序列/公开状态/原始状态 4 个只读方法；
+>   `queryMissionStatus` 保持原实现"不校验关闭态"的语义（其余三个保留 `assertOpen`）。
+> - 新增 5 条单测（含"不触发 assertOpen"与"关闭态不触达 controller"两个反例）。
+> - 门禁：`npm test` **1021 files / 6408 tests 全过**；typecheck/lint 0；隐私 ok。
+> - `public-sdk.ts` 8540 → 8209（累计 −331）。

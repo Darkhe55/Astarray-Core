@@ -259,6 +259,7 @@ import { PermissionFacet } from "./public-sdk-facets/permission-facet.js";
 import { OpsFacet } from "./public-sdk-facets/ops-facet.js";
 import { GoalFacet } from "./public-sdk-facets/goal-facet.js";
 import { ContextFacet } from "./public-sdk-facets/context-facet.js";
+import { MissionFacet } from "./public-sdk-facets/mission-facet.js";
 import type { PublicContextSettings } from "./public-sdk-facets/context-facet.js";
 import type { PublicParameterAuthorizationSettings } from "./public-sdk-facets/permission-facet.js";
 
@@ -3241,7 +3242,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   async queryMissionStatus(missionId: string) {
-    return this.runtime.controller.queryMissionStatus(missionId);
+    return await this.createMissionFacet().queryMissionStatus(missionId);
   }
 
   getMetricsSnapshot() {
@@ -3468,26 +3469,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    * UI-ALIGN-01：只读查询 mission 的权威任务序列投影（节点/依赖/就绪/revision）。
    * 未建立映射时返回 null；不触发派发或改状态。
    */
-  async queryMissionTaskSequence(missionIdentifier: string): Promise<{
-    readonly missionIdentifier: string;
-    readonly sequenceIdentifier: string;
-    readonly taskIdentifier: string;
-    readonly ownerAgentInstanceIdentifier: string;
-    readonly revision: number;
-    readonly readyTaskIdentifiers: readonly string[];
-    readonly nodes: ReadonlyArray<{
-      taskIdentifier: string;
-      title: string;
-      status: string;
-      dependsOn: readonly string[];
-      priorityTier: number | null;
-      sequenceOrdinal: number;
-      blockReason: string | null;
-      assignedAgentInstanceIdentifier: string | null;
-    }>;
-  } | null> {
-    this.assertOpen();
-    return this.runtime.controller.queryMissionTaskSequence(missionIdentifier);
+  async queryMissionTaskSequence(missionIdentifier: string) {
+    return await this.createMissionFacet().queryMissionTaskSequence(missionIdentifier);
   }
   /**
    * UI-ALIGN-01：运行中补充任务（登记进权威序列；不等同于改写正在执行的工具调用）。
@@ -4395,6 +4378,20 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           idempotencyId: this.nextEventIdempotencyId(),
         });
       },
+    });
+  }
+
+  /**
+   * AXIOMATIC-DESIGN P2：mission 只读查询子门面的**窄接口装配**。
+   */
+  private createMissionFacet(): MissionFacet {
+    return new MissionFacet({
+      assertOpen: () => this.assertOpen(),
+      queryMissionStatus: async (missionId: string) =>
+        await this.runtime.controller.queryMissionStatus(missionId),
+      queryMissionTaskSequence: async (missionIdentifier: string) =>
+        await this.runtime.controller.queryMissionTaskSequence(missionIdentifier),
+      mapMissionStatus: (missionStatus) => this.mapMissionStatus(missionStatus),
     });
   }
 
@@ -6000,19 +5997,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.recoveryCenterController;
   }
 
-  /** 按 mission 标识查询权威状态（CLI 与 SDK 共用同一状态源）。 */
+  /** 按 mission 标识查询权威状态（已迁入 mission-facet）。 */
   async queryMission(missionIdentifier: string): Promise<PublicMissionState> {
-    this.assertOpen();
-    const missionStatus = (await this.runtime.controller.queryMissionStatus(
-      missionIdentifier,
-    )) as {
-      summary?: { status?: string } | null;
-      taskChain?: { tasks: Array<{ status: string }> } | null;
-    };
-    return {
-      missionIdentifier,
-      status: this.mapMissionStatus(missionStatus),
-    };
+    return await this.createMissionFacet().queryMission(missionIdentifier);
   }
 
   /**
@@ -6285,11 +6272,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.runtime.recordIndependentVerdict(input);
   }
   async queryMissionRawStatus(missionIdentifier: string): Promise<string> {
-    this.assertOpen();
-    const missionStatus = (await this.runtime.controller.queryMissionStatus(
-      missionIdentifier,
-    )) as { summary?: { status?: string } | null };
-    return missionStatus.summary?.status ?? "running";
+    return await this.createMissionFacet().queryMissionRawStatus(missionIdentifier);
   }
   async submitTask(input: {
     sessionId: string;
