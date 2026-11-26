@@ -130,7 +130,16 @@ task-chain → receipts → independent-verdict
 - 端口：`readCurrentPermissionProfile`、`readCapabilityCatalog`。
 - 验收：权限矩阵单测（deny 优先/能力组合/参数规则）在服务层独立运行；`main-controller` 仅注入端口。
 
-## P4：`GoalDispatchGateAdapter`（计划）
+## P4：`GoalDispatchGateAdapter`（完成）
+
+- 新文件 `orchestration/goal-dispatch-gate-adapter.ts`：`observeMissionDispatch(missionId)`；
+- 端口：gate 解析器、mission→项目标识、强制开关、判定回调、流式输出、时钟；
+- 行为逐字保留：判定必记录；仅 `isGoalModeEnforcementEnabled === true` 才阻断；
+  未装配解析器/解析为 null ⇒ 不阻断；
+- `GoalDispatchVerdictRecord` 定义迁到适配器，`main-controller` 再导出（既有 import 路径不变）；
+- 反例 5 条：未装配、允许、拒绝仅观察、拒绝强制、端口时间/项目标识来源。
+
+
 
 - 封装 `goal-gate-cache` + 契约/状态读取 + 强制/观察开关，向 `main-controller` 暴露 `assertMissionDispatchAllowed`。
 - 验收：目标门禁的"只观察/强制阻断"两分支单测独立；`main-controller` 不再直接拼 goal 逻辑。

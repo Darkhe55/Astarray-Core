@@ -130,6 +130,8 @@ import { PermissionResolutionService } from "./permission-resolution-service.js"
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { CompletionVerdictStore } from "./completion-verdict-store.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
+import { GoalDispatchGateAdapter } from "./goal-dispatch-gate-adapter.js";
+import type { GoalDispatchVerdictRecord as GoalDispatchVerdictRecordValue } from "./goal-dispatch-gate-adapter.js";
 import type { CompletionReceipt } from "./completion-receipt.js";
 import { evaluateWorkWindowResume } from "./work-window-resume.js";
 import type { WorkWindowResumeDecision } from "./work-window-resume.js";
@@ -187,19 +189,8 @@ import type { AgentAppointmentRegistry } from "./agent-appointment-registry.js";
 import type { AcceptanceVerdictGate } from "./acceptance-verdict-gate.js";
 import type { QuaternaryLifecycleController } from "./quaternary-lifecycle-controller.js";
 
-/** 目标门禁判定记录（清单第 ⑥ 项；只读观察用）。 */
-export interface GoalDispatchVerdictRecord {
-  readonly missionIdentifier: string;
-  readonly projectIdentifier: string;
-  readonly contractRevision: number;
-  readonly isAllowed: boolean;
-  readonly reasonCode: string | null;
-  readonly detail: string | null;
-  readonly evidenceGaps: readonly string[];
-  /** 本次判定是否真的阻断了派发（false = 仅观察）。 */
-  readonly isEnforced: boolean;
-  readonly observedAtIso: string;
-}
+/** 目标门禁判定记录（定义已迁到 goal-dispatch-gate-adapter，对外导出不变）。 */
+export type { GoalDispatchVerdictRecord } from "./goal-dispatch-gate-adapter.js";
 
 export interface MissionPreparedObservation {
   readonly missionIdentifier: string;
@@ -732,7 +723,7 @@ export interface MainControllerOptions {
    */
   isGoalModeEnforcementEnabled?: boolean;
   /** 目标门禁判定上报（观察或强制都会调用；不含任何模型可见副作用）。 */
-  onGoalDispatchVerdict?: (record: GoalDispatchVerdictRecord) => void;
+  onGoalDispatchVerdict?: (record: GoalDispatchVerdictRecordValue) => void;
   /**
    * 接线缺口第 ① 项（2026-10-28）：只读序列状态控制面。
    *
@@ -4273,49 +4264,36 @@ export class MainController {
    * 未装配 resolver ⇒ 直接返回"未阻断"（行为不变）。
    * 装配后：判定必记录；只有 `isGoalModeEnforcementEnabled === true` 才真的阻断派发。
    */
+  // ─── AXIOMATIC-DESIGN P4：目标门禁适配器（端口注入，首次构造后缓存） ───
+  private goalDispatchGateAdapterInstance: GoalDispatchGateAdapter | null = null;
+
+  private getGoalDispatchGateAdapter(): GoalDispatchGateAdapter {
+    if (this.goalDispatchGateAdapterInstance === null) {
+      this.goalDispatchGateAdapterInstance = new GoalDispatchGateAdapter({
+        resolveGate: (missionIdentifier: string) => {
+          const resolver = this.options.goalDispatchGateResolver;
+          if (resolver === undefined) return null;
+          return resolver(missionIdentifier);
+        },
+        readProjectIdentifier: (missionIdentifier: string) =>
+          this.missionProjectIdentifiers.get(missionIdentifier) ?? "",
+        isEnforcementEnabled: () => this.options.isGoalModeEnforcementEnabled === true,
+        onVerdict: (record: GoalDispatchVerdictRecordValue) =>
+          this.options.onGoalDispatchVerdict?.(record),
+        streamOutput: (missionIdentifier: string, outputText: string) =>
+          this.options.streamOutput(missionIdentifier, outputText),
+        nowIso: () => new Date().toISOString(),
+      });
+    }
+    return this.goalDispatchGateAdapterInstance;
+  }
+
   private observeGoalDispatchGate(missionId: string): {
     readonly isBlocked: boolean;
     readonly detail: string | null;
   } {
-    const resolver = this.options.goalDispatchGateResolver;
-    if (resolver === undefined) {
-      return { isBlocked: false, detail: null };
-    }
-    const gate = resolver(missionId);
-    if (gate === null) {
-      return { isBlocked: false, detail: null };
-    }
-    const state = gate.getState();
-    const projectIdentifier = this.missionProjectIdentifiers.get(missionId) ?? "";
-    const observedAtIso = new Date().toISOString();
-    const verdict = gate.assertMissionDispatchAllowed({
-      requestedContractRevision: state.contractRevision,
-      projectIdentifier,
-      nowIso: observedAtIso,
-    });
-    const isEnforced = this.options.isGoalModeEnforcementEnabled === true;
-    const record: GoalDispatchVerdictRecord = {
-      missionIdentifier: missionId,
-      projectIdentifier,
-      contractRevision: state.contractRevision,
-      isAllowed: verdict.isAllowed,
-      reasonCode: verdict.isAllowed ? null : verdict.reasonCode,
-      detail: verdict.isAllowed ? null : verdict.detail,
-      evidenceGaps: verdict.isAllowed ? [] : [...verdict.evidenceGaps],
-      isEnforced,
-      observedAtIso,
-    };
-    this.options.onGoalDispatchVerdict?.(record);
-    if (!verdict.isAllowed) {
-      this.options.streamOutput(
-        missionId,
-        `[目标门禁] ${isEnforced ? "阻断派发" : "仅观察（未阻断）"}：${verdict.detail}`,
-      );
-      if (isEnforced) {
-        return { isBlocked: true, detail: verdict.detail };
-      }
-    }
-    return { isBlocked: false, detail: verdict.isAllowed ? null : verdict.detail };
+    /** AXIOMATIC-DESIGN P4：观察/强制逻辑已迁到 GoalDispatchGateAdapter。 */
+    return this.getGoalDispatchGateAdapter().observeMissionDispatch(missionId);
   }
 
   /**

@@ -8825,3 +8825,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   都改为调用服务；控制器内不再有权限规则副本。
 > - 反例 6 条（动作命中重算、未知工具、无 profile ⇒ null、缺目录空概览等），累计 P3 反例 17 条。
 > - 门禁：`npm test` **1025 files / 6428 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P4 完成：目标门禁适配器（2026-11-26）**
+>
+> - 新增 `orchestration/goal-dispatch-gate-adapter.ts`；`main-controller.observeGoalDispatchGate` 改为委托。
+> - `GoalDispatchVerdictRecord` 定义迁到适配器并在控制器再导出（`application-runtime` 等导入路径不变）。
+> - 反例 5 条（未装配、允许、拒绝仅观察、拒绝强制、端口时间/项目来源）。
+> - 门禁：`npm test` **1026 files / 6433 tests 全过**；typecheck/lint 0；隐私 ok。
