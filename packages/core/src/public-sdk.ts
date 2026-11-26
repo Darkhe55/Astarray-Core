@@ -252,14 +252,13 @@ export {
   type ParameterAuthorizationSettings,
   type ParameterRuleMatch,
 } from "./tools/parameter-authorization.js";
-import { evaluateParameterAuthorization } from "./tools/parameter-authorization.js";
 import {
   ParameterAuthorizationSettingsStore,
-  evaluateParameterAuthorizationSettingChange,
   type ParameterAuthorizationSettingChangeOutcome,
   type ToolAuthorizationShape,
 } from "./tools/parameter-authorization-settings-store.js";
 import { PermissionFacet } from "./public-sdk-facets/permission-facet.js";
+import type { PublicParameterAuthorizationSettings } from "./public-sdk-facets/permission-facet.js";
 
 // ─── MERGE-01 §1.3：参数授权**设置入口**与"关闭细分不得静默扩大权限" ───
 // 卡内："关闭细分若会从 deny/ask 回退 allow，必须明确提示放宽范围，
@@ -277,13 +276,8 @@ export {
   type ToolAuthorizationShape,
 } from "./tools/parameter-authorization-settings-store.js";
 
-/** 参数授权设置的**公开只读视图**（SDK 消费者用）。 */
-export interface PublicParameterAuthorizationSettings {
-  isParameterAuthorizationEnabled: boolean;
-  isParameterRulesEnabled: boolean;
-  configurationRevision: number;
-  ruleCount: number;
-}
+/** 参数授权设置的**公开只读视图**（定义已迁到 permission-facet，对外导出保持不变）。 */
+export type { PublicParameterAuthorizationSettings };
 // ─── MERGE-01：能力族 + action 统一（纵向样本与只读投影）公开入口 ───
 // 只读投影由本入口导出，保证 Ponder/主 Agent 视图不会因统一族名而暴露隐藏写动作。
 export {
@@ -4446,6 +4440,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       assertOpen: () => this.assertOpen(),
       createParameterAuthorizationSettingsStore: () =>
         this.createParameterAuthorizationSettingsStore(),
+      createSettingsWriteRejectedError: (message: string) =>
+        new PublicApplicationError("settings-write-rejected", message),
     });
   }
 
@@ -4467,144 +4463,20 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return await this.createPermissionFacet().queryPermissionToolOverview();
   }
 
-  /**
-   * AUTH-UI-01：无副作用判定预览。
-   * 只读当前 profile / 参数授权设置 / 规则，不改任何状态、不调用模型。
-   */
+  /** AUTH-UI-01：无副作用判定预览（已迁入 permission-facet，本方法仅委托）。 */
   async previewParameterAuthorization(input: {
     readonly toolName: string;
     readonly action: string;
     readonly argumentsJson: string;
-  }): Promise<{
-    status: "ok" | "unknown-tool" | "invalid-arguments" | "preview-unavailable";
-    decision: "allow" | "ask" | "deny" | null;
-    source: "tool-baseline" | "parameter-rule" | null;
-    appliedRuleExplanation: string | null;
-    isRuleEvaluationSkipped: boolean;
-    baselineDecision: "allow" | "ask" | "deny" | null;
-    capabilityIds: string[];
-    configurationRevision: number;
-    message: string | null;
-  }> {
-    this.assertOpen();
-    let parsedArguments: Record<string, unknown>;
-    try {
-      const parsed = JSON.parse(input.argumentsJson || "{}") as unknown;
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return {
-          status: "invalid-arguments",
-          decision: null,
-          source: null,
-          appliedRuleExplanation: null,
-          isRuleEvaluationSkipped: false,
-          baselineDecision: null,
-          capabilityIds: [],
-          configurationRevision: 0,
-          message: "参数必须是 JSON 对象。",
-        };
-      }
-      parsedArguments = parsed as Record<string, unknown>;
-    } catch {
-      return {
-        status: "invalid-arguments",
-        decision: null,
-        source: null,
-        appliedRuleExplanation: null,
-        isRuleEvaluationSkipped: false,
-        baselineDecision: null,
-        capabilityIds: [],
-        configurationRevision: 0,
-        message: "参数不是合法 JSON。",
-      };
-    }
-    const baseline = await this.runtime.controller.previewToolPermission({
-      toolName: input.toolName,
-      action: input.action,
-    });
-    if (baseline.status === "unknown-tool") {
-      return {
-        status: "unknown-tool",
-        decision: null,
-        source: null,
-        appliedRuleExplanation: null,
-        isRuleEvaluationSkipped: false,
-        baselineDecision: null,
-        capabilityIds: [],
-        configurationRevision: 0,
-        message: "未知工具：" + input.toolName,
-      };
-    }
-    if (baseline.baselineDecision === null) {
-      return {
-        status: "preview-unavailable",
-        decision: null,
-        source: null,
-        appliedRuleExplanation: null,
-        isRuleEvaluationSkipped: false,
-        baselineDecision: null,
-        capabilityIds: baseline.capabilityIds,
-        configurationRevision: 0,
-        message: "当前权限组不可读，无法预览。",
-      };
-    }
-    const store = this.createParameterAuthorizationSettingsStore();
-    const document = await store.readSettings();
-    if (document.settings.isParameterAuthorizationEnabled !== true) {
-      return {
-        status: "ok",
-        decision: baseline.baselineDecision,
-        source: "tool-baseline",
-        appliedRuleExplanation: null,
-        isRuleEvaluationSkipped: true,
-        baselineDecision: baseline.baselineDecision,
-        capabilityIds: baseline.capabilityIds,
-        configurationRevision: document.configurationRevision ?? 0,
-        message: "参数授权总开关关闭：只按工具基线判定。",
-      };
-    }
-    const outcome = evaluateParameterAuthorization({
-      toolName: input.toolName,
-      action: input.action,
-      argumentsJson: JSON.stringify(parsedArguments),
-      baselineDecision: baseline.baselineDecision,
-      settings: {
-        isParameterAuthorizationEnabled: true,
-        isParameterRulesEnabled: document.settings.isParameterRulesEnabled,
-      },
-      rules: document.rules,
-    });
-    return {
-      status: "ok",
-      decision: outcome.decision,
-      source: outcome.source,
-      appliedRuleExplanation: outcome.appliedRuleExplanation,
-      isRuleEvaluationSkipped: outcome.isRuleEvaluationSkipped,
-      baselineDecision: baseline.baselineDecision,
-      capabilityIds: baseline.capabilityIds,
-      configurationRevision: document.configurationRevision ?? 0,
-      message: null,
-    };
+  }) {
+    return await this.createPermissionFacet().previewParameterAuthorization(input);
   }
 
   // ─── MERGE-01 §1.3 第 4 项：参数授权**设置入口**（SDK 侧） ───
 
-  /**
-   * 读取参数授权设置（**只读、零副作用**）。
-   *
-   * 卡内要求该设置是"设置入口"：此前 `ParameterAuthorizationSettingsStore` 虽被导出，
-   * 但**全仓从未被构造** ⇒ 入口在产品层面不成立。这里把它接到真实状态目录上。
-   */
+  /** 读取参数授权设置（只读、零副作用；已迁入 permission-facet）。 */
   async queryParameterAuthorizationSettings(): Promise<PublicParameterAuthorizationSettings> {
-    this.assertOpen();
-    const store = this.createParameterAuthorizationSettingsStore();
-    const settingsDocument = await store.readSettings();
-    return {
-      isParameterAuthorizationEnabled:
-        settingsDocument.settings.isParameterAuthorizationEnabled,
-      isParameterRulesEnabled: settingsDocument.settings.isParameterRulesEnabled,
-      configurationRevision: settingsDocument.configurationRevision ?? 0,
-      ruleCount: settingsDocument.rules.length,
-    };
+    return await this.createPermissionFacet().queryParameterAuthorizationSettings();
   }
 
   /** GUI-03-03：读取参数授权规则明细（只读；供设置页展示，不含凭据）。 */
@@ -4612,10 +4484,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return await this.createPermissionFacet().queryParameterAuthorizationRuleDetails();
   }
 
-  /**
-   * GUI-03-03：GUI 规则集写入。
-   * 服务端重新读取当前规则、检查 revision 和放宽项；不做“信任浏览器确认”的捷径。
-   */
+  /** GUI-03-03：GUI 规则集写入（已迁入 permission-facet）。 */
   async updateParameterAuthorizationRules(input: {
     isParameterAuthorizationEnabled: boolean;
     isParameterRulesEnabled: boolean;
@@ -4623,122 +4492,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     rules: ParameterAuthorizationRule[];
     expectedRevision: number;
     isConfirmedByAuthenticatedUser: boolean;
-  }): Promise<{
-    status: "saved" | "rejected" | "confirmation-required";
-    revision: number;
-    widenedRules: string[];
-    message: string | null;
-  }> {
-    this.assertOpen();
-    const store = this.createParameterAuthorizationSettingsStore();
-    const current = await store.readSettings();
-    const currentRevision = current.configurationRevision ?? 0;
-    if (currentRevision !== input.expectedRevision) {
-      return {
-        status: "rejected",
-        revision: currentRevision,
-        widenedRules: [],
-        message: "配置 revision 已变化，请刷新后重试。",
-      };
-    }
-    const previous = new Map<string, string>();
-    for (const rule of current.rules) {
-      previous.set(rule.ruleIdentifier ?? rule.toolName + "|" + rule.action, rule.decision);
-    }
-    const widenedRules = input.rules
-      .filter((rule) => {
-        const key = rule.ruleIdentifier ?? rule.toolName + "|" + rule.action;
-        const old = previous.get(key);
-        return rule.decision === "allow" && old !== undefined && old !== "allow";
-      })
-      .map((rule) => rule.ruleIdentifier ?? rule.toolName + "|" + rule.action);
-    if (widenedRules.length > 0 && !input.isConfirmedByAuthenticatedUser) {
-      return {
-        status: "confirmation-required",
-        revision: currentRevision,
-        widenedRules,
-        message: "本次修改会放宽 " + String(widenedRules.length) + " 条规则，需要明确确认。",
-      };
-    }
-    try {
-      const updated = await store.replaceDocument({
-        settings: {
-          isParameterAuthorizationEnabled: input.isParameterAuthorizationEnabled,
-          isParameterRulesEnabled: input.isParameterRulesEnabled,
-          perToolRulesEnabled: input.perToolRulesEnabled ?? {},
-        },
-        rules: input.rules,
-        expectedRevision: currentRevision,
-      });
-      return {
-        status: "saved",
-        revision: updated.configurationRevision ?? currentRevision + 1,
-        widenedRules,
-        message: null,
-      };
-    } catch (error) {
-      if (error instanceof DomainError) {
-        return {
-          status: "rejected",
-          revision: currentRevision,
-          widenedRules,
-          message: error.message,
-        };
-      }
-      throw error;
-    }
+  }) {
+    return await this.createPermissionFacet().updateParameterAuthorizationRules(input);
   }
 
-  /**
-   * 写入参数授权设置。
-   *
-   * 卡内 §1.3："**关闭细分若会从 deny/ask 回退 allow，必须明确提示放宽范围，
-   * 不以'关闭功能'静默扩大权限**"；"扩大权限需既有认证用户确认"。
-   * 因此这里把**放宽判定**放在真实写入路径上：未确认即拒绝，且**不写任何文件**。
-   */
+  /** 写入参数授权设置（已迁入 permission-facet）。 */
   async updateParameterAuthorizationSettings(input: {
     isParameterAuthorizationEnabled: boolean;
     isParameterRulesEnabled: boolean;
     toolAuthorizationShapes: ToolAuthorizationShape[];
     isConfirmedByAuthenticatedUser: boolean;
   }): Promise<ParameterAuthorizationSettingChangeOutcome> {
-    this.assertOpen();
-    const store = this.createParameterAuthorizationSettingsStore();
-    const settingsDocument = await store.readSettings();
-    const changeOutcome = evaluateParameterAuthorizationSettingChange({
-      previousSettings: {
-        isParameterAuthorizationEnabled:
-          settingsDocument.settings.isParameterAuthorizationEnabled,
-        isParameterRulesEnabled: settingsDocument.settings.isParameterRulesEnabled,
-      },
-      nextSettings: {
-        isParameterAuthorizationEnabled: input.isParameterAuthorizationEnabled,
-        isParameterRulesEnabled: input.isParameterRulesEnabled,
-      },
-      tools: input.toolAuthorizationShapes,
-      isConfirmedByAuthenticatedUser: input.isConfirmedByAuthenticatedUser,
-      configurationRevision: settingsDocument.configurationRevision ?? 0,
-      effectiveRevision: settingsDocument.configurationRevision ?? 0,
-    });
-    if (!changeOutcome.isAccepted) {
-      /** 拒绝 ⇒ **不落地任何文件变更**（不得半生效）。 */
-      return changeOutcome;
-    }
-    const writeResult = await store.writeSettings({
-      settings: {
-        isParameterAuthorizationEnabled: input.isParameterAuthorizationEnabled,
-        isParameterRulesEnabled: input.isParameterRulesEnabled,
-      },
-      rules: settingsDocument.rules,
-      configurationRevision: changeOutcome.configurationRevision,
-    });
-    if (!writeResult.isValid) {
-      throw new PublicApplicationError(
-        "settings-write-rejected",
-        "参数授权设置写入被拒绝: " + String(writeResult.reason),
-      );
-    }
-    return changeOutcome;
+    return await this.createPermissionFacet().updateParameterAuthorizationSettings(input);
   }
 
   private createParameterAuthorizationSettingsStore(): ParameterAuthorizationSettingsStore {

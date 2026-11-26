@@ -8760,3 +8760,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `public-sdk.ts` 8540 → 8525 行；新增 4 条子门面单测（含关闭态不触达 controller）；`gui03-parameter-authorization` 回归通过。
 > - 门禁：`npm test` **1017 files / 6384 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。
 > - P1 后覆盖率实测：分支 **83.13%**（基线 83.05%，未下降）。
+
+> **全面解耦改造 P2 第二切片：参数授权整体迁出（2026-11-26）**
+>
+> - `permission-facet.ts` 扩到 349 行 / 8 方法：新增 `previewParameterAuthorization`、`queryParameterAuthorizationSettings`、
+>   `updateParameterAuthorizationSettings`、`updateParameterAuthorizationRules`；错误构造由宿主注入（避免循环依赖）。
+> - `public-sdk.ts` 8525 → **8290 行**（累计 −250）；新增子门面单测 4 条（累计 8 条），覆盖非法 JSON/未知工具/不可读、
+>   总开关关闭、revision 冲突、放宽需确认、写入被拒。
+> - 门禁：`npm test` **1017 files / 6388 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。

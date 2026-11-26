@@ -13,7 +13,7 @@
 | 阶段 | 内容 | 状态 | 主要产出 |
 |---|---|---|---|
 | **P1** | 完成判定三角化（`CompletionDecision` 聚合器） | **done（2026-11-26）** | `mission-completion-decision.ts`（134 行）+ 7 条反例；`main-controller` 该段 −53 行 |
-| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限切片已完成）** | `public-sdk-facets/permission-facet.ts`（4 方法）+ 窄宿主接口 + 4 条独立单测 |
+| **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（权限域已整体迁出）** | `public-sdk-facets/permission-facet.ts`（349 行 / 8 方法 / 8 条单测）；`public-sdk.ts` 8540 → 8290 |
 | **P3** | 权限判定迁出 `PermissionResolutionService` | 未开始 | 从 `main-controller` 抽出组合判定与 `previewToolPermission` |
 | **P4** | 目标门禁适配器 `GoalDispatchGateAdapter` | 未开始 | 封装 `goal-gate-cache` + 契约/状态读取 |
 | **P5** | 矩阵治理 + `createApplicationRuntime` 选项分组 | 未开始 | `docs/design/DESIGN_MATRIX.md`、import 规则、子配置对象 |
@@ -40,12 +40,15 @@ task-chain → receipts → independent-verdict
 
 ## P2：`public-sdk` 按 FR 拆子门面（进行中）
 
-**已完成的第一个切片（权限查询/预览）**：
+**已完成（权限域两次切片）**：
 - 新文件 `public-sdk-facets/permission-facet.ts`：`listPermissionToolOverview`、`previewToolPermission`、
   `queryPermissionToolOverview`、`queryParameterAuthorizationRuleDetails`；
 - 宿主为**窄接口**（controller 两个查询入口 + 参数授权设置存储 + `assertOpen`），子门面不依赖门面其余状态；
 - 门面保留同名方法并委托（导出面不变）；`public-sdk.ts` 8540 → 8525 行；
-- 单测 4 条（含 `assertOpen` 抛错时不触达 controller）；`gui03-parameter-authorization` 回归 4 条通过。
+- 第二批：`previewParameterAuthorization`、`queryParameterAuthorizationSettings`、`updateParameterAuthorizationSettings`、
+  `updateParameterAuthorizationRules` 也迁入（含非法 JSON/未知工具/权限组不可读、总开关关闭、revision 冲突、
+  放宽需确认、写入被拒抛宿主错误）；单测累计 8 条；`gui03` 回归通过。
+- 错误构造改为宿主注入，避免子门面 -> 门面的循环依赖。
 
 
 
@@ -80,5 +83,5 @@ task-chain → receipts → independent-verdict
 | `main-controller.ts` 行数 | 6183 | 6160 | < 4500 |
 | `main-controller.ts` import 数 | 107 | 107（P1 未减） | < 70 |
 | `application-runtime.ts` 行数 | 5734 | 5734 | < 4500 |
-| `public-sdk.ts` 行数 | 8540 | 8525 | 拆分后单文件 < 3000 |
+| `public-sdk.ts` 行数 | 8540 | 8290 | 拆分后单文件 < 3000 |
 | 分支覆盖率 | 83.05% | 83.13%（P1 后实测） | ≥ 83.05% |
