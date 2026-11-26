@@ -4428,6 +4428,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           await this.captureAuthoritativeResult(record as TaskRecord),
         toTaskResult: (taskIdentifier: string, record) =>
           this.toTaskResult(taskIdentifier, record as TaskRecord),
+        submitTask: async (input) => await this.submitTask(input),
+        cancelTask: async (input) => await this.cancelTask(input),
       });
     }
     return this.missionFacetInstance;

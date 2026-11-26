@@ -8868,3 +8868,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `run-command.ts` 4 处 `queryTask` 改走 `application.mission.queryTask`；三处测试假端口同步补 `mission` 子门面。
 > - 回归：`run-command-*`、`b6r10-wait-for-task-terminal` 全过。
 > - 门禁：`npm test` **1027 files / 6443 tests 全过**；`test:scripts` 58/58；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P2 第十一切片：提交/取消薄委托（2026-11-26）**
+>
+> - `MissionFacet` 新增 `submitTask`/`cancelTask` 薄委托（状态机、幂等账本、槽位补位仍由门面持有，facet 不复制）。
+> - `run-command.ts` 提交调用改走 `application.mission.submitTask`；新增 2 条 facet 反例（透传、关闭态不触达）。
+> - 门禁：`npm test` **1027 files / 6445 tests 全过**；`test:scripts` 58/58；typecheck/lint 0；隐私 ok。

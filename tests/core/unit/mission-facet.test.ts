@@ -188,4 +188,45 @@ describe("AXIOMATIC P2：mission 只读查询子门面", () => {
     ).rejects.toThrow("application-closed");
     expect(requireTask).not.toHaveBeenCalled();
   });
+
+  it("⑩ submitTask：薄委托到门面端口，参数原样透传", async () => {
+    const submitTask = vi.fn(async () => ({
+      taskIdentifier: "task-1",
+      status: "queued" as const,
+      missionIdentifier: null,
+      summaryPreview: null,
+    }));
+    const { host } = buildHost({ submitTask });
+    const result = await new MissionFacet(host).submitTask({
+      sessionId: "session-1",
+      taskIdentifier: "task-1",
+      prompt: "做一件事",
+      idempotencyKey: "key-1",
+    });
+    expect(result).toMatchObject({ taskIdentifier: "task-1", status: "queued" });
+    expect(submitTask).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      taskIdentifier: "task-1",
+      prompt: "做一件事",
+      idempotencyKey: "key-1",
+    });
+  });
+
+  it("⑪ cancelTask：薄委托；关闭态 ⇒ 拒绝且不触达门面", async () => {
+    const cancelTask = vi.fn(async () => undefined);
+    const { host } = buildHost({ cancelTask });
+    await new MissionFacet(host).cancelTask({ sessionId: "session-1", taskIdentifier: "task-1" });
+    expect(cancelTask).toHaveBeenCalledWith({ sessionId: "session-1", taskIdentifier: "task-1" });
+
+    const { host: closedHost } = buildHost({
+      cancelTask,
+      assertOpen: () => {
+        throw new Error("application-closed");
+      },
+    });
+    await expect(
+      new MissionFacet(closedHost).cancelTask({ sessionId: "s", taskIdentifier: "t" }),
+    ).rejects.toThrow("application-closed");
+    expect(cancelTask).toHaveBeenCalledTimes(1);
+  });
 });

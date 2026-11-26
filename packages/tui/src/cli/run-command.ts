@@ -358,7 +358,7 @@ try {
     }
     let accepted: Awaited<ReturnType<typeof application.submitTask>>;
     try {
-      accepted = await application.submitTask({
+      accepted = await application.mission.submitTask({
         sessionId: "cli-run",
         taskIdentifier: "cli-task",
         prompt: options.prompt,

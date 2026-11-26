@@ -51,6 +51,20 @@ export interface MissionFacetHost {
   isTerminalStatus(status: MissionTaskStatus): boolean;
   captureAuthoritativeResult(record: MissionTaskRecordView): Promise<void>;
   toTaskResult(taskIdentifier: string, record: MissionTaskRecordView): MissionTaskResultView;
+  /** AXIOMATIC P2：任务提交/取消的**薄委托**（逻辑仍由门面持有，facet 不复制状态机）。 */
+  submitTask(input: MissionTaskSubmitInput): Promise<MissionTaskResultView>;
+  cancelTask(input: { sessionId: string; taskIdentifier: string }): Promise<void>;
+}
+
+export interface MissionTaskSubmitInput {
+  sessionId: string;
+  taskIdentifier: string;
+  prompt: string;
+  idempotencyKey?: string;
+  projectIdentifier?: string;
+  workspaceRootPath?: string;
+  targetAgentInstanceIdentifier?: string;
+  goalIdentifier?: string;
 }
 
 export interface MissionTaskRecordView {
@@ -126,6 +140,18 @@ export class MissionFacet {
       await this.host.captureAuthoritativeResult(record);
     }
     return this.host.toTaskResult(input.taskIdentifier, record);
+  }
+
+  /** 提交任务：薄委托到门面（幂等/槽位/监视器等状态机仍由门面持有）。 */
+  async submitTask(input: MissionTaskSubmitInput): Promise<MissionTaskResultView> {
+    this.host.assertOpen();
+    return await this.host.submitTask(input);
+  }
+
+  /** 取消任务：薄委托到门面（终态判断、槽位补位仍在门面）。 */
+  async cancelTask(input: { sessionId: string; taskIdentifier: string }): Promise<void> {
+    this.host.assertOpen();
+    await this.host.cancelTask(input);
   }
 
 }
