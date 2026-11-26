@@ -8743,3 +8743,13 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - **B9 覆盖率**：**83.05% < 85%**，结论与可选路径见 `docs/reports/B9_COVERAGE_STATUS_2026-11-25.md`。
 >
 > **结论**：本轮次内不再有可独立推进的本地分项；以上四项均为明确的阻塞点或未达标项，不做虚假完成声明。
+
+> **全面解耦改造 P1：完成判定三角化（2026-11-26）**
+>
+> - 新目标已建立（原 B9 goal 改为"全面改造"，40 轮预算）：按公理设计矩阵结论分五阶段解耦。
+> - **P1 完成**：新增 `orchestration/mission-completion-decision.ts`（134 行，端口注入、固定顺序
+>   `task-chain → receipts → independent-verdict`），`main-controller.projectMissionCompletionGate`
+>   改为委托；该段 −53 行。反例 7 条（严格模式 skipped、读失败上抛、端口抛错 fail-closed、原因文本兼容）。
+> - 计划文档：`docs/design/REFACTOR_PLAN_2026-11-26.md`（P1 done；P2 门面拆分 / P3 权限服务 /
+>   P4 目标门禁适配器 / P5 矩阵治理 待做）。
+> - 门禁：`npm test` 1016 files / 6380 tests 全过；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。

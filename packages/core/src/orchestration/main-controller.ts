@@ -125,7 +125,7 @@ import {
   type TaskLedgerDivergenceJournal,
 } from "./task-ledger-divergence-journal.js";
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
-import { evaluateCompletionReceipt } from "./completion-receipt.js";
+import { decideMissionCompletion } from "./mission-completion-decision.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { CompletionVerdictStore } from "./completion-verdict-store.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
@@ -4387,59 +4387,36 @@ export class MainController {
     readonly blockedReasons: readonly string[];
     readonly incompleteTaskIdentifiers: readonly string[];
   }> {
-    const missionStatus = await this.options.missionManager.getMissionStatus(missionId);
-    const tasks = missionStatus.taskChain?.tasks ?? [];
-    const incompleteTaskIdentifiers = tasks
-      .filter((task) => task.status !== "done")
-      .map((task) => `${task.id}(${task.status})`);
-    const blockedReasons: string[] = [];
-    if (incompleteTaskIdentifiers.length > 0) {
-      blockedReasons.push(
-        `任务链仍有未完成任务: ${incompleteTaskIdentifiers.join(", ")}`,
-      );
-    }
-    if (this.options.isCompletionReceiptRequired === true) {
-      const receiptReader = this.options.completionReceiptReader;
-      const insufficientReceipts: string[] = [];
-      for (const task of tasks.filter((candidate) => candidate.status === "done")) {
-        const receipt =
-          receiptReader === undefined
-            ? null
-            : await receiptReader(missionId, task.id).catch(() => null);
-        const evaluation = evaluateCompletionReceipt({
-          receipt: receipt ?? null,
-          requiresCompletionControlEvent:
-            this.options.requireCompletionControlEvent === true,
-        });
-        if (!evaluation.isSufficient) {
-          insufficientReceipts.push(`${task.id}: ${evaluation.reasons.join("；")}`);
-        }
-      }
-      if (insufficientReceipts.length > 0) {
-        blockedReasons.push(`完成收据不足: ${insufficientReceipts.join(" | ")}`);
-      }
-      const verdictReader = this.options.completionVerdictReader;
-      /**
-       * R12（2026-10-29）：**逐任务对齐** —— 把已 done 任务交给读取端口，
-       * 由它确认"每个任务都有 accepted 裁决"，而不是只看 mission 级汇总。
-       */
-      const doneTaskIdentifiers = tasks
-        .filter((candidate) => candidate.status === "done")
-        .map((candidate) => candidate.id);
-      const verdict =
-        verdictReader === undefined
-          ? null
-          : await verdictReader(missionId, doneTaskIdentifiers).catch(() => null);
-      if (verdict === null || !verdict.isAccepted) {
-        blockedReasons.push(
-          `缺少已接受的独立完成裁决${verdict === null ? "" : `：${verdict.reasons.join("；")}`}`,
-        );
-      }
-    }
+    /**
+     * AXIOMATIC-DESIGN 阶段①（2026-11-26）：判定逻辑已迁到 mission-completion-decision.ts。
+     *
+     * 顺序固定：task-chain → receipts → independent-verdict；此处只做端口装配，
+     * 不再在控制器里堆叠判定分支（设计矩阵 FR1/3/4/5 的交叉耦合开始收敛）。
+     */
+    const receiptReader = this.options.completionReceiptReader;
+    const verdictReader = this.options.completionVerdictReader;
+    const decision = await decideMissionCompletion({
+      missionIdentifier: missionId,
+      ports: {
+        readTaskChainTasks: async (identifier) =>
+          (await this.options.missionManager.getMissionStatus(identifier)).taskChain?.tasks ?? [],
+        isCompletionReceiptRequired: this.options.isCompletionReceiptRequired === true,
+        requireCompletionControlEvent: this.options.requireCompletionControlEvent === true,
+        ...(receiptReader === undefined ? {} : { readReceipt: receiptReader }),
+        ...(verdictReader === undefined
+          ? {}
+          : {
+              readIndependentVerdict: async (
+                identifier: string,
+                doneTaskIdentifiers: readonly string[],
+              ) => await verdictReader(identifier, doneTaskIdentifiers),
+            }),
+      },
+    });
     return {
-      isAllowed: blockedReasons.length === 0,
-      blockedReasons,
-      incompleteTaskIdentifiers,
+      isAllowed: decision.isAllowed,
+      blockedReasons: decision.blockedReasons,
+      incompleteTaskIdentifiers: decision.incompleteTaskIdentifiers,
     };
   }
 
