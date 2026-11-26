@@ -8803,3 +8803,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `goal-mode-command.ts` 5 处调用改走 `application.goal.*`，验证"CLI 只依赖所需子门面"。
 > - 新增 3 条单测（缓存同一实例、窄面不含整门面方法、关闭态拒绝）。
 > - 门禁：`npm test` **1022 files / 6411 tests 全过**；typecheck/lint 0；隐私 ok。
+
+> **全面解耦改造 P3 第一切片：权限纯判定抽出（2026-11-26）**
+>
+> - 新增 `orchestration/permission-resolution.ts`（`resolveToolBaselineDecision`），消除 `main-controller` 内
+>   `strictest` 与 `computeCapabilityBaseline` 的重复规则；控制器只读 profile 后调用纯函数。
+> - 反例 6 条（含"能力级 deny 先于显式工具决定"的兼容性反例）。
+> - 门禁：`npm test` **1023 files / 6417 tests 全过**；`test:scripts` 51/51；typecheck/lint 0；隐私 ok。

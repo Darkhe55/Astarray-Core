@@ -126,6 +126,7 @@ import {
 } from "./task-ledger-divergence-journal.js";
 import type { TaskLedgerAlignmentReport } from "./task-ledger-bridge.js";
 import { decideMissionCompletion } from "./mission-completion-decision.js";
+import { resolveToolBaselineDecision } from "./permission-resolution.js";
 import type { CompletionReceiptStore } from "./completion-receipt-store.js";
 import type { CompletionVerdictStore } from "./completion-verdict-store.js";
 import type { GoalDispatchGate } from "./goal-dispatch-gate.js";
@@ -2395,18 +2396,9 @@ export class MainController {
     const capabilityCatalog = this.options.permissionCapabilityCatalog;
     if (capabilityCatalog === null || capabilityCatalog === undefined) return [];
     const profile = await this.readCurrentPermissionProfileOrNull();
-    const strictest = (capabilityIds: string[], toolName: string): PermissionDecision | null => {
-      if (profile === null) return null;
-      const explicit = profile.toolDecisions?.[toolName];
-      if (capabilityIds.length === 0) return explicit ?? null;
-      let decision: PermissionDecision = "allow";
-      for (const capabilityId of capabilityIds) {
-        const current = profile.capabilityDecisions[capabilityId] ?? profile.fallbackDecision;
-        if (current === "deny") return "deny";
-        if (current === "ask") decision = "ask";
-      }
-      return explicit ?? decision;
-    };
+    /** AXIOMATIC-DESIGN P3：最严判定已抽为纯函数（permission-resolution.ts）。 */
+    const strictest = (capabilityIds: string[], toolName: string): PermissionDecision | null =>
+      resolveToolBaselineDecision(profile, capabilityIds, toolName);
     const wholeTools = capabilityCatalog.listToolMappings();
     const actionMappings = capabilityCatalog.listToolActionMappings();
     const registry = this.options.registry;
@@ -2490,17 +2482,9 @@ export class MainController {
     capabilityIds: string[],
     toolName: string,
   ): Promise<PermissionDecision | null> {
+    /** AXIOMATIC-DESIGN P3：读 profile 后交给纯函数判定（不再在此复制规则）。 */
     const profile = await this.readCurrentPermissionProfileOrNull();
-    if (profile === null) return null;
-    const explicit = profile.toolDecisions?.[toolName];
-    if (capabilityIds.length === 0) return explicit ?? null;
-    let decision: PermissionDecision = "allow";
-    for (const capabilityId of capabilityIds) {
-      const current = profile.capabilityDecisions[capabilityId] ?? profile.fallbackDecision;
-      if (current === "deny") return "deny";
-      if (current === "ask") decision = "ask";
-    }
-    return explicit ?? decision;
+    return resolveToolBaselineDecision(profile, capabilityIds, toolName);
   }
 
   /** 读取权限组可配置明细（内置组同样可读，只读）。 */

@@ -14,7 +14,7 @@
 |---|---|---|---|
 | **P1** | 完成判定三角化（`CompletionDecision` 聚合器） | **done（2026-11-26）** | `mission-completion-decision.ts`（134 行）+ 7 条反例；`main-controller` 该段 −53 行 |
 | **P2** | `public-sdk` 按 FR 拆子门面 | **进行中（五域 + 只读 getter + CLI 起步接入）** | 5 个 facet、23 个方法、31 条单测；`facade.goal/permission/ops/context/mission` |
-| **P3** | 权限判定迁出 `PermissionResolutionService` | 未开始 | 从 `main-controller` 抽出组合判定与 `previewToolPermission` |
+| **P3** | 权限判定迁出 `PermissionResolutionService` | **进行中**（纯判定已抽出） | `permission-resolution.ts`（`resolveToolBaselineDecision`）+ 6 条反例 |
 | **P4** | 目标门禁适配器 `GoalDispatchGateAdapter` | 未开始 | 封装 `goal-gate-cache` + 契约/状态读取 |
 | **P5** | 矩阵治理 + `createApplicationRuntime` 选项分组 | 未开始 | `docs/design/DESIGN_MATRIX.md`、import 规则、子配置对象 |
 
@@ -102,7 +102,20 @@ task-chain → receipts → independent-verdict
   3. 最后视情况把子门面拆文件（`public-sdk/` 目录 + barrel 导出）。
 - 验收：`public-sdk` 导出面不变；CLI 编译通过；新增"子门面可独立实例化/调用"的单测；fan-in 统计下降。
 
-## P3：`PermissionResolutionService`（计划）
+## P3：`PermissionResolutionService`（进行中）
+
+**第一切片：纯判定抽出（已完成）**
+- 新文件 `orchestration/permission-resolution.ts`：`resolveToolBaselineDecision(profile, capabilityIds, toolName)`；
+- 此前 `listPermissionToolOverview` 的 `strictest` 与 `computeCapabilityBaseline` 是**同一规则的两份实现**，
+  现都改为调用纯函数；`main-controller` 只负责读 profile；
+- 反例 6 条：无权限组 null、无能力映射显式/null、能力 deny 胜出、ask 聚合与显式覆盖、
+  fallback 缺省、显式 deny 覆盖聚合；
+- 保留规则语义：**能力级 deny 先于显式工具决定**（与旧实现逐字一致）。
+
+**下一步（第二切片）**：把 `listPermissionToolOverview` 的装配（catalog 映射 + registry 状态）也迁到服务，
+宿主注入 profile 读取器/能力目录/registry 查询，控制器只做端口装配。
+
+
 
 - 从 `main-controller` 抽出：`previewToolPermission`、能力级 deny 优先、显式工具决定、fallback 组合。
 - 端口：`readCurrentPermissionProfile`、`readCapabilityCatalog`。
