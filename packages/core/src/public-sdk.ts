@@ -4305,94 +4305,124 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
   }
 
+  // ─── AXIOMATIC-DESIGN P2：子门面只读入口（CLI/宿主按需依赖，避免整门面耦合） ───
+  private permissionFacetInstance: PermissionFacet | null = null;
+  private opsFacetInstance: OpsFacet | null = null;
+  private goalFacetInstance: GoalFacet | null = null;
+  private contextFacetInstance: ContextFacet | null = null;
+  private missionFacetInstance: MissionFacet | null = null;
+
+  get permission(): PermissionFacet {
+    return this.createPermissionFacet();
+  }
+
+  get ops(): OpsFacet {
+    return this.createOpsFacet();
+  }
+
+  get goal(): GoalFacet {
+    return this.createGoalFacet();
+  }
+
+  get context(): ContextFacet {
+    return this.createContextFacet();
+  }
+
+  get mission(): MissionFacet {
+    return this.createMissionFacet();
+  }
+
   /**
-   * AXIOMATIC-DESIGN P2：权限域子门面的**窄接口装配**。
+   * AXIOMATIC-DESIGN P2：权限域子门面的**窄接口装配**（首次构造后缓存）。
    *
    * 只暴露 controller 的两个查询入口与参数授权设置存储；子门面不感知门面其余状态。
    */
   private createPermissionFacet(): PermissionFacet {
-    return new PermissionFacet({
-      permissionController: this.runtime.controller,
-      assertOpen: () => this.assertOpen(),
-      createParameterAuthorizationSettingsStore: () =>
-        this.createParameterAuthorizationSettingsStore(),
-      createSettingsWriteRejectedError: (message: string) =>
-        new PublicApplicationError("settings-write-rejected", message),
-    });
+    if (this.permissionFacetInstance === null) {
+      this.permissionFacetInstance = new PermissionFacet({
+        permissionController: this.runtime.controller,
+        assertOpen: () => this.assertOpen(),
+        createParameterAuthorizationSettingsStore: () =>
+          this.createParameterAuthorizationSettingsStore(),
+        createSettingsWriteRejectedError: (message: string) =>
+          new PublicApplicationError("settings-write-rejected", message),
+      });
+    }
+    return this.permissionFacetInstance;
   }
 
-  /**
-   * AXIOMATIC-DESIGN P2：运维只读子门面的**窄接口装配**。
-   *
-   * 只暴露只读存储读取与任务链查询；子门面不感知门面其余状态。
-   */
+  /** AXIOMATIC-DESIGN P2：运维只读子门面的窄接口装配（首次构造后缓存）。 */
   private createOpsFacet(): OpsFacet {
-    return new OpsFacet({
-      assertOpen: () => this.assertOpen(),
-      readStartupRecoveryPolicy: async () =>
-        await this.runtime.startupRecoveryPolicyStore.readPolicy(),
-      readStartupRecoveryReport: async () => await this.runtime.readStartupRecoveryReport(),
-      readExperimentSettings: async () => await this.runtime.experimentSettingsStore.read(),
-      readArtifactRecords: async () => await this.runtime.artifactRecordStore.read(),
-      queryMissionStatus: async (missionId: string) =>
-        await this.runtime.controller.queryMissionStatus(missionId),
-    });
+    if (this.opsFacetInstance === null) {
+      this.opsFacetInstance = new OpsFacet({
+        assertOpen: () => this.assertOpen(),
+        readStartupRecoveryPolicy: async () =>
+          await this.runtime.startupRecoveryPolicyStore.readPolicy(),
+        readStartupRecoveryReport: async () => await this.runtime.readStartupRecoveryReport(),
+        readExperimentSettings: async () => await this.runtime.experimentSettingsStore.read(),
+        readArtifactRecords: async () => await this.runtime.artifactRecordStore.read(),
+        queryMissionStatus: async (missionId: string) =>
+          await this.runtime.controller.queryMissionStatus(missionId),
+      });
+    }
+    return this.opsFacetInstance;
   }
 
-  /**
-   * AXIOMATIC-DESIGN P2：目标域子门面的**窄接口装配**。
-   *
-   * 只暴露 runtime 的目标服务；子门面不感知门面其余状态。
-   */
+  /** AXIOMATIC-DESIGN P2：目标域子门面的窄接口装配（首次构造后缓存）。 */
   private createGoalFacet(): GoalFacet {
-    return new GoalFacet({
-      assertOpen: () => this.assertOpen(),
-      goalService: this.runtime,
-    });
+    if (this.goalFacetInstance === null) {
+      this.goalFacetInstance = new GoalFacet({
+        assertOpen: () => this.assertOpen(),
+        goalService: this.runtime,
+      });
+    }
+    return this.goalFacetInstance;
   }
 
-  /**
-   * AXIOMATIC-DESIGN P2：上下文预算子门面的**窄接口装配**。
-   */
+  /** AXIOMATIC-DESIGN P2：上下文预算子门面的窄接口装配（首次构造后缓存）。 */
   private createContextFacet(): ContextFacet {
-    return new ContextFacet({
-      assertOpen: () => this.assertOpen(),
-      readBudgetPolicy: async () => await this.runtime.globalContextBudgetStore.readPolicy(),
-      readAssemblyEvents: async () => await this.runtime.contextRuntimeEventStore.readAll(),
-      updateBudgetPolicy: async (input) => {
-        await this.runtime.globalContextBudgetStore.updatePolicy(input);
-      },
-      createPublicErrorFrom: (error: unknown) => {
-        if (error instanceof DomainError) {
-          return new PublicApplicationError(error.errorCode, error.message);
-        }
-        return error instanceof Error ? error : new Error(String(error));
-      },
-      emitBudgetPolicyUpdated: (settings) => {
-        this.emit({
-          eventType: "budget-policy-updated",
-          budgetPolicyRevision: settings.budgetPolicyRevision,
-          configuredMaximumGlobalContextTokenCount:
-            settings.configuredMaximumGlobalContextTokenCount,
-          revision: settings.budgetPolicyRevision,
-          idempotencyId: this.nextEventIdempotencyId(),
-        });
-      },
-    });
+    if (this.contextFacetInstance === null) {
+      this.contextFacetInstance = new ContextFacet({
+        assertOpen: () => this.assertOpen(),
+        readBudgetPolicy: async () => await this.runtime.globalContextBudgetStore.readPolicy(),
+        readAssemblyEvents: async () => await this.runtime.contextRuntimeEventStore.readAll(),
+        updateBudgetPolicy: async (input) => {
+          await this.runtime.globalContextBudgetStore.updatePolicy(input);
+        },
+        createPublicErrorFrom: (error: unknown) => {
+          if (error instanceof DomainError) {
+            return new PublicApplicationError(error.errorCode, error.message);
+          }
+          return error instanceof Error ? error : new Error(String(error));
+        },
+        emitBudgetPolicyUpdated: (settings) => {
+          this.emit({
+            eventType: "budget-policy-updated",
+            budgetPolicyRevision: settings.budgetPolicyRevision,
+            configuredMaximumGlobalContextTokenCount:
+              settings.configuredMaximumGlobalContextTokenCount,
+            revision: settings.budgetPolicyRevision,
+            idempotencyId: this.nextEventIdempotencyId(),
+          });
+        },
+      });
+    }
+    return this.contextFacetInstance;
   }
 
-  /**
-   * AXIOMATIC-DESIGN P2：mission 只读查询子门面的**窄接口装配**。
-   */
+  /** AXIOMATIC-DESIGN P2：mission 只读查询子门面的窄接口装配（首次构造后缓存）。 */
   private createMissionFacet(): MissionFacet {
-    return new MissionFacet({
-      assertOpen: () => this.assertOpen(),
-      queryMissionStatus: async (missionId: string) =>
-        await this.runtime.controller.queryMissionStatus(missionId),
-      queryMissionTaskSequence: async (missionIdentifier: string) =>
-        await this.runtime.controller.queryMissionTaskSequence(missionIdentifier),
-      mapMissionStatus: (missionStatus) => this.mapMissionStatus(missionStatus),
-    });
+    if (this.missionFacetInstance === null) {
+      this.missionFacetInstance = new MissionFacet({
+        assertOpen: () => this.assertOpen(),
+        queryMissionStatus: async (missionId: string) =>
+          await this.runtime.controller.queryMissionStatus(missionId),
+        queryMissionTaskSequence: async (missionIdentifier: string) =>
+          await this.runtime.controller.queryMissionTaskSequence(missionIdentifier),
+        mapMissionStatus: (missionStatus) => this.mapMissionStatus(missionStatus),
+      });
+    }
+    return this.missionFacetInstance;
   }
 
   /** 与主控制器同名的门面转发（PublicApplicationService 形状要求）。 */

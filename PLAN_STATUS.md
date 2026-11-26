@@ -8796,3 +8796,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 新增 5 条单测（含"不触发 assertOpen"与"关闭态不触达 controller"两个反例）。
 > - 门禁：`npm test` **1021 files / 6408 tests 全过**；typecheck/lint 0；隐私 ok。
 > - `public-sdk.ts` 8540 → 8209（累计 −331）。
+
+> **全面解耦改造 P2 第七切片：子门面入口 + CLI 窄依赖（2026-11-26）**
+>
+> - 门面新增只读 getter `permission/ops/goal/context/mission`（首次构造后缓存）。
+> - `goal-mode-command.ts` 5 处调用改走 `application.goal.*`，验证"CLI 只依赖所需子门面"。
+> - 新增 3 条单测（缓存同一实例、窄面不含整门面方法、关闭态拒绝）。
+> - 门禁：`npm test` **1022 files / 6411 tests 全过**；typecheck/lint 0；隐私 ok。

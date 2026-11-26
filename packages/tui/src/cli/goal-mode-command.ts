@@ -307,7 +307,7 @@ export async function executeGoalModeProposeCommand(
     runtime: "mock",
   });
   try {
-    const result = await application.proposeGoalContract({
+    const result = await application.goal.proposeGoalContract({
       draft: draft as never,
       sourceRequestReference: input.sourceRequestReference,
       ...(input.expiresInSeconds === undefined
@@ -364,7 +364,7 @@ export async function executeGoalModeConfirmCommand(
       writeDiagnosticText(`目标模式未激活: ${activation.reason}\n`.trimEnd());
       return EXIT_CODES.USAGE_ERROR;
     }
-    const result = await application.confirmGoalContract({
+    const result = await application.goal.confirmGoalContract({
       proposalIdentifier: input.proposalIdentifier,
       goalIdentifier: input.goalIdentifier,
       ownerIdentifier: input.ownerIdentifier,
@@ -404,7 +404,7 @@ export async function executeGoalModeBindCommand(
     runtime: "mock",
   });
   try {
-    const result = await application.bindMissionToGoal({
+    const result = await application.goal.bindMissionToGoal({
       missionIdentifier: input.missionIdentifier,
       goalIdentifier: input.goalIdentifier,
     });
@@ -438,7 +438,7 @@ export async function executeGoalModeMapCommand(
     runtime: "mock",
   });
   try {
-    const result = await application.bindRequirementTaskMapping({
+    const result = await application.goal.bindRequirementTaskMapping({
       goalIdentifier: input.goalIdentifier,
       requirementIdentifier: input.requirementIdentifier,
       taskNodeIdentifiers: input.taskNodeIdentifiers,
@@ -474,7 +474,7 @@ export async function executeGoalModeInvalidateCommand(
     runtime: "mock",
   });
   try {
-    const result = await application.invalidateGoalEvidence({
+    const result = await application.goal.invalidateGoalEvidence({
       goalIdentifier: input.goalIdentifier,
       requirementIdentifiers: input.requirementIdentifiers,
       reason: input.reason,
