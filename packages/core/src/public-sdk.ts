@@ -261,6 +261,11 @@ import { OpsFacet } from "./public-sdk-facets/ops-facet.js";
 import { GoalFacet } from "./public-sdk-facets/goal-facet.js";
 import { ContextFacet } from "./public-sdk-facets/context-facet.js";
 import { MissionFacet } from "./public-sdk-facets/mission-facet.js";
+import {
+  computeTaskSubmissionInputHash,
+  evaluateIdempotentSubmission,
+  type MissionTaskIdempotencyEntry,
+} from "./orchestration/mission-task-registry.js";
 import type { PublicContextSettings } from "./public-sdk-facets/context-facet.js";
 import type { PublicParameterAuthorizationSettings } from "./public-sdk-facets/permission-facet.js";
 
@@ -3123,9 +3128,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     workspaceRootPath?: string;
     targetAgentInstanceIdentifier?: string;
   }): string {
-    return createHash("sha256")
-      .update(input.prompt + "\u0000" + (input.projectIdentifier ?? "") + "\u0000" + (input.workspaceRootPath ?? "") + "\u0000" + (input.targetAgentInstanceIdentifier ?? ""))
-      .digest("hex");
+    /** MISSION-WRITE-01 切片 1：哈希实现迁到 mission-task-registry（逐字兼容）。 */
+    return computeTaskSubmissionInputHash(input);
   }
 
   /**
@@ -6384,34 +6388,48 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       ? {}
       : { workspaceRootPath: input.workspaceRootPath }),
     });
-    if (ledgerKey !== null && input.idempotencyKey !== undefined) {
-      const existingEntry = this.taskIdempotencyLedger.get(ledgerKey);
-      if (existingEntry !== undefined) {
-        if (existingEntry.inputHash !== submissionInputHash) {
-          throw new PublicApplicationError(
-            "idempotency-key-conflict",
-            "同一 idempotencyKey 绑定了不同参数，拒绝复用: " + String(input.idempotencyKey),
-          );
-        }
-        if (existingEntry.missionIdentifier === null) {
-          // 已 claim 未结算：不重复执行，也不假定成功。
-          throw new PublicApplicationError(
-            "idempotency-claim-pending",
-            "同一 idempotencyKey 的提交仍在进行中，未重复执行: " + String(input.idempotencyKey),
-          );
-        }
-        const settledRecord = this.tasksByTaskIdentifier.get(existingEntry.taskIdentifier);
-        if (settledRecord !== undefined) {
-          return this.toTaskResult(existingEntry.taskIdentifier, settledRecord);
-        }
-        return {
-          taskIdentifier: existingEntry.taskIdentifier,
-          missionIdentifier: existingEntry.missionIdentifier,
-          status: "accepted" as PublicTaskStatus,
-          summaryPreview: null,
-        };
+    /**
+     * MISSION-WRITE-01 切片 1：幂等判定改为**纯函数**（同键同参复用 / 异参拒绝 /
+     * claim 未结算拒绝），错误码与文案逐字保持；状态仍由门面持有（切片 4 再搬存储）。
+     */
+    const idempotencyOutcome = evaluateIdempotentSubmission({
+      sessionId: input.sessionId,
+      ...(input.idempotencyKey === undefined
+        ? {}
+        : { idempotencyKey: input.idempotencyKey }),
+      inputHash: submissionInputHash,
+      findEntry: (key: string) => this.taskIdempotencyLedger.get(key),
+      hasTaskRecord: (taskIdentifier: string) =>
+        this.tasksByTaskIdentifier.has(taskIdentifier),
+    });
+    if (idempotencyOutcome.kind === "conflict") {
+      throw new PublicApplicationError(
+        "idempotency-key-conflict",
+        "同一 idempotencyKey 绑定了不同参数，拒绝复用: " + String(input.idempotencyKey),
+      );
+    }
+    if (idempotencyOutcome.kind === "claim-pending") {
+      // 已 claim 未结算：不重复执行，也不假定成功。
+      throw new PublicApplicationError(
+        "idempotency-claim-pending",
+        "同一 idempotencyKey 的提交仍在进行中，未重复执行: " + String(input.idempotencyKey),
+      );
+    }
+    if (idempotencyOutcome.kind === "reuse-settled") {
+      const settledEntry = idempotencyOutcome.entry;
+      const settledRecord = this.tasksByTaskIdentifier.get(settledEntry.taskIdentifier);
+      if (settledRecord !== undefined) {
+        return this.toTaskResult(settledEntry.taskIdentifier, settledRecord);
       }
-      this.taskIdempotencyLedger.set(ledgerKey, {
+      return {
+        taskIdentifier: settledEntry.taskIdentifier,
+        missionIdentifier: settledEntry.missionIdentifier,
+        status: "accepted" as PublicTaskStatus,
+        summaryPreview: null,
+      };
+    }
+    if (idempotencyOutcome.kind === "claim" && input.idempotencyKey !== undefined) {
+      const claimEntry: MissionTaskIdempotencyEntry = {
         sessionIdentifier: input.sessionId,
         idempotencyKey: input.idempotencyKey,
         inputHash: submissionInputHash,
@@ -6419,7 +6437,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         missionIdentifier: null,
         claimedAtIso: new Date().toISOString(),
         settledAtIso: null,
-      });
+      };
+      this.taskIdempotencyLedger.set(idempotencyOutcome.ledgerKey, claimEntry);
       await this.persistTaskIdempotencyLedger();
     }
     const existing = this.tasksByTaskIdentifier.get(input.taskIdentifier);

@@ -8911,3 +8911,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   任务表 10 处、幂等账本 31 处、指令窗口/监视器 13 处），确定**按状态切分**的四切片计划；
 > - 结论：不能按方法整体搬运（跨方法共享状态机），切片 1 为「任务记录 + 幂等账本 → 纯状态容器 + 纯幂等判定」；
 > - 下一步按切片先写反例再实施，每切片全量门禁后提交。
+
+> **MISSION-WRITE-01 切片 1：幂等判定纯函数 + 任务注册表容器（2026-11-28）**
+>
+> - 新增 `orchestration/mission-task-registry.ts`：`evaluateIdempotentSubmission`（同键同参复用/异参冲突/
+>   claim 未结算/未命中 claim）、`computeTaskSubmissionInputHash`、`MissionTaskRegistry` 容器。
+> - 门面 `submitTask` 的 claim 分支改调纯函数，错误码与文案逐字不变；记录/账本存储下一片再搬。
+> - 反例 10 条；门禁：`npm test` **1029 files / 6467 tests 全过**；typecheck/lint 0。

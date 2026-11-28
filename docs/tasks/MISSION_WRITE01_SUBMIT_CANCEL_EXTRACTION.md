@@ -1,6 +1,6 @@
 # MISSION-WRITE-01：Mission 写路径真正迁出（submit / cancel）
 
-状态：**范围与切片已确定，切片 1 待实施**（2026-11-28 新建）。基线：`7141e42c`。
+状态：**切片 1 已完成**（2026-11-28）；切片 2–4 待实施。基线：`7141e42c`。
 
 ## 0. 背景
 
@@ -25,7 +25,13 @@ P2 子门面拆分时，mission 写路径（`submitTask` / `cancelTask`）只做
 
 ## 2. 切片计划（每一步可独立提交、可回滚）
 
-**切片 1：任务记录与幂等账本 → `MissionTaskRegistry`（纯状态容器）**
+**切片 1：任务记录与幂等账本 → `MissionTaskRegistry`（纯状态容器）— 已完成**
+
+- 已落地：`orchestration/mission-task-registry.ts`（`evaluateIdempotentSubmission` 纯函数 +
+  `computeTaskSubmissionInputHash` + `MissionTaskRegistry` 容器）；
+- 门面 `submitTask` 的 claim 分支改为调用纯函数，**错误码与文案逐字不变**；状态仍由门面持有；
+- 反例 10 条（含跨会话隔离、claim 未结算、容器 round-trip、哈希分隔符碰撞）。
+
 - 新模块 `orchestration/mission-task-registry.ts`：
   - 持有 `tasksByTaskIdentifier` 与 `taskIdempotencyLedger` 的内存结构；
   - 只做 get/set/delete/claim/settle/serialize 等**状态操作**，不含错误策略与事件发射；
