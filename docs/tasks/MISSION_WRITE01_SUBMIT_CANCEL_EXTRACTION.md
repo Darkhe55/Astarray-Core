@@ -1,6 +1,6 @@
 # MISSION-WRITE-01：Mission 写路径真正迁出（submit / cancel）
 
-状态：**切片 1 已完成**（2026-11-28）；切片 2–4 待实施。基线：`7141e42c`。
+状态：**切片 1、2 已完成**（2026-11-28）；切片 3–4 待实施。基线：`7141e42c`。
 
 ## 0. 背景
 
@@ -39,7 +39,12 @@ P2 子门面拆分时，mission 写路径（`submitTask` / `cancelTask`）只做
 - 门面改为持有 `MissionTaskRegistry` 实例，`submitTask` 中的账本操作改调 registry（控制流与错误文案保持逐字不变）；
 - 反例：同键同参复用、异参冲突、claim 未结算、跨会话隔离、序列化 round-trip 后仍可复用。
 
-**切片 2：会话/任务校验结果 → `MissionSubmissionPreflight`（纯函数）**
+**切片 2：会话/任务校验结果 → 纯函数（已完成）**
+
+- 已落地：`evaluateExistingTaskForSubmission`（absent / reuse / session-mismatch）；
+- 门面 `submitTask` 的既有任务分支改调纯函数，错误码与文案逐字不变；
+- 反例 3 条（无既有任务、同会话复用、跨会话不匹配）。
+
 - 把 `requireSession` / `requireTask` 的校验结果与错误码改为纯函数输出（不改 throw 形状）；
 - 反例：未知会话、任务不属于会话、已存在同 taskIdentifier。
 

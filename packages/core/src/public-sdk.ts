@@ -263,6 +263,7 @@ import { ContextFacet } from "./public-sdk-facets/context-facet.js";
 import { MissionFacet } from "./public-sdk-facets/mission-facet.js";
 import {
   computeTaskSubmissionInputHash,
+  evaluateExistingTaskForSubmission,
   evaluateIdempotentSubmission,
   type MissionTaskIdempotencyEntry,
 } from "./orchestration/mission-task-registry.js";
@@ -6442,13 +6443,17 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
       await this.persistTaskIdempotencyLedger();
     }
     const existing = this.tasksByTaskIdentifier.get(input.taskIdentifier);
-    if (existing !== undefined) {
-      if (existing.sessionId !== input.sessionId) {
-        throw new PublicApplicationError(
-          "session-mismatch",
-          "任务不属于该会话: " + input.taskIdentifier,
-        );
-      }
+    const existingOutcome = evaluateExistingTaskForSubmission({
+      requestedSessionId: input.sessionId,
+      ...(existing === undefined ? {} : { existingTaskSessionId: existing.sessionId }),
+    });
+    if (existingOutcome.kind === "session-mismatch") {
+      throw new PublicApplicationError(
+        "session-mismatch",
+        "任务不属于该会话: " + input.taskIdentifier,
+      );
+    }
+    if (existingOutcome.kind === "reuse" && existing !== undefined) {
       return this.toTaskResult(input.taskIdentifier, existing);
     }
     // Ponder 是本地只读问答（ADR-0014）：不产生 mission。此前这里把 handleUserMessage

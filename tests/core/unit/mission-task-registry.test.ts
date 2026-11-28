@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   MissionTaskRegistry,
   computeTaskSubmissionInputHash,
+  evaluateExistingTaskForSubmission,
   evaluateIdempotentSubmission,
   resolveIdempotencyLedgerKey,
   type MissionTaskIdempotencyEntry,
@@ -154,5 +155,31 @@ describe("MISSION-WRITE-01：任务内容哈希", () => {
       projectIdentifier: "",
     });
     expect(left).not.toBe(right);
+  });
+});
+
+describe("MISSION-WRITE-01：既有任务提交判定（切片 2）", () => {
+  it("⑪ 无既有任务 ⇒ absent", () => {
+    expect(evaluateExistingTaskForSubmission({ requestedSessionId: "s1" })).toEqual({
+      kind: "absent",
+    });
+  });
+
+  it("⑫ 同会话 ⇒ reuse（投影不重建）", () => {
+    expect(
+      evaluateExistingTaskForSubmission({
+        requestedSessionId: "s1",
+        existingTaskSessionId: "s1",
+      }),
+    ).toEqual({ kind: "reuse" });
+  });
+
+  it("⑬ 跨会话 ⇒ session-mismatch（调用方抛既有文案）", () => {
+    expect(
+      evaluateExistingTaskForSubmission({
+        requestedSessionId: "s1",
+        existingTaskSessionId: "s2",
+      }),
+    ).toEqual({ kind: "session-mismatch" });
   });
 });

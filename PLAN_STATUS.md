@@ -8918,3 +8918,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   claim 未结算/未命中 claim）、`computeTaskSubmissionInputHash`、`MissionTaskRegistry` 容器。
 > - 门面 `submitTask` 的 claim 分支改调纯函数，错误码与文案逐字不变；记录/账本存储下一片再搬。
 > - 反例 10 条；门禁：`npm test` **1029 files / 6467 tests 全过**；typecheck/lint 0。
+
+> **MISSION-WRITE-01 切片 2：既有任务提交判定纯函数（2026-11-28）**
+>
+> - `mission-task-registry.ts` 新增 `evaluateExistingTaskForSubmission`（absent/reuse/session-mismatch）；
+>   `submitTask` 既有任务分支改调它，文案不变。
+> - 门禁：`npm test` **1029 files / 6470 tests 全过**；typecheck/lint 0。
