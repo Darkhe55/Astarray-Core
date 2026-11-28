@@ -8947,3 +8947,9 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 3 条（存储 API、引用共享、恢复后复用）。
 > - 门禁：第二遍全量 `npm test` **1030 files / 6485 tests 全过**（首遍 broker 7 条因并行 `spawn UNKNOWN` 抖动失败，
 >   单跑与重跑均通过）；typecheck/lint 0。
+
+> **MISSION-WRITE-01 切片 6：指令窗口准入/释放/补位派发迁出（2026-11-28）**
+>
+> - 新增 `orchestration/instruction-window-dispatch-service.ts`；门面四个私有方法改委托，状态经端口注入。
+> - 反例 8 条（窗口降级/准入/排队/幂等冲突/三种回执/只补一条+锁/失败回执/反查）。
+> - 门禁：`npm test` **1031 files / 6493 tests 全过**；typecheck/lint 0。

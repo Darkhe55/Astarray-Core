@@ -1,6 +1,6 @@
 # MISSION-WRITE-01：Mission 写路径真正迁出（submit / cancel）
 
-状态：**切片 1–5 已完成（编排迁出 + 任务表/幂等账本存储迁入注册表）**（2026-11-28）。基线：`7141e42c`。
+状态：**切片 1–6 已完成（编排 + 存储 + 指令窗口准入/释放/补位）**（2026-11-28）。基线：`7141e42c`。
 
 ## 0. 背景
 
@@ -77,6 +77,13 @@ P2 子门面拆分时，mission 写路径（`submitTask` / `cancelTask`）只做
 - 反例 3 条（原始键读写/clearAll/size、引用共享语义、恢复后复用）。
 - 备注：`exec01-02-broker-execution` 在全量并行下偶发 `spawn UNKNOWN`（sandbox helper 启动竞争），
   单独运行与第二次全量均通过，属环境抖动，非本改动回归。
+
+**切片 6：指令窗口准入/释放/补位派发 → `InstructionWindowDispatchService`（已完成）**
+
+- 已落地 `orchestration/instruction-window-dispatch-service.ts`：`admitTaskInstruction`、
+  `releaseSlotAndDispatchNext`、`dispatchNextQueuedTask`、`taskIdentifierOf`；
+- 门面四个私有方法改为委托；队列、进行中标记、任务记录、监视器、事件、控制器提交全部经端口注入；
+- 反例 8 条（unwindowed、windowed 幂等键含摘要、queued、幂等冲突、三种回执结果、只补一条+并发锁、失败回执、反查不猜）。
 
 ## 4. 验收
 

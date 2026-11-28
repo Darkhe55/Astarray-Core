@@ -267,6 +267,11 @@ import {
 } from "./orchestration/mission-task-registry.js";
 import type { MissionTaskIdempotencyEntry } from "./orchestration/mission-task-registry.js";
 import { MissionSubmissionService } from "./orchestration/mission-submission-service.js";
+import {
+  InstructionWindowDispatchService,
+  type InstructionWindowStorePort,
+  type InstructionWindowTaskRecord,
+} from "./orchestration/instruction-window-dispatch-service.js";
 import type {
   MissionSubmissionInputData,
   MissionTaskRecordData,
@@ -4443,6 +4448,72 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.contextFacetInstance;
   }
 
+  // ─── MISSION-WRITE-01：指令窗口准入/释放/补位派发服务（端口注入） ───
+  private instructionWindowDispatchServiceInstance: InstructionWindowDispatchService | null =
+    null;
+
+  private getInstructionWindowDispatchService(): InstructionWindowDispatchService {
+    if (this.instructionWindowDispatchServiceInstance === null) {
+      this.instructionWindowDispatchServiceInstance =
+        new InstructionWindowDispatchService({
+          isWindowEnabled: () => this.stateDirectory !== null,
+          getStore: async () =>
+            (await this.getInstructionWindowStore()) as unknown as InstructionWindowStorePort,
+          createPublicError: (errorCode: string, message: string) =>
+            new PublicApplicationError(errorCode, message),
+          shiftQueuedTask: () => this.queuedTaskIdentifiers.shift(),
+          removeQueuedTask: (taskIdentifier: string) => {
+            const queueIndex = this.queuedTaskIdentifiers.indexOf(taskIdentifier);
+            if (queueIndex < 0) return false;
+            this.queuedTaskIdentifiers.splice(queueIndex, 1);
+            return true;
+          },
+          findTaskRecord: (taskIdentifier: string) =>
+            this.missionTaskRegistry.findTaskRecord(taskIdentifier) as
+              | InstructionWindowTaskRecord
+              | undefined,
+          listTaskEntries: () =>
+            this.missionTaskRegistry.listTaskRecords() as unknown as Array<
+              readonly [string, InstructionWindowTaskRecord]
+            >,
+          emitTaskStatus: (event) => {
+            this.emit({
+              eventType: "task-status",
+              taskIdentifier: event.taskIdentifier,
+              status: event.status as PublicTaskStatus,
+              revision: event.revision,
+              idempotencyId: this.nextEventIdempotencyId(),
+            });
+          },
+          emitTaskFinished: (event) => {
+            this.emit({
+              eventType: "task-finished",
+              taskIdentifier: event.taskIdentifier,
+              status: event.status as PublicTaskStatus,
+              revision: event.revision,
+              idempotencyId: this.nextEventIdempotencyId(),
+            });
+          },
+          startTaskMonitor: (taskIdentifier: string) => {
+            this.startTaskMonitor(taskIdentifier);
+          },
+          submitPrompt: async (input) =>
+            await this.runtime.controller.handleUserMessage(input.prompt, {
+              sessionIdentifier: input.sessionId,
+            }),
+          acquireDispatchLock: () => {
+            if (this.isDispatchingQueuedTask) return false;
+            this.isDispatchingQueuedTask = true;
+            return true;
+          },
+          releaseDispatchLock: () => {
+            this.isDispatchingQueuedTask = false;
+          },
+        });
+    }
+    return this.instructionWindowDispatchServiceInstance;
+  }
+
   // ─── MISSION-WRITE-01：任务提交编排服务（状态仍由门面持有，端口注入） ───
   private missionSubmissionServiceInstance: MissionSubmissionService | null = null;
 
@@ -8022,43 +8093,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     | { kind: "queued"; link: { instructionIdentifier: string; instructionRevision: number } }
     | { kind: "unwindowed" }
   > {
-    if (this.stateDirectory === null) {
-      return { kind: "unwindowed" };
-    }
-    const store = await this.getInstructionWindowStore();
-    /**
-     * 窗口幂等键**按任务提交**生成，不复用用户的 `idempotencyKey`。
-     *
-     * 任务幂等已由 `taskIdempotencyLedger` 负责；窗口只负责**容量计数**。
-     * 若这里复用用户键，第二个实例用同键不同文本提交会被窗口判"同键异参"
-     * 而整单失败（实测：预算持久化用例因此翻红）。
-     */
-    const result = await store.admitInstruction({
-      instructionIdentifier: "task-instruction:" + input.taskIdentifier,
-      instructionRevision: 1,
-      sourceKind: "user",
-      instructionText: input.prompt,
-      /** 含内容摘要：同标识不同内容的**再次提交**也必须能各自占位，否则被判同键异参。 */
-      idempotencyKey:
-        "task:" +
-        input.sessionId +
-        ":" +
-        input.taskIdentifier +
-        ":" +
-        createHash("sha256").update(input.prompt, "utf8").digest("hex").slice(0, 16),
-    });
-    if (result.outcome === "idempotency-conflict") {
-      throw new PublicApplicationError(
-        "idempotency-key-conflict",
-        "同一幂等键绑定了不同的指令内容，拒绝接收: " +
-          String(input.idempotencyKey ?? input.taskIdentifier),
-      );
-    }
-    const link = {
-      instructionIdentifier: result.instructionIdentifier,
-      instructionRevision: 1,
-    };
-    return result.outcome === "queued" ? { kind: "queued", link } : { kind: "windowed", link };
+    /** MISSION-WRITE-01 切片 6：准入逻辑已迁到 InstructionWindowDispatchService。 */
+    return await this.getInstructionWindowDispatchService().admitTaskInstruction(input);
   }
 
   /**
@@ -8073,35 +8109,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     record: TaskRecord,
     terminalStatus: PublicTaskStatus,
   ): Promise<void> {
-    const instructionLink = record.instructionLink;
-    if (instructionLink === null) return;
-    const store = await this.getInstructionWindowStore();
-    const receiptOutcome =
-      terminalStatus === "cancelled"
-        ? "cancelled"
-        : terminalStatus === "done"
-          ? "completed"
-          : "failed";
-    await store
-      .submitReceipt({
-        instructionIdentifier: instructionLink.instructionIdentifier,
-        instructionRevision: instructionLink.instructionRevision,
-        receiptOutcome,
-        taskIdentifiers: [this.taskIdentifierOf(record)],
-        evidenceReferences: [],
-        unresolvedQuestions: [],
-      })
-      .catch(() => null);
-    record.instructionLink = null;
-    await this.dispatchNextQueuedTask();
+    /** MISSION-WRITE-01 切片 6：回执 + 补位派发已迁到 InstructionWindowDispatchService。 */
+    await this.getInstructionWindowDispatchService().releaseSlotAndDispatchNext(
+      record as unknown as InstructionWindowTaskRecord,
+      terminalStatus,
+    );
   }
 
   /** 反查任务标识（回执需要它；找不到就不猜）。 */
   private taskIdentifierOf(record: TaskRecord): string {
-    for (const [taskIdentifier, candidate] of this.missionTaskRegistry.listTaskRecords()) {
-      if (candidate === record) return taskIdentifier;
-    }
-    return "unknown-task";
+    return this.getInstructionWindowDispatchService().taskIdentifierOf(
+      record as unknown as InstructionWindowTaskRecord,
+    );
   }
 
   /**
@@ -8111,57 +8130,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
    * 避免同一时刻放出多条而越过窗口容量。
    */
   private async dispatchNextQueuedTask(): Promise<void> {
-    if (this.isDispatchingQueuedTask) return;
-    this.isDispatchingQueuedTask = true;
-    try {
-      const nextTaskIdentifier = this.queuedTaskIdentifiers.shift();
-      if (nextTaskIdentifier === undefined) return;
-      const record = this.missionTaskRegistry.findTaskRecord(nextTaskIdentifier);
-      if (record === undefined || record.queuedPrompt === null) return;
-      const prompt = record.queuedPrompt;
-      record.queuedPrompt = null;
-      try {
-        const missionIdentifier = await this.runtime.controller.handleUserMessage(prompt, {
-          sessionIdentifier: record.sessionId,
-        });
-        record.missionIdentifier = missionIdentifier;
-        record.status = "accepted";
-        this.emit({
-          eventType: "task-status",
-          taskIdentifier: nextTaskIdentifier,
-          status: "accepted",
-          revision: record.revision,
-          idempotencyId: this.nextEventIdempotencyId(),
-        });
-        this.startTaskMonitor(nextTaskIdentifier);
-      } catch {
-        record.status = "failed";
-        record.summaryPreview = "排队指令派发失败";
-        this.emit({
-          eventType: "task-finished",
-          taskIdentifier: nextTaskIdentifier,
-          status: "failed",
-          revision: record.revision,
-          idempotencyId: this.nextEventIdempotencyId(),
-        });
-        if (record.instructionLink !== null) {
-          const store = await this.getInstructionWindowStore();
-          await store
-            .submitReceipt({
-              instructionIdentifier: record.instructionLink.instructionIdentifier,
-              instructionRevision: record.instructionLink.instructionRevision,
-              receiptOutcome: "failed",
-              taskIdentifiers: [nextTaskIdentifier],
-              evidenceReferences: [],
-              unresolvedQuestions: [],
-            })
-            .catch(() => null);
-          record.instructionLink = null;
-        }
-      }
-    } finally {
-      this.isDispatchingQueuedTask = false;
-    }
+    /** MISSION-WRITE-01 切片 6：补位派发已迁到 InstructionWindowDispatchService。 */
+    await this.getInstructionWindowDispatchService().dispatchNextQueuedTask();
   }
 
   private assertOpen(): void {
