@@ -8895,3 +8895,12 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 最终覆盖率实测：语句 90.56% / 分支 **83.32%** / 函数 91.38% / 行 90.95% ⇒ 高于改造前基线 83.05%（+0.27pp）。
 > - 最终门禁：typecheck 0、lint 0、test **1027 files / 6445 tests 全过**、test:scripts **62/62**、隐私 ok、解耦规则零违规。
 > - 总结报告已更新为最终版（含 CLI 窄依赖证据与 85% 阈值缺口记录）。
+
+> **TOKTRACE-01：工具失败 → 下一次成功的 token 轨迹（2026-11-28）**
+>
+> - 新增 `orchestration/tool-failure-token-trace.ts`（纯函数）：按 `(mission, tool)` 窗口关联失败与下一次成功，
+>   统计窗口内 Provider 请求 token；未知用量记缺失不补 0；未关窗只计数；非法时间戳计数跳过。
+> - `RunHistoryDocument` 只读解析（不改存储格式）+ `ops` 子门面 `queryToolFailureTokenTraces` + 门面同名入口。
+> - 反例 9 条（纯函数）+ 3 条（ops facet：absent/invalid/ok）。
+> - 门禁：`npm test` **1028 files / 6457 tests 全过**（1 条 broker 集成测试首跑 `spawn UNKNOWN` 环境抖动，单跑通过）；
+>   `test:scripts` 62/62；typecheck/lint 0；隐私 ok；解耦规则零违规。

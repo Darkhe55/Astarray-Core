@@ -123,4 +123,74 @@ describe("AXIOMATIC P2：运维只读子门面", () => {
     await expect(new OpsFacet(host).queryArtifacts()).rejects.toThrow("application-closed");
     expect(readArtifactRecords).not.toHaveBeenCalled();
   });
+
+  it("⑥ 工具失败 token 轨迹：历史缺失 ⇒ status=absent、空结果并给出原因", async () => {
+    const { host } = buildHost({
+      readRunHistory: async () => ({ kind: "absent", reason: "该 mission 没有运行历史文件。" }),
+      readUsageLedgerEntries: async () => [],
+    });
+    const report = await new OpsFacet(host).queryToolFailureTokenTraces({
+      missionIdentifier: "mission-1",
+    });
+    expect(report).toMatchObject({ traces: [], status: "absent", openWindowCount: 0 });
+    expect(report.reason).toContain("没有运行历史");
+  });
+
+  it("⑦ 工具失败 token 轨迹：历史损坏 ⇒ status=invalid，不伪造 trace", async () => {
+    const { host } = buildHost({
+      readRunHistory: async () => ({ kind: "invalid", reason: "坏 JSON" }),
+      readUsageLedgerEntries: async () => [],
+    });
+    const report = await new OpsFacet(host).queryToolFailureTokenTraces({
+      missionIdentifier: "mission-1",
+    });
+    expect(report).toMatchObject({ traces: [], status: "invalid", reason: "坏 JSON" });
+  });
+
+  it("⑧ 工具失败 token 轨迹：正常关联失败窗口与用量", async () => {
+    const { host } = buildHost({
+      readRunHistory: async () => ({
+        kind: "valid",
+        document: {
+          missionIdentifier: "mission-1",
+          segments: [
+            {
+              events: [
+                {
+                  kind: "tool-failure",
+                  recordedAtIso: "2026-11-28T10:00:00.000Z",
+                  payloadJson: JSON.stringify({ toolName: "readFile", failureReason: "ENOENT" }),
+                },
+                {
+                  kind: "tool-call",
+                  recordedAtIso: "2026-11-28T10:02:00.000Z",
+                  payloadJson: JSON.stringify({ toolName: "readFile", outputText: "ok" }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      readUsageLedgerEntries: async () => [
+        {
+          requestIdentifier: "req-1",
+          missionIdentifier: "mission-1",
+          inputTokenCount: 40,
+          outputTokenCount: 10,
+          recordedAtIso: "2026-11-28T10:01:00.000Z",
+        },
+      ],
+    });
+    const report = await new OpsFacet(host).queryToolFailureTokenTraces({
+      missionIdentifier: "mission-1",
+    });
+    expect(report.status).toBe("ok");
+    expect(report.traces).toHaveLength(1);
+    expect(report.traces[0]).toMatchObject({
+      toolName: "readFile",
+      totalTokenCount: 50,
+      isComplete: true,
+      providerRequestCount: 1,
+    });
+  });
 });

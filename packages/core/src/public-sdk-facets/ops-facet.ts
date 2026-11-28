@@ -16,6 +16,37 @@ import type {
   ArtifactRecord,
   ArtifactRecordDocument,
 } from "../orchestration/artifact-record-store.js";
+import type { ToolFailureTokenTraceReport } from "../orchestration/tool-failure-token-trace.js";
+import {
+  buildToolFailureTokenTraces,
+  extractToolActivityEvents,
+} from "../orchestration/tool-failure-token-trace.js";
+
+/** 运行历史读取结论（只读；缺失/损坏如实返回，不伪造完整）。 */
+export type RunHistoryReadView =
+  | { readonly kind: "absent"; readonly reason: string }
+  | { readonly kind: "invalid"; readonly reason: string }
+  | {
+      readonly kind: "valid";
+      readonly document: {
+        readonly missionIdentifier: string;
+        readonly segments: ReadonlyArray<{
+          readonly events: ReadonlyArray<{
+            readonly kind: string;
+            readonly recordedAtIso: string;
+            readonly payloadJson: string;
+          }>;
+        }>;
+      };
+    };
+
+export interface ProviderUsagePointView {
+  readonly requestIdentifier: string;
+  readonly missionIdentifier: string | null;
+  readonly inputTokenCount: number | null;
+  readonly outputTokenCount: number | null;
+  readonly recordedAtIso: string;
+}
 
 type ExperimentSettingsDocument = Awaited<ReturnType<ExperimentSettingsStore["read"]>>;
 
@@ -29,6 +60,8 @@ export interface OpsFacetHost {
   readStartupRecoveryReport(): Promise<StartupRecoveryBootReport | null>;
   readExperimentSettings(): Promise<ExperimentSettingsDocument>;
   readArtifactRecords(): Promise<ArtifactRecordDocument>;
+  readRunHistory(missionIdentifier: string): Promise<RunHistoryReadView>;
+  readUsageLedgerEntries(): Promise<ReadonlyArray<ProviderUsagePointView>>;
   queryMissionStatus(missionId: string): Promise<{
     taskChain: {
       tasks: ReadonlyArray<{
@@ -112,4 +145,49 @@ export class OpsFacet {
         source: "task-result-location" as const,
       }));
   }
+  /**
+   * TOKTRACE-01：**工具失败 → 下一次成功的 token 消耗与日志**（只读关联）。
+   *
+   * 口径：同一 mission 内，某工具失败后到它下一次成功前的全部 Provider 请求用量求和；
+   * 未关窗只计数不产出 trace；历史缺失/损坏如实标注，不伪造。
+   */
+  async queryToolFailureTokenTraces(input: {
+    missionIdentifier: string;
+  }): Promise<
+    ToolFailureTokenTraceReport & {
+      readonly status: "ok" | "absent" | "invalid";
+      readonly reason: string | null;
+    }
+  > {
+    this.host.assertOpen();
+    const history = await this.host.readRunHistory(input.missionIdentifier);
+    if (history.kind !== "valid") {
+      return {
+        traces: [],
+        openWindowCount: 0,
+        skippedEventCount: 0,
+        status: history.kind,
+        reason: history.reason,
+      };
+    }
+    const extracted = extractToolActivityEvents(history.document);
+    const usageEntries = await this.host.readUsageLedgerEntries();
+    const report = buildToolFailureTokenTraces({
+      toolEvents: extracted.events,
+      usageObservations: usageEntries.map((entry) => ({
+        missionIdentifier: entry.missionIdentifier,
+        inputTokenCount: entry.inputTokenCount,
+        outputTokenCount: entry.outputTokenCount,
+        observedAtIso: entry.recordedAtIso,
+        requestIdentifier: entry.requestIdentifier,
+      })),
+    });
+    return {
+      ...report,
+      skippedEventCount: report.skippedEventCount + extracted.skippedEventCount,
+      status: "ok",
+      reason: null,
+    };
+  }
+
 }

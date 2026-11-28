@@ -91,6 +91,7 @@ import {
   type PermissionAskAuthorityPort,
 } from "./orchestration/permission-ask-decision-entry.js";
 import { UsageLedgerStore } from "./orchestration/usage-ledger-store.js";
+import { RunHistoryStore } from "./orchestration/run-history-store.js";
 import {
   analyzeLegacyIdentityAssociations,
   collectLegacyIdentitySnapshot,
@@ -3979,6 +3980,16 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return await this.createOpsFacet().queryMissionArtifacts(missionId);
   }
 
+  /**
+   * TOKTRACE-01：工具失败 → 下一次成功的 token 消耗与日志（只读）。
+   *
+   * 汇总该 mission 内每次「某工具失败 → 它下一次成功」窗口内消耗的 Provider token，
+   * 并给出按时间排序的日志（失败/请求/成功），用于调试与优化。
+   */
+  async queryToolFailureTokenTraces(input: { missionIdentifier: string }) {
+    return await this.createOpsFacet().queryToolFailureTokenTraces(input);
+  }
+
   async queryMissionHistory(input?: {
     pageSize?: number;
     pageIndex?: number;
@@ -4363,6 +4374,18 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         readArtifactRecords: async () => await this.runtime.artifactRecordStore.read(),
         queryMissionStatus: async (missionId: string) =>
           await this.runtime.controller.queryMissionStatus(missionId),
+        readRunHistory: async (missionIdentifier: string) => {
+          if (this.stateDirectory === null) {
+            return { kind: "absent" as const, reason: "未配置状态目录：无法读取运行历史。" };
+          }
+          const store = new RunHistoryStore({ baseDirectory: this.stateDirectory });
+          return await store.read(missionIdentifier);
+        },
+        readUsageLedgerEntries: async () => {
+          if (this.stateDirectory === null) return [];
+          const store = new UsageLedgerStore({ baseDirectory: this.stateDirectory });
+          return await store.readAll();
+        },
       });
     }
     return this.opsFacetInstance;
