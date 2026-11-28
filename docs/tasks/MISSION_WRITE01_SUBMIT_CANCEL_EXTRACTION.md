@@ -1,6 +1,6 @@
 # MISSION-WRITE-01：Mission 写路径真正迁出（submit / cancel）
 
-状态：**切片 1–4 已完成（submitTask + cancelTask 均已迁出）**（2026-11-28）。基线：`7141e42c`。
+状态：**切片 1–5 已完成（编排迁出 + 任务表/幂等账本存储迁入注册表）**（2026-11-28）。基线：`7141e42c`。
 
 ## 0. 背景
 
@@ -69,6 +69,14 @@ P2 子门面拆分时，mission 写路径（`submitTask` / `cancelTask`）只做
 - 每切片跑 `typecheck/lint/test/test:scripts/隐私/解耦规则` 并提交推送；
 - 不做"一次性大爆炸"重写：切片之间保持测试全绿；
 - 若某切片触发跨方法状态无法收敛，记录原因并停在上一绿点，不硬拆。
+
+**切片 5：任务表/幂等账本存储迁入 `MissionTaskRegistry`（已完成）**
+
+- 门面不再持有 `tasksByTaskIdentifier` / `taskIdempotencyLedger` 两个 Map，统一由注册表持有；
+- 记录按引用共享（写路径直接改状态对象），账本按「会话|幂等键」读写保持兼容；
+- 反例 3 条（原始键读写/clearAll/size、引用共享语义、恢复后复用）。
+- 备注：`exec01-02-broker-execution` 在全量并行下偶发 `spawn UNKNOWN`（sandbox helper 启动竞争），
+  单独运行与第二次全量均通过，属环境抖动，非本改动回归。
 
 ## 4. 验收
 

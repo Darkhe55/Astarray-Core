@@ -157,6 +157,32 @@ export class MissionTaskRegistry<TRecord> {
   listIdempotencyEntries(): MissionTaskIdempotencyEntry[] {
     return [...this.idempotencyEntries.values()];
   }
+
+  /** 兼容按「会话|幂等键」原始键读取（门面历史路径使用）。 */
+  findIdempotencyEntryByLedgerKey(ledgerKey: string): MissionTaskIdempotencyEntry | undefined {
+    return this.idempotencyEntries.get(ledgerKey);
+  }
+
+  /** 兼容按原始键写入（键由 `resolveIdempotencyLedgerKey` 生成）。 */
+  recordIdempotencyEntryByLedgerKey(
+    ledgerKey: string,
+    entry: MissionTaskIdempotencyEntry,
+  ): void {
+    this.idempotencyEntries.set(ledgerKey, entry);
+  }
+
+  hasTaskRecord(taskIdentifier: string): boolean {
+    return this.recordsByTaskIdentifier.has(taskIdentifier);
+  }
+
+  clearAll(): void {
+    this.recordsByTaskIdentifier.clear();
+    this.idempotencyEntries.clear();
+  }
+
+  get size(): number {
+    return this.recordsByTaskIdentifier.size;
+  }
 }
 
 export type ExistingTaskSubmissionOutcome =

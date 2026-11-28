@@ -263,7 +263,9 @@ import { ContextFacet } from "./public-sdk-facets/context-facet.js";
 import { MissionFacet } from "./public-sdk-facets/mission-facet.js";
 import {
   computeTaskSubmissionInputHash,
+  MissionTaskRegistry,
 } from "./orchestration/mission-task-registry.js";
+import type { MissionTaskIdempotencyEntry } from "./orchestration/mission-task-registry.js";
 import { MissionSubmissionService } from "./orchestration/mission-submission-service.js";
 import type {
   MissionSubmissionInputData,
@@ -3099,7 +3101,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         ? null
         : path.join(this.stateDirectory, "task-idempotency-ledger.json");
     for (const entry of options.idempotencyLedgerEntries ?? []) {
-      this.taskIdempotencyLedger.set(
+      this.missionTaskRegistry.recordIdempotencyEntryByLedgerKey(
         entry.sessionIdentifier + "|" + entry.idempotencyKey,
         entry,
       );
@@ -3115,7 +3117,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     const { writeAtomicJson } = await import("./infra/atomic-json.js");
     await writeAtomicJson(filePath, {
       schemaVersion: 1,
-      entries: [...this.taskIdempotencyLedger.values()],
+      entries: this.missionTaskRegistry.listIdempotencyEntries(),
     });
   }
 
@@ -3177,7 +3179,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   private recoveryCenterController: RecoveryCenterController | null = null;
 
   private readonly sessionStates = new Map<string, PublicSessionState>();
-  private readonly tasksByTaskIdentifier = new Map<string, TaskRecord>();
+  /** MISSION-WRITE-01 切片 5：任务记录统一由注册表持有（存储从门面迁出）。 */
+  private readonly missionTaskRegistry = new MissionTaskRegistry<TaskRecord>();
   /**
    * SMART-01：等待槽位的任务（**FIFO**）。
    *
@@ -3187,7 +3190,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   /** 串行化"补位"，保证同一时刻只放出**一条**。 */
   private isDispatchingQueuedTask = false;
   /** 幂等账目（内存镜像；键 = `sessionId|idempotencyKey`）。 */
-  private readonly taskIdempotencyLedger = new Map<string, TaskIdempotencyLedgerEntry>();
+
   private readonly idempotencyLedgerFilePath: string | null;
   private readonly taskMonitors = new Map<string, NodeJS.Timeout>();
   private readonly inFlightPolls = new Set<Promise<void>>();
@@ -4451,9 +4454,9 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           this.requireSession(sessionId);
         },
         findIdempotencyEntry: (ledgerKey: string) =>
-          this.taskIdempotencyLedger.get(ledgerKey),
+          this.missionTaskRegistry.findIdempotencyEntryByLedgerKey(ledgerKey),
         findTaskRecord: (taskIdentifier: string) =>
-          this.tasksByTaskIdentifier.get(taskIdentifier) as
+          this.missionTaskRegistry.findTaskRecord(taskIdentifier) as
             | MissionTaskRecordData
             | undefined,
         currentMode: () => this.runtime.controller.getCurrentMode(),
@@ -4525,19 +4528,23 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
           }
         },
         registerTaskRecord: (taskIdentifier: string, record: MissionTaskRecordData) => {
-          this.tasksByTaskIdentifier.set(taskIdentifier, record as TaskRecord);
+          this.missionTaskRegistry.upsertTaskRecord(taskIdentifier, record as TaskRecord);
         },
         markTaskQueued: (taskIdentifier: string) => {
           this.queuedTaskIdentifiers.push(taskIdentifier);
         },
         claimIdempotency: async (ledgerKey, entry) => {
-          this.taskIdempotencyLedger.set(ledgerKey, entry);
+          this.missionTaskRegistry.recordIdempotencyEntryByLedgerKey(
+            ledgerKey,
+            entry as MissionTaskIdempotencyEntry,
+          );
           await this.persistTaskIdempotencyLedger();
         },
         settleIdempotencyClaim: async (ledgerKey, missionIdentifier) => {
-          const claimedEntry = this.taskIdempotencyLedger.get(ledgerKey);
+          const claimedEntry =
+            this.missionTaskRegistry.findIdempotencyEntryByLedgerKey(ledgerKey);
           if (claimedEntry !== undefined) {
-            this.taskIdempotencyLedger.set(ledgerKey, {
+            this.missionTaskRegistry.recordIdempotencyEntryByLedgerKey(ledgerKey, {
               ...claimedEntry,
               missionIdentifier,
               settledAtIso: new Date().toISOString(),
@@ -7863,8 +7870,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     }
     await Promise.allSettled([...this.inFlightPolls]);
     this.sessionStates.clear();
-    this.tasksByTaskIdentifier.clear();
-    this.taskIdempotencyLedger.clear();
+    this.missionTaskRegistry.clearAll();
     this.listeners.clear();
     await this.runtime.shutdown();
   }
@@ -7936,7 +7942,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   private async pollTaskStatus(taskIdentifier: string): Promise<void> {
-    const record = this.tasksByTaskIdentifier.get(taskIdentifier);
+    const record = this.missionTaskRegistry.findTaskRecord(taskIdentifier);
     if (record === undefined || record.missionIdentifier === null || this.isClosedFlag) {
       return;
     }
@@ -8092,7 +8098,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 
   /** 反查任务标识（回执需要它；找不到就不猜）。 */
   private taskIdentifierOf(record: TaskRecord): string {
-    for (const [taskIdentifier, candidate] of this.tasksByTaskIdentifier) {
+    for (const [taskIdentifier, candidate] of this.missionTaskRegistry.listTaskRecords()) {
       if (candidate === record) return taskIdentifier;
     }
     return "unknown-task";
@@ -8110,7 +8116,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     try {
       const nextTaskIdentifier = this.queuedTaskIdentifiers.shift();
       if (nextTaskIdentifier === undefined) return;
-      const record = this.tasksByTaskIdentifier.get(nextTaskIdentifier);
+      const record = this.missionTaskRegistry.findTaskRecord(nextTaskIdentifier);
       if (record === undefined || record.queuedPrompt === null) return;
       const prompt = record.queuedPrompt;
       record.queuedPrompt = null;
@@ -8173,7 +8179,7 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
   }
 
   private requireTask(taskIdentifier: string, sessionId: string): TaskRecord {
-    const record = this.tasksByTaskIdentifier.get(taskIdentifier);
+    const record = this.missionTaskRegistry.findTaskRecord(taskIdentifier);
     if (record === undefined) {
       throw new PublicApplicationError("task-not-found", "任务不存在: " + taskIdentifier);
     }

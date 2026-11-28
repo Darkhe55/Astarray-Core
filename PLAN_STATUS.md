@@ -8939,3 +8939,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 取消端口：requireTask / isTerminalStatus / stopTaskMonitor / removeQueuedTask / cancelMission /
 >   emitTaskFinished / releaseInstructionSlot。
 > - 门禁：`npm test` **1030 files / 6482 tests 全过**；test:scripts 62/62；typecheck/lint 0；隐私/解耦规则 ok。
+
+> **MISSION-WRITE-01 切片 5：任务表/幂等账本存储迁入注册表（2026-11-28）**
+>
+> - 门面移除 `tasksByTaskIdentifier` / `taskIdempotencyLedger` 字段，统一由 `MissionTaskRegistry` 持有；
+>   记录引用共享语义与账本键保持不变；shutdown 改用 `clearAll()`。
+> - 反例 3 条（存储 API、引用共享、恢复后复用）。
+> - 门禁：第二遍全量 `npm test` **1030 files / 6485 tests 全过**（首遍 broker 7 条因并行 `spawn UNKNOWN` 抖动失败，
+>   单跑与重跑均通过）；typecheck/lint 0。

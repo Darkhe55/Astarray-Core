@@ -183,3 +183,43 @@ describe("MISSION-WRITE-01：既有任务提交判定（切片 2）", () => {
     ).toEqual({ kind: "session-mismatch" });
   });
 });
+
+describe("MISSION-WRITE-01：注册表存储迁移（切片 5）", () => {
+  it("⑭ 按原始 ledgerKey 读写与 hasTaskRecord / size / clearAll", () => {
+    const registry = new MissionTaskRegistry<{ status: string }>();
+    registry.recordIdempotencyEntryByLedgerKey("session-1|key-1", settledEntry);
+    expect(registry.findIdempotencyEntryByLedgerKey("session-1|key-1")).toEqual(settledEntry);
+    expect(registry.findIdempotencyEntryByLedgerKey("session-1|other")).toBeUndefined();
+
+    registry.upsertTaskRecord("task-1", { status: "running" });
+    expect(registry.hasTaskRecord("task-1")).toBe(true);
+    expect(registry.size).toBe(1);
+
+    registry.clearAll();
+    expect(registry.hasTaskRecord("task-1")).toBe(false);
+    expect(registry.size).toBe(0);
+    expect(registry.listIdempotencyEntries()).toEqual([]);
+  });
+
+  it("⑮ 记录对象按引用共享：状态变更对注册表可见（门面写路径依赖这一语义）", () => {
+    const registry = new MissionTaskRegistry<{ status: string }>();
+    const record = { status: "running" };
+    registry.upsertTaskRecord("task-1", record);
+    record.status = "cancelled";
+    expect(registry.findTaskRecord("task-1")?.status).toBe("cancelled");
+  });
+
+  it("⑯ 构造恢复与幂等判定组合：恢复后同键同参可直接复用", () => {
+    const registry = new MissionTaskRegistry<unknown>({
+      idempotencyEntries: [settledEntry],
+    });
+    const outcome = evaluateIdempotentSubmission({
+      sessionId: "session-1",
+      idempotencyKey: "key-1",
+      inputHash: "hash-a",
+      findEntry: (key) => registry.findIdempotencyEntryByLedgerKey(key),
+      hasTaskRecord: (taskIdentifier) => registry.hasTaskRecord(taskIdentifier),
+    });
+    expect(outcome).toMatchObject({ kind: "reuse-settled", hasTaskRecord: false });
+  });
+});
