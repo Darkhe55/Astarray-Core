@@ -8931,3 +8931,11 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 >   门面 `submitTask` 只保留一行委托。
 > - 反例 8 条；门禁：`npm test` **1030 files / 6478 tests 全过**；`test:scripts` 62/62；typecheck/lint 0；隐私 ok。
 > - `cancelTask` 尚未迁移（下一片）。
+
+> **MISSION-WRITE-01 切片 4b：cancelTask 编排迁出（2026-11-28）**
+>
+> - `MissionSubmissionService.cancelTask`：终态短路 → 停监视器 → 出队清 prompt → 取消 mission → 标终态 →
+>   发 task-finished → 释放槽位；门面只留一行委托。
+> - 取消端口：requireTask / isTerminalStatus / stopTaskMonitor / removeQueuedTask / cancelMission /
+>   emitTaskFinished / releaseInstructionSlot。
+> - 门禁：`npm test` **1030 files / 6482 tests 全过**；test:scripts 62/62；typecheck/lint 0；隐私/解耦规则 ok。

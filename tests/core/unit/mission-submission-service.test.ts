@@ -14,6 +14,7 @@ import {
 
 function buildService(overrides: Partial<MissionSubmissionServicePorts> = {}) {
   const records = new Map<string, MissionTaskRecordData>();
+  const queued: string[] = [];
   const ledger = new Map<string, Parameters<MissionSubmissionServicePorts["claimIdempotency"]>[1]>();
   const ports: MissionSubmissionServicePorts = {
     assertOpen: vi.fn(),
@@ -52,9 +53,30 @@ function buildService(overrides: Partial<MissionSubmissionServicePorts> = {}) {
       return error;
     },
     nowIso: () => "2026-11-28T10:00:00.000Z",
+    requireTask: (taskIdentifier) => {
+      const record = records.get(taskIdentifier);
+      if (record === undefined) {
+        throw Object.assign(new Error("任务不存在: " + taskIdentifier), {
+          errorCode: "task-not-found",
+        });
+      }
+      return record;
+    },
+    isTerminalStatus: (status) =>
+      status === "done" || status === "failed" || status === "cancelled",
+    stopTaskMonitor: vi.fn(),
+    removeQueuedTask: (taskIdentifier) => {
+      const index = queued.indexOf(taskIdentifier);
+      if (index < 0) return false;
+      queued.splice(index, 1);
+      return true;
+    },
+    cancelMission: vi.fn(async () => undefined),
+    emitTaskFinished: vi.fn(),
+    releaseInstructionSlot: vi.fn(async () => undefined),
     ...overrides,
   };
-  return { service: new MissionSubmissionService(ports), ports, records, ledger };
+  return { service: new MissionSubmissionService(ports), ports, records, ledger, queued };
 }
 
 const baseInput = {
@@ -224,5 +246,81 @@ describe("MISSION-WRITE-01：提交编排服务", () => {
     await expect(service.submitTask(baseInput)).rejects.toMatchObject({
       errorCode: "submit-failed",
     });
+  });
+});
+
+describe("MISSION-WRITE-01：取消编排服务", () => {
+  it("⑨ 终态任务 ⇒ 短路（不停监视器、不取消 mission、不发事件）", async () => {
+    const { service, ports, records } = buildService();
+    records.set("task-1", {
+      sessionId: "session-1",
+      missionIdentifier: "mission-1",
+      status: "done",
+      summaryPreview: "完成",
+      revision: 2,
+      instructionLink: null,
+      queuedPrompt: null,
+    });
+    await service.cancelTask({ sessionId: "session-1", taskIdentifier: "task-1" });
+    expect(ports.stopTaskMonitor).not.toHaveBeenCalled();
+    expect(ports.cancelMission).not.toHaveBeenCalled();
+    expect(ports.emitTaskFinished).not.toHaveBeenCalled();
+  });
+
+  it("⑩ 排队中的任务 ⇒ 出队并清 queuedPrompt，不取消 mission", async () => {
+    const { service, ports, records, queued } = buildService();
+    records.set("task-1", {
+      sessionId: "session-1",
+      missionIdentifier: null,
+      status: "queued",
+      summaryPreview: null,
+      revision: 0,
+      instructionLink: { instructionIdentifier: "instr-1", instructionRevision: 1 },
+      queuedPrompt: "排队提示词",
+    });
+    queued.push("task-1");
+    await service.cancelTask({ sessionId: "session-1", taskIdentifier: "task-1" });
+    expect(queued).toEqual([]);
+    expect(records.get("task-1")).toMatchObject({ status: "cancelled", queuedPrompt: null });
+    expect(ports.cancelMission).not.toHaveBeenCalled();
+    expect(ports.emitTaskFinished).toHaveBeenCalledWith({
+      taskIdentifier: "task-1",
+      status: "cancelled",
+      revision: 0,
+    });
+    expect(ports.releaseInstructionSlot).toHaveBeenCalledTimes(1);
+  });
+
+  it("⑪ 运行中的任务 ⇒ 先停监视器、取消 mission，再标终态与释放槽位", async () => {
+    const { service, ports, records } = buildService();
+    records.set("task-1", {
+      sessionId: "session-1",
+      missionIdentifier: "mission-1",
+      status: "running",
+      summaryPreview: null,
+      revision: 4,
+      instructionLink: null,
+      queuedPrompt: null,
+    });
+    await service.cancelTask({ sessionId: "session-1", taskIdentifier: "task-1" });
+    expect(ports.stopTaskMonitor).toHaveBeenCalledWith("task-1");
+    expect(ports.cancelMission).toHaveBeenCalledWith("mission-1");
+    expect(records.get("task-1")?.status).toBe("cancelled");
+    expect(ports.emitTaskFinished).toHaveBeenCalledWith({
+      taskIdentifier: "task-1",
+      status: "cancelled",
+      revision: 4,
+    });
+    expect(ports.releaseInstructionSlot).toHaveBeenCalledWith(
+      expect.objectContaining({ missionIdentifier: "mission-1" }),
+      "cancelled",
+    );
+  });
+
+  it("⑫ 未知任务 ⇒ 端口抛 task-not-found（不静默成功）", async () => {
+    const { service } = buildService();
+    await expect(
+      service.cancelTask({ sessionId: "session-1", taskIdentifier: "missing" }),
+    ).rejects.toMatchObject({ errorCode: "task-not-found" });
   });
 });

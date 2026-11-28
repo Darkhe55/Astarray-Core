@@ -4562,6 +4562,37 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
         createPublicError: (errorCode: string, message: string) =>
           new PublicApplicationError(errorCode, message),
         nowIso: () => new Date().toISOString(),
+        requireTask: (taskIdentifier: string, sessionId: string) =>
+          this.requireTask(taskIdentifier, sessionId) as unknown as MissionTaskRecordData,
+        isTerminalStatus: (status) =>
+          this.isTerminalStatus(status as PublicTaskStatus),
+        stopTaskMonitor: (taskIdentifier: string) => {
+          this.stopTaskMonitor(taskIdentifier);
+        },
+        removeQueuedTask: (taskIdentifier: string) => {
+          const queueIndex = this.queuedTaskIdentifiers.indexOf(taskIdentifier);
+          if (queueIndex < 0) return false;
+          this.queuedTaskIdentifiers.splice(queueIndex, 1);
+          return true;
+        },
+        cancelMission: async (missionIdentifier: string) => {
+          await this.runtime.controller.cancelMission(missionIdentifier);
+        },
+        emitTaskFinished: (event) => {
+          this.emit({
+            eventType: "task-finished",
+            taskIdentifier: event.taskIdentifier,
+            status: event.status,
+            revision: event.revision,
+            idempotencyId: this.nextEventIdempotencyId(),
+          });
+        },
+        releaseInstructionSlot: async (record, terminalStatus) => {
+          await this.releaseInstructionSlotAndDispatchNext(
+            record as unknown as TaskRecord,
+            terminalStatus as PublicTaskStatus,
+          );
+        },
       });
     }
     return this.missionSubmissionServiceInstance;
@@ -6685,42 +6716,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
 
   /** 取消任务：委托控制器取消并记录终态。 */
   async cancelTask(input: { sessionId: string; taskIdentifier: string }): Promise<void> {
-    this.assertOpen();
-    this.requireSession(input.sessionId);
-    const record = this.requireTask(input.taskIdentifier, input.sessionId);
-    if (this.isTerminalStatus(record.status)) {
-      return;
-    }
-    this.stopTaskMonitor(input.taskIdentifier);
-    /**
-     * SMART-01（用户裁决）：取消走**独立控制通道**，不受指令窗口约束。
-     *
-     * 排队中的任务还没有 mission，取消只需把它移出队列并提交回执；
-     * 不能因为"没有槽位"而拒绝取消。
-     */
-    const queueIndex = this.queuedTaskIdentifiers.indexOf(input.taskIdentifier);
-    if (queueIndex >= 0) {
-      this.queuedTaskIdentifiers.splice(queueIndex, 1);
-      record.queuedPrompt = null;
-    }
-    if (record.missionIdentifier !== null) {
-      await this.runtime.controller.cancelMission(record.missionIdentifier);
-    }
-    record.status = "cancelled";
-    this.emit({
-      eventType: "task-finished",
-      taskIdentifier: input.taskIdentifier,
-      status: "cancelled",
-      revision: record.revision,
-      idempotencyId: this.nextEventIdempotencyId(),
-    });
-    /**
-     * 取消同样是"已交办完成" ⇒ 释放槽位并补一条。
-     *
-     * 不能只依赖轮询发现终态：取消会**先停掉监视器**，轮询再也看不到终态，
-     * 于是槽位永远不释放（实测：取消后排队任务一直停在 queued）。
-     */
-    await this.releaseInstructionSlotAndDispatchNext(record, "cancelled");
+    /** MISSION-WRITE-01 切片 4b：取消编排已迁到 MissionSubmissionService。 */
+    await this.getMissionSubmissionService().cancelTask(input);
   }
 
   subscribe(listener: (event: PublicAstarrayEvent) => void): { unsubscribe(): void } {

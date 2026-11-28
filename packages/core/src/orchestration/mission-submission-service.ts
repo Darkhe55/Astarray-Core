@@ -93,6 +93,21 @@ export interface MissionSubmissionServicePorts {
   toTaskResult(taskIdentifier: string, record: MissionTaskRecordData): MissionSubmissionResultData;
   createPublicError(errorCode: string, message: string): Error;
   nowIso(): string;
+  /** 取消路径端口（切片 4b）：任务查找、终态判定、监视器、队列、控制器取消、槽位释放。 */
+  requireTask(taskIdentifier: string, sessionId: string): MissionTaskRecordData;
+  isTerminalStatus(status: MissionSubmissionTaskStatus): boolean;
+  stopTaskMonitor(taskIdentifier: string): void;
+  removeQueuedTask(taskIdentifier: string): boolean;
+  cancelMission(missionIdentifier: string): Promise<void>;
+  emitTaskFinished(input: {
+    taskIdentifier: string;
+    status: MissionSubmissionTaskStatus;
+    revision: number;
+  }): void;
+  releaseInstructionSlot(
+    record: MissionTaskRecordData,
+    terminalStatus: MissionSubmissionTaskStatus,
+  ): Promise<void>;
 }
 
 export class MissionSubmissionService {
@@ -253,5 +268,35 @@ export class MissionSubmissionService {
     ports.startTaskMonitor(input.taskIdentifier);
     return ports.toTaskResult(input.taskIdentifier, acceptedRecord);
   }
+  /**
+   * 取消任务：终态短路 → 停监视器 → 出队（清 queuedPrompt）→ 取消 mission →
+   * 标终态 → 发 task-finished → 释放指令槽位并补一条。
+   *
+   * 语义与门面原实现逐字一致；状态与副作用全部经端口注入。
+   */
+  async cancelTask(input: { sessionId: string; taskIdentifier: string }): Promise<void> {
+    const ports = this.ports;
+    ports.assertOpen();
+    ports.requireSession(input.sessionId);
+    const record = ports.requireTask(input.taskIdentifier, input.sessionId);
+    if (ports.isTerminalStatus(record.status)) {
+      return;
+    }
+    ports.stopTaskMonitor(input.taskIdentifier);
+    if (ports.removeQueuedTask(input.taskIdentifier)) {
+      record.queuedPrompt = null;
+    }
+    if (record.missionIdentifier !== null) {
+      await ports.cancelMission(record.missionIdentifier);
+    }
+    record.status = "cancelled";
+    ports.emitTaskFinished({
+      taskIdentifier: input.taskIdentifier,
+      status: "cancelled",
+      revision: record.revision,
+    });
+    await ports.releaseInstructionSlot(record, "cancelled");
+  }
+
 }
 
