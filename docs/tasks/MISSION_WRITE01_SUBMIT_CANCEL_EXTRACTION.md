@@ -1,6 +1,6 @@
 # MISSION-WRITE-01：Mission 写路径真正迁出（submit / cancel）
 
-状态：**切片 1、2 已完成**（2026-11-28）；切片 3–4 待实施。基线：`7141e42c`。
+状态：**切片 1–3 已完成；切片 4 的 submitTask 已完成，cancelTask 待迁**（2026-11-28）。基线：`7141e42c`。
 
 ## 0. 背景
 
@@ -52,7 +52,13 @@ P2 子门面拆分时，mission 写路径（`submitTask` / `cancelTask`）只做
 - 指令窗口与监视器保留门面实现，但以端口注入 `submitTask` 编排函数；
 - 反例：窗口满 ⇒ queued 且不启动 mission；槽位释放只补一条；取消排队任务不占槽位。
 
-**切片 4：`submitTask` / `cancelTask` 编排函数搬到 `orchestration/mission-submission-service.ts`**
+**切片 4：编排函数搬到 `orchestration/mission-submission-service.ts`（submitTask 已完成）**
+
+- 已落地 `MissionSubmissionService.submitTask`：幂等判定 → 既有任务 → ponder/目标 Agent/执行根 → 准入 →
+  排队/提交 → 记录 → 结算 → 事件 → 监视器；状态全部经端口注入（门面持有）。
+- 门面 `submitTask` 方法体只剩一行委托；`cancelTask` 尚未迁移。
+- 反例 8 条（排队不启动、受理结算、ponder、冲突/挂起、复用、跨会话、校验仅在提供时、提交失败透传）。
+
 - 门面只保留 `createMissionFacet()` 端口装配与方法转发；
 - 反例：ponder 拒绝、目标 Agent 不存在/已回收、执行根非绝对/不存在、重复 taskIdentifier 会话归属。
 

@@ -8924,3 +8924,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - `mission-task-registry.ts` 新增 `evaluateExistingTaskForSubmission`（absent/reuse/session-mismatch）；
 >   `submitTask` 既有任务分支改调它，文案不变。
 > - 门禁：`npm test` **1029 files / 6470 tests 全过**；typecheck/lint 0。
+
+> **MISSION-WRITE-01 切片 3/4：submitTask 编排迁出（2026-11-28）**
+>
+> - 新增 `orchestration/mission-submission-service.ts`：`MissionSubmissionService.submitTask`（端口注入状态）；
+>   门面 `submitTask` 只保留一行委托。
+> - 反例 8 条；门禁：`npm test` **1030 files / 6478 tests 全过**；`test:scripts` 62/62；typecheck/lint 0；隐私 ok。
+> - `cancelTask` 尚未迁移（下一片）。

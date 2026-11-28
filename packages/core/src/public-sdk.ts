@@ -263,10 +263,12 @@ import { ContextFacet } from "./public-sdk-facets/context-facet.js";
 import { MissionFacet } from "./public-sdk-facets/mission-facet.js";
 import {
   computeTaskSubmissionInputHash,
-  evaluateExistingTaskForSubmission,
-  evaluateIdempotentSubmission,
-  type MissionTaskIdempotencyEntry,
 } from "./orchestration/mission-task-registry.js";
+import { MissionSubmissionService } from "./orchestration/mission-submission-service.js";
+import type {
+  MissionSubmissionInputData,
+  MissionTaskRecordData,
+} from "./orchestration/mission-submission-service.js";
 import type { PublicContextSettings } from "./public-sdk-facets/context-facet.js";
 import type { PublicParameterAuthorizationSettings } from "./public-sdk-facets/permission-facet.js";
 
@@ -4438,6 +4440,133 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
     return this.contextFacetInstance;
   }
 
+  // ─── MISSION-WRITE-01：任务提交编排服务（状态仍由门面持有，端口注入） ───
+  private missionSubmissionServiceInstance: MissionSubmissionService | null = null;
+
+  private getMissionSubmissionService(): MissionSubmissionService {
+    if (this.missionSubmissionServiceInstance === null) {
+      this.missionSubmissionServiceInstance = new MissionSubmissionService({
+        assertOpen: () => this.assertOpen(),
+        requireSession: (sessionId: string) => {
+          this.requireSession(sessionId);
+        },
+        findIdempotencyEntry: (ledgerKey: string) =>
+          this.taskIdempotencyLedger.get(ledgerKey),
+        findTaskRecord: (taskIdentifier: string) =>
+          this.tasksByTaskIdentifier.get(taskIdentifier) as
+            | MissionTaskRecordData
+            | undefined,
+        currentMode: () => this.runtime.controller.getCurrentMode(),
+        validateTargetAgentInstance: async (agentInstanceIdentifier: string) => {
+          if (this.stateDirectory === null) {
+            throw new PublicApplicationError(
+              "missing-state-directory",
+              "未配置状态目录：无法校验目标 Agent",
+            );
+          }
+          const registry = new AgentCreationRegistry({
+            stateDirectory: this.stateDirectory,
+          });
+          const record = await registry.getRecord(agentInstanceIdentifier);
+          if (record === null || record.recycledAtIso !== null) {
+            throw new PublicApplicationError(
+              "target-agent-invalid",
+              "目标 Agent 不存在或已回收: " + agentInstanceIdentifier,
+            );
+          }
+        },
+        validateWorkspaceRootPath: async (workspaceRootPath: string) => {
+          if (!path.isAbsolute(workspaceRootPath)) {
+            throw new PublicApplicationError(
+              "workspace-root-invalid",
+              "执行根必须是绝对路径: " + workspaceRootPath,
+            );
+          }
+          const workspaceStatistics = await fs
+            .stat(workspaceRootPath)
+            .catch(() => null);
+          if (
+            workspaceStatistics === null ||
+            !workspaceStatistics.isDirectory()
+          ) {
+            throw new PublicApplicationError(
+              "workspace-root-invalid",
+              "执行根不存在或不是目录: " + workspaceRootPath,
+            );
+          }
+        },
+        admitInstruction: async (input: MissionSubmissionInputData) =>
+          await this.admitInstructionForTask(input),
+        submitPromptToController: async (input) => {
+          try {
+            return await this.runtime.controller.handleUserMessage(input.prompt, {
+              sessionIdentifier: input.sessionId,
+              ...(input.projectIdentifier === undefined
+                ? {}
+                : { projectIdentifier: input.projectIdentifier }),
+              ...(input.workspaceRootPath === undefined
+                ? {}
+                : { workspaceRootPath: input.workspaceRootPath }),
+              ...(input.targetAgentInstanceIdentifier === undefined
+                ? {}
+                : {
+                    targetAgentInstanceIdentifier:
+                      input.targetAgentInstanceIdentifier,
+                  }),
+              ...(input.goalIdentifier === undefined
+                ? {}
+                : { goalIdentifier: input.goalIdentifier }),
+            });
+          } catch (error) {
+            throw new PublicApplicationError(
+              "submit-failed",
+              "任务提交失败: " + (error as Error).message,
+            );
+          }
+        },
+        registerTaskRecord: (taskIdentifier: string, record: MissionTaskRecordData) => {
+          this.tasksByTaskIdentifier.set(taskIdentifier, record as TaskRecord);
+        },
+        markTaskQueued: (taskIdentifier: string) => {
+          this.queuedTaskIdentifiers.push(taskIdentifier);
+        },
+        claimIdempotency: async (ledgerKey, entry) => {
+          this.taskIdempotencyLedger.set(ledgerKey, entry);
+          await this.persistTaskIdempotencyLedger();
+        },
+        settleIdempotencyClaim: async (ledgerKey, missionIdentifier) => {
+          const claimedEntry = this.taskIdempotencyLedger.get(ledgerKey);
+          if (claimedEntry !== undefined) {
+            this.taskIdempotencyLedger.set(ledgerKey, {
+              ...claimedEntry,
+              missionIdentifier,
+              settledAtIso: new Date().toISOString(),
+            });
+            await this.persistTaskIdempotencyLedger();
+          }
+        },
+        emitTaskStatus: (event) => {
+          this.emit({
+            eventType: "task-status",
+            taskIdentifier: event.taskIdentifier,
+            status: event.status,
+            revision: event.revision,
+            idempotencyId: this.nextEventIdempotencyId(),
+          });
+        },
+        startTaskMonitor: (taskIdentifier: string) => {
+          this.startTaskMonitor(taskIdentifier);
+        },
+        toTaskResult: (taskIdentifier: string, record: MissionTaskRecordData) =>
+          this.toTaskResult(taskIdentifier, record as TaskRecord),
+        createPublicError: (errorCode: string, message: string) =>
+          new PublicApplicationError(errorCode, message),
+        nowIso: () => new Date().toISOString(),
+      });
+    }
+    return this.missionSubmissionServiceInstance;
+  }
+
   /** AXIOMATIC-DESIGN P2：mission 只读查询子门面的窄接口装配（首次构造后缓存）。 */
   private createMissionFacet(): MissionFacet {
     if (this.missionFacetInstance === null) {
@@ -6370,235 +6499,8 @@ export class AstarrayApplicationFacade implements PublicApplicationService {
      */
     goalIdentifier?: string;
   }): Promise<PublicTaskResult> {
-    this.assertOpen();
-    this.requireSession(input.sessionId);
-    /**
-     * 幂等 claim（R4，2026-10-02）：**在任何 await 之前**完成
-     * "查账目 → 判同键异参 → 登记 pending claim"，消除检查-登记之间的并发窗口。
-     */
-    const ledgerKey =
-      input.idempotencyKey === undefined
-        ? null
-        : input.sessionId + "|" + input.idempotencyKey;
-    const submissionInputHash = this.computeTaskSubmissionInputHash({
-      prompt: input.prompt,
-    ...(input.projectIdentifier === undefined
-      ? {}
-      : { projectIdentifier: input.projectIdentifier }),
-    ...(input.workspaceRootPath === undefined
-      ? {}
-      : { workspaceRootPath: input.workspaceRootPath }),
-    });
-    /**
-     * MISSION-WRITE-01 切片 1：幂等判定改为**纯函数**（同键同参复用 / 异参拒绝 /
-     * claim 未结算拒绝），错误码与文案逐字保持；状态仍由门面持有（切片 4 再搬存储）。
-     */
-    const idempotencyOutcome = evaluateIdempotentSubmission({
-      sessionId: input.sessionId,
-      ...(input.idempotencyKey === undefined
-        ? {}
-        : { idempotencyKey: input.idempotencyKey }),
-      inputHash: submissionInputHash,
-      findEntry: (key: string) => this.taskIdempotencyLedger.get(key),
-      hasTaskRecord: (taskIdentifier: string) =>
-        this.tasksByTaskIdentifier.has(taskIdentifier),
-    });
-    if (idempotencyOutcome.kind === "conflict") {
-      throw new PublicApplicationError(
-        "idempotency-key-conflict",
-        "同一 idempotencyKey 绑定了不同参数，拒绝复用: " + String(input.idempotencyKey),
-      );
-    }
-    if (idempotencyOutcome.kind === "claim-pending") {
-      // 已 claim 未结算：不重复执行，也不假定成功。
-      throw new PublicApplicationError(
-        "idempotency-claim-pending",
-        "同一 idempotencyKey 的提交仍在进行中，未重复执行: " + String(input.idempotencyKey),
-      );
-    }
-    if (idempotencyOutcome.kind === "reuse-settled") {
-      const settledEntry = idempotencyOutcome.entry;
-      const settledRecord = this.tasksByTaskIdentifier.get(settledEntry.taskIdentifier);
-      if (settledRecord !== undefined) {
-        return this.toTaskResult(settledEntry.taskIdentifier, settledRecord);
-      }
-      return {
-        taskIdentifier: settledEntry.taskIdentifier,
-        missionIdentifier: settledEntry.missionIdentifier,
-        status: "accepted" as PublicTaskStatus,
-        summaryPreview: null,
-      };
-    }
-    if (idempotencyOutcome.kind === "claim" && input.idempotencyKey !== undefined) {
-      const claimEntry: MissionTaskIdempotencyEntry = {
-        sessionIdentifier: input.sessionId,
-        idempotencyKey: input.idempotencyKey,
-        inputHash: submissionInputHash,
-        taskIdentifier: input.taskIdentifier,
-        missionIdentifier: null,
-        claimedAtIso: new Date().toISOString(),
-        settledAtIso: null,
-      };
-      this.taskIdempotencyLedger.set(idempotencyOutcome.ledgerKey, claimEntry);
-      await this.persistTaskIdempotencyLedger();
-    }
-    const existing = this.tasksByTaskIdentifier.get(input.taskIdentifier);
-    const existingOutcome = evaluateExistingTaskForSubmission({
-      requestedSessionId: input.sessionId,
-      ...(existing === undefined ? {} : { existingTaskSessionId: existing.sessionId }),
-    });
-    if (existingOutcome.kind === "session-mismatch") {
-      throw new PublicApplicationError(
-        "session-mismatch",
-        "任务不属于该会话: " + input.taskIdentifier,
-      );
-    }
-    if (existingOutcome.kind === "reuse" && existing !== undefined) {
-      return this.toTaskResult(input.taskIdentifier, existing);
-    }
-    // Ponder 是本地只读问答（ADR-0014）：不产生 mission。此前这里把 handleUserMessage
-    // 返回的字面量 "ponder" 当成 missionIdentifier 并回 accepted，导致调用方随后
-    // queryTask 抛 mission-not-found——属虚报受理，改为明确拒绝并指向直接问答入口。
-    if (this.runtime.controller.getCurrentMode() === "ponder") {
-      throw new PublicApplicationError(
-        "invalid-mode-transition",
-        "Ponder 模式为本地只读问答，不产生 mission；请使用 handleUserMessage 获取直接回答",
-      );
-    }
-    if (input.targetAgentInstanceIdentifier !== undefined) {
-      if (this.stateDirectory === null) {
-        throw new PublicApplicationError(
-          "missing-state-directory",
-          "未配置状态目录：无法校验目标 Agent",
-        );
-      }
-      const registry = new AgentCreationRegistry({
-        stateDirectory: this.stateDirectory,
-      });
-      const record = await registry.getRecord(input.targetAgentInstanceIdentifier);
-      if (record === null || record.recycledAtIso !== null) {
-        throw new PublicApplicationError(
-          "target-agent-invalid",
-          "目标 Agent 不存在或已回收: " + input.targetAgentInstanceIdentifier,
-        );
-      }
-    }
-    if (input.workspaceRootPath !== undefined) {
-      if (!path.isAbsolute(input.workspaceRootPath)) {
-        throw new PublicApplicationError(
-          "workspace-root-invalid",
-          "执行根必须是绝对路径: " + input.workspaceRootPath,
-        );
-      }
-      const workspaceStatistics = await fs.stat(input.workspaceRootPath).catch(() => null);
-      if (workspaceStatistics === null || !workspaceStatistics.isDirectory()) {
-        throw new PublicApplicationError(
-          "workspace-root-invalid",
-          "执行根不存在或不是目录: " + input.workspaceRootPath,
-        );
-      }
-    }
-    /**
-     * SMART-01（用户裁决 2026-11-09）：**窗口满时禁止越窗准入与启动**。
-     *
-     * 语义：第 4 条业务指令**照常接收并持久化**（`admitInstruction` 落盘排队），
-     * 但**不启动** mission；槽位释放后**只补一条**。已准入任务及其必要下级派发不受影响
-     * （它们已经在跑，不经过这里）。
-     *
-     * 控制通道（取消/暂停/撤权）**不经过**此门：见 `cancelTask`，它不需要槽位。
-     */
-    /**
-     * 无状态目录 ⇒ **不启用**指令窗口（如实降级，不假装已准入）。
-     *
-     * 为什么不能直接抛错：没有状态目录的 facade 是既有合法装配（headless/单次调用），
-     * 让它连提交都失败属于"为控制面牺牲主路径"。此时 `instructionLink` 为 null，
-     * 既不排队也不占槽位，`submitTask` 行为与引入窗口之前一致。
-     */
-    const admission = await this.admitInstructionForTask(input);
-    if (admission.kind === "queued") {
-      /**
-       * 已持久化排队：**不启动**，也**不注册任务监视器**（没有 mission 可监视）。
-       * 释放槽位时由 `releaseInstructionSlotAndDispatchNext` 取出并派发。
-       */
-      const queuedRecord: TaskRecord = {
-        sessionId: input.sessionId,
-        missionIdentifier: null,
-        status: "queued",
-        summaryPreview: null,
-        revision: 0,
-        instructionLink: admission.link,
-        queuedPrompt: input.prompt,
-      };
-      this.tasksByTaskIdentifier.set(input.taskIdentifier, queuedRecord);
-      this.queuedTaskIdentifiers.push(input.taskIdentifier);
-      this.emit({
-        eventType: "task-status",
-        taskIdentifier: input.taskIdentifier,
-        status: "queued",
-        revision: 0,
-        idempotencyId: this.nextEventIdempotencyId(),
-      });
-      return this.toTaskResult(input.taskIdentifier, queuedRecord);
-    }
-    const instructionLink = admission.kind === "windowed" ? admission.link : null;
-    let missionIdentifier: string;
-    try {
-      missionIdentifier = await this.runtime.controller.handleUserMessage(
-        input.prompt,
-        {
-          sessionIdentifier: input.sessionId,
-          ...(input.projectIdentifier === undefined
-            ? {}
-            : { projectIdentifier: input.projectIdentifier }),
-          ...(input.workspaceRootPath === undefined
-            ? {}
-            : { workspaceRootPath: input.workspaceRootPath }),
-          ...(input.targetAgentInstanceIdentifier === undefined
-            ? {}
-            : { targetAgentInstanceIdentifier: input.targetAgentInstanceIdentifier }),
-          ...(input.goalIdentifier === undefined
-            ? {}
-            : { goalIdentifier: input.goalIdentifier }),
-        },
-      );
-    } catch (error) {
-      throw new PublicApplicationError(
-        "submit-failed",
-        "任务提交失败: " + (error as Error).message,
-      );
-    }
-    this.assertOpen();
-    const record: TaskRecord = {
-      sessionId: input.sessionId,
-      missionIdentifier,
-      status: "accepted",
-      summaryPreview: null,
-      revision: 0,
-      instructionLink,
-      queuedPrompt: null,
-    };
-    this.tasksByTaskIdentifier.set(input.taskIdentifier, record);
-    if (ledgerKey !== null) {
-      // 结算 claim：绑定 mission，使重启后可复用（同键同参不再执行）。
-      const claimedEntry = this.taskIdempotencyLedger.get(ledgerKey);
-      if (claimedEntry !== undefined) {
-        this.taskIdempotencyLedger.set(ledgerKey, {
-          ...claimedEntry,
-          missionIdentifier,
-          settledAtIso: new Date().toISOString(),
-        });
-        await this.persistTaskIdempotencyLedger();
-      }
-    }
-    this.emit({
-      eventType: "task-status",
-      taskIdentifier: input.taskIdentifier,
-      status: "accepted",
-      revision: record.revision,
-      idempotencyId: this.nextEventIdempotencyId(),
-    });
-    this.startTaskMonitor(input.taskIdentifier);
-    return this.toTaskResult(input.taskIdentifier, record);
+    /** MISSION-WRITE-01 切片 3/4：编排已迁到 MissionSubmissionService（状态经端口注入）。 */
+    return await this.getMissionSubmissionService().submitTask(input);
   }
 
   /**
