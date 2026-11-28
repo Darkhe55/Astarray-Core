@@ -8904,3 +8904,10 @@ RELIABILITY-01-03、AR-07、B6R-10、SMART-01、BRIDGE-01 —— 只缺 **macOS*
 > - 反例 9 条（纯函数）+ 3 条（ops facet：absent/invalid/ok）。
 > - 门禁：`npm test` **1028 files / 6457 tests 全过**（1 条 broker 集成测试首跑 `spawn UNKNOWN` 环境抖动，单跑通过）；
 >   `test:scripts` 62/62；typecheck/lint 0；隐私 ok；解耦规则零违规。
+
+> **MISSION-WRITE-01：写路径迁出范围与切片确定（2026-11-28）**
+>
+> - 新增任务卡 `docs/tasks/MISSION_WRITE01_SUBMIT_CANCEL_EXTRACTION.md`：源码核对（`submitTask` 421 行、
+>   任务表 10 处、幂等账本 31 处、指令窗口/监视器 13 处），确定**按状态切分**的四切片计划；
+> - 结论：不能按方法整体搬运（跨方法共享状态机），切片 1 为「任务记录 + 幂等账本 → 纯状态容器 + 纯幂等判定」；
+> - 下一步按切片先写反例再实施，每切片全量门禁后提交。
